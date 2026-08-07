@@ -47,4 +47,17 @@ describe('formatMinor', () => {
   it('can force a sign for income rows', () => {
     expect(formatMinor(1234, 'USD', { showSign: true })).toBe('+$12.34');
   });
+
+  it('overrides the symbol so EGP is "E£", not "EGP "', () => {
+    // Intl renders "EGP 12,500.00" for the app's primary currency on Hermes,
+    // which is both uglier and wider in a right-aligned amount column. The
+    // override must also swallow the space that follows the ISO code.
+    expect(formatMinor(1250000, 'EGP')).toBe('E£12,500.00');
+    expect(formatMinor(-8000, 'EGP')).toBe('-E£80.00');
+    expect(formatMinor(1250000, 'EGP', { showSign: true })).toBe('+E£12,500.00');
+  });
+
+  it('respects zero-decimal currencies when formatting', () => {
+    expect(formatMinor(1200, 'JPY')).toBe('¥1,200');
+  });
 });

@@ -7,6 +7,16 @@
 const ZERO_DECIMAL = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'XAF', 'XOF']);
 const THREE_DECIMAL = new Set(['BHD', 'IQD', 'JOD', 'KWD', 'OMR', 'TND', 'LYD']);
 
+/**
+ * Currencies whose Intl "symbol" resolves to the bare ISO code on the ICU builds
+ * we actually ship on (notably Hermes on Android). Add an entry when a currency
+ * renders as a code instead of a symbol on a real device — not based on how it
+ * looks in Node, which has fuller ICU data and will mislead you.
+ */
+const SYMBOL_OVERRIDES: Record<string, string> = {
+  EGP: 'E£',
+};
+
 export function decimalsFor(currency: string): number {
   const c = currency.toUpperCase();
   if (ZERO_DECIMAL.has(c)) return 0;
@@ -52,16 +62,39 @@ export function formatMinor(
 ): string {
   const { showSign = false, locale = 'en-US' } = opts;
   const decimals = decimalsFor(currency);
+  const value = minorToMajor(minor, currency);
+  const code = currency.toUpperCase();
 
-  const formatted = new Intl.NumberFormat(locale, {
+  const base: Intl.NumberFormatOptions = {
     style: 'currency',
     currency,
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
     signDisplay: showSign ? 'always' : 'auto',
-  }).format(minorToMajor(minor, currency));
+  };
 
-  return formatted;
+  // `currencyDisplay: 'narrowSymbol'` works in Node but NOT on Hermes/Android,
+  // where the bundled ICU has no narrow symbol for EGP — and it fails *silently*,
+  // returning "EGP 12,500.00" rather than throwing. So never trust it: rewrite
+  // the currency part ourselves using SYMBOL_OVERRIDES.
+  const parts = new Intl.NumberFormat(locale, base).formatToParts(value);
+  const override = SYMBOL_OVERRIDES[code];
+  if (!override) return parts.map((p) => p.value).join('');
+
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part.type !== 'currency') {
+      out.push(part.value);
+      continue;
+    }
+    out.push(override);
+    // en-US renders the ISO code with a trailing space ("EGP 12,500.00").
+    // A symbol should hug its number, so drop that separator.
+    const next = parts[i + 1];
+    if (next?.type === 'literal' && next.value.trim() === '') i++;
+  }
+  return out.join('');
 }
 
 /** Sum minor units safely. Integers only, so no drift. */

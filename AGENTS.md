@@ -51,6 +51,11 @@ Drive the UI with `adb shell input tap X Y`, `adb shell input text "..."`,
 - **Money is integer minor units.** `amount_minor` is a signed integer (negative = money out).
   Never store or arithmetic money as a float. Convert only at the render boundary via
   `src/lib/money.ts`. Any new money code needs a test in `money.test.ts`.
+- **Hermes `Intl` is not Node's `Intl`.** Android ships less ICU data, and it degrades
+  *silently* rather than throwing — `currencyDisplay: 'narrowSymbol'` returns `"EGP 12,500.00"`
+  on device while Node returns `"E£12,500.00"`. A green `npm test` proves nothing about currency
+  rendering. Anything touching `Intl` must be checked with a screenshot on a real device, and
+  symbols belong in `SYMBOL_OVERRIDES` rather than trusting the platform.
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
@@ -71,8 +76,30 @@ scripts/         emu-up.sh, screenshot.sh
 
 ## Known environment constraints
 
-- WSL2, ~7.6 GB RAM. The emulator is configured headless with 2 GB and swiftshader.
-  Do not run two emulators, and prefer `-no-window`.
+### Memory — read this before any native build
+
+WSL2 defaults to 50% of host RAM. `C:\Users\Ahmed\.wslconfig` raises it to 11 GB (of 16 GB);
+that file only takes effect after `wsl --shutdown` from Windows. If `free -h` shows ~7.6 GB
+total, the config has not been applied and everything below is much tighter.
+
+Rough working-set sizes: qemu/emulator ~3.7 GB, Metro ~3 GB (cold bundle), Gradle daemon ~2 GB,
+plus ninja's C++ compilers (see below). Three of those at once will not fit in 7.6 GB.
+
+Three separate OOM kills were hit while setting this up, each with a different cause:
+
+1. **Gradle daemon + a separate Kotlin daemon.** Kotlin compilation spawns its *own* ~2 GB JVM
+   by default, and it lingers for 2 hours after the build. Fixed in `~/.gradle/gradle.properties`
+   with `kotlin.compiler.execution.strategy=in-process`. If a build dies mysteriously, check for
+   a stray `KotlinCompileDaemon` process first.
+2. **ninja's C++ compilers during `:app:buildCMakeDebug`.** Skia, reanimated and worklets compile
+   native code, and ninja defaults its job count to `nproc` (16 here) — 16 concurrent compilers,
+   each a few hundred MB, none of them governed by any Gradle heap setting. Fix: run Gradle under
+   `taskset -c 0-3`, which caps the affinity the whole process tree derives its job count from.
+   With that, a clean debug build takes ~2 min.
+3. **Emulator + Metro doing a cold bundle.** Cold bundling of ~1900 modules peaks around 3 GB.
+   A warm Metro cache re-bundles the same tree in ~3 s, so this only bites on the first run.
+
+Safe order for a native build: stop the emulator → build → start emulator → `adb install`.
+
 - iOS cannot be built or run here. iOS output requires EAS cloud builds.
-- The emulator needs the `kvm` group. If `emulator -accel-check` complains about
-  `/dev/kvm` permissions, the user must run `sudo usermod -aG kvm $USER` and restart WSL.
+- The emulator needs the `kvm` group (`sudo usermod -aG kvm $USER`, then restart WSL).

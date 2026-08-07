@@ -1,5 +1,5 @@
 import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedIcon } from '@/components/animated-icon';
@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { formatMinor } from '@/lib/money';
 
 function getDevMenuHint() {
   if (Platform.OS === 'web') {
@@ -38,6 +39,33 @@ export default function HomeScreen() {
             Welcome to&nbsp;Expo
           </ThemedText>
         </ThemedView>
+
+        {/* Toolchain smoke check: renders the "Ledger" palette tokens on-device.
+            Delete once real screens exist — until then it is the canary that
+            tells us NativeWind and tailwind.config.js are still wired up. */}
+        <View className="mx-6 mb-4 rounded-xl bg-surface p-4" testID="palette-check">
+          <Text className="mb-3 text-xs uppercase tracking-widest text-muted">
+            Ledger palette
+          </Text>
+          <View className="flex-row items-center justify-between border-b border-line pb-2">
+            <Text className="text-sm text-ink">Salary</Text>
+            <Text className="text-sm font-semibold text-income" testID="nw-income">
+              {formatMinor(1250000, 'EGP', { showSign: true })}
+            </Text>
+          </View>
+          <View className="flex-row items-center justify-between border-b border-line py-2">
+            <Text className="text-sm text-ink">Food</Text>
+            <Text className="text-sm font-semibold text-expense" testID="nw-expense">
+              {formatMinor(-8000, 'EGP', { showSign: true })}
+            </Text>
+          </View>
+          <View className="flex-row items-center justify-between pt-2">
+            <Text className="text-sm text-ink">Bank → Credit Card</Text>
+            <Text className="text-sm font-semibold text-transfer" testID="nw-transfer">
+              {formatMinor(1075300, 'EGP')}
+            </Text>
+          </View>
+        </View>
 
         <ThemedText type="code" style={styles.code}>
           get started
