@@ -1,0 +1,9 @@
+appId: com.ahmed.peace
+---
+# Smoke test: the app launches and the shell renders.
+# Grow this into real flows (add expense, edit, delete) as screens land.
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "home-screen"
+- takeScreenshot: launch
