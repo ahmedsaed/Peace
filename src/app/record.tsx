@@ -355,19 +355,24 @@ export default function RecordScreen() {
         <Keypad onKey={onKey} />
       </View>
 
+      {/* Surface fill and radius match the account and category pickers, so the
+          form reads as one set of controls. The value alone is the label here —
+          a date needs no caption to be recognisable as a date. */}
       <View className="mx-4 mb-1 mt-3 flex-row gap-3">
         <Pressable
           onPress={() => setPicking('date')}
           testID="record-date"
           accessibilityRole="button"
-          className="flex-1 items-center rounded-lg border border-line py-2.5 active:opacity-70">
+          accessibilityLabel={`Date, ${formatDayLabel(occurredAt)}`}
+          className="flex-1 items-center rounded-lg bg-surface py-3 active:opacity-70">
           <Text className="text-sm text-ink">{formatDayLabel(occurredAt)}</Text>
         </Pressable>
         <Pressable
           onPress={() => setPicking('time')}
           testID="record-time"
           accessibilityRole="button"
-          className="flex-1 items-center rounded-lg border border-line py-2.5 active:opacity-70">
+          accessibilityLabel={`Time, ${formatTimeLabel(occurredAt)}`}
+          className="flex-1 items-center rounded-lg bg-surface py-3 active:opacity-70">
           <Text className="text-sm text-ink">{formatTimeLabel(occurredAt)}</Text>
         </Pressable>
       </View>
@@ -379,8 +384,6 @@ export default function RecordScreen() {
           is24Hour={false}
           onValueChange={onPickDateTime}
           onDismiss={() => setPicking(null)}
-          // A ledger entry cannot be in the future.
-          maximumDate={picking === 'date' ? new Date() : undefined}
         />
       ) : null}
 

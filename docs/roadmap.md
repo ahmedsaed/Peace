@@ -45,8 +45,9 @@ The point where you can stop using MyMoney. This is the stage that matters most.
   transfers listed once and excluded from the totals
 - ✅ **Edit an existing record** — tap a row to reopen it prefilled. Editing cannot convert a
   record into a transfer or back, since that changes how many rows exist.
-- ✅ **Date and time picker** — native dialogs, capped at today; a ledger entry cannot be in the
-  future.
+- ✅ **Date and time picker** — native dialogs, dark-themed. Future dates are allowed: a known
+  upcoming bill is a legitimate entry, and Stage 3's recurring rules generate future-dated
+  records anyway.
 - Delete with undo
 - Accounts CRUD, Categories CRUD
 

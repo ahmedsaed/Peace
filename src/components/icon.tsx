@@ -62,6 +62,9 @@ const PATHS: Record<string, string> = {
   cash: 'M3 6h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4V6zm9 2.5L10.6 11H13l-1 4.5L13.4 13H11l1-4.5z',
   bank: 'M12 2l10 6H2l10-6zM4 10h2v8H4v-8zm5 0h2v8H9v-8zm5 0h2v8h-2v-8zm5 0h2v8h-2v-8zM2 20h20v2H2v-2z',
   dots: 'M6 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+  calendar:
+    'M7 2v2h10V2h2v2h2v18H1V4h2V2h2zm12 8H3v10h16V10zM6 12h3v3H6v-3zm5 0h3v3h-3v-3z',
+  clock: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm1 5h-2v6.4l4.6 2.8 1-1.7-3.6-2.2V7z',
   // Two opposed arrows. Deliberately NOT the same glyph as `refresh`, which is
   // already the Installments category — a transfer and a recurring charge
   // looking identical in the list is a real misread.
