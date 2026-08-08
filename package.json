@@ -67,7 +67,8 @@
     "db:generate": "drizzle-kit generate",
     "e2e": "maestro test .maestro/",
     "emu": "bash scripts/emu-up.sh",
-    "shot": "bash scripts/screenshot.sh"
+    "shot": "bash scripts/screenshot.sh",
+    "apk": "cd android && taskset -c 0-3 ./gradlew app:assembleRelease -x lint -x test --build-cache -PreactNativeArchitectures=arm64-v8a"
   },
   "private": true
 }
