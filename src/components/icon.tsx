@@ -62,6 +62,10 @@ const PATHS: Record<string, string> = {
   cash: 'M3 6h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4V6zm9 2.5L10.6 11H13l-1 4.5L13.4 13H11l1-4.5z',
   bank: 'M12 2l10 6H2l10-6zM4 10h2v8H4v-8zm5 0h2v8H9v-8zm5 0h2v8h-2v-8zm5 0h2v8h-2v-8zM2 20h20v2H2v-2z',
   dots: 'M6 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+  // Two opposed arrows. Deliberately NOT the same glyph as `refresh`, which is
+  // already the Installments category — a transfer and a recurring charge
+  // looking identical in the list is a real misread.
+  transfer: 'M4 8h11V5l5 4.5-5 4.5v-3H4V8zm16 8H9v-3l-5 4.5L9 22v-3h11v-3z',
 };
 
 export type IconName = keyof typeof PATHS;

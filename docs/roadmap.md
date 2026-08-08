@@ -39,11 +39,13 @@ Maestro walks the whole shell.
 The point where you can stop using MyMoney. This is the stage that matters most.
 
 - ✅ **Keypad arithmetic** (`src/lib/calculator.ts`) — see the model below
-- **Add/edit record** — one-screen layout, Income/Expense/Transfer switch, account and category
-  pickers, note, date/time
-- **Records list** — month navigator, day grouping, EXPENSE/INCOME/BALANCE header wired to data
-- Accounts CRUD, Categories CRUD (two-tier), Transfers
-- Delete/edit with undo
+- ✅ **Add record** — one-screen layout, Income/Expense/Transfer switch, account and category
+  pickers (two-tier), note. Writes through the repository layer.
+- ✅ **Records list** — month navigator, day grouping, EXPENSE/INCOME/BALANCE wired to real data,
+  transfers listed once and excluded from the totals
+- **Edit an existing record**, and a date/time picker (the form currently always logs "now")
+- Delete with undo
+- Accounts CRUD, Categories CRUD
 
 ### The keypad is an immediate-execution calculator
 

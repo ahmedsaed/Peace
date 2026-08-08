@@ -106,10 +106,13 @@ export function SummaryTrio({
   expense,
   income,
   balance,
+  balanceMinor,
 }: {
   expense: string;
   income: string;
   balance: string;
+  /** Drives the balance colour. Passed separately so this stays presentational. */
+  balanceMinor: number;
 }) {
   const cell = (label: string, value: string, tone: string, testID: string) => (
     <View className="flex-1 items-center">
@@ -124,7 +127,14 @@ export function SummaryTrio({
     <View className="mt-3 flex-row">
       {cell('Expense', expense, 'text-expense', 'summary-expense')}
       {cell('Income', income, 'text-income', 'summary-income')}
-      {cell('Balance', balance, 'text-income', 'summary-balance')}
+      {/* Balance takes its colour from its sign. Showing a month you overspent
+          in the income colour is exactly backwards. */}
+      {cell(
+        'Balance',
+        balance,
+        balanceMinor < 0 ? 'text-expense' : 'text-income',
+        'summary-balance'
+      )}
     </View>
   );
 }

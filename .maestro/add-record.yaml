@@ -46,8 +46,14 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "home-screen"
 
-# GAP: nothing here asserts the saved AMOUNT, because the records list does not
-# render yet. That is how an earlier version of this flow passed while actually
-# saving 120 - 35: the keypad shows "35" either way. Once the list lands, assert
-# "E£155.00" appears here — until then this flow proves the plumbing, not the
-# arithmetic. The arithmetic is covered by src/lib/calculator.test.ts.
+# THE ASSERTION THAT MATTERS. An earlier version of this flow passed while
+# actually saving 120 - 35, because the keypad shows "35" either way and nothing
+# checked the result. The amount below is the only thing that would have caught
+# a wrong operator key.
+- assertVisible:
+    id: "records-list"
+- assertVisible: "-E£155.00" # 120 + 35, not 120 - 35
+- assertVisible: "Restaurants" # the sub-category chosen earlier
+- assertVisible:
+    id: "summary-expense" # the month total picked the record up
+- takeScreenshot: 02-record-listed
