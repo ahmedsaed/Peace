@@ -1,6 +1,9 @@
 import {
   addMonths,
+  formatDayHeading,
+  formatDayLabel,
   formatPeriod,
+  formatTimeLabel,
   parsePeriod,
   periodBounds,
   periodOf,
@@ -82,5 +85,28 @@ describe('formatPeriod', () => {
     expect(formatPeriod('2026-08')).toBe('August 2026');
     expect(formatPeriod('2026-01')).toBe('January 2026');
     expect(formatPeriod('2026-12')).toBe('December 2026');
+  });
+});
+
+describe('day and time labels', () => {
+  it('formats the record form date footer', () => {
+    expect(formatDayLabel(new Date(2026, 7, 8))).toBe('Aug 08, 2026');
+    expect(formatDayLabel(new Date(2026, 11, 25))).toBe('Dec 25, 2026');
+  });
+
+  it('formats the records list day heading', () => {
+    // 6 Aug 2026 is a Thursday.
+    expect(formatDayHeading(new Date(2026, 7, 6))).toBe('Aug 06, Thursday');
+  });
+
+  it('formats 12-hour time with the right meridiem', () => {
+    expect(formatTimeLabel(new Date(2026, 7, 8, 19, 14))).toBe('7:14 PM');
+    expect(formatTimeLabel(new Date(2026, 7, 8, 7, 5))).toBe('7:05 AM');
+  });
+
+  it('renders both midnights as 12, not 0', () => {
+    // The classic off-by-twelve: hours % 12 is 0 at both noon and midnight.
+    expect(formatTimeLabel(new Date(2026, 7, 8, 0, 30))).toBe('12:30 AM');
+    expect(formatTimeLabel(new Date(2026, 7, 8, 12, 30))).toBe('12:30 PM');
   });
 });

@@ -11,33 +11,55 @@ on 0–3 structurally (you cannot OCR into a record type that does not exist yet
 
 ---
 
-## Stage 0 — Foundations
+## Stage 0 — Foundations ✅ done
 
 Schema and design system. Cheap now, expensive later — every one of these is a *table-shape*
 change, not a column addition.
 
-- `categories.parentId` — two-tier categories (MyMoney's most-requested gap)
-- `budgets` table keyed by `(categoryId, period)` — replaces the standing `budgetMinor` column
-- `recurring_rules` table
-- `attachments` table
-- Settings: **home currency** (the one all reporting converts to)
-- Decide transfer modelling: paired rows vs. single row (see research doc)
-- Dark palette as NativeWind theme tokens + `dark:` variants
-- 5-tab navigation shell: Records · Analysis · Budgets · Accounts · Categories
-- Seed default categories/accounts on first run
+- ✅ `categories.parentId` — two-tier categories (MyMoney's most-requested gap)
+- ✅ `budgets` table keyed by `(categoryId, period)` — replaced the standing `budgetMinor` column
+- ✅ `recurring_rules` table
+- ✅ `attachments` table
+- ✅ Settings: **home currency** (the one all reporting converts to)
+- ✅ Transfer modelling: **paired rows**, plus a denormalised `counterAccountId` on both legs so
+  the records list renders "Bank → Cash" without a self-join on its hottest query
+- ✅ Dark palette ("Ledger") as NativeWind tokens, sourced from `src/constants/palette.js`
+- ✅ 5-tab navigation shell: Records · Analysis · Budgets · Accounts · Categories
+- ✅ Seed 33 categories (7 of them second-level) + 2 accounts, idempotently
+- ✅ **Repository layer** (`src/db/repo/`) enforcing what SQLite cannot express: category depth
+  and kind, unsigned-amount-plus-type for records, atomic transfer pairs, derived balances
 
-**Done when:** schema is stable enough that later stages only add columns.
+**Done when:** schema is stable enough that later stages only add columns. — Met. 92 unit tests,
+Maestro walks the whole shell.
 
 ---
 
-## Stage 1 — Daily driver
+## Stage 1 — Daily driver 🚧
 
 The point where you can stop using MyMoney. This is the stage that matters most.
 
-- **Records list** — month navigator, day grouping, EXPENSE/INCOME/BALANCE header
-- **Add/edit record** — the calculator keypad, one-screen layout, Income/Expense/Transfer switch
+- ✅ **Keypad arithmetic** (`src/lib/calculator.ts`) — see the model below
+- **Add/edit record** — one-screen layout, Income/Expense/Transfer switch, account and category
+  pickers, note, date/time
+- **Records list** — month navigator, day grouping, EXPENSE/INCOME/BALANCE header wired to data
 - Accounts CRUD, Categories CRUD (two-tier), Transfers
 - Delete/edit with undo
+
+### The keypad is an immediate-execution calculator
+
+Confirmed against the reference app, and the model matters more than it looks:
+
+- **No expression is displayed.** Only the current number.
+- **Pressing an operator computes what is pending** and replaces the display with the result.
+  `120 +` then `35 +` shows `155`.
+- **Only one operation is ever pending.** Two operators in a row swaps the operator; the user
+  corrected themselves, they did not ask for a calculation.
+- **`=` is optional.** Save evaluates anything still outstanding.
+
+Operand semantics are the trap: for `+` and `−` both sides are money, so arithmetic runs in exact
+integer minor units. For `×` and `÷` the second operand is a **count** — "25 × 3" is three items at
+25 = 75, not 7,500. Results round to the currency's precision after every step so float dust cannot
+accumulate across a chain.
 
 **Done when:** you have logged a real week of your own spending in it without reaching for MyMoney.
 

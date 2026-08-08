@@ -1,9 +1,25 @@
 import { Pressable, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { addMonths, formatPeriod, type Period } from '@/lib/period';
+
+/**
+ * The app's own header, on every screen. The tab bar already says which section
+ * you are in, so this carries the name rather than repeating the tab label —
+ * the same choice the reference app makes.
+ */
+export function AppHeader({ right }: { right?: React.ReactNode }) {
+  return (
+    <View className="flex-row items-center justify-between bg-surface px-4 pb-2 pt-1">
+      <Text className="text-xl font-semibold tracking-tight text-accent" testID="app-title">
+        Peace
+      </Text>
+      {right}
+    </View>
+  );
+}
 
 export function Screen({
   children,
@@ -12,18 +28,27 @@ export function Screen({
   children: React.ReactNode;
   testID?: string;
 }) {
+  // Explicit inset rather than <SafeAreaView edges={['top']}>: Android draws
+  // edge-to-edge, and relying on the wrapper put the header inside the status
+  // bar. Applying paddingTop to the surface also lets the header's background
+  // extend behind the status bar, which is what makes it look intentional.
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-ground" testID={testID}>
+    <View className="flex-1 bg-ground" testID={testID}>
+      <View style={{ paddingTop: insets.top }} className="bg-surface">
+        <AppHeader />
+      </View>
       {children}
-    </SafeAreaView>
+    </View>
   );
 }
 
-/** Plain title bar, for the screens that are not scoped to a month. */
+/** Section label for the screens that are not scoped to a month. */
 export function ScreenHeader({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
-    <View className="flex-row items-center justify-between bg-surface px-4 py-3">
-      <Text className="text-lg font-semibold text-ink">{title}</Text>
+    <View className="flex-row items-center justify-between bg-surface px-4 pb-3">
+      <Text className="text-base font-medium text-muted">{title}</Text>
       {right}
     </View>
   );
@@ -101,6 +126,27 @@ export function SummaryTrio({
       {cell('Income', income, 'text-income', 'summary-income')}
       {cell('Balance', balance, 'text-income', 'summary-balance')}
     </View>
+  );
+}
+
+/** Floating action button, bottom-right above the tab bar. */
+export function Fab({ onPress, testID = 'fab' }: { onPress: () => void; testID?: string }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel="Add record"
+      className="absolute bottom-5 right-5 h-14 w-14 items-center justify-center rounded-full bg-accent active:opacity-80"
+      style={{
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+      }}>
+      <Text className="text-3xl leading-9 text-accent-ink">+</Text>
+    </Pressable>
   );
 }
 

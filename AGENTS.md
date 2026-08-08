@@ -66,6 +66,12 @@ Drive the UI with `adb shell input tap X Y`, `adb shell input text "..."`,
   rendering. Anything touching `Intl` must be checked with a screenshot on a real device, and
   symbols belong in `SYMBOL_OVERRIDES` rather than trusting the platform.
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
+- **testIDs must be regex-safe** — letters, digits, hyphens between words. Maestro matches ids as
+  **regular expressions**, so `key-op-+` reads as "`key-op` then one or more hyphens" and silently
+  taps the *minus* key. That shipped a green E2E test that saved `120 - 35` while claiming to test
+  `120 + 35`. Never put `+ * ? . ( ) [ ] |` in a testID.
+- **A passing flow that asserts nothing specific proves only that the app did not crash.** Assert
+  the value the user would check, not just that a screen appeared.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

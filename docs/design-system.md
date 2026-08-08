@@ -65,8 +65,29 @@ and costs nothing to load.
 Money **always** uses tabular figures (`font-variant-numeric: tabular-nums`). Amounts sit in a
 right-aligned column, and proportional digits make that column visibly ragged.
 
+## Icons
+
+Hand-drawn inline SVG in [`src/components/icon.tsx`](../../src/components/icon.tsx), resolved from
+the **slug** stored on each row (`categories.icon`, `accounts.icon`) — never a glyph. Swapping to a
+different icon library later is therefore a change to one file, not a data migration. An unknown
+slug falls back to `dots` so a missing icon looks deliberate rather than broken.
+
+Two rules for adding a path:
+
+- **Every segment must be a closed, filled shape.** The `<Path>` has no stroke, so an open line
+  segment (`M5 8l3 2`) renders as nothing at all. This has already shipped two invisible icons.
+- Draw on a 24×24 viewBox and check it at 14px inside a 26px circle, which is the smallest place
+  it appears.
+
+## Naming
+
+The app is **Peace** — as in peace of mind. Lowercase `peace` remains the project slug and the
+Android package suffix (`com.ahmed.peace`); the display name and the in-app wordmark are
+capitalised.
+
 ## Open
 
 - A light theme is deliberately out of scope. Tokens make adding one later a config change rather
   than a refactor.
-- Icon set not yet chosen. Needs ~40 category glyphs that read at 14px inside a 26px circle.
+- The icon set is functional but hand-drawn. Worth revisiting if the category list grows much past
+  40 entries.

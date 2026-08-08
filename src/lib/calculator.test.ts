@@ -142,3 +142,29 @@ describe('clearing', () => {
     expect(type('120+35+<').entry).toBe('0');
   });
 });
+
+describe('a dangling operator', () => {
+  // Found by driving the real screen: after "120 + 35 +" the display reads 155
+  // and `+` is still pending, waiting for a right-hand operand that never came.
+  // Applying it would use 155 as BOTH operands and save 310.
+  it('saves what is on screen, not double it', () => {
+    const state = type('120+35+');
+    expect(state.entry).toBe('155');
+    expect(committedMinor(state)).toBe(15500);
+  });
+
+  it('is dropped by equals rather than repeating the operand', () => {
+    const state = type('120+35+=');
+    expect(state.entry).toBe('155');
+    expect(state.pendingOp).toBeNull();
+  });
+
+  it('still computes normally once an operand is typed', () => {
+    expect(committedMinor(type('120+35+10'))).toBe(16500);
+  });
+
+  it('holds across several dangling operators', () => {
+    expect(committedMinor(type('10+5+'))).toBe(1500);
+    expect(committedMinor(type('10+5+*'))).toBe(1500);
+  });
+});

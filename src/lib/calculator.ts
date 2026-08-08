@@ -166,6 +166,17 @@ export function equals(state: CalcState, currency = 'EGP'): CalcState {
     return { ...state, replaceOnNextDigit: true, error: null };
   }
 
+  // A pending operator with no right-hand operand yet: `entry` currently holds
+  // the RESULT of the previous step, not something the user typed. Applying the
+  // operator here would use that result as both operands — "120 + 35 +" would
+  // settle as 310 instead of 155. Drop the dangling operator instead.
+  //
+  // A pocket calculator would repeat the last operand here. For a ledger,
+  // "what you see is what gets saved" is worth more than that convention.
+  if (state.replaceOnNextDigit) {
+    return { ...state, accumulatorMinor: null, pendingOp: null, error: null };
+  }
+
   const result = applyOp(state.accumulatorMinor, state.pendingOp, state.entry, currency);
   if ('error' in result) return { ...state, error: result.error };
 

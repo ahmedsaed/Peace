@@ -1,56 +1,124 @@
-# Welcome to your Expo app 👋
+# Peace
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A local-first expense tracker for Android. Peace of mind about where the money went.
 
-## Get started
+Built because [MyMoney](docs/research/mymoney.md) gets the daily experience right but is missing
+sub-categories, recurring payments, multi-currency, receipt attachments and any kind of assisted
+entry. Peace keeps what works — the calculator keypad, the one-screen record form, the month as the
+organising unit — and adds the rest.
 
-1. Install dependencies
+**Local-first and offline.** Your ledger lives in SQLite on the device. There is no server, no
+account, and no network dependency anywhere in the core product.
 
-   ```bash
-   npm install
-   ```
+## Status
 
-2. Start the app
+| Stage | Scope | State |
+|---|---|---|
+| 0 | Schema, design system, navigation shell, repository layer | ✅ done |
+| 1 | Daily driver — records list, add-record with calculator keypad | 🚧 in progress |
+| 2 | Multi-currency, budgets, analysis, export | planned |
+| 3 | Recurring payments | planned |
+| 4 | Receipt attachments | planned |
+| 5 | OCR + voice entry (Gemini Flash) | planned |
+| 6 | Bank notification ingestion | planned |
 
-   ```bash
-   npx expo start
-   ```
+Full plan and the reasoning behind the ordering: [docs/roadmap.md](docs/roadmap.md).
 
-In the output, you'll find options to open the app in a
+Stage 1's finish line is not a feature list — it is *logging a real week of spending without
+reaching for MyMoney*.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Stack
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Expo SDK 57 · React Native 0.86 · React 19.2 · TypeScript · expo-router · NativeWind ·
+Drizzle ORM + expo-sqlite · Jest · Maestro
 
-## Get a fresh project
+> **Expo has changed.** SDK 57 and RN 0.86 are newer than most training data and most tutorials.
+> Read [the versioned docs](https://docs.expo.dev/versions/v57.0.0/) rather than writing APIs
+> from memory. See [AGENTS.md](AGENTS.md).
 
-When you're ready, run:
+## Getting started
+
+The toolchain installs entirely under `$HOME` — no sudo, no system packages. See
+[AGENTS.md](AGENTS.md) for the environment, and read its **memory** section before any native
+build; this machine will OOM if you get the order wrong.
 
 ```bash
-npm run reset-project
+npm install
+npm test              # unit tests, no device needed
+npm run typecheck
+npm run emu           # boot the headless Android emulator
+npm start             # Metro dev server
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+| Task | Command |
+|---|---|
+| Unit tests | `npm test` |
+| Typecheck / lint | `npm run typecheck` / `npm run lint` |
+| Boot emulator | `npm run emu` |
+| Screenshot the device | `npm run shot -- <name>` → prints a PNG path |
+| E2E flows | `npm run e2e` |
+| Standalone APK for a phone | `npm run apk` |
+| Regenerate migrations | `npm run db:generate` |
 
-### Other setup steps
+### Installing on a phone
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Distribution is **sideload only** — no Play Store, so no restricted-permission review. `npm run apk`
+produces a standalone arm64 APK at `android/app/build/outputs/apk/release/app-release.apk` with the
+JS bundle embedded, so it runs with no laptop attached.
 
-## Learn more
+It is signed with Expo's debug keystore. Fine for personal use; generating your own keystore later
+makes Android treat it as a different app, so switch before you rely on the data.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Layout
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```
+src/app/         expo-router routes — one file per tab
+src/components/  shared UI (screen chrome, icon set)
+src/constants/   palette.js — the single source of colour truth
+src/db/          schema, client, migrations provider, seed
+src/db/repo/     the ONLY place that writes to the database
+src/lib/         pure logic — money, periods, calculator, ids. Tests live here.
+src/test/        test helpers (in-memory database from real migrations)
+drizzle/         generated migrations (committed)
+docs/            research, roadmap, design system
+.maestro/        E2E flows
+```
 
-## Join the community
+## Rules that are not negotiable
 
-Join our community of developers creating universal apps.
+These exist because breaking them corrupts a ledger quietly, which is the worst way to fail.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. **Money is integer minor units.** `amount_minor` is a signed integer; negative is money out.
+   Never store or do arithmetic on money as a float. Convert only at the render boundary, via
+   [`src/lib/money.ts`](src/lib/money.ts).
+
+2. **All writes go through `src/db/repo/`.** SQLite cannot express "categories are two levels
+   deep" or "a transfer is two rows"; the repository can, and it is tested.
+
+3. **Transfers are two rows** sharing a `transfer_pair_id`, written in one SQL transaction. Per-
+   account balance stays a plain `SUM(amount_minor)`. Every query must render only the outgoing
+   leg, and exclude transfers from income and expense totals — a transfer is neither.
+
+4. **Balances are derived, never stored.** A stored running total is one missed update away from
+   disagreeing with the ledger, with no way to tell afterwards which is right.
+
+5. **Colour is never the only signal.** Every amount carries an explicit `+` or `−`. Roughly one
+   man in twelve has red-green colour deficiency and the amount is the most important thing on
+   screen. See [docs/design-system.md](docs/design-system.md).
+
+6. **`Intl` on Hermes is not `Intl` on Node, and it fails silently.** A green `npm test` proves
+   nothing about currency or date rendering. Check it with a screenshot on a device.
+
+7. **Add a `testID` to anything a flow needs to find.** Maestro matches on it; labels get reworded.
+
+## Documentation
+
+| Document | What it holds |
+|---|---|
+| [AGENTS.md](AGENTS.md) | Toolchain, verification workflow, environment constraints and the OOM traps |
+| [docs/roadmap.md](docs/roadmap.md) | Six stages, dependencies, and the decisions already made |
+| [docs/research/mymoney.md](docs/research/mymoney.md) | The reference app, from screenshots of v6.6 |
+| [docs/design-system.md](docs/design-system.md) | The "Ledger" palette, its rules, and category colours |
+
+Keep these current. They are the reason a new session can pick the work up without re-deriving
+decisions that were already made and paid for.

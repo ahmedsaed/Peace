@@ -72,3 +72,23 @@ export function formatPeriod(period: Period): string {
   const { year, month } = parsePeriod(period);
   return `${MONTHS[month - 1]} ${year}`;
 }
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** "Aug 08, 2026" — the record form's date footer. */
+export function formatDayLabel(date: Date): string {
+  return `${MONTHS[date.getMonth()].slice(0, 3)} ${pad(date.getDate())}, ${date.getFullYear()}`;
+}
+
+/** "Aug 06, Thursday" — the day heading in the records list. */
+export function formatDayHeading(date: Date): string {
+  return `${MONTHS[date.getMonth()].slice(0, 3)} ${pad(date.getDate())}, ${DAYS[date.getDay()]}`;
+}
+
+/** "7:14 PM". Hand-rolled for the same reason as formatPeriod. */
+export function formatTimeLabel(date: Date): string {
+  const hours = date.getHours();
+  const suffix = hours < 12 ? 'AM' : 'PM';
+  const twelve = hours % 12 === 0 ? 12 : hours % 12;
+  return `${twelve}:${pad(date.getMinutes())} ${suffix}`;
+}

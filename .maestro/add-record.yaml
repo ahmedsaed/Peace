@@ -1,0 +1,53 @@
+appId: com.ahmed.peace
+---
+# Logs an expense end to end: category picker (including a sub-category), the
+# calculator keypad, and Save writing through the repository layer.
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "home-screen"
+
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "record-screen"
+
+# Expense is the default — the overwhelmingly common case.
+- assertVisible:
+    id: "type-expense"
+
+- tapOn:
+    id: "pick-category"
+- assertVisible:
+    id: "sheet-category"
+# A second-level category, so this covers the two-tier tree end to end.
+- tapOn: "Restaurants"
+
+# 120 + 35. The operator commits the 120 immediately and the display shows 35,
+# so this also pins the immediate-execution behaviour.
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-op-plus"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-5"
+
+- takeScreenshot: 01-record-filled
+
+# Save without pressing "=" — evaluating a pending operation is Save's job.
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+# GAP: nothing here asserts the saved AMOUNT, because the records list does not
+# render yet. That is how an earlier version of this flow passed while actually
+# saving 120 - 35: the keypad shows "35" either way. Once the list lands, assert
+# "E£155.00" appears here — until then this flow proves the plumbing, not the
+# arithmetic. The arithmetic is covered by src/lib/calculator.test.ts.
