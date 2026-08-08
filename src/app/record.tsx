@@ -1,18 +1,26 @@
-import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import { Keypad, type KeyPress } from '@/components/keypad';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
+import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { InvariantError, listCategoryTree } from '@/db/repo/categories';
-import { createRecord, createTransfer } from '@/db/repo/transactions';
+import {
+  createRecord,
+  createTransfer,
+  getRecord,
+  updateRecord,
+  updateTransfer,
+} from '@/db/repo/transactions';
 import {
   backspace,
+  calcFromMinor,
   committedMinor,
   equals,
   initialCalc,
@@ -33,20 +41,50 @@ const TYPES: { value: RecordType; label: string }[] = [
 export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { id } = useLocalSearchParams<{ id?: string }>();
 
   const accounts = useMemo(() => listAccountsWithBalance(db), []);
-  const [type, setType] = useState<RecordType>('expense');
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
-  const [toAccountId, setToAccountId] = useState<string | null>(accounts[1]?.id ?? null);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [note, setNote] = useState('');
-  const [calc, setCalc] = useState(initialCalc());
-  const [occurredAt] = useState(() => new Date());
+
+  // Load once. `id` does not change while the screen is mounted, and re-reading
+  // on every render would fight the edits being made.
+  const existing = useMemo(() => (id ? getRecord(db, id) : undefined), [id]);
+  const isEdit = !!existing;
+  const editingTransfer = !!existing?.transferPairId;
+
+  const [type, setType] = useState<RecordType>(() => {
+    if (!existing) return 'expense';
+    if (existing.transferPairId) return 'transfer';
+    return existing.amountMinor < 0 ? 'expense' : 'income';
+  });
+
+  // A transfer can be opened from either leg; the form always presents it as
+  // "from the account that lost money".
+  const [accountId, setAccountId] = useState(() => {
+    if (!existing) return accounts[0]?.id ?? '';
+    if (existing.transferPairId && existing.amountMinor > 0) {
+      return existing.counterAccountId ?? existing.accountId;
+    }
+    return existing.accountId;
+  });
+  const [toAccountId, setToAccountId] = useState<string | null>(() => {
+    if (!existing) return accounts[1]?.id ?? null;
+    if (existing.transferPairId && existing.amountMinor > 0) return existing.accountId;
+    return existing.counterAccountId ?? accounts[1]?.id ?? null;
+  });
+
+  const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null);
+  const [note, setNote] = useState(existing?.note ?? '');
+  const [occurredAt, setOccurredAt] = useState<Date>(existing?.occurredAt ?? new Date());
+  const [picking, setPicking] = useState<'date' | 'time' | null>(null);
   const [sheet, setSheet] = useState<'account' | 'category' | 'toAccount' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const account = accounts.find((a) => a.id === accountId);
   const currency = account?.currency ?? 'EGP';
+
+  const [calc, setCalc] = useState(() =>
+    existing ? calcFromMinor(existing.amountMinor, existing.currency) : initialCalc()
+  );
 
   // Only categories of the matching kind are offered — a category is income XOR
   // expense, so showing all of them would just invite an invalid pick.
@@ -55,10 +93,7 @@ export default function RecordScreen() {
     [type]
   );
   const category = useMemo(
-    () =>
-      categoryTree
-        .flatMap((node) => [node, ...node.children])
-        .find((c) => c.id === categoryId),
+    () => categoryTree.flatMap((n) => [n, ...n.children]).find((c) => c.id === categoryId),
     [categoryTree, categoryId]
   );
 
@@ -85,10 +120,53 @@ export default function RecordScreen() {
     });
   }
 
+  /**
+   * `onValueChange` fires only when a value is actually chosen — cancelling
+   * goes to `onDismiss` — so there is no event type to check here. (The older
+   * `onChange` callback, which received both, is deprecated in v9.)
+   */
+  function onPickDateTime(_event: unknown, picked: Date) {
+    const mode = picking;
+    setPicking(null);
+
+    // The picker hands back a whole Date, so keep the half the user was not
+    // editing — otherwise choosing a date silently resets the time to midnight.
+    setOccurredAt((current) => {
+      const next = new Date(current);
+      if (mode === 'date') {
+        next.setFullYear(picked.getFullYear(), picked.getMonth(), picked.getDate());
+      } else {
+        next.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+      }
+      return next;
+    });
+  }
+
   function onSave() {
     if (!canSave || amountMinor === null) return;
     try {
-      if (type === 'transfer') {
+      if (existing) {
+        if (editingTransfer) {
+          updateTransfer(db, existing.id, {
+            fromAccountId: accountId,
+            toAccountId: toAccountId!,
+            amountMinor,
+            currency,
+            note: note.trim() || null,
+            occurredAt,
+          });
+        } else {
+          updateRecord(db, existing.id, {
+            type: type as 'expense' | 'income',
+            accountId,
+            categoryId,
+            amountMinor,
+            currency,
+            note: note.trim() || null,
+            occurredAt,
+          });
+        }
+      } else if (type === 'transfer') {
         createTransfer(db, {
           fromAccountId: accountId,
           toAccountId: toAccountId!,
@@ -137,14 +215,18 @@ export default function RecordScreen() {
     })),
   ]);
 
+  /**
+   * Editing cannot turn a record into a transfer or back — that changes how many
+   * rows exist. Delete and re-add is clearer than a silent restructure.
+   */
+  const typeLocked = (value: RecordType) =>
+    isEdit && (editingTransfer ? value !== 'transfer' : value === 'transfer');
+
   return (
     <View
       className="flex-1 bg-ground"
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       testID="record-screen">
-      {/* Cancel and Save are real buttons. They end the task, so they get a
-          target you can hit without aiming — and Save carries the accent so it
-          reads as the primary action. */}
       <View className="flex-row items-center justify-between px-4 py-3">
         <Pressable
           onPress={() => router.back()}
@@ -154,6 +236,10 @@ export default function RecordScreen() {
           <Text className="text-sm font-medium text-muted">Cancel</Text>
         </Pressable>
 
+        <Text className="text-sm font-medium text-muted" testID="record-title">
+          {isEdit ? 'Edit record' : 'New record'}
+        </Text>
+
         <Pressable
           onPress={onSave}
           disabled={!canSave}
@@ -162,32 +248,40 @@ export default function RecordScreen() {
           className={`rounded-lg px-7 py-2.5 active:opacity-80 ${
             canSave ? 'bg-accent' : 'bg-surface'
           }`}>
-          <Text
-            className={`text-sm font-semibold ${canSave ? 'text-accent-ink' : 'text-line'}`}>
+          <Text className={`text-sm font-semibold ${canSave ? 'text-accent-ink' : 'text-line'}`}>
             Save
           </Text>
         </Pressable>
       </View>
 
-      {/* Type switch changes what the whole form means, so it leads. */}
       <View className="mx-4 mb-3 flex-row rounded-lg bg-surface p-1">
-        {TYPES.map(({ value, label }) => (
-          <Pressable
-            key={value}
-            onPress={() => {
-              setType(value);
-              setCategoryId(null);
-              setError(null);
-            }}
-            testID={`type-${value}`}
-            accessibilityRole="button"
-            className={`flex-1 items-center rounded-md py-2 ${type === value ? 'bg-raised' : ''}`}>
-            <Text
-              className={`text-sm ${type === value ? 'font-semibold text-accent' : 'text-muted'}`}>
-              {label}
-            </Text>
-          </Pressable>
-        ))}
+        {TYPES.map(({ value, label }) => {
+          const locked = typeLocked(value);
+          return (
+            <Pressable
+              key={value}
+              disabled={locked}
+              onPress={() => {
+                setType(value);
+                setCategoryId(null);
+                setError(null);
+              }}
+              testID={`type-${value}`}
+              accessibilityRole="button"
+              className={`flex-1 items-center rounded-md py-2 ${type === value ? 'bg-raised' : ''}`}>
+              <Text
+                className={`text-sm ${
+                  type === value
+                    ? 'font-semibold text-accent'
+                    : locked
+                      ? 'text-line'
+                      : 'text-muted'
+                }`}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <View className="mx-4 mb-3 flex-row gap-3">
@@ -221,9 +315,7 @@ export default function RecordScreen() {
       </View>
 
       {/* Notes claims every pixel between the pickers and the amount, the way a
-          web textarea fills its container. It is the only element here with no
-          natural size, so giving the slack to it keeps the layout stable on any
-          screen height instead of leaving a dead gap. */}
+          web textarea fills its container. */}
       <TextInput
         value={note}
         onChangeText={setNote}
@@ -263,19 +355,16 @@ export default function RecordScreen() {
         <Keypad onKey={onKey} />
       </View>
 
-      {/* Date and time are buttons: they are editable, so they must look it.
-          The picker itself lands with the edit-record work — until then these
-          report "now" and say so when tapped. */}
       <View className="mx-4 mb-1 mt-3 flex-row gap-3">
         <Pressable
-          onPress={() => setError('Changing the date arrives with edit — this is logged as now.')}
+          onPress={() => setPicking('date')}
           testID="record-date"
           accessibilityRole="button"
           className="flex-1 items-center rounded-lg border border-line py-2.5 active:opacity-70">
           <Text className="text-sm text-ink">{formatDayLabel(occurredAt)}</Text>
         </Pressable>
         <Pressable
-          onPress={() => setError('Changing the time arrives with edit — this is logged as now.')}
+          onPress={() => setPicking('time')}
           testID="record-time"
           accessibilityRole="button"
           className="flex-1 items-center rounded-lg border border-line py-2.5 active:opacity-70">
@@ -283,13 +372,25 @@ export default function RecordScreen() {
         </Pressable>
       </View>
 
+      {picking ? (
+        <DateTimePicker
+          value={occurredAt}
+          mode={picking}
+          is24Hour={false}
+          onValueChange={onPickDateTime}
+          onDismiss={() => setPicking(null)}
+          // A ledger entry cannot be in the future.
+          maximumDate={picking === 'date' ? new Date() : undefined}
+        />
+      ) : null}
+
       <PickerSheet
         visible={sheet === 'account'}
         title={type === 'transfer' ? 'From account' : 'Account'}
         options={accountOptions}
         selectedId={accountId}
-        onSelect={(id) => {
-          setAccountId(id);
+        onSelect={(pickedId) => {
+          setAccountId(pickedId);
           setSheet(null);
         }}
         onClose={() => setSheet(null)}
@@ -301,8 +402,8 @@ export default function RecordScreen() {
         title="To account"
         options={accountOptions.filter((o) => o.id !== accountId)}
         selectedId={toAccountId}
-        onSelect={(id) => {
-          setToAccountId(id);
+        onSelect={(pickedId) => {
+          setToAccountId(pickedId);
           setSheet(null);
         }}
         onClose={() => setSheet(null)}
@@ -314,8 +415,8 @@ export default function RecordScreen() {
         title="Category"
         options={categoryOptions}
         selectedId={categoryId}
-        onSelect={(id) => {
-          setCategoryId(id);
+        onSelect={(pickedId) => {
+          setCategoryId(pickedId);
           setSheet(null);
         }}
         onClose={() => setSheet(null)}

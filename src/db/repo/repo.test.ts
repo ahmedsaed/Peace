@@ -13,7 +13,13 @@ import {
   InvariantError,
   updateCategory,
 } from './categories';
-import { createRecord, createTransfer, deleteRecord } from './transactions';
+import {
+  createRecord,
+  createTransfer,
+  deleteRecord,
+  updateRecord,
+  updateTransfer,
+} from './transactions';
 
 const CASH = accountId('cash');
 const BANK = accountId('bank');
@@ -287,5 +293,119 @@ describe('InvariantError', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(InvariantError);
     }
+  });
+});
+
+describe('editing records', () => {
+  let db: TestDb;
+  beforeEach(() => {
+    db = createTestDb().db;
+    seedDefaults(db);
+  });
+
+  it('changes fields without touching the ones left alone', () => {
+    const r = createRecord(db, {
+      type: 'expense',
+      accountId: CASH,
+      categoryId: catId('food'),
+      amountMinor: 8000,
+      note: 'lunch',
+      occurredAt: new Date(2026, 7, 5),
+    });
+
+    const updated = updateRecord(db, r.id, { amountMinor: 9500 });
+    expect(updated.amountMinor).toBe(-9500);
+    expect(updated.note).toBe('lunch');
+    expect(updated.categoryId).toBe(catId('food'));
+  });
+
+  it('flips the sign when an expense is corrected to income', () => {
+    // The caller passes a type and an unsigned amount; sign is never their job.
+    const r = createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 8000 });
+    expect(updateRecord(db, r.id, { type: 'income' }).amountMinor).toBe(8000);
+  });
+
+  it('can clear the category', () => {
+    const r = createRecord(db, {
+      type: 'expense',
+      accountId: CASH,
+      categoryId: catId('food'),
+      amountMinor: 100,
+    });
+    expect(updateRecord(db, r.id, { categoryId: null }).categoryId).toBeNull();
+  });
+
+  it('still rejects a zero amount', () => {
+    const r = createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 100 });
+    expect(() => updateRecord(db, r.id, { amountMinor: 0 })).toThrow(/greater than zero/i);
+  });
+
+  it('refuses to edit a transfer leg as if it were a record', () => {
+    const { out } = createTransfer(db, {
+      fromAccountId: BANK,
+      toAccountId: CASH,
+      amountMinor: 500,
+    });
+    expect(() => updateRecord(db, out.id, { amountMinor: 600 })).toThrow(/edit it as a transfer/i);
+  });
+});
+
+describe('editing transfers', () => {
+  let db: TestDb;
+  beforeEach(() => {
+    db = createTestDb().db;
+    seedDefaults(db);
+  });
+
+  it('rewrites both legs so the pair still nets to zero', () => {
+    const { out } = createTransfer(db, {
+      fromAccountId: BANK,
+      toAccountId: CASH,
+      amountMinor: 500_00,
+    });
+
+    const updated = updateTransfer(db, out.id, { amountMinor: 750_00 });
+    expect(updated.out.amountMinor).toBe(-75_000);
+    expect(updated.in.amountMinor).toBe(75_000);
+    expect(totalBalance(db)).toBe(0);
+  });
+
+  it('can be edited from either leg', () => {
+    const { in: incoming } = createTransfer(db, {
+      fromAccountId: BANK,
+      toAccountId: CASH,
+      amountMinor: 100,
+    });
+    expect(updateTransfer(db, incoming.id, { amountMinor: 200 }).out.amountMinor).toBe(-200);
+  });
+
+  it('swaps direction and keeps counterAccountId consistent on both legs', () => {
+    const { out } = createTransfer(db, {
+      fromAccountId: BANK,
+      toAccountId: CASH,
+      amountMinor: 100,
+    });
+
+    const updated = updateTransfer(db, out.id, { fromAccountId: CASH, toAccountId: BANK });
+    expect(updated.out.accountId).toBe(CASH);
+    expect(updated.out.counterAccountId).toBe(BANK);
+    expect(updated.in.accountId).toBe(BANK);
+    expect(updated.in.counterAccountId).toBe(CASH);
+  });
+
+  it('refuses to point a transfer at a single account', () => {
+    const { out } = createTransfer(db, {
+      fromAccountId: BANK,
+      toAccountId: CASH,
+      amountMinor: 100,
+    });
+    expect(() => updateTransfer(db, out.id, { toAccountId: BANK })).toThrow(
+      /two different accounts/i
+    );
+  });
+
+  it('refuses to edit a normal record as a transfer', () => {
+    const r = createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 100 });
+    expect(() => updateTransfer(db, r.id, { amountMinor: 200 })).toThrow(/not a transfer/i);
   });
 });

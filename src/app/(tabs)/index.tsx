@@ -63,7 +63,12 @@ export default function RecordsScreen() {
         <SectionList
           sections={sections}
           keyExtractor={(row) => row.id}
-          renderItem={({ item }) => <RecordRow row={item} />}
+          renderItem={({ item }) => (
+            <RecordRow
+              row={item}
+              onPress={() => router.push({ pathname: '/record', params: { id: item.id } })}
+            />
+          )}
           renderSectionHeader={({ section }) => (
             <Text className="bg-ground px-4 pb-1.5 pt-4 text-xs font-semibold text-muted">
               {section.title}

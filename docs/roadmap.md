@@ -43,7 +43,10 @@ The point where you can stop using MyMoney. This is the stage that matters most.
   pickers (two-tier), note. Writes through the repository layer.
 - ✅ **Records list** — month navigator, day grouping, EXPENSE/INCOME/BALANCE wired to real data,
   transfers listed once and excluded from the totals
-- **Edit an existing record**, and a date/time picker (the form currently always logs "now")
+- ✅ **Edit an existing record** — tap a row to reopen it prefilled. Editing cannot convert a
+  record into a transfer or back, since that changes how many rows exist.
+- ✅ **Date and time picker** — native dialogs, capped at today; a ledger entry cannot be in the
+  future.
 - Delete with undo
 - Accounts CRUD, Categories CRUD
 

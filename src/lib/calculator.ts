@@ -48,6 +48,20 @@ export const initialCalc = (): CalcState => ({
   error: null,
 });
 
+/**
+ * Start the keypad from an existing amount, for editing a saved record.
+ *
+ * `replaceOnNextDigit` is true so the first key press replaces the loaded value
+ * rather than appending to it — typing "5" on a record of 155 means five, not
+ * 1,555. Backspace is there for anyone who wants to edit digit by digit.
+ */
+export function calcFromMinor(minor: number, currency = 'EGP'): CalcState {
+  return {
+    ...initialCalc(),
+    entry: minorToEntry(Math.abs(minor), currency),
+  };
+}
+
 const clampToPrecision = (minor: number) => Math.round(minor);
 
 /** Render minor units back into the entry string, trimming pointless zeros. */

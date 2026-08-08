@@ -1,5 +1,6 @@
 import {
   backspace,
+  calcFromMinor,
   committedMinor,
   equals,
   initialCalc,
@@ -166,5 +167,34 @@ describe('a dangling operator', () => {
   it('holds across several dangling operators', () => {
     expect(committedMinor(type('10+5+'))).toBe(1500);
     expect(committedMinor(type('10+5+*'))).toBe(1500);
+  });
+});
+
+describe('calcFromMinor', () => {
+  it('loads a saved amount for editing', () => {
+    expect(calcFromMinor(15500).entry).toBe('155');
+    expect(calcFromMinor(-8000).entry).toBe('80'); // sign lives on the record, not the keypad
+    expect(calcFromMinor(1234).entry).toBe('12.34');
+  });
+
+  it('trims trailing zeros in the fraction', () => {
+    expect(calcFromMinor(1250).entry).toBe('12.5');
+    expect(calcFromMinor(1200).entry).toBe('12');
+  });
+
+  it('respects zero-decimal currencies', () => {
+    expect(calcFromMinor(1200, 'JPY').entry).toBe('1200');
+  });
+
+  it('is replaced by the first key press, not appended to', () => {
+    // Typing "5" on a loaded 155 means five, not 1555.
+    const loaded = calcFromMinor(15500);
+    expect(inputDigit(loaded, '5').entry).toBe('5');
+  });
+
+  it('round-trips through committedMinor', () => {
+    for (const minor of [1, 99, 100, 1234, 15500, 1_250_000]) {
+      expect(committedMinor(calcFromMinor(minor))).toBe(minor);
+    }
   });
 });

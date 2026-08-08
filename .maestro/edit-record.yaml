@@ -1,0 +1,56 @@
+appId: com.ahmed.peace
+---
+# Creates a record, reopens it from the list, changes the amount, and checks the
+# list reflects the edit. The old value must be GONE, not merely joined by the
+# new one — an edit that silently inserts instead of updating would otherwise
+# pass.
+- launchApp:
+    clearState: true
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Restaurants"
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-op-plus"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "record-save"
+- assertVisible: "-E£155.00"
+
+# Reopen it. Row testIDs carry a generated uuid, so match the category name.
+- tapOn: "Restaurants"
+- assertVisible:
+    id: "record-screen"
+- assertVisible: "Edit record"
+
+# The form must arrive prefilled, or "edit" is really "retype".
+- assertVisible: "155"
+- assertVisible: "Restaurants"
+
+# Typing replaces the loaded amount rather than appending to it: 2-0-0, not
+# 155200.
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- assertVisible:
+    id: "home-screen"
+- assertVisible: "-E£200.00"
+- assertNotVisible: "-E£155.00" # updated in place, not duplicated
+- takeScreenshot: 01-edited

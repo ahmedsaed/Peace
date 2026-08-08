@@ -125,6 +125,126 @@ export function createTransfer(db: Db, input: TransferInput): { out: Transaction
   };
 }
 
+export function getRecord(db: Db, id: string): Transaction | undefined {
+  return db.select().from(transactions).where(eq(transactions.id, id)).get();
+}
+
+export type RecordPatch = {
+  type?: 'expense' | 'income';
+  accountId?: string;
+  categoryId?: string | null;
+  /** Unsigned, like createRecord. */
+  amountMinor?: number;
+  currency?: string;
+  note?: string | null;
+  occurredAt?: Date;
+};
+
+/**
+ * Edit a normal record.
+ *
+ * Type and amount are resolved together: the stored sign always follows the
+ * type, so correcting an expense to income flips it without the caller having
+ * to think about signs at all.
+ *
+ * A transfer cannot be edited here — its two legs must stay consistent, which
+ * is `updateTransfer`'s job. Converting between a record and a transfer is
+ * deliberately not supported: it changes how many rows exist, and "delete and
+ * re-add" is clearer than a silent restructure.
+ */
+export function updateRecord(db: Db, id: string, patch: RecordPatch): Transaction {
+  const existing = getRecord(db, id);
+  if (!existing) throw new InvariantError(`Record "${id}" does not exist.`);
+  if (existing.transferPairId) {
+    throw new InvariantError('This is a transfer — edit it as a transfer, not as a record.');
+  }
+
+  const type = patch.type ?? (existing.amountMinor < 0 ? 'expense' : 'income');
+  const unsigned = patch.amountMinor ?? Math.abs(existing.amountMinor);
+  assertAmount(unsigned);
+
+  db.update(transactions)
+    .set({
+      accountId: patch.accountId ?? existing.accountId,
+      categoryId: patch.categoryId === undefined ? existing.categoryId : patch.categoryId,
+      amountMinor: type === 'expense' ? -unsigned : unsigned,
+      currency: patch.currency ?? existing.currency,
+      note: patch.note === undefined ? existing.note : patch.note,
+      occurredAt: patch.occurredAt ?? existing.occurredAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(transactions.id, id))
+    .run();
+
+  return getRecord(db, id)!;
+}
+
+export type TransferPatch = {
+  fromAccountId?: string;
+  toAccountId?: string;
+  amountMinor?: number;
+  currency?: string;
+  note?: string | null;
+  occurredAt?: Date;
+};
+
+/**
+ * Edit a transfer, given either of its legs.
+ *
+ * Both rows are rewritten inside one SQL transaction. Updating one leg alone
+ * would break the invariant that a transfer nets to zero — the ledger would
+ * quietly gain or lose money.
+ */
+export function updateTransfer(
+  db: Db,
+  id: string,
+  patch: TransferPatch
+): { out: Transaction; in: Transaction } {
+  const leg = getRecord(db, id);
+  if (!leg) throw new InvariantError(`Record "${id}" does not exist.`);
+  if (!leg.transferPairId) {
+    throw new InvariantError('This is not a transfer.');
+  }
+
+  const legs = db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.transferPairId, leg.transferPairId))
+    .all();
+  const outLeg = legs.find((l) => l.amountMinor < 0);
+  const inLeg = legs.find((l) => l.amountMinor > 0);
+  if (!outLeg || !inLeg) {
+    throw new InvariantError('This transfer is missing a leg and cannot be edited.');
+  }
+
+  const from = patch.fromAccountId ?? outLeg.accountId;
+  const to = patch.toAccountId ?? inLeg.accountId;
+  if (from === to) throw new InvariantError('A transfer needs two different accounts.');
+
+  const unsigned = patch.amountMinor ?? Math.abs(outLeg.amountMinor);
+  assertAmount(unsigned);
+
+  const shared = {
+    currency: patch.currency ?? outLeg.currency,
+    note: patch.note === undefined ? outLeg.note : patch.note,
+    occurredAt: patch.occurredAt ?? outLeg.occurredAt,
+    updatedAt: new Date(),
+  };
+
+  db.transaction((tx) => {
+    tx.update(transactions)
+      .set({ ...shared, accountId: from, counterAccountId: to, amountMinor: -unsigned })
+      .where(eq(transactions.id, outLeg.id))
+      .run();
+    tx.update(transactions)
+      .set({ ...shared, accountId: to, counterAccountId: from, amountMinor: unsigned })
+      .where(eq(transactions.id, inLeg.id))
+      .run();
+  });
+
+  return { out: getRecord(db, outLeg.id)!, in: getRecord(db, inLeg.id)! };
+}
+
 /**
  * Deletes a record — and if it is one leg of a transfer, its partner too.
  * Deleting a single leg would leave money apparently created or destroyed.
