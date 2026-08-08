@@ -1,9 +1,57 @@
 appId: com.ahmed.peace
 ---
-# Smoke test: the app launches and the shell renders.
-# Grow this into real flows (add expense, edit, delete) as screens land.
+# Smoke test: the app launches, migrations and seeding complete, and every tab
+# renders. `clearState` forces the fresh-install path each run, so this also
+# covers "migrate then seed on an empty database".
 - launchApp:
     clearState: true
+
 - assertVisible:
     id: "home-screen"
-- takeScreenshot: launch
+- assertVisible:
+    id: "month-label"
+- takeScreenshot: 01-records
+
+# The month navigator is the app's spine — every month-scoped screen depends on it.
+- tapOn:
+    id: "month-next"
+- tapOn:
+    id: "month-prev"
+
+- tapOn:
+    id: "tab-analysis"
+- assertVisible:
+    id: "analysis-screen"
+
+- tapOn:
+    id: "tab-budgets"
+- assertVisible:
+    id: "budgets-screen"
+
+# Accounts and Categories render seeded data, so these assertions prove the
+# database round-trip, not just that a screen mounted.
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-screen"
+- assertVisible: "Cash"
+- assertVisible: "Bank"
+- takeScreenshot: 02-accounts
+
+- tapOn:
+    id: "tab-categories"
+- assertVisible:
+    id: "categories-screen"
+- assertVisible: "Salary" # income section leads
+- takeScreenshot: 03-categories
+# Expense categories are below the fold — scroll rather than assuming a
+# viewport size, so this keeps passing on a different screen.
+- scrollUntilVisible:
+    element: "Groceries" # a second-level category, so this proves the tree renders
+    direction: DOWN
+- assertVisible: "Food"
+
+- tapOn:
+    id: "tab-index"
+- assertVisible:
+    id: "home-screen"

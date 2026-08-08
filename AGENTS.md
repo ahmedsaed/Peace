@@ -42,6 +42,15 @@ Cheapest first — most changes never need a device.
 2. `npx expo export --platform android` catches Metro/babel/NativeWind config breakage in ~30s.
 3. Only then boot a device: `npm run emu`, then `npm start`, then screenshot.
 
+**Killing Metro: go by port, not by name.** Node renames its main thread, so a stale dev server
+shows up as `MainThread` and `pkill -f "expo start"` misses it — while `pkill -f` *does* match the
+shell running that very command, killing your own session instead. A leftover Metro keeps serving
+a stale module graph, so edits appear to do nothing:
+
+```
+PID=$(ss -tlnp | grep -oP '8081.*pid=\K[0-9]+' | head -1) && kill "$PID"
+```
+
 To actually see the app: `npm run shot -- after-change` and read the returned PNG.
 Drive the UI with `adb shell input tap X Y`, `adb shell input text "..."`,
 `adb shell input keyevent KEYCODE_BACK`. Prefer Maestro flows in `.maestro/` for anything repeatable.

@@ -1,36 +1,40 @@
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import migrations from '../../drizzle/migrations';
+import palette from '../constants/palette';
 import { db } from './client';
 import { seedDefaults } from './seed';
 import { getSetting } from './settings';
 
 /**
- * Runs pending migrations before any screen touches the database.
- * Migrations are bundled at build time, so this is fast (milliseconds) after
- * the first launch — but it must still gate rendering, because a screen that
- * queries a table that does not exist yet will throw.
+ * Runs pending migrations, then tops up default categories and accounts,
+ * before any screen touches the database.
+ *
+ * Both steps gate rendering. A screen that queries a table which does not exist
+ * yet will throw, and one that mounts before seeding shows an empty category
+ * picker on first launch.
  */
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const { success, error } = useMigrations(db, migrations);
-  const [seedError, setSeedError] = useState<Error | null>(null);
-  const [seeded, setSeeded] = useState(false);
 
-  useEffect(() => {
-    if (!success || seeded) return;
+  /**
+   * Seeding is synchronous and idempotent, so it runs during render rather than
+   * in an effect. An effect would need setState to report its outcome, which
+   * costs an extra render pass and trips react-hooks/set-state-in-effect for
+   * good reason. Idempotency is what makes this safe: if React discards the
+   * render or double-invokes in StrictMode, the second pass inserts nothing.
+   */
+  const seedError = useMemo(() => {
+    if (!success) return null;
     try {
-      // Runs on every launch, not just the first. Seeding is an insert-or-ignore
-      // keyed on deterministic ids, so this tops up defaults added in a later
-      // release without touching anything the user has since edited.
       seedDefaults(db, getSetting('homeCurrency'));
+      return null;
     } catch (e) {
-      setSeedError(e instanceof Error ? e : new Error(String(e)));
-      return;
+      return e instanceof Error ? e : new Error(String(e));
     }
-    setSeeded(true);
-  }, [success, seeded]);
+  }, [success]);
 
   const failure = error ?? seedError;
   if (failure) {
@@ -42,12 +46,10 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Gate on seeding too, not just migrations — a screen that renders before the
-  // default categories exist would show an empty picker on first launch.
-  if (!success || !seeded) {
+  if (!success) {
     return (
       <View className="flex-1 items-center justify-center bg-ground">
-        <ActivityIndicator color="#E3A33C" />
+        <ActivityIndicator color={palette.accent} />
       </View>
     );
   }

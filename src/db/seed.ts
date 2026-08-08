@@ -22,7 +22,7 @@ import { accounts, categories, type NewAccount, type NewCategory } from './schem
 
 type SeedCategory = Omit<NewCategory, 'id'> & { id: string };
 
-const EXPENSE: Array<[slug: string, name: string, icon: string, color: string]> = [
+const EXPENSE: [slug: string, name: string, icon: string, color: string][] = [
   ['food', 'Food', 'food', '#B03A3A'],
   ['transport', 'Transportation', 'bus', '#3B4E9E'],
   ['bills', 'Bills', 'receipt', '#6B5B4A'],
@@ -44,7 +44,7 @@ const EXPENSE: Array<[slug: string, name: string, icon: string, color: string]> 
   ['other-expense', 'Other', 'dots', '#6B5B4A'],
 ];
 
-const INCOME: Array<[slug: string, name: string, icon: string, color: string]> = [
+const INCOME: [slug: string, name: string, icon: string, color: string][] = [
   ['salary', 'Salary', 'wallet', '#2E7D46'],
   ['bonus', 'Bonus', 'star', '#6E8B3D'],
   ['refunds', 'Refunds', 'refresh', '#2F8A78'],
@@ -59,7 +59,7 @@ const INCOME: Array<[slug: string, name: string, icon: string, color: string]> =
  * the first launch rather than a column nobody uses. A child MUST share its
  * parent's `kind` and MUST NOT itself be a parent.
  */
-const CHILDREN: Array<[slug: string, name: string, parent: string, icon: string]> = [
+const CHILDREN: [slug: string, name: string, parent: string, icon: string][] = [
   ['groceries', 'Groceries', 'food', 'cart'],
   ['restaurants', 'Restaurants', 'food', 'fork'],
   ['coffee', 'Coffee', 'food', 'cup'],
@@ -114,7 +114,7 @@ export function defaultCategories(): SeedCategory[] {
   return [...parents, ...children];
 }
 
-export function defaultAccounts(homeCurrency = 'EGP'): Array<Omit<NewAccount, 'id'> & { id: string }> {
+export function defaultAccounts(homeCurrency = 'EGP'): (Omit<NewAccount, 'id'> & { id: string })[] {
   return [
     {
       id: accountId('cash'),
