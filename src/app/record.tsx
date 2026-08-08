@@ -14,6 +14,7 @@ import { InvariantError, listCategoryTree } from '@/db/repo/categories';
 import {
   createRecord,
   createTransfer,
+  deleteRecord,
   getRecord,
   updateRecord,
   updateTransfer,
@@ -29,6 +30,7 @@ import {
   inputOp,
 } from '@/lib/calculator';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
+import { useUndoStore } from '@/state/undo';
 
 type RecordType = 'income' | 'expense' | 'transfer';
 
@@ -78,6 +80,7 @@ export default function RecordScreen() {
   const [picking, setPicking] = useState<'date' | 'time' | null>(null);
   const [sheet, setSheet] = useState<'account' | 'category' | 'toAccount' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const offerUndo = useUndoStore((state) => state.offer);
 
   const account = accounts.find((a) => a.id === accountId);
   const currency = account?.currency ?? 'EGP';
@@ -193,6 +196,19 @@ export default function RecordScreen() {
       setError(
         e instanceof InvariantError ? e.message : 'Could not save this record. Please try again.'
       );
+    }
+  }
+
+  function onDelete() {
+    if (!existing) return;
+    try {
+      // The rows come back so they can be put straight back on undo — see
+      // src/state/undo.ts for why this is not a soft delete.
+      const removed = deleteRecord(db, existing.id);
+      offerUndo(removed, removed.length > 1 ? 'Transfer deleted' : 'Record deleted');
+      router.back();
+    } catch {
+      setError('Could not delete this record.');
     }
   }
 
@@ -349,6 +365,18 @@ export default function RecordScreen() {
         <Text className="mx-4 mb-2 text-sm text-expense" testID="record-error">
           {calc.error ?? error}
         </Text>
+      ) : null}
+
+      {/* Delete sits at the bottom-left, far from Save, and is the only
+          destructive control on the screen — hence the expense colour. */}
+      {isEdit ? (
+        <Pressable
+          onPress={onDelete}
+          testID="record-delete"
+          accessibilityRole="button"
+          className="mx-4 mb-2 self-start rounded-lg border border-expense/40 px-4 py-2 active:opacity-70">
+          <Text className="text-sm font-medium text-expense">Delete</Text>
+        </Pressable>
       ) : null}
 
       <View className="mx-3">

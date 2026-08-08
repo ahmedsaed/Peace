@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { createTestDb, type TestDb } from '../../test/db';
 import { accounts, categories, transactions } from '../schema';
@@ -17,9 +17,12 @@ import {
   createRecord,
   createTransfer,
   deleteRecord,
+  restoreRecords,
   updateRecord,
   updateTransfer,
 } from './transactions';
+
+const sqlDeleteAccount = (id: string) => sql`delete from accounts where id = ${id}`;
 
 const CASH = accountId('cash');
 const BANK = accountId('bank');
@@ -240,7 +243,7 @@ describe('transfers', () => {
       amountMinor: 100,
     });
 
-    expect(deleteRecord(db, out.id)).toBe(2);
+    expect(deleteRecord(db, out.id)).toHaveLength(2);
     expect(db.select().from(transactions).all()).toHaveLength(0);
     expect(totalBalance(db)).toBe(0);
   });
@@ -249,12 +252,12 @@ describe('transfers', () => {
     const a = createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 100 });
     createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 200 });
 
-    expect(deleteRecord(db, a.id)).toBe(1);
+    expect(deleteRecord(db, a.id)).toHaveLength(1);
     expect(db.select().from(transactions).all()).toHaveLength(1);
   });
 
   it('reports nothing deleted for an unknown id', () => {
-    expect(deleteRecord(db, 'nope')).toBe(0);
+    expect(deleteRecord(db, 'nope')).toHaveLength(0);
   });
 });
 
@@ -407,5 +410,62 @@ describe('editing transfers', () => {
   it('refuses to edit a normal record as a transfer', () => {
     const r = createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 100 });
     expect(() => updateTransfer(db, r.id, { amountMinor: 200 })).toThrow(/not a transfer/i);
+  });
+});
+
+describe('delete and restore', () => {
+  let db: TestDb;
+  beforeEach(() => {
+    db = createTestDb().db;
+    seedDefaults(db);
+  });
+
+  it('puts a deleted record back exactly as it was', () => {
+    const original = createRecord(db, {
+      type: 'expense',
+      accountId: CASH,
+      categoryId: catId('food'),
+      amountMinor: 8000,
+      note: 'lunch',
+      occurredAt: new Date(2026, 7, 5, 13, 30),
+    });
+
+    const removed = deleteRecord(db, original.id);
+    expect(db.select().from(transactions).all()).toHaveLength(0);
+
+    expect(restoreRecords(db, removed)).toBe(1);
+    const back = db.select().from(transactions).all();
+    expect(back).toHaveLength(1);
+    // Same id, so anything referencing it still points at the right row.
+    expect(back[0]).toEqual(original);
+  });
+
+  it('restores both legs of a transfer together', () => {
+    createTransfer(db, { fromAccountId: BANK, toAccountId: CASH, amountMinor: 50_000 });
+    const [leg] = db.select().from(transactions).all();
+
+    const removed = deleteRecord(db, leg.id);
+    expect(removed).toHaveLength(2);
+    expect(totalBalance(db)).toBe(0);
+
+    restoreRecords(db, removed);
+    expect(db.select().from(transactions).all()).toHaveLength(2);
+    // A half-restored transfer would leave money created or destroyed.
+    expect(totalBalance(db)).toBe(0);
+    expect(listAccountsWithBalance(db).find((a) => a.id === BANK)!.balanceMinor).toBe(-50_000);
+  });
+
+  it('restores nothing for an empty list', () => {
+    expect(restoreRecords(db, [])).toBe(0);
+  });
+
+  it('throws rather than half-restoring when the account is gone', () => {
+    const r = createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 100 });
+    const removed = deleteRecord(db, r.id);
+    db.run(sqlDeleteAccount(CASH));
+
+    // Undo must fail loudly; silently dropping the row would look like success.
+    expect(() => restoreRecords(db, removed)).toThrow();
+    expect(db.select().from(transactions).all()).toHaveLength(0);
   });
 });

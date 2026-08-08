@@ -248,26 +248,46 @@ export function updateTransfer(
 /**
  * Deletes a record — and if it is one leg of a transfer, its partner too.
  * Deleting a single leg would leave money apparently created or destroyed.
+ *
+ * Returns the rows that were removed, which is what makes undo possible without
+ * a soft-delete column: the caller holds them and can hand them straight back
+ * to `restoreRecords`.
  */
-export function deleteRecord(db: Db, id: string): number {
+export function deleteRecord(db: Db, id: string): Transaction[] {
   const row = db.select().from(transactions).where(eq(transactions.id, id)).get();
-  if (!row) return 0;
+  if (!row) return [];
 
   if (!row.transferPairId) {
     db.delete(transactions).where(eq(transactions.id, id)).run();
-    return 1;
+    return [row];
   }
 
   const pairId = row.transferPairId;
-  let deleted = 0;
+  let removed: Transaction[] = [];
   db.transaction((tx) => {
-    const legs = tx
+    removed = tx
       .select()
       .from(transactions)
       .where(eq(transactions.transferPairId, pairId))
       .all();
     tx.delete(transactions).where(eq(transactions.transferPairId, pairId)).run();
-    deleted = legs.length;
   });
-  return deleted;
+  return removed;
+}
+
+/**
+ * Puts deleted rows back, ids and all, so undo restores the original record
+ * rather than a copy of it. Both legs of a transfer go back together or neither
+ * does — a half-restored transfer is worse than none.
+ *
+ * Re-inserting a row whose account or category has since been deleted would
+ * violate a foreign key; that throws, and the caller should treat undo as no
+ * longer available rather than swallow it.
+ */
+export function restoreRecords(db: Db, rows: Transaction[]): number {
+  if (rows.length === 0) return 0;
+  db.transaction((tx) => {
+    tx.insert(transactions).values(rows).run();
+  });
+  return rows.length;
 }

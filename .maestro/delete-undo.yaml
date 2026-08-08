@@ -1,0 +1,35 @@
+appId: com.ahmed.peace
+---
+# Deleting a record, and the undo offer appearing.
+#
+# NOT COVERED HERE: actually taking the undo. The offer auto-dismisses after 8s
+# and every Maestro step costs 1-2s on this emulator, so the tap regularly lands
+# after the snackbar has gone — which fails in a way that looks like a broken
+# feature rather than a slow test. Restoring is covered properly by
+# `restoreRecords` in src/db/repo/repo.test.ts (including that both legs of a
+# transfer come back together), and was verified by hand on device.
+- launchApp:
+    clearState: true
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Restaurants"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible: "-E£50.00"
+
+- tapOn: "Restaurants"
+- assertVisible:
+    id: "record-delete"
+- tapOn:
+    id: "record-delete"
+
+- assertVisible: "No records this month"
+- assertNotVisible: "-E£50.00"
+- takeScreenshot: 01-deleted

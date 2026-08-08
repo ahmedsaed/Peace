@@ -139,15 +139,31 @@ export function SummaryTrio({
   );
 }
 
-/** Floating action button, bottom-right above the tab bar. */
-export function Fab({ onPress, testID = 'fab' }: { onPress: () => void; testID?: string }) {
+/**
+ * Floating action button, bottom-right above the tab bar.
+ *
+ * `raised` lifts it clear of a snackbar. Material does this too, and the reason
+ * is practical rather than decorative: left in place, the FAB sits on top of the
+ * snackbar's action and swallows taps meant for "Undo".
+ */
+export function Fab({
+  onPress,
+  testID = 'fab',
+  raised = false,
+}: {
+  onPress: () => void;
+  testID?: string;
+  raised?: boolean;
+}) {
   return (
     <Pressable
       onPress={onPress}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel="Add record"
-      className="absolute bottom-5 right-5 h-14 w-14 items-center justify-center rounded-full bg-accent active:opacity-80"
+      className={`absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-accent active:opacity-80 ${
+        raised ? 'bottom-24' : 'bottom-5'
+      }`}
       style={{
         elevation: 6,
         shadowColor: '#000',
