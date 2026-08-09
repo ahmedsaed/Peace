@@ -36,7 +36,8 @@
       ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "./plugins/with-dark-theme"
+      "./plugins/with-dark-theme",
+      "./plugins/with-release-signing"
     ],
     "experiments": {
       "typedRoutes": true,

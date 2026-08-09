@@ -15,7 +15,7 @@ account, and no network dependency anywhere in the core product.
 | Stage | Scope | State |
 |---|---|---|
 | 0 | Schema, design system, navigation shell, repository layer | ✅ done |
-| 1 | Daily driver — records list, add-record with calculator keypad | 🚧 in progress |
+| 1 | Daily driver — records, calculator keypad, edit/delete, accounts & categories | ✅ done |
 | 2 | Multi-currency, budgets, analysis, export | planned |
 | 3 | Recurring payments | planned |
 | 4 | Receipt attachments | planned |
@@ -24,8 +24,8 @@ account, and no network dependency anywhere in the core product.
 
 Full plan and the reasoning behind the ordering: [docs/roadmap.md](docs/roadmap.md).
 
-Stage 1's finish line is not a feature list — it is *logging a real week of spending without
-reaching for MyMoney*.
+Stage 1's finish line was never a feature list — it is *logging a real week of spending without
+reaching for MyMoney*. That test is still outstanding.
 
 ## Stack
 
@@ -64,10 +64,39 @@ npm start             # Metro dev server
 
 Distribution is **sideload only** — no Play Store, so no restricted-permission review. `npm run apk`
 produces a standalone arm64 APK at `android/app/build/outputs/apk/release/app-release.apk` with the
-JS bundle embedded, so it runs with no laptop attached.
+JS bundle embedded, so it runs with no laptop attached. CI attaches the same APK to every PR.
 
-It is signed with Expo's debug keystore. Fine for personal use; generating your own keystore later
-makes Android treat it as a different app, so switch before you rely on the data.
+### Signing
+
+Release builds are signed with a **private key**, not Expo's shared debug keystore. Android treats a
+differently-signed APK as a different app, so this identity must stay stable: lose the key and you
+can never ship an update that upgrades an existing install.
+
+- Keystore lives at `~/keystores/peace-release.jks`, outside the repository. **Back it up.**
+- Credentials are Gradle properties in `~/.gradle/gradle.properties` (`PEACE_STORE_FILE`,
+  `PEACE_STORE_PASSWORD`, `PEACE_KEY_ALIAS`, `PEACE_KEY_PASSWORD`), and GitHub secrets for CI.
+- [`plugins/with-release-signing.js`](plugins/with-release-signing.js) wires them in. It is a
+  config plugin because `expo prebuild` regenerates `android/`.
+- **Missing credentials fall back to debug signing** rather than failing, so a fresh clone — or a
+  PR from a fork, which cannot read secrets — still builds a working APK. It just is not
+  upgrade-compatible with the signed one.
+
+On a new machine, restore the `.jks` and re-add those four properties; nothing else is needed.
+
+## Continuous integration
+
+Every PR to `main` runs [`.github/workflows/pr.yml`](.github/workflows/pr.yml):
+
+| Job | What it does |
+|---|---|
+| `check` | typecheck, lint, unit tests — about a minute, so it fails fast |
+| `apk` | `expo prebuild` + Gradle release build, uploaded as a downloadable artifact |
+
+`android/` is gitignored and generated from `app.json` plus the config plugins, so CI runs
+`prebuild` itself rather than checking it out.
+
+**Maestro flows do not run in CI** — they need a booted emulator, which is slow and flaky on
+hosted runners. Run them locally with `npm run e2e` before merging anything that touches a screen.
 
 ## Layout
 
