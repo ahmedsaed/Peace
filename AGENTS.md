@@ -55,6 +55,25 @@ To actually see the app: `npm run shot -- after-change` and read the returned PN
 Drive the UI with `adb shell input tap X Y`, `adb shell input text "..."`,
 `adb shell input keyevent KEYCODE_BACK`. Prefer Maestro flows in `.maestro/` for anything repeatable.
 
+## Working on this repo
+
+Development happens on branches with a PR into `main`. CI
+(`.github/workflows/pr.yml`) runs typecheck, lint and unit tests in ~1 min, then
+builds a signed APK and attaches it to the PR.
+
+Three things that are true only because CI caught them, and will bite again:
+
+- **`android/` is gitignored and generated.** CI runs `expo prebuild` itself. Never commit it,
+  and never assume a file under it survives.
+- **`expo-env.d.ts` is gitignored too**, so a fresh checkout has no ambient types. Anything the
+  typechecker needs must live in the committed `types.d.ts`.
+- **`npm ci` is stricter than `npm install`.** It validates the lockfile against package.json and
+  rejects the inconsistent optional-dependency subtrees that `npm install` happily tolerates. Run
+  it in a clean directory before pushing a dependency change.
+
+**Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
+merging anything that touches a screen.
+
 ## Hard rules
 
 - **Money is integer minor units.** `amount_minor` is a signed integer (negative = money out).
