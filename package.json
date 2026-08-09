@@ -71,5 +71,8 @@
     "shot": "bash scripts/screenshot.sh",
     "apk": "cd android && taskset -c 0-3 ./gradlew app:assembleRelease -x lint -x test --build-cache -PreactNativeArchitectures=arm64-v8a"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  }
 }

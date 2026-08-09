@@ -23,7 +23,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # From .nvmrc, so CI uses the same npm as local development. npm 10
+          # and 11 record optional platform dependencies differently, and the
+          # mismatch makes `npm ci` reject a lockfile that is perfectly valid.
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -49,7 +52,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # From .nvmrc, so CI uses the same npm as local development. npm 10
+          # and 11 record optional platform dependencies differently, and the
+          # mismatch makes `npm ci` reject a lockfile that is perfectly valid.
+          node-version-file: .nvmrc
           cache: npm
 
       - uses: actions/setup-java@v4
