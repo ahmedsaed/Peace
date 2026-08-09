@@ -4,8 +4,16 @@ appId: com.ahmed.peace
 # calculator keypad, and Save writing through the repository layer.
 - launchApp:
     clearState: true
-- assertVisible:
-    id: "home-screen"
+
+# `clearState` wipes the dev build's cached JS too, so a cold launch re-fetches
+# the whole bundle from Metro *and* then runs migrations and seeding. That is
+# comfortably longer than Maestro's default assertion wait, and it fails looking
+# like a broken screen rather than a slow one. Gate on the first screen instead
+# of racing it — this still fails if the app never renders.
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
 
 - tapOn:
     id: "fab"

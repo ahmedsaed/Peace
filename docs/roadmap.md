@@ -73,16 +73,38 @@ accumulate across a chain.
 
 **Done when:** you have logged a real week of your own spending in it without reaching for MyMoney.
 
+### Navigation shell (landed early, ahead of Stage 2)
+
+The app icon and the side menu were built before Stage 2 rather than during it, because both are
+chrome that every later screen hangs off — retrofitting a hamburger into six finished screens is
+worse than putting it there first.
+
+- ✅ **App icon**, generated from one vector definition — see
+  [design-system.md](design-system.md#app-icon) for the adaptive/monochrome geometry
+- ✅ **Side menu** behind a hamburger, holding Settings, Export & backup, About. The five tabs are
+  the app's *content* and stay in the tab bar; the drawer holds what you touch a few times a year.
+  Duplicating the tabs into it would only give two answers to "where is Budgets".
+- ✅ **Search entry point** in the header
+- ✅ **About** — the one destination that is real rather than a placeholder, because the version
+  number is the first thing worth knowing when a sideloaded APK misbehaves
+
+Settings, Export and Search are laid out but **not wired**. They belong to Stage 2.
+
 ---
 
 ## Stage 2 — Money features
 
+- **Settings screen** — the preferences already exist and persist (`src/lib/settings.ts` defines
+  them, `src/db/settings.ts` stores them); only the UI is missing. Worth doing first, since
+  multi-currency has no meaning until home currency is changeable.
 - **Multi-currency** — per-account currency, per-record currency + `fxRate`, all reporting
   converted to home currency. Manual rate entry always available; optional rate fetch on top.
 - **Budgets** — per month, "copy from last month", progress bars, over-budget states
 - **Analysis** — donut by category, ranked bars with %, cash-flow over time, **carry-over**
-- Search and filters
-- **Export CSV + backup/restore** — MyMoney parity, and your safety net for switching
+- Search and filters — the screen and its entry point exist; the query does not
+- **Export CSV + backup/restore** — MyMoney parity, and your safety net for switching. Worth
+  pulling to the front of the stage: until the data can get back out, "stop using MyMoney" is a
+  one-way door.
 
 ---
 

@@ -1,0 +1,74 @@
+appId: com.ahmed.peace
+---
+# The side menu and the search entry point.
+#
+# Asserts values a person would actually check — the version string, the
+# package name — rather than "a screen appeared". A flow that only asserts
+# visibility of a title would still pass if every destination rendered blank.
+- launchApp:
+    clearState: true
+
+# `clearState` wipes the dev build's cached JS too, so a cold launch re-fetches
+# the whole bundle from Metro *and* then runs migrations and seeding. That is
+# comfortably longer than Maestro's default assertion wait, and it fails looking
+# like a broken screen rather than a slow one. Gate on the first screen instead
+# of racing it — this still fails if the app never renders.
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- header chrome is present on the tab screens ---
+- assertVisible:
+    id: "nav-menu"
+- assertVisible:
+    id: "nav-search"
+
+# --- the drawer opens from the hamburger and lists its destinations ---
+- tapOn:
+    id: "nav-menu"
+- assertVisible: "Settings"
+- assertVisible: "Export & backup"
+- assertVisible: "About"
+- assertVisible: ".*Local-first.*"
+- takeScreenshot: 01-drawer
+
+# --- About is a real screen, so assert what it reports ---
+- tapOn:
+    id: "drawer-about"
+- assertVisible:
+    id: "about-screen"
+- assertVisible:
+    id: "about-version"
+    text: "1.0.0"
+- assertVisible:
+    id: "about-package"
+    text: "com.ahmed.peace"
+
+# The custom back button returns to the tabs, not to the drawer.
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "app-title"
+
+# --- the drawer's placeholders are honest about being placeholders ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-export"
+- assertVisible:
+    id: "export-screen"
+- assertVisible: ".*Stage 2.*"
+- tapOn:
+    id: "nav-back"
+
+# --- search opens from the header, and says it is not wired yet ---
+- tapOn:
+    id: "nav-search"
+- assertVisible:
+    id: "search-input"
+- assertVisible: "Search is not wired up yet"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "home-screen"
