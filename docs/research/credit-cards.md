@@ -113,13 +113,26 @@ Ordered by how much drift each removes per unit of work:
 
 1 and 3 are cheap. 2 is the one that fixes the numbers. 4 and 5 can wait.
 
-## Questions still open
+## Decisions
 
-1. **Owed or negative?** Should a card you owe E£5,000 on read `E£5,000 owed` in the expense
-   colour, or `−E£5,000`? The second is consistent with every other account; the first is what you
-   actually think.
-2. **Do you carry a balance?** If interest accrues, the card needs `interestRate` (the column
-   already exists for loans) and eventually a "what is this costing me" line. If you always pay in
-   full, that is dead weight.
-3. **Are refunds tied to a purchase?** See above — decides whether a refund needs a link or just a
-   flag.
+Settled on 2026-08-09.
+
+| Question | Decision | Consequence |
+|---|---|---|
+| Owed or negative? | **`E£5,000 owed`** — positive, expense colour | Presentation only. The stored sign never flips, so `SUM(amount_minor)` and net worth are untouched. Needs a liability-aware formatter, not a schema change. |
+| Refunds tied to a purchase? | **Both, roughly equally** | Ship the flag first, since that is what fixes the totals. The optional link to an original record is a later addition, not a prerequisite. |
+| Carry a balance? | **Paid in full every month** | No interest modelling. `interestRate` stays a loan-only column. Drop it from the card scope entirely. |
+
+That removes interest from the slice and splits the refund work in two, leaving:
+
+1. Liability balances render as **owed** *(presentation)*
+2. **Refund flag** — a signed expense that nets against its category *(repo + record form)*
+3. **"Pay this card"** — pre-filled Bank → Card transfer *(account screen)*
+4. `statementDay` / `dueDay` and a derived statement view *(schema + account screen)*
+5. Foreign purchases store the **settled** amount *(Stage 2)*
+6. ~~Interest~~ — dropped
+7. *Later:* link a refund to the purchase it reverses
+
+Item 2 is the one that stops the numbers drifting, and it is the one that needs the most careful
+tests: relaxing "expense rows are negative" is exactly the class of change the repository layer
+exists to police.
