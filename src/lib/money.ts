@@ -97,6 +97,31 @@ export function formatMinor(
   return out.join('');
 }
 
+/**
+ * Group the integer part of a *partially typed* amount with thousand
+ * separators, for the keypad display: "1234.5" -> "1,234.5".
+ *
+ * Deliberately not `Intl.NumberFormat`: this runs on every keystroke against a
+ * string that is often not yet a valid number. `Number("1234.")` is 1234, so
+ * formatting it would eat the decimal point the moment it was typed, and
+ * `"0.50"` would collapse to `"0.5"` while the user was still entering the
+ * second digit. The fraction is therefore passed through untouched, exactly as
+ * typed, and only the integer part is grouped.
+ *
+ * Display only — never parse this back. The calculator's `entry` stays raw.
+ */
+export function groupDigits(entry: string): string {
+  // Anything that is not a plain unsigned decimal is left alone rather than
+  // mangled: an error string or a future format should render as-is.
+  if (!/^\d*\.?\d*$/.test(entry)) return entry;
+
+  const dot = entry.indexOf('.');
+  const whole = dot === -1 ? entry : entry.slice(0, dot);
+  const rest = dot === -1 ? '' : entry.slice(dot);
+
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + rest;
+}
+
 /** Sum minor units safely. Integers only, so no drift. */
 export function sumMinor(amounts: number[]): number {
   return amounts.reduce((acc, n) => acc + n, 0);

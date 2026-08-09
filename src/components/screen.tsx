@@ -111,15 +111,10 @@ export function Screen({
   );
 }
 
-/** Section label for the screens that are not scoped to a month. */
-export function ScreenHeader({ title, right }: { title: string; right?: React.ReactNode }) {
-  return (
-    <View className="flex-row items-center justify-between bg-surface px-4 pb-3">
-      <Text className="text-base font-medium text-muted">{title}</Text>
-      {right}
-    </View>
-  );
-}
+// ScreenHeader ("Accounts", "Categories") lived here and is gone: the tab bar
+// already names the screen you are on, so it spent a row of height restating
+// it. Screens pushed *over* the tabs still need a title and a back arrow —
+// that is StackHeader, above.
 
 /**
  * The month navigator that anchors Records, Analysis and Budgets. It is the

@@ -9,8 +9,10 @@ export type PickerOption = {
   color?: string | null;
   /** Rendered indented — a sub-category under its parent. */
   indented?: boolean;
-  /** Extra detail on the right, e.g. an account's currency. */
+  /** Extra detail on the right, e.g. an account's balance. */
   detail?: string;
+  /** Colours the detail. A negative balance in the muted grey reads as fine. */
+  detailTone?: 'neutral' | 'negative';
 };
 
 /**
@@ -39,11 +41,29 @@ export function PickerSheet({
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {/* Tapping the scrim dismisses — expected of a sheet, and it keeps the
-          user from feeling trapped in a picker they opened by accident. */}
-      <Pressable className="flex-1 bg-black/60" onPress={onClose} accessibilityRole="button" />
+      {/* Tapping above the sheet dismisses it — expected of a sheet, and it
+          keeps the user from feeling trapped in a picker they opened by
+          accident. Deliberately NOT dimmed: `animationType="slide"` moves the
+          sheet but cross-fades nothing, so a scrim appears as an abrupt dark
+          slab over the screen the instant the sheet starts moving. The sheet's
+          own border and elevation separate it well enough on a dark theme. */}
+      <Pressable
+        className="flex-1"
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss"
+      />
 
-      <View className="max-h-[70%] rounded-t-2xl bg-ground pb-6" testID={testID}>
+      <View
+        className="max-h-[70%] rounded-t-2xl border-t border-line bg-ground pb-6"
+        style={{
+          elevation: 16,
+          shadowColor: '#000',
+          shadowOpacity: 0.5,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: -4 },
+        }}
+        testID={testID}>
         <View className="flex-row items-center justify-between border-b border-line px-5 py-4">
           <Text className="text-base font-semibold text-ink">{title}</Text>
           <Pressable onPress={onClose} hitSlop={16} testID="picker-close">
@@ -82,7 +102,12 @@ export function PickerSheet({
                 </Text>
 
                 {option.detail ? (
-                  <Text className="text-xs text-muted">{option.detail}</Text>
+                  <Text
+                    className={`text-xs tabular-nums ${
+                      option.detailTone === 'negative' ? 'text-expense' : 'text-muted'
+                    }`}>
+                    {option.detail}
+                  </Text>
                 ) : null}
                 {selected ? <Text className="text-base text-accent">✓</Text> : null}
               </Pressable>

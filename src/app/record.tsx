@@ -1,7 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -29,6 +29,8 @@ import {
   inputDot,
   inputOp,
 } from '@/lib/calculator';
+import { byDensity, useDensity } from '@/lib/layout';
+import { formatMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
 import { useUndoStore } from '@/state/undo';
 
@@ -44,6 +46,7 @@ export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const density = useDensity();
 
   const accounts = useMemo(() => listAccountsWithBalance(db), []);
 
@@ -212,12 +215,16 @@ export default function RecordScreen() {
     }
   }
 
+  // The balance, not the currency code — the currency is already visible in the
+  // formatted amount, and "which account still has money in it" is the actual
+  // question being asked at the moment of picking one.
   const accountOptions: PickerOption[] = accounts.map((a) => ({
     id: a.id,
     label: a.name,
     icon: a.icon,
     color: a.color,
-    detail: a.currency,
+    detail: formatMinor(a.balanceMinor, a.currency),
+    detailTone: a.balanceMinor < 0 ? ('negative' as const) : ('neutral' as const),
   }));
 
   const categoryOptions: PickerOption[] = categoryTree.flatMap((node) => [
@@ -238,12 +245,33 @@ export default function RecordScreen() {
   const typeLocked = (value: RecordType) =>
     isEdit && (editingTransfer ? value !== 'transfer' : value === 'transfer');
 
+  /**
+   * Split-screen is a first-class way this screen gets used: half the display
+   * shows the bank notification, half logs the record. See src/lib/layout.ts.
+   *
+   * The structure is the fix, and the density table is only the polish. The
+   * amount, the keypad and the date row are PINNED to the bottom; everything
+   * above them lives in a ScrollView. However short the window gets, the keys
+   * stay on screen and the squeeze is absorbed by scrolling instead of by
+   * pushing the keypad off the bottom edge.
+   */
+  const pad = byDensity(density, { regular: 'py-3', compact: 'py-2', tight: 'py-1.5' });
+  const gap = byDensity(density, { regular: 'mb-3', compact: 'mb-2', tight: 'mb-1.5' });
+  const amountText = byDensity(density, {
+    regular: 'text-4xl',
+    compact: 'text-3xl',
+    tight: 'text-2xl',
+  });
+  // The note keeps a floor rather than a fixed height: with room it grows like a
+  // web textarea, without room it stops at something still usable.
+  const noteMinHeight = byDensity(density, { regular: 120, compact: 76, tight: 48 });
+
   return (
     <View
       className="flex-1 bg-ground"
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       testID="record-screen">
-      <View className="flex-row items-center justify-between px-4 py-3">
+      <View className={`flex-row items-center justify-between px-4 ${pad}`}>
         <Pressable
           onPress={() => router.back()}
           testID="record-cancel"
@@ -270,86 +298,102 @@ export default function RecordScreen() {
         </Pressable>
       </View>
 
-      <View className="mx-4 mb-3 flex-row rounded-lg bg-surface p-1">
-        {TYPES.map(({ value, label }) => {
-          const locked = typeLocked(value);
-          return (
-            <Pressable
-              key={value}
-              disabled={locked}
-              onPress={() => {
-                setType(value);
-                setCategoryId(null);
-                setError(null);
-              }}
-              testID={`type-${value}`}
-              accessibilityRole="button"
-              className={`flex-1 items-center rounded-md py-2 ${type === value ? 'bg-raised' : ''}`}>
-              <Text
-                className={`text-sm ${
-                  type === value
-                    ? 'font-semibold text-accent'
-                    : locked
-                      ? 'text-line'
-                      : 'text-muted'
+      {/* `flexGrow: 1` lets the note expand into spare room on a full-height
+          screen, while still allowing the whole block to scroll when there is
+          none. Without it the content container collapses to its content and
+          the note's flex-1 has nothing to grow into. */}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled">
+        <View className={`mx-4 flex-row rounded-lg bg-surface p-1 ${gap}`}>
+          {TYPES.map(({ value, label }) => {
+            const locked = typeLocked(value);
+            return (
+              <Pressable
+                key={value}
+                disabled={locked}
+                onPress={() => {
+                  setType(value);
+                  setCategoryId(null);
+                  setError(null);
+                }}
+                testID={`type-${value}`}
+                accessibilityRole="button"
+                className={`flex-1 items-center rounded-md py-2 ${
+                  type === value ? 'bg-raised' : ''
                 }`}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+                <Text
+                  className={`text-sm ${
+                    type === value
+                      ? 'font-semibold text-accent'
+                      : locked
+                        ? 'text-line'
+                        : 'text-muted'
+                  }`}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-      <View className="mx-4 mb-3 flex-row gap-3">
-        <PickerButton
-          label={type === 'transfer' ? 'From' : 'Account'}
-          value={account?.name}
-          icon={account?.icon}
-          color={account?.color}
-          onPress={() => setSheet('account')}
-          testID="pick-account"
+        <View className={`mx-4 flex-row gap-3 ${gap}`}>
+          <PickerButton
+            label={type === 'transfer' ? 'From' : 'Account'}
+            value={account?.name}
+            icon={account?.icon}
+            color={account?.color}
+            onPress={() => setSheet('account')}
+            testID="pick-account"
+          />
+          {type === 'transfer' ? (
+            <PickerButton
+              label="To"
+              value={accounts.find((a) => a.id === toAccountId)?.name}
+              icon={accounts.find((a) => a.id === toAccountId)?.icon}
+              color={accounts.find((a) => a.id === toAccountId)?.color}
+              onPress={() => setSheet('toAccount')}
+              testID="pick-to-account"
+            />
+          ) : (
+            <PickerButton
+              label="Category"
+              value={category?.name}
+              icon={category?.icon ?? 'categories'}
+              color={category?.color}
+              onPress={() => setSheet('category')}
+              testID="pick-category"
+            />
+          )}
+        </View>
+
+        {/* Notes claims every pixel left between the pickers and the amount, the
+            way a web textarea fills its container — down to a floor, below which
+            it stops shrinking and the block scrolls instead. */}
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="Add notes"
+          placeholderTextColor={palette.muted}
+          multiline
+          textAlignVertical="top"
+          testID="record-note"
+          style={{ minHeight: noteMinHeight }}
+          className={`mx-4 flex-1 rounded-lg bg-surface px-4 py-3 text-base text-ink ${gap}`}
         />
-        {type === 'transfer' ? (
-          <PickerButton
-            label="To"
-            value={accounts.find((a) => a.id === toAccountId)?.name}
-            icon={accounts.find((a) => a.id === toAccountId)?.icon}
-            color={accounts.find((a) => a.id === toAccountId)?.color}
-            onPress={() => setSheet('toAccount')}
-            testID="pick-to-account"
-          />
-        ) : (
-          <PickerButton
-            label="Category"
-            value={category?.name}
-            icon={category?.icon ?? 'categories'}
-            color={category?.color}
-            onPress={() => setSheet('category')}
-            testID="pick-category"
-          />
-        )}
-      </View>
+      </ScrollView>
 
-      {/* Notes claims every pixel between the pickers and the amount, the way a
-          web textarea fills its container. */}
-      <TextInput
-        value={note}
-        onChangeText={setNote}
-        placeholder="Add notes"
-        placeholderTextColor={palette.muted}
-        multiline
-        textAlignVertical="top"
-        testID="record-note"
-        className="mx-4 mb-3 flex-1 rounded-lg bg-surface px-4 py-3 text-base text-ink"
-      />
-
-      <View className="mx-4 mb-3 flex-row items-center justify-end gap-4 rounded-lg bg-surface px-4 py-4">
+      <View
+        className={`mx-4 flex-row items-center justify-end gap-4 rounded-lg bg-surface px-4 ${pad} ${gap}`}>
         <Text
-          className="text-4xl font-light text-ink"
+          className={`font-light text-ink ${amountText}`}
           numberOfLines={1}
           adjustsFontSizeToFit
+          // The calculator's `entry` stays raw; grouping is display only, and
+          // must never be parsed back.
           testID="amount-display">
-          {calc.entry}
+          {groupDigits(calc.entry)}
         </Text>
         <Pressable
           onPress={() => setCalc(backspace)}
@@ -380,19 +424,19 @@ export default function RecordScreen() {
       ) : null}
 
       <View className="mx-3">
-        <Keypad onKey={onKey} />
+        <Keypad onKey={onKey} density={density} />
       </View>
 
       {/* Surface fill and radius match the account and category pickers, so the
           form reads as one set of controls. The value alone is the label here —
           a date needs no caption to be recognisable as a date. */}
-      <View className="mx-4 mb-1 mt-3 flex-row gap-3">
+      <View className={`mx-4 mb-1 flex-row gap-3 ${byDensity(density, { regular: 'mt-3', compact: 'mt-2', tight: 'mt-1.5' })}`}>
         <Pressable
           onPress={() => setPicking('date')}
           testID="record-date"
           accessibilityRole="button"
           accessibilityLabel={`Date, ${formatDayLabel(occurredAt)}`}
-          className="flex-1 items-center rounded-lg bg-surface py-3 active:opacity-70">
+          className={`flex-1 items-center rounded-lg bg-surface active:opacity-70 ${pad}`}>
           <Text className="text-sm text-ink">{formatDayLabel(occurredAt)}</Text>
         </Pressable>
         <Pressable
@@ -400,7 +444,7 @@ export default function RecordScreen() {
           testID="record-time"
           accessibilityRole="button"
           accessibilityLabel={`Time, ${formatTimeLabel(occurredAt)}`}
-          className="flex-1 items-center rounded-lg bg-surface py-3 active:opacity-70">
+          className={`flex-1 items-center rounded-lg bg-surface active:opacity-70 ${pad}`}>
           <Text className="text-sm text-ink">{formatTimeLabel(occurredAt)}</Text>
         </Pressable>
       </View>

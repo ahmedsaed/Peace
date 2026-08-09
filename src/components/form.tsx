@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { Icon, ICON_NAMES } from '@/components/icon';
 import palette from '@/constants/palette';
@@ -112,8 +112,10 @@ export function ColorPicker({
   value: string;
   onChange: (next: string) => void;
 }) {
+  // Wraps for the same reason as the icons below it: the last few swatches were
+  // clipped off the right edge with nothing to suggest they existed.
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3">
+    <View className="flex-row flex-wrap gap-3">
       {SWATCHES.map((swatch) => (
         <Pressable
           key={swatch}
@@ -127,7 +129,7 @@ export function ColorPicker({
           style={{ backgroundColor: swatch }}
         />
       ))}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -140,8 +142,11 @@ export function IconPicker({
   color: string;
   onChange: (next: string) => void;
 }) {
+  // Wraps rather than scrolls horizontally. A horizontal strip hid two thirds of
+  // the set behind a gesture nobody thinks to make, on a form with empty space
+  // below it — you cannot choose from a list you do not know is there.
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3">
+    <View className="flex-row flex-wrap gap-3">
       {ICON_NAMES.map((name) => (
         <Pressable
           key={name}
@@ -155,7 +160,7 @@ export function IconPicker({
           <Icon name={name} size={19} color={value === name ? '#FFFFFF' : palette.muted} />
         </Pressable>
       ))}
-    </ScrollView>
+    </View>
   );
 }
 

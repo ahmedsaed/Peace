@@ -29,7 +29,9 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Lint | `npm run lint` |
 | Boot headless emulator | `npm run emu` |
 | Screenshot the device | `npm run shot -- <name>` → prints PNG path |
-| E2E flows | `npm run e2e` |
+| E2E flows | `npm run e2e` (against a release APK — see below) |
+| Release APK for your phone | `npm run apk` (arm64) |
+| Release APK for the emulator | `npm run apk:emu` (x86_64) |
 | Regenerate migrations | `npm run db:generate` (after editing `src/db/schema.ts`) |
 | Regenerate app icons | `npm i --no-save sharp && node scripts/make-icons.mjs` |
 | Validate the JS bundle without a device | `npx expo export --platform android` |
@@ -83,12 +85,39 @@ Three things that are true only because CI caught them, and will bite again:
 **Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
 merging anything that touches a screen.
 
-Every flow opens with `launchApp: clearState` followed by an `extendedWaitUntil` on `home-screen`.
-That gate is not padding: `clearState` throws away the dev build's cached JS, so a cold launch
-re-downloads the whole bundle from Metro *and then* migrates and seeds. It regularly outruns
-Maestro's default assertion wait, and when it does, five flows fail at once looking exactly like a
-broken screen. Keep the gate when adding a flow; do not "fix" a slow launch by relaxing the
-assertions that follow it.
+### Run E2E against a release APK, not the dev build
+
+```
+npm run apk:emu                                    # x86_64, ~5 min
+adb uninstall com.ahmed.peace
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+npm run e2e
+```
+
+The dev build is the wrong target for flows and wastes a lot of time proving it:
+
+- **`clearState` wipes the dev client's saved packager URL.** The next launch falls back to an
+  embedded bundle that a debug build does not have, and dies on a `loadJSBundleFromAssets` red box.
+  Flows then fail on their first assertion looking exactly like a broken screen.
+- Even when it does connect, a cold launch re-downloads ~2,200 modules from Metro. Measured on this
+  machine: **~200s for the dev build against 9s for the release APK**, and the whole suite went from
+  17m17s to 4m41s.
+
+Every flow still opens with `launchApp: clearState` followed by an `extendedWaitUntil` on
+`home-screen`, which covers migrations and seeding on the fresh-install path. Keep the gate when
+adding a flow; do not "fix" a slow launch by relaxing the assertions that follow it.
+
+**`npm run apk` builds arm64 only — it will not run on the emulator.** The install *succeeds*
+(arm64-v8a is in the emulator's `abilist`) and then the app dies at startup with
+`couldn't find DSO to load: libreactnative.so`, which reads like a broken native module rather than
+an ABI mismatch. `npm run apk:emu` builds x86_64 for the emulator; `npm run apk` stays arm64 for a
+real phone. Check with `adb shell getprop ro.product.cpu.abi` against
+`unzip -l …/app-release.apk | grep lib/`.
+
+**Kill the Gradle daemon after a native build, not just before.** It idles at ~3 GB for hours; left
+alive next to the emulator it starves the system, and the first symptom is Android's
+"System UI isn't responding" dialog swallowing every `adb shell input tap` — which looks like the
+app ignoring input. `pkill -f GradleDaemon`.
 
 ## Hard rules
 
@@ -100,6 +129,11 @@ assertions that follow it.
   on device while Node returns `"E£12,500.00"`. A green `npm test` proves nothing about currency
   rendering. Anything touching `Intl` must be checked with a screenshot on a real device, and
   symbols belong in `SYMBOL_OVERRIDES` rather than trusting the platform.
+- **Split-screen is a supported layout, not an edge case.** Records get logged with a bank
+  notification open beside the app, which leaves roughly 340dp of height instead of 800. Anything
+  with a fixed-height stack must pin what the user needs (the keypad) and let the rest scroll —
+  see `src/lib/layout.ts` and the comment in `src/app/record.tsx`. Test it without split-screen
+  using `adb shell wm size 1080x1150`, and `adb shell wm size reset` afterwards.
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
 - **testIDs must be regex-safe** — letters, digits, hyphens between words. Maestro matches ids as
   **regular expressions**, so `key-op-+` reads as "`key-op` then one or more hyphens" and silently
