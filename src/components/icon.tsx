@@ -13,6 +13,20 @@ import Svg, { Path } from 'react-native-svg';
  * 26px circle.
  */
 const PATHS: Record<string, string> = {
+  // --- app chrome: header buttons and the side menu ---
+  menu: 'M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h18v2H3v-2z',
+  // The lens is a ring, and a ring in a fill-only Path needs the inner circle
+  // wound the *opposite* way (sweep-flag 1 against the outer's 0). Same winding
+  // and non-zero fill would give a solid disc, which reads as a lollipop.
+  search:
+    'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zm0 2.2a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 1 1 0-8.6zM15.2 16.6l1.4-1.4 4.9 4.9-1.4 1.4z',
+  // Sliders rather than a gear: eight gear teeth turn to mush at 20px.
+  settings:
+    'M3 6h9v2H3V6zm14 0h4v2h-4V6zm-4-3h4v8h-4V3zM3 16h4v2H3v-2zm9 0h9v2h-9v-2zM7 13h4v8H7v-8z',
+  export: 'M11 3h2v8h3.5L12 16.5 7.5 11H11V3zM4 18h16v2.5H4V18z',
+  info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 4h2v2h-2V6zm0 4h2v8h-2v-8z',
+  back: 'M20 11v2H7.8l4.6 4.6-1.4 1.4L4 12l7-7 1.4 1.4L7.8 11H20z',
+
   // --- tab bar ---
   records: 'M5 2h14v20l-2.3-1.6L14.4 22l-2.4-1.7L9.6 22l-2.3-1.6L5 22V2zm3 5v2h8V7H8zm0 4v2h8v-2H8z',
   // Pie chart: a disc with one wedge cut away, which reads at 22px far better
@@ -73,11 +87,28 @@ const PATHS: Record<string, string> = {
 
 export type IconName = keyof typeof PATHS;
 
-/** Every slug, for the icon picker. Tab-bar glyphs are excluded — they name a
- *  section, not a category. */
-export const ICON_NAMES = Object.keys(PATHS).filter(
-  (n) => !['records', 'analysis', 'budgets', 'accounts', 'categories'].includes(n)
-);
+/**
+ * Navigation and chrome glyphs. They name a section or an action, not a
+ * category, so the icon picker must not offer them — a category called
+ * "Groceries" with a hamburger-menu icon is a bug that only shows up in a
+ * screenshot. Every glyph added above the category block belongs here too.
+ */
+const CHROME = [
+  'menu',
+  'search',
+  'settings',
+  'export',
+  'info',
+  'back',
+  'records',
+  'analysis',
+  'budgets',
+  'accounts',
+  'categories',
+];
+
+/** Every slug the icon picker may offer. */
+export const ICON_NAMES = Object.keys(PATHS).filter((n) => !CHROME.includes(n));
 
 export function hasIcon(name: string): boolean {
   return name in PATHS;

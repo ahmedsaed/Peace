@@ -78,6 +78,49 @@ Two rules for adding a path:
   segment (`M5 8l3 2`) renders as nothing at all. This has already shipped two invisible icons.
 - Draw on a 24×24 viewBox and check it at 14px inside a 26px circle, which is the smallest place
   it appears.
+- A **ring** (the search lens, the About badge) needs its inner subpath wound the *opposite* way —
+  `sweep-flag 1` against the outer's `0`. Same winding under non-zero fill gives a solid disc,
+  which reads as a lollipop rather than a magnifier.
+- Chrome glyphs (`menu`, `search`, `settings`, `export`, `info`, `back`) must be added to `CHROME`
+  in the same file, or they leak into the category icon picker.
+
+## App icon
+
+Concept: a wallet with a sprout on it — money that grows, which is where the name comes from. The
+wallet greens are deliberately deeper than the in-app `income` sage; the cards borrow `accent` and
+`transfer` so the launcher icon and the UI are visibly the same product.
+
+Everything is generated from one vector definition by
+[`scripts/make-icons.mjs`](../scripts/make-icons.mjs):
+
+```
+npm i --no-save sharp && node scripts/make-icons.mjs
+```
+
+`sharp` is intentionally not a dependency — it is a large platform-specific binary, this runs
+about twice a year, and `npm ci` validates the lockfile strictly. **Never hand-edit the PNGs**;
+change the geometry in the script and re-run. The source SVGs land in `assets/logo/` so the
+artwork stays diffable.
+
+| Output | Purpose |
+|---|---|
+| `android-icon-foreground.png` | Adaptive icon foreground, transparent |
+| `android-icon-background.png` | Adaptive icon background, radial ground |
+| `android-icon-monochrome.png` | Android 13+ themed icon |
+| `icon.png` | Legacy square launcher icon, web, stores |
+| `splash-icon.png` | Splash, over `#17140F` |
+| `logo-mark.png` | 144px in-app mark for the drawer and About |
+| `favicon.png` | Web |
+
+Two things about this that are easy to get wrong:
+
+- **The adaptive foreground looks too small on purpose.** The launcher composes 108×108dp and masks
+  down to 72×72dp, with only the central 66×66dp circle guaranteed visible. Art drawn edge-to-edge
+  gets its corners eaten by a circular mask, so the geometry is scaled to fit that circle.
+- **The monochrome layer uses only the alpha channel** — the colour is discarded and replaced by
+  the wallpaper theme. Flattened naively, the cards, the wallet and the clasp merge into one
+  unreadable blob. The mask therefore paints a transparent gap around every shape before filling
+  it, and knocks the sprout out as a hole.
 
 ## Native surfaces
 

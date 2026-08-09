@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+
+<defs>
+    <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <g transform="translate(512 512) scale(0.9) translate(-515 -505)">
+        <rect x="270" y="250" width="300" height="240" rx="36" fill="#fff"/>
+        <rect x="324" y="280" width="332" height="242" rx="52" fill="#000"/>
+        <rect x="340" y="296" width="300" height="210" rx="36" fill="#fff"/>
+        <rect x="394" y="326" width="332" height="212" rx="52" fill="#000"/>
+        <rect x="410" y="342" width="300" height="180" rx="36" fill="#fff"/>
+        <rect x="184" y="414" width="592" height="362" rx="82" fill="#000"/>
+        <rect x="200" y="430" width="560" height="330" rx="66" fill="#fff"/>
+        <rect x="634" y="504" width="212" height="182" rx="64" fill="#000"/>
+        <rect x="650" y="520" width="180" height="150" rx="48" fill="#fff"/>
+        <circle cx="748" cy="595" r="46" fill="#000"/>
+        <circle cx="748" cy="595" r="30" fill="#000"/>
+        <g transform="translate(420 595) translate(-533 -628)">
+      <path d="M 548 560 C 536 632 532 690 532 744" fill="none" stroke="#000" stroke-width="18" stroke-linecap="round"/>
+      <path d="M 536 648 C 604 627 634 579 624 508 C 556 529 526 577 536 648 Z" fill="#000"/>
+      <path d="M 520 664 C 464 661 434 631 432 574 C 488 577 518 607 520 664 Z" fill="#000"/>
+    </g>
+      </g>
+    </mask>
+  </defs>
+  <rect width="1024" height="1024" fill="#fff" mask="url(#m)"/>
+</svg>
