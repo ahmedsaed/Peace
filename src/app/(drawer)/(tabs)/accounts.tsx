@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import { Fab, Screen, ScreenHeader } from '@/components/screen';
+import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
 import { listAccountsWithBalance, totalBalance } from '@/db/repo/accounts';
 import { formatMinor } from '@/lib/money';
@@ -24,9 +24,9 @@ export default function AccountsScreen() {
 
   return (
     <Screen testID="accounts-screen">
-      <ScreenHeader title="Accounts" />
-
-      <View className="items-center bg-surface px-4 pb-4">
+      {/* No "Accounts" caption: the active tab already says which screen this
+          is, and repeating it cost a row of height for no information. */}
+      <View className="items-center bg-surface px-4 pb-4 pt-1">
         <Text className="mb-1 text-[10px] uppercase tracking-widest text-muted">All accounts</Text>
         <Text className="text-xl font-semibold text-ink" testID="accounts-total">
           {formatMinor(total, 'EGP')}

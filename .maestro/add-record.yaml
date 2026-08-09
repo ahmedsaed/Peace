@@ -48,6 +48,24 @@ appId: com.ahmed.peace
 
 - takeScreenshot: 01-record-filled
 
+# Thousand separators are display-only, so this is the only place the grouping
+# can be checked at all — the saved value never carries a comma. Typing four
+# more digits pushes the entry past a thousand and back.
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "key-8"
+- assertVisible:
+    id: "amount-display"
+    text: "3,598"
+- tapOn:
+    id: "key-backspace"
+- tapOn:
+    id: "key-backspace"
+- assertVisible:
+    id: "amount-display"
+    text: "35"
+
 # Save without pressing "=" — evaluating a pending operation is Save's job.
 - tapOn:
     id: "record-save"

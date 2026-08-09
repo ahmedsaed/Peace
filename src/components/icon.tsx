@@ -107,8 +107,23 @@ const CHROME = [
   'categories',
 ];
 
+/**
+ * Slugs that draw a glyph another *pickable* slug already draws. `fork` and
+ * `food` are the same path, and both are seeded (Restaurants uses `fork`, its
+ * Food parent uses `food`), so the picker offered two identical circles — you
+ * could not tell which one you had chosen. The slug stays in `PATHS` because
+ * dropping it would render every seeded Restaurants row as `dots`.
+ *
+ * `receipt` and `tag` are NOT listed here: they duplicate `records` and
+ * `categories`, which are chrome and already filtered out, so each glyph still
+ * appears exactly once in the picker.
+ */
+const ALIASES = ['fork'];
+
 /** Every slug the icon picker may offer. */
-export const ICON_NAMES = Object.keys(PATHS).filter((n) => !CHROME.includes(n));
+export const ICON_NAMES = Object.keys(PATHS).filter(
+  (n) => !CHROME.includes(n) && !ALIASES.includes(n)
+);
 
 export function hasIcon(name: string): boolean {
   return name in PATHS;
