@@ -46,3 +46,8 @@ example
 .screenshots/
 .maestro/**/screenshots/
 dist/
+
+# signing material — never commit
+*.keystore
+*.jks
+keystore.properties
