@@ -154,7 +154,8 @@ These exist because breaking them corrupts a ledger quietly, which is the worst 
 | [AGENTS.md](AGENTS.md) | Toolchain, verification workflow, environment constraints and the OOM traps |
 | [docs/roadmap.md](docs/roadmap.md) | Six stages, dependencies, and the decisions already made |
 | [docs/research/mymoney.md](docs/research/mymoney.md) | The reference app, from screenshots of v6.6 |
-| [docs/design-system.md](docs/design-system.md) | The "Ledger" palette, its rules, and category colours |
+| [docs/design-system.md](docs/design-system.md) | The "Ledger" palette, its rules, the app icon, and split-screen density |
+| [docs/research/credit-cards.md](docs/research/credit-cards.md) | Why card accounts drift, and the proposed fix |
 
 Keep these current. They are the reason a new session can pick the work up without re-deriving
 decisions that were already made and paid for.

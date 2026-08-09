@@ -1,4 +1,4 @@
-import { formatMinor, parseAmountToMinor, sumMinor } from './money';
+import { formatMinor, groupDigits, parseAmountToMinor, sumMinor } from './money';
 
 describe('parseAmountToMinor', () => {
   it('parses plain decimals into minor units', () => {
@@ -59,5 +59,34 @@ describe('formatMinor', () => {
 
   it('respects zero-decimal currencies when formatting', () => {
     expect(formatMinor(1200, 'JPY')).toBe('¥1,200');
+  });
+});
+
+describe('groupDigits', () => {
+  it('groups the integer part', () => {
+    expect(groupDigits('1234')).toBe('1,234');
+    expect(groupDigits('1234567')).toBe('1,234,567');
+    expect(groupDigits('999')).toBe('999');
+    expect(groupDigits('0')).toBe('0');
+  });
+
+  // The whole reason this is not Intl.NumberFormat. Every one of these is a
+  // state the display passes through while a single amount is being typed.
+  it('leaves a half-typed fraction exactly as typed', () => {
+    expect(groupDigits('1234.')).toBe('1,234.');
+    expect(groupDigits('1234.5')).toBe('1,234.5');
+    expect(groupDigits('1234.50')).toBe('1,234.50');
+    expect(groupDigits('0.0')).toBe('0.0');
+    expect(groupDigits('.')).toBe('.');
+  });
+
+  it('never groups the fraction', () => {
+    expect(groupDigits('1.23456')).toBe('1.23456');
+  });
+
+  it('passes anything unexpected through untouched', () => {
+    expect(groupDigits('Cannot divide by zero')).toBe('Cannot divide by zero');
+    expect(groupDigits('-12')).toBe('-12');
+    expect(groupDigits('')).toBe('');
   });
 });

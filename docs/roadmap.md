@@ -90,6 +90,23 @@ worse than putting it there first.
 
 Settings, Export and Search are laid out but **not wired**. They belong to Stage 2.
 
+### Polish pass (after nine days of real use)
+
+- ✅ **Split-screen layout.** The record screen is used with a bank notification open beside it, and
+  the keypad used to slide off the bottom while the note collapsed to nothing. The amount, keypad
+  and date row are now pinned and everything above them scrolls. See
+  [design-system.md](design-system.md#density-designing-for-split-screen).
+- ✅ **Date and time dialogs in the Ledger palette** — no platform blue left anywhere
+- ✅ Account picker shows each account's **balance**, so "which account still has money in it" is
+  answerable at the moment of choosing
+- ✅ Amounts over a thousand show **separators** while being typed
+- ✅ Icon and colour pickers **wrap** instead of hiding two thirds of their options off-screen
+- ✅ Picker sheets lost their dark scrim, which flashed in as a slab against the slide animation
+- ✅ Accounts and Categories lost their redundant sub-headers — the tab bar already names the screen
+
+Still open from that pass: a **default account** setting (Stage 2's settings screen) and
+[credit-card handling](research/credit-cards.md), which needs a decision before it needs code.
+
 ---
 
 ## Stage 2 — Money features

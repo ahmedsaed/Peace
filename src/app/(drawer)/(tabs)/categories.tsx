@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import { Fab, Screen, ScreenHeader } from '@/components/screen';
+import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
 import { listCategoryTree, type CategoryNode } from '@/db/repo/categories';
 import type { Category } from '@/db/schema';
@@ -77,7 +77,7 @@ export default function CategoriesScreen() {
 
   return (
     <Screen testID="categories-screen">
-      <ScreenHeader title="Categories" />
+      {/* Same as Accounts: the tab bar already names this screen. */}
       {/* Income first, matching the reference app. It is the far shorter list,
           so leading with it keeps both sections reachable — putting ~26 expense
           rows first buries income below the fold entirely. */}
