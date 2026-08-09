@@ -73,6 +73,12 @@ const PATHS: Record<string, string> = {
 
 export type IconName = keyof typeof PATHS;
 
+/** Every slug, for the icon picker. Tab-bar glyphs are excluded — they name a
+ *  section, not a category. */
+export const ICON_NAMES = Object.keys(PATHS).filter(
+  (n) => !['records', 'analysis', 'budgets', 'accounts', 'categories'].includes(n)
+);
+
 export function hasIcon(name: string): boolean {
   return name in PATHS;
 }

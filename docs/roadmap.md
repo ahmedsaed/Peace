@@ -34,7 +34,7 @@ Maestro walks the whole shell.
 
 ---
 
-## Stage 1 — Daily driver 🚧
+## Stage 1 — Daily driver ✅ done
 
 The point where you can stop using MyMoney. This is the stage that matters most.
 
@@ -48,8 +48,12 @@ The point where you can stop using MyMoney. This is the stage that matters most.
 - ✅ **Date and time picker** — native dialogs, dark-themed. Future dates are allowed: a known
   upcoming bill is a legitimate entry, and Stage 3's recurring rules generate future-dated
   records anyway.
-- Delete with undo
-- Accounts CRUD, Categories CRUD
+- ✅ **Delete with undo** — the deleted rows are held in memory rather than soft-deleted, so the
+  schema stays honest: a deleted record is gone, not hiding behind a filter.
+- ✅ **Accounts CRUD** — with a guard: an account holding records cannot be deleted, because
+  `account_id` cascades and would take the history with it. Archive instead.
+- ✅ **Categories CRUD** — deleting is safe by construction: records survive uncategorised and
+  sub-categories are promoted rather than deleted.
 
 ### The keypad is an immediate-execution calculator
 

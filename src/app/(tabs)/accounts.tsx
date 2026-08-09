@@ -1,19 +1,26 @@
-import { ScrollView, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import { Screen, ScreenHeader } from '@/components/screen';
+import { Fab, Screen, ScreenHeader } from '@/components/screen';
 import { db } from '@/db/client';
 import { listAccountsWithBalance, totalBalance } from '@/db/repo/accounts';
 import { formatMinor } from '@/lib/money';
 
-/**
- * Reads synchronously on render. There is nothing to mutate accounts from yet,
- * so a live query would buy nothing; this moves to `useLiveQuery` in Stage 1
- * when records start changing balances.
- */
 export default function AccountsScreen() {
-  const accounts = listAccountsWithBalance(db);
-  const total = totalBalance(db);
+  const router = useRouter();
+  const [accounts, setAccounts] = useState<ReturnType<typeof listAccountsWithBalance>>([]);
+  const [total, setTotal] = useState(0);
+
+  // Re-read on focus so a balance change, or a newly added account, shows up on
+  // the way back from any other screen.
+  useFocusEffect(
+    useCallback(() => {
+      setAccounts(listAccountsWithBalance(db));
+      setTotal(totalBalance(db));
+    }, [])
+  );
 
   return (
     <Screen testID="accounts-screen">
@@ -28,9 +35,10 @@ export default function AccountsScreen() {
 
       <ScrollView contentContainerClassName="p-4 gap-3">
         {accounts.map((account) => (
-          <View
+          <Pressable
             key={account.id}
-            className="flex-row items-center gap-3 rounded-xl bg-surface p-3"
+            onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
+            className="flex-row items-center gap-3 rounded-xl bg-surface p-3 active:opacity-70"
             testID={`account-${account.id}`}>
             <View
               className="h-10 w-10 items-center justify-center rounded-full"
@@ -51,9 +59,11 @@ export default function AccountsScreen() {
               }`}>
               {formatMinor(account.balanceMinor, account.currency)}
             </Text>
-          </View>
+          </Pressable>
         ))}
       </ScrollView>
+
+      <Fab onPress={() => router.push('/account')} testID="fab-account" />
     </Screen>
   );
 }

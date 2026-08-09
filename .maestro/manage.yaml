@@ -1,0 +1,74 @@
+appId: com.ahmed.peace
+---
+# Creating an account and a category, and the guard that stops an account being
+# deleted out from under its history.
+- launchApp:
+    clearState: true
+
+# --- create an account ---
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-screen"
+- tapOn:
+    id: "fab-account"
+- assertVisible: "New account"
+
+- tapOn:
+    id: "account-name"
+- inputText: "Savings"
+- tapOn:
+    id: "acct-type-savings"
+- tapOn:
+    id: "form-save"
+
+- assertVisible:
+    id: "accounts-screen"
+- assertVisible: "Savings"
+- takeScreenshot: 01-account-created
+
+# --- create a category ---
+- tapOn:
+    id: "tab-categories"
+- tapOn:
+    id: "fab-category"
+- assertVisible: "New category"
+
+- tapOn:
+    id: "category-name"
+- inputText: "Gym"
+- tapOn:
+    id: "form-save"
+
+- assertVisible:
+    id: "categories-screen"
+- scrollUntilVisible:
+    element: "Gym"
+    direction: DOWN
+- takeScreenshot: 02-category-created
+
+# --- the account delete guard ---
+# Log something against Cash, then try to delete Cash. Deleting cascades to
+# transactions, so the repository refuses and says to archive instead.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "record-save"
+- assertVisible: "-E£9.00"
+
+- tapOn:
+    id: "tab-accounts"
+- tapOn: "Cash"
+- assertVisible: "Edit account"
+- tapOn:
+    id: "account-delete"
+- assertVisible:
+    id: "account-error"
+# Maestro matches text as a regex anchored to the WHOLE element, so a substring
+# needs explicit wildcards — "Archive it instead" alone never matches a sentence.
+- assertVisible: ".*Archive it instead.*"
+- takeScreenshot: 03-delete-guarded

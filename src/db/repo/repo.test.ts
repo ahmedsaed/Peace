@@ -6,10 +6,19 @@ import { eq, sql } from 'drizzle-orm';
 import { createTestDb, type TestDb } from '../../test/db';
 import { accounts, categories, transactions } from '../schema';
 import { accountId, catId, seedDefaults } from '../seed';
-import { listAccountsWithBalance, totalBalance } from './accounts';
+import {
+  createAccount,
+  deleteAccount,
+  getAccount,
+  listAccountsWithBalance,
+  totalBalance,
+  updateAccount,
+} from './accounts';
 import {
   buildCategoryTree,
   createCategory,
+  deleteCategory,
+  getCategory,
   InvariantError,
   updateCategory,
 } from './categories';
@@ -467,5 +476,95 @@ describe('delete and restore', () => {
     // Undo must fail loudly; silently dropping the row would look like success.
     expect(() => restoreRecords(db, removed)).toThrow();
     expect(db.select().from(transactions).all()).toHaveLength(0);
+  });
+});
+
+describe('account CRUD', () => {
+  let db: TestDb;
+  beforeEach(() => {
+    db = createTestDb().db;
+    seedDefaults(db);
+  });
+
+  it('creates an account with sensible defaults', () => {
+    const a = createAccount(db, { name: '  Savings  ' });
+    expect(a.name).toBe('Savings');
+    expect(a.currency).toBe('EGP');
+    expect(a.openingBalance).toBe(0);
+    expect(a.archived).toBe(false);
+  });
+
+  it('refuses a blank name', () => {
+    expect(() => createAccount(db, { name: '   ' })).toThrow(/needs a name/i);
+    expect(() => updateAccount(db, CASH, { name: '' })).toThrow(/needs a name/i);
+  });
+
+  it('appends new accounts after the existing ones', () => {
+    const a = createAccount(db, { name: 'Third' });
+    expect(a.sortOrder).toBeGreaterThan(1);
+  });
+
+  it('counts the opening balance toward the balance', () => {
+    const a = createAccount(db, { name: 'Savings', openingBalance: 500_00 });
+    expect(listAccountsWithBalance(db).find((x) => x.id === a.id)!.balanceMinor).toBe(50_000);
+  });
+
+  it('hides archived accounts from pickers but keeps them retrievable', () => {
+    updateAccount(db, CASH, { archived: true });
+    expect(listAccountsWithBalance(db).some((a) => a.id === CASH)).toBe(false);
+    expect(listAccountsWithBalance(db, true).some((a) => a.id === CASH)).toBe(true);
+  });
+
+  it('deletes an account that has no records', () => {
+    const a = createAccount(db, { name: 'Scratch' });
+    deleteAccount(db, a.id);
+    expect(getAccount(db, a.id)).toBeUndefined();
+  });
+
+  it('REFUSES to delete an account that has records', () => {
+    // account_id cascades, so this would silently delete the history too.
+    createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 100 });
+    expect(() => deleteAccount(db, CASH)).toThrow(/Archive it instead/i);
+    expect(getAccount(db, CASH)).toBeDefined();
+    expect(db.select().from(transactions).all()).toHaveLength(1);
+  });
+
+  it('counts a transfer leg as a record for that guard', () => {
+    createTransfer(db, { fromAccountId: BANK, toAccountId: CASH, amountMinor: 100 });
+    expect(() => deleteAccount(db, BANK)).toThrow(/Archive it instead/i);
+    expect(() => deleteAccount(db, CASH)).toThrow(/Archive it instead/i);
+  });
+});
+
+describe('category delete', () => {
+  let db: TestDb;
+  beforeEach(() => {
+    db = createTestDb().db;
+    seedDefaults(db);
+  });
+
+  it('leaves records uncategorised rather than deleting them', () => {
+    createRecord(db, {
+      type: 'expense',
+      accountId: CASH,
+      categoryId: catId('food'),
+      amountMinor: 100,
+    });
+
+    expect(deleteCategory(db, catId('food'))).toEqual({ orphanedRecords: 1 });
+    const rows = db.select().from(transactions).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].categoryId).toBeNull();
+  });
+
+  it('promotes children instead of deleting them', () => {
+    deleteCategory(db, catId('food'));
+    const groceries = getCategory(db, catId('groceries'));
+    expect(groceries).toBeDefined();
+    expect(groceries!.parentId).toBeNull();
+  });
+
+  it('reports zero for a category nothing uses', () => {
+    expect(deleteCategory(db, catId('pets'))).toEqual({ orphanedRecords: 0 });
   });
 });

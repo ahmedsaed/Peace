@@ -2,7 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import * as schema from '../schema';
-import { categories, type Category, type NewCategory } from '../schema';
+import { categories, transactions, type Category, type NewCategory } from '../schema';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -143,4 +143,31 @@ export function listTopLevel(db: Db, kind: Category['kind']): Category[] {
     .from(categories)
     .where(and(eq(categories.kind, kind), isNull(categories.parentId)))
     .all();
+}
+
+export function getCategory(db: Db, id: string): Category | undefined {
+  return db.select().from(categories).where(eq(categories.id, id)).get();
+}
+
+export function categoryRecordCount(db: Db, id: string): number {
+  return db.select().from(transactions).where(eq(transactions.categoryId, id)).all().length;
+}
+
+/**
+ * Delete a category.
+ *
+ * Unlike accounts, this is SAFE by construction: `transactions.category_id` is
+ * SET NULL, so records survive uncategorised, and `categories.parent_id` is also
+ * SET NULL, so children are promoted to top level rather than deleted. Losing a
+ * label should never lose the money or the sub-categories underneath it.
+ *
+ * Returns how many records were left uncategorised, so the caller can say so.
+ */
+export function deleteCategory(db: Db, id: string): { orphanedRecords: number } {
+  const existing = getCategory(db, id);
+  if (!existing) throw new InvariantError(`Category "${id}" does not exist.`);
+
+  const orphanedRecords = categoryRecordCount(db, id);
+  db.delete(categories).where(eq(categories.id, id)).run();
+  return { orphanedRecords };
 }
