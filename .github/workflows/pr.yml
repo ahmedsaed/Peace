@@ -103,11 +103,26 @@ jobs:
         # C++ compile time versus building all four ABIs.
         run: ./gradlew app:assembleRelease -x lint -x test -PreactNativeArchitectures=arm64-v8a
 
-      - name: Report what signed it
+      # An assertion, not a log line: if the secrets were present, the APK MUST
+      # carry our certificate. Without this check a misconfigured secret would
+      # silently fall back to debug signing and produce an APK that cannot
+      # upgrade anyone's install — the failure would only surface on a phone.
+      - name: Verify signing identity
+        env:
+          SIGNED: ${{ env.PEACE_STORE_FILE }}
         run: |
           APK=android/app/build/outputs/apk/release/app-release.apk
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" \
-            | grep -E "Signer #1 certificate DN" || true
+          APKSIGNER=$(find "$ANDROID_HOME"/build-tools -name apksigner | sort -V | tail -1)
+          CERTS=$("$APKSIGNER" verify --print-certs "$APK")
+          echo "$CERTS" | grep -E "Signer #1 certificate (DN|SHA-256)"
+          if [ -n "$SIGNED" ]; then
+            echo "$CERTS" | grep -q "CN=Peace" || {
+              echo "::error::Release key was configured but the APK is not signed with it."
+              exit 1
+            }
+          else
+            echo "::warning::No signing secrets available — this APK is debug-signed and cannot upgrade an existing install."
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
