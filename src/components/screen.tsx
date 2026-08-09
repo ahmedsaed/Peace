@@ -1,3 +1,5 @@
+import { router, useNavigation } from 'expo-router';
+import type { DrawerNavigationProp } from 'expo-router/drawer';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -5,18 +7,83 @@ import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { addMonths, formatPeriod, type Period } from '@/lib/period';
 
+/** Header icon button. 44px square: the Material minimum touch target. */
+export function HeaderButton({
+  icon,
+  label,
+  onPress,
+  testID,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className="h-11 w-11 items-center justify-center rounded-full active:bg-raised">
+      <Icon name={icon} size={22} color={palette.ink} />
+    </Pressable>
+  );
+}
+
 /**
- * The app's own header, on every screen. The tab bar already says which section
- * you are in, so this carries the name rather than repeating the tab label —
- * the same choice the reference app makes.
+ * The app's own header, on every tab screen. The tab bar already says which
+ * section you are in, so this carries the name rather than repeating the tab
+ * label — the same choice the reference app makes.
+ *
+ * Menu on the left, search on the right: both thumb-reachable corners, and the
+ * arrangement every Android user already has muscle memory for.
  */
 export function AppHeader({ right }: { right?: React.ReactNode }) {
+  // Addressed to the drawer layout explicitly rather than relying on the tab
+  // navigator inheriting `openDrawer` from its parent. Passing the path makes
+  // expo-router throw "Could not find parent navigation" if the (drawer) group
+  // is ever moved — far better than a hamburger that silently does nothing.
+  const drawer = useNavigation<DrawerNavigationProp<ReactNavigation.RootParamList>>('/(drawer)');
+
   return (
-    <View className="flex-row items-center justify-between bg-surface px-4 pb-2 pt-1">
-      <Text className="text-xl font-semibold tracking-tight text-accent" testID="app-title">
+    <View className="flex-row items-center bg-surface px-1 pb-2 pt-1">
+      <HeaderButton
+        icon="menu"
+        label="Open menu"
+        testID="nav-menu"
+        onPress={() => drawer.openDrawer()}
+      />
+      <Text
+        className="flex-1 pl-1 text-xl font-semibold tracking-tight text-accent"
+        testID="app-title">
         Peace
       </Text>
       {right}
+      <HeaderButton
+        icon="search"
+        label="Search records"
+        testID="nav-search"
+        onPress={() => router.push('/search')}
+      />
+    </View>
+  );
+}
+
+/**
+ * Header for a screen pushed over the tabs — carries a back arrow and its own
+ * title instead of the app name.
+ */
+export function StackHeader({ title, right }: { title: string; right?: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={{ paddingTop: insets.top }} className="bg-surface">
+      <View className="flex-row items-center bg-surface px-1 pb-2 pt-1">
+        <HeaderButton icon="back" label="Go back" testID="nav-back" onPress={() => router.back()} />
+        <Text className="flex-1 pl-1 text-xl font-semibold tracking-tight text-ink">{title}</Text>
+        {right}
+      </View>
     </View>
   );
 }

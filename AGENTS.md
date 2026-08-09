@@ -31,6 +31,7 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Screenshot the device | `npm run shot -- <name>` → prints PNG path |
 | E2E flows | `npm run e2e` |
 | Regenerate migrations | `npm run db:generate` (after editing `src/db/schema.ts`) |
+| Regenerate app icons | `npm i --no-save sharp && node scripts/make-icons.mjs` |
 | Validate the JS bundle without a device | `npx expo export --platform android` |
 | Dev server | `npm start` |
 
@@ -41,6 +42,14 @@ Cheapest first — most changes never need a device.
 1. `npm test` + `npm run typecheck` for logic.
 2. `npx expo export --platform android` catches Metro/babel/NativeWind config breakage in ~30s.
 3. Only then boot a device: `npm run emu`, then `npm start`, then screenshot.
+
+**Added a route? `npm run typecheck` will lie to you.** `typedRoutes` is on, and the union of valid
+hrefs lives in `.expo/types/router.d.ts`, which is written by **the dev server** — not by `tsc`,
+and not by `expo export`. A stale copy rejects `router.push('/your-new-screen')` with a wall of
+literal types. Start `npx expo start` once, wait for the file to change, then kill it by port.
+CI is the mirror image: `.expo/` is gitignored, so a fresh checkout has no generated types at all
+and the same push typechecks whether the route exists or not. Neither machine can catch a typo in
+a route path on its own.
 
 **Killing Metro: go by port, not by name.** Node renames its main thread, so a stale dev server
 shows up as `MainThread` and `pkill -f "expo start"` misses it — while `pkill -f` *does* match the
@@ -73,6 +82,13 @@ Three things that are true only because CI caught them, and will bite again:
 
 **Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
 merging anything that touches a screen.
+
+Every flow opens with `launchApp: clearState` followed by an `extendedWaitUntil` on `home-screen`.
+That gate is not padding: `clearState` throws away the dev build's cached JS, so a cold launch
+re-downloads the whole bundle from Metro *and then* migrates and seeds. It regularly outruns
+Maestro's default assertion wait, and when it does, five flows fail at once looking exactly like a
+broken screen. Keep the gate when adding a flow; do not "fix" a slow launch by relaxing the
+assertions that follow it.
 
 ## Hard rules
 
