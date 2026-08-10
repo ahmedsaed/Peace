@@ -128,9 +128,14 @@ work depends on Stage 2's per-record currency.
 - **Budgets** — per month, "copy from last month", progress bars, over-budget states
 - **Analysis** — donut by category, ranked bars with %, cash-flow over time, **carry-over**
 - Search and filters — the screen and its entry point exist; the query does not
-- **Export CSV + backup/restore** — MyMoney parity, and your safety net for switching. Worth
-  pulling to the front of the stage: until the data can get back out, "stop using MyMoney" is a
-  one-way door.
+- ✅ **Export CSV + backup** — done first, because a month of real records with no way out is a
+  worse risk than any missing feature. CSV carries every record and **both legs of each transfer**
+  (unlike the records list, which hides one) so per-account balances in the file add up. The backup
+  is a byte copy of the SQLite file, taken after a `wal_checkpoint(TRUNCATE)` — without that it
+  would silently omit the newest records, which are the ones you would notice missing.
+- **Restore** — still to do. A backup is a standard SQLite file so nothing is locked up, but
+  one-tap recovery does not exist yet. It needs the connection closed, the file swapped and the app
+  restarted, which is the risky half and deserves its own change.
 
 ---
 
