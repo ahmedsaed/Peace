@@ -31,6 +31,7 @@ import {
 } from '@/lib/calculator';
 import { byDensity, useDensity } from '@/lib/layout';
 import { formatMinor, groupDigits } from '@/lib/money';
+import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
 import { useUndoStore } from '@/state/undo';
 
@@ -81,8 +82,19 @@ export default function RecordScreen() {
   const [note, setNote] = useState(existing?.note ?? '');
   const [occurredAt, setOccurredAt] = useState<Date>(existing?.occurredAt ?? new Date());
   const [picking, setPicking] = useState<'date' | 'time' | null>(null);
-  const [sheet, setSheet] = useState<'account' | 'category' | 'toAccount' | null>(null);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  /**
+   * Which pickers the `=` flow has already put in front of the user.
+   *
+   * Editing starts with everything answered: an existing record's account and
+   * category were chosen once already, so re-prompting for them would make `=`
+   * useless for the common edit, which is changing the amount.
+   */
+  const [offered, setOffered] = useState<Sheet[]>(() =>
+    existing ? ['account', 'toAccount', 'category'] : []
+  );
   const offerUndo = useUndoStore((state) => state.offer);
 
   const account = accounts.find((a) => a.id === accountId);
@@ -110,8 +122,58 @@ export default function RecordScreen() {
     !!accountId &&
     (type !== 'transfer' || (!!toAccountId && toAccountId !== accountId));
 
+  /**
+   * What `=` will do on the next press. Computed every render because it also
+   * drives the key's label — see src/lib/record-flow.ts for why the key cannot
+   * just say "=".
+   */
+  const flow = nextAction({
+    hasPendingOp: calc.pendingOp !== null,
+    type,
+    accountId: accountId || null,
+    toAccountId,
+    categoryId,
+    amountMinor,
+    offered,
+  });
+
+  function openSheet(next: Sheet) {
+    setOffered((current) => (current.includes(next) ? current : [...current, next]));
+    setSheet(next);
+  }
+
+  /**
+   * The keypad drives the whole screen. The pickers are at the top and the keys
+   * at the bottom, so without this, logging a spend one-handed means reaching
+   * across the phone twice.
+   */
+  function advance() {
+    switch (flow.kind) {
+      case 'evaluate':
+        setCalc((state) => equals(state, currency));
+        return;
+      case 'open':
+        openSheet(flow.sheet);
+        return;
+      case 'save':
+        onSave();
+        return;
+      case 'incomplete':
+        setHint(flow.message);
+    }
+  }
+
   function onKey(press: KeyPress) {
     setError(null);
+    setHint(null);
+
+    // `=` is handled outside the calculator: it only evaluates while a sum is
+    // pending, and otherwise moves the record along.
+    if (press.kind === 'equals') {
+      advance();
+      return;
+    }
+
     setCalc((state) => {
       switch (press.kind) {
         case 'digit':
@@ -120,8 +182,6 @@ export default function RecordScreen() {
           return inputDot(state, currency);
         case 'op':
           return inputOp(state, press.value, currency);
-        case 'equals':
-          return equals(state, currency);
       }
     });
   }
@@ -356,7 +416,7 @@ export default function RecordScreen() {
               label={`${type === 'transfer' ? 'From account' : 'Account'}: ${account?.name ?? 'choose'}`}
               icon={account?.icon}
               color={account?.color}
-              onPress={() => setSheet('account')}
+              onPress={() => openSheet('account')}
               testID="pick-account"
             />
             {type === 'transfer' ? (
@@ -364,7 +424,7 @@ export default function RecordScreen() {
                 label={`To account: ${accounts.find((a) => a.id === toAccountId)?.name ?? 'choose'}`}
                 icon={accounts.find((a) => a.id === toAccountId)?.icon ?? 'transfer'}
                 color={accounts.find((a) => a.id === toAccountId)?.color}
-                onPress={() => setSheet('toAccount')}
+                onPress={() => openSheet('toAccount')}
                 testID="pick-to-account"
               />
             ) : (
@@ -372,7 +432,7 @@ export default function RecordScreen() {
                 label={`Category: ${category?.name ?? 'choose'}`}
                 icon={category?.icon ?? 'categories'}
                 color={category?.color}
-                onPress={() => setSheet('category')}
+                onPress={() => openSheet('category')}
                 testID="pick-category"
               />
             )}
@@ -393,7 +453,7 @@ export default function RecordScreen() {
                 value={account?.name}
                 icon={account?.icon}
                 color={account?.color}
-                onPress={() => setSheet('account')}
+                onPress={() => openSheet('account')}
                 testID="pick-account"
               />
               {type === 'transfer' ? (
@@ -402,7 +462,7 @@ export default function RecordScreen() {
                   value={accounts.find((a) => a.id === toAccountId)?.name}
                   icon={accounts.find((a) => a.id === toAccountId)?.icon}
                   color={accounts.find((a) => a.id === toAccountId)?.color}
-                  onPress={() => setSheet('toAccount')}
+                  onPress={() => openSheet('toAccount')}
                   testID="pick-to-account"
                 />
               ) : (
@@ -411,7 +471,7 @@ export default function RecordScreen() {
                   value={category?.name}
                   icon={category?.icon ?? 'categories'}
                   color={category?.color}
-                  onPress={() => setSheet('category')}
+                  onPress={() => openSheet('category')}
                   testID="pick-category"
                 />
               )}
@@ -460,6 +520,12 @@ export default function RecordScreen() {
         <Text className="mx-4 mb-2 text-sm text-expense" testID="record-error">
           {calc.error ?? error}
         </Text>
+      ) : hint ? (
+        // Muted, not the expense colour: pressing "next" with nothing typed is
+        // the user asking what comes next, not making a mistake.
+        <Text className="mx-4 mb-2 text-sm text-muted" testID="record-hint">
+          {hint}
+        </Text>
       ) : null}
 
       {/* Delete sits at the bottom-left, far from Save, and is the only
@@ -475,7 +541,7 @@ export default function RecordScreen() {
       ) : null}
 
       <View className="mx-3">
-        <Keypad onKey={onKey} density={density} />
+        <Keypad onKey={onKey} density={density} equalsLabel={flowKeyLabel(flow)} />
       </View>
 
       {/* Surface fill and radius match the account and category pickers, so the
