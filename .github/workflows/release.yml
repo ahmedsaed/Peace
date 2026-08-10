@@ -44,9 +44,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Globbed rather than named. The artifact name cannot be passed out of the
+      # build job — it starts with "peace", which is the value of the
+      # PEACE_KEY_ALIAS secret, and GitHub drops a job output containing a
+      # secret instead of masking it. Matching on shape is also simply more
+      # robust than agreeing a filename across two workflows.
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.apk.outputs.artifact }}
+          pattern: '*'
+          merge-multiple: true
 
       # The tag is version + build number, not version alone. The semver only
       # moves when a human decides it should, so several merges routinely share
@@ -57,10 +63,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.apk.outputs.version }}
           BUILD: ${{ needs.apk.outputs.build-number }}
-          ARTIFACT: ${{ needs.apk.outputs.artifact }}
         run: |
           set -euo pipefail
           TAG="v${VERSION}+build.${BUILD}"
+
+          # Fail loudly rather than publishing a release with nothing attached,
+          # which is worse than no release: it looks installable and is not.
+          APK=$(find . -maxdepth 2 -name '*.apk' -print -quit)
+          if [ -z "$APK" ]; then
+            echo "::error::No APK found in the downloaded artifacts."
+            find . -maxdepth 2 -type f | head -20
+            exit 1
+          fi
+          echo "attaching $APK"
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "::notice::$TAG already exists — nothing to publish."
@@ -89,7 +104,9 @@ jobs:
           ${NOTES}
           EOF
 
-          gh release create "$TAG" "${ARTIFACT}.apk" \
+          gh release create "$TAG" "$APK" \
             --title "Peace ${VERSION} (build ${BUILD})" \
             --notes-file notes.md \
             --target "${GITHUB_SHA}"
+
+          echo "::notice::Published $TAG"
