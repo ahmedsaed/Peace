@@ -104,8 +104,14 @@ Settings, Export and Search are laid out but **not wired**. They belong to Stage
 - ✅ Picker sheets lost their dark scrim, which flashed in as a slab against the slide animation
 - ✅ Accounts and Categories lost their redundant sub-headers — the tab bar already names the screen
 
+- ✅ **One-handed entry.** The keypad's bottom-right key walks the whole record — account, category,
+  save — so a spend can be logged without reaching the top of the screen. `=` still finishes a sum
+  first, and the key's label says which of the three it will do. See
+  [design-system.md](design-system.md#the-keypad-drives-the-record-screen).
+
 Still open from that pass: a **default account** setting (Stage 2's settings screen) and
-[credit-card handling](research/credit-cards.md), which needs a decision before it needs code.
+[credit-card handling](research/credit-cards.md), where the model is now settled and the remaining
+work depends on Stage 2's per-record currency.
 
 ---
 

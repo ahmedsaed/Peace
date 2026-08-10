@@ -91,9 +91,16 @@ function Key({
 export function Keypad({
   onKey,
   density = 'regular',
+  equalsLabel = '=',
 }: {
   onKey: (press: KeyPress) => void;
   density?: Density;
+  /**
+   * What the bottom-right key will do next — see src/lib/record-flow.ts. The
+   * key is `=` while a sum is pending and becomes the record's "next" and
+   * "save" action once there is nothing to evaluate, so it has to say which.
+   */
+  equalsLabel?: string;
 }) {
   return (
     <View testID="keypad">
@@ -122,7 +129,7 @@ export function Keypad({
               return (
                 <Key
                   key={d}
-                  label="="
+                  label={equalsLabel}
                   variant="op"
                   density={density}
                   testID="key-equals"
