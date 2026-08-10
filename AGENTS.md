@@ -208,6 +208,11 @@ app ignoring input. `pkill -f GradleDaemon`.
   `120 + 35`. Never put `+ * ? . ( ) [ ] |` in a testID.
 - **A passing flow that asserts nothing specific proves only that the app did not crash.** Assert
   the value the user would check, not just that a screen appeared.
+- **A safety net has to be reachable.** Restore parks the pre-restore database in the cache under a
+  FIXED name — not the dated one exports use. The first version reused `peace-<date>.db`, so tapping
+  "Back up everything" on the same day deleted it: the screen promised the restore was undoable
+  while the only thing making it undoable was one tap from destruction. There is now an explicit
+  "Undo last restore" button, because a recovery file the user cannot reach is not a recovery.
 - **A file that exists is not a file that has content.** The backup flow passed while producing a
   **0-byte** `.db` — `File.copy()` is async and was being called synchronously, so the share sheet
   offered an empty file under a perfectly correct filename. Nothing downstream could tell. Every
