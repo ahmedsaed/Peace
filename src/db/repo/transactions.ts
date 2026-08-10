@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { newId } from '../../lib/id';
+import { convertMinor } from '../../lib/money';
 import * as schema from '../schema';
 import { transactions, type Transaction } from '../schema';
 import { InvariantError } from './categories';
@@ -15,7 +16,14 @@ export type RecordInput = {
   /** ALWAYS unsigned. The sign is derived from `type` — see below. */
   amountMinor: number;
   currency?: string;
+  /** Home-currency major units per one major unit of `currency`. */
   fxRate?: number;
+  /**
+   * Needed to convert. Omitting it means "the record is already in the home
+   * currency", which is the overwhelmingly common case and keeps every existing
+   * caller working unchanged.
+   */
+  homeCurrency?: string;
   note?: string | null;
   occurredAt?: Date;
   id?: string;
@@ -28,6 +36,7 @@ export type TransferInput = {
   amountMinor: number;
   currency?: string;
   fxRate?: number;
+  homeCurrency?: string;
   note?: string | null;
   occurredAt?: Date;
 };
@@ -41,6 +50,31 @@ function assertAmount(amountMinor: number): void {
   }
 }
 
+
+/**
+ * The signed amount expressed in the home currency, or NULL when no conversion
+ * applies.
+ *
+ * NULL rather than a copy of the amount: it is what lets the column be read as
+ * `COALESCE(home_amount_minor, amount_minor)`, so every record written before
+ * multi-currency existed is already correct without being touched.
+ */
+function homeAmount(
+  signedMinor: number,
+  currency: string,
+  homeCurrency: string | undefined,
+  fxRate: number
+): { homeAmountMinor: number | null; homeCurrency: string | null } {
+  if (!homeCurrency) return { homeAmountMinor: null, homeCurrency: null };
+  return {
+    homeAmountMinor: convertMinor(signedMinor, currency, homeCurrency, fxRate),
+    // Stored even when the currencies match, because "converted to EGP" and
+    // "not converted at all" have to stay distinguishable after the home
+    // currency changes.
+    homeCurrency: homeCurrency.toUpperCase(),
+  };
+}
+
 /**
  * Callers pass an unsigned amount plus a type, and the sign is derived here.
  * Letting callers pass a signed amount invites a positive "expense" that
@@ -51,6 +85,8 @@ export function createRecord(db: Db, input: RecordInput): Transaction {
 
   const id = input.id ?? newId();
   const signed = input.type === 'expense' ? -input.amountMinor : input.amountMinor;
+  const currency = input.currency ?? 'EGP';
+  const fxRate = input.fxRate ?? 1;
 
   db.insert(transactions)
     .values({
@@ -58,8 +94,9 @@ export function createRecord(db: Db, input: RecordInput): Transaction {
       accountId: input.accountId,
       categoryId: input.categoryId ?? null,
       amountMinor: signed,
-      currency: input.currency ?? 'EGP',
-      fxRate: input.fxRate ?? 1,
+      currency,
+      fxRate,
+      ...homeAmount(signed, currency, input.homeCurrency, fxRate),
       note: input.note ?? null,
       occurredAt: input.occurredAt ?? new Date(),
     })
@@ -87,10 +124,12 @@ export function createTransfer(db: Db, input: TransferInput): { out: Transaction
   const outId = newId();
   const inId = newId();
   const occurredAt = input.occurredAt ?? new Date();
+  const currency = input.currency ?? 'EGP';
+  const fxRate = input.fxRate ?? 1;
   const shared = {
     amountMinor: input.amountMinor,
-    currency: input.currency ?? 'EGP',
-    fxRate: input.fxRate ?? 1,
+    currency,
+    fxRate,
     note: input.note ?? null,
     occurredAt,
     transferPairId: pairId,
@@ -107,6 +146,7 @@ export function createTransfer(db: Db, input: TransferInput): { out: Transaction
           accountId: input.fromAccountId,
           counterAccountId: input.toAccountId,
           amountMinor: -input.amountMinor,
+          ...homeAmount(-input.amountMinor, currency, input.homeCurrency, fxRate),
         },
         {
           ...shared,
@@ -114,6 +154,7 @@ export function createTransfer(db: Db, input: TransferInput): { out: Transaction
           accountId: input.toAccountId,
           counterAccountId: input.fromAccountId,
           amountMinor: input.amountMinor,
+          ...homeAmount(input.amountMinor, currency, input.homeCurrency, fxRate),
         },
       ])
       .run();
@@ -136,6 +177,8 @@ export type RecordPatch = {
   /** Unsigned, like createRecord. */
   amountMinor?: number;
   currency?: string;
+  fxRate?: number;
+  homeCurrency?: string;
   note?: string | null;
   occurredAt?: Date;
 };
@@ -163,12 +206,21 @@ export function updateRecord(db: Db, id: string, patch: RecordPatch): Transactio
   const unsigned = patch.amountMinor ?? Math.abs(existing.amountMinor);
   assertAmount(unsigned);
 
+  // Recomputed, never carried over: the stored home amount describes a specific
+  // amount at a specific rate, so leaving it untouched while the amount changes
+  // would leave every total quoting the old value.
+  const signedNew = type === 'expense' ? -unsigned : unsigned;
+  const currencyNew = patch.currency ?? existing.currency;
+  const fxRateNew = patch.fxRate ?? existing.fxRate;
+
   db.update(transactions)
     .set({
       accountId: patch.accountId ?? existing.accountId,
       categoryId: patch.categoryId === undefined ? existing.categoryId : patch.categoryId,
-      amountMinor: type === 'expense' ? -unsigned : unsigned,
-      currency: patch.currency ?? existing.currency,
+      amountMinor: signedNew,
+      currency: currencyNew,
+      fxRate: fxRateNew,
+      ...homeAmount(signedNew, currencyNew, patch.homeCurrency, fxRateNew),
       note: patch.note === undefined ? existing.note : patch.note,
       occurredAt: patch.occurredAt ?? existing.occurredAt,
       updatedAt: new Date(),
@@ -184,6 +236,8 @@ export type TransferPatch = {
   toAccountId?: string;
   amountMinor?: number;
   currency?: string;
+  fxRate?: number;
+  homeCurrency?: string;
   note?: string | null;
   occurredAt?: Date;
 };
@@ -224,8 +278,11 @@ export function updateTransfer(
   const unsigned = patch.amountMinor ?? Math.abs(outLeg.amountMinor);
   assertAmount(unsigned);
 
+  const currencyNew = patch.currency ?? outLeg.currency;
+  const fxRateNew = patch.fxRate ?? outLeg.fxRate;
   const shared = {
-    currency: patch.currency ?? outLeg.currency,
+    currency: currencyNew,
+    fxRate: fxRateNew,
     note: patch.note === undefined ? outLeg.note : patch.note,
     occurredAt: patch.occurredAt ?? outLeg.occurredAt,
     updatedAt: new Date(),
@@ -233,11 +290,23 @@ export function updateTransfer(
 
   db.transaction((tx) => {
     tx.update(transactions)
-      .set({ ...shared, accountId: from, counterAccountId: to, amountMinor: -unsigned })
+      .set({
+        ...shared,
+        accountId: from,
+        counterAccountId: to,
+        amountMinor: -unsigned,
+        ...homeAmount(-unsigned, currencyNew, patch.homeCurrency, fxRateNew),
+      })
       .where(eq(transactions.id, outLeg.id))
       .run();
     tx.update(transactions)
-      .set({ ...shared, accountId: to, counterAccountId: from, amountMinor: unsigned })
+      .set({
+        ...shared,
+        accountId: to,
+        counterAccountId: from,
+        amountMinor: unsigned,
+        ...homeAmount(unsigned, currencyNew, patch.homeCurrency, fxRateNew),
+      })
       .where(eq(transactions.id, inLeg.id))
       .run();
   });

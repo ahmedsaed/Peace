@@ -68,6 +68,8 @@ export function listRecordsForPeriod(db: Db, period: Period): RecordRow[] {
 }
 
 export type PeriodSummary = {
+  /** Records excluded because their value in the home currency is unknown. */
+  unvaluedCount: number;
   expenseMinor: number;
   incomeMinor: number;
   balanceMinor: number;
@@ -80,13 +82,24 @@ export type PeriodSummary = {
  * accounts is neither income nor expense; counting it would inflate both by the
  * same amount and make the month look far busier than it was.
  */
-export function periodSummary(db: Db, period: Period): PeriodSummary {
+/**
+ * Totals for the month, in the HOME currency.
+ *
+ * The sign test still uses `amount_minor` — a conversion never changes whether
+ * money came in or went out — but what gets SUMMED is the converted amount.
+ * Adding raw amounts across currencies produced a number with no meaning: 100
+ * dollars plus 100 pounds came out as 200 and was labelled pounds.
+ */
+export function periodSummary(db: Db, period: Period, homeCurrency = 'EGP'): PeriodSummary {
   const { start, end } = periodBounds(period);
+
+  const home = sql`${homeCurrency.toUpperCase()}`;
 
   const row = db
     .select({
-      expense: sql<number>`coalesce(sum(case when ${transactions.amountMinor} < 0 then ${transactions.amountMinor} else 0 end), 0)`,
-      income: sql<number>`coalesce(sum(case when ${transactions.amountMinor} > 0 then ${transactions.amountMinor} else 0 end), 0)`,
+      expense: sql<number>`coalesce(sum(case when ${transactions.amountMinor} < 0 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
+      income: sql<number>`coalesce(sum(case when ${transactions.amountMinor} > 0 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
+      unvalued: sql<number>`coalesce(sum(case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then 0 else 1 end), 0)`,
     })
     .from(transactions)
     .where(
@@ -100,7 +113,16 @@ export function periodSummary(db: Db, period: Period): PeriodSummary {
 
   const expenseMinor = Number(row?.expense ?? 0);
   const incomeMinor = Number(row?.income ?? 0);
-  return { expenseMinor, incomeMinor, balanceMinor: incomeMinor + expenseMinor };
+  return {
+    expenseMinor,
+    incomeMinor,
+    balanceMinor: incomeMinor + expenseMinor,
+    // Records whose value in TODAY's home currency is unknown — almost always
+    // because the home currency was changed after they were entered. Excluded
+    // from the totals and counted, rather than summed in as if their numbers
+    // meant something they do not.
+    unvaluedCount: Number(row?.unvalued ?? 0),
+  };
 }
 
 export type DayGroup = { key: string; heading: string; rows: RecordRow[] };

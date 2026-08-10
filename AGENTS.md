@@ -188,6 +188,14 @@ app ignoring input. `pkill -f GradleDaemon`.
   on device while Node returns `"E£12,500.00"`. A green `npm test` proves nothing about currency
   rendering. Anything touching `Intl` must be checked with a screenshot on a real device, and
   symbols belong in `SYMBOL_OVERRIDES` rather than trusting the platform.
+- **Minor units are not comparable across currencies.** Yen has no decimal places, dinars have
+  three — so converting is `amount x rate x 10 ** (decTo - decFrom)`, and the scale term is
+  invisible in an EGP-only app right up until it is wrong by a factor of a hundred. Use
+  `convertMinor` in money.ts; never multiply by a rate by hand.
+- **Rounding money must be symmetric.** `Math.round` rounds toward +infinity, so `-0.5` becomes
+  `-0` and a converted expense ends up a unit away from the matching income. And round only AFTER
+  trimming float noise: `5000 * 3.03 * 0.01` is `151.49999999999997`, which rounds down and quietly
+  loses half a unit on every conversion.
 - **Split-screen is a supported layout, not an edge case.** Records get logged with a bank
   notification open beside the app, which leaves roughly 340dp of height instead of 800. Anything
   with a fixed-height stack must pin what the user needs (the keypad) and let the rest scroll —

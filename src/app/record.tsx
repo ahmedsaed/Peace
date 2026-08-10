@@ -30,7 +30,7 @@ import {
   inputOp,
 } from '@/lib/calculator';
 import { byDensity, useDensity } from '@/lib/layout';
-import { formatMinor, groupDigits } from '@/lib/money';
+import { convertMinor, formatMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
 import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
 import { useSetting } from '@/state/settings';
@@ -109,10 +109,23 @@ export default function RecordScreen() {
 
   const account = accounts.find((a) => a.id === accountId);
   const currency = account?.currency ?? 'EGP';
+  const homeCurrency = useSetting('homeCurrency');
 
   const [calc, setCalc] = useState(() =>
     existing ? calcFromMinor(existing.amountMinor, existing.currency) : initialCalc()
   );
+
+  /**
+   * A record in an account that does not hold the home currency needs a rate,
+   * or its value is unknowable and every month total that includes it is wrong.
+   * Defaulting to 1 would be worse than asking: it looks like an answer.
+   */
+  const foreign = currency.toUpperCase() !== homeCurrency.toUpperCase();
+  const [rateText, setRateText] = useState(() =>
+    existing && existing.fxRate !== 1 ? String(existing.fxRate) : ''
+  );
+  const fxRate = Number(rateText);
+  const rateValid = rateText.trim() !== '' && Number.isFinite(fxRate) && fxRate > 0;
 
   // Only categories of the matching kind are offered — a category is income XOR
   // expense, so showing all of them would just invite an invalid pick.
@@ -126,10 +139,18 @@ export default function RecordScreen() {
   );
 
   const amountMinor = committedMinor(calc, currency);
+  const homePreview =
+    foreign && rateValid && amountMinor !== null
+      ? convertMinor(amountMinor, currency, homeCurrency, fxRate)
+      : null;
+
   const canSave =
     amountMinor !== null &&
     amountMinor > 0 &&
     !!accountId &&
+    // Without a rate the record cannot be valued, so saving it would put a
+    // number into the month total that means nothing.
+    (!foreign || rateValid) &&
     (type !== 'transfer' || (!!toAccountId && toAccountId !== accountId));
 
   /**
@@ -228,6 +249,8 @@ export default function RecordScreen() {
             toAccountId: toAccountId!,
             amountMinor,
             currency,
+            fxRate: foreign ? fxRate : 1,
+            homeCurrency,
             note: note.trim() || null,
             occurredAt,
           });
@@ -238,6 +261,8 @@ export default function RecordScreen() {
             categoryId,
             amountMinor,
             currency,
+            fxRate: foreign ? fxRate : 1,
+            homeCurrency,
             note: note.trim() || null,
             occurredAt,
           });
@@ -248,6 +273,8 @@ export default function RecordScreen() {
           toAccountId: toAccountId!,
           amountMinor,
           currency,
+          fxRate: foreign ? fxRate : 1,
+          homeCurrency,
           note: note.trim() || null,
           occurredAt,
         });
@@ -258,6 +285,8 @@ export default function RecordScreen() {
           categoryId,
           amountMinor,
           currency,
+          fxRate: foreign ? fxRate : 1,
+          homeCurrency,
           note: note.trim() || null,
           occurredAt,
         });
@@ -410,6 +439,32 @@ export default function RecordScreen() {
             );
           })}
         </View>
+
+        {/* Only when the account holds something other than the home currency,
+            which for most people is never. An always-visible rate field would
+            be clutter on every record to serve a handful. */}
+        {foreign ? (
+          <View className={`mx-4 flex-row items-center gap-2 rounded-lg bg-surface px-3 py-2 ${gap}`}>
+            <Text className="text-sm text-muted">1 {currency} =</Text>
+            <TextInput
+              value={rateText}
+              onChangeText={setRateText}
+              placeholder="rate"
+              placeholderTextColor={palette.muted}
+              keyboardType="decimal-pad"
+              testID="record-rate"
+              className="min-w-16 flex-1 py-1 text-sm text-ink"
+            />
+            <Text className="text-sm text-muted">{homeCurrency}</Text>
+            <Text
+              className={`text-sm ${homePreview === null ? 'text-line' : 'text-accent'}`}
+              testID="record-home-preview">
+              {homePreview === null
+                ? 'rate needed'
+                : `= ${formatMinor(type === 'income' ? homePreview : -homePreview, homeCurrency)}`}
+            </Text>
+          </View>
+        ) : null}
 
         {/* One row instead of three when the window is short: the two pickers
             collapse to their icons and the note takes the rest of the line.
