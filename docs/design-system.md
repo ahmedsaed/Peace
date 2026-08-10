@@ -155,6 +155,37 @@ fork of the library. Three things are easy to get wrong:
 - **A dev build cannot verify any of this.** `styles.xml` is native, so it takes a `prebuild` plus a
   full Gradle build to see. Screenshot it.
 
+## The keypad drives the record screen
+
+The pickers sit at the top of the record screen and the keypad at the bottom, so logging a spend
+one-handed meant reaching across the whole phone twice. The bottom-right key fixes that: it walks
+the record forward — account, then category — and saves once everything is present.
+
+**`=` keeps its arithmetic meaning.** A pending operation always wins, so `120 + 35 =` still shows
+155 rather than saving a record. That is safe precisely because the calculator is
+immediate-execution: an operator commits the previous step, so a pending operation exists exactly
+when the user is mid-sum. The logic is pure and branch-tested in
+[`src/lib/record-flow.ts`](../src/lib/record-flow.ts).
+
+**The key says what it will do.** A key labelled `=` that silently writes a record is a trap, so
+the label tracks the action:
+
+| Label | Next press |
+|---|---|
+| `=` | finish the sum |
+| `→` | open the next picker |
+| `✓` | save the record |
+
+Two rules that keep it predictable:
+
+- **Each picker is offered once.** A category is not required to save, so re-prompting after a
+  dismissal would be an inescapable loop around an optional field. Tapping a picker by hand counts
+  as offered too, so `=` never re-asks something just answered.
+- **The key is never dead.** If everything has been offered and the record still cannot be saved,
+  it reopens whatever is actually missing — and when only the amount is absent, it says so in the
+  muted colour rather than the error colour, because pressing "next" with nothing typed is a
+  question, not a mistake.
+
 ## Density: designing for split-screen
 
 Peace gets used with half the screen showing a bank notification, which leaves roughly **340dp of

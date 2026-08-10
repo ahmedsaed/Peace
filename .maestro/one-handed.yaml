@@ -1,0 +1,71 @@
+appId: com.ahmed.peace
+---
+# Logging a record WITHOUT touching the top of the screen.
+#
+# The whole point of the feature: the pickers live at the top and the keypad at
+# the bottom, so `=` advances through the record instead. Every tap here is
+# either the `=` key, a digit, or a row inside a sheet the `=` key opened —
+# nothing taps `pick-account` or `record-save`. If this flow ever needs one of
+# those to pass, the feature has stopped working.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "record-screen"
+
+# --- arithmetic still owns the key while a sum is pending ---
+# 120 + 35 with `=` pressed: this must show 155 and NOT save anything. It is the
+# regression that would make the feature dangerous rather than merely broken.
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-op-plus"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-equals"
+- assertVisible:
+    id: "amount-display"
+    text: "155"
+- assertVisible:
+    id: "record-screen" # still here — `=` evaluated, it did not save
+
+# --- now the same key walks the record ---
+- tapOn:
+    id: "key-equals"
+- assertVisible:
+    id: "sheet-account"
+- tapOn: "Cash"
+
+- tapOn:
+    id: "key-equals"
+- assertVisible:
+    id: "sheet-category"
+- tapOn: "Restaurants"
+
+- takeScreenshot: 01-one-handed-ready
+
+# Everything answered and an amount present, so the next press saves.
+- tapOn:
+    id: "key-equals"
+- assertVisible:
+    id: "home-screen"
+
+# THE ASSERTION THAT MATTERS. The record has to carry the value the calculator
+# produced and the category chosen through the sheet — a flow that only checked
+# "we got back to the list" would pass even if `=` had saved an empty record.
+- assertVisible: "-E£155.00"
+- assertVisible: "Restaurants"
