@@ -78,3 +78,15 @@ appId: com.ahmed.peace
     timeout: 15000
 - assertNotVisible:
     id: "export-error"
+
+# NOT COVERED HERE: restore.
+#
+# It goes through the system file picker, whose layout differs by device and
+# Android version, so a flow driving it would assert the picker's UI rather
+# than the app's. The part that matters is covered where it can be tested
+# properly: src/db/restore-core.test.ts destroys a real database and gets it
+# back, refuses a foreign file, refuses a newer backup, and proves a failure
+# part-way through rolls back completely.
+#
+# The whole round trip — record, back up, wipe with `pm clear`, restore, undo —
+# was verified by hand on a release build.

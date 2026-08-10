@@ -135,9 +135,12 @@ work depends on Stage 2's per-record currency.
   (unlike the records list, which hides one) so per-account balances in the file add up. The backup
   is a byte copy of the SQLite file, taken after a `wal_checkpoint(TRUNCATE)` — without that it
   would silently omit the newest records, which are the ones you would notice missing.
-- **Restore** — still to do. A backup is a standard SQLite file so nothing is locked up, but
-  one-tap recovery does not exist yet. It needs the connection closed, the file swapped and the app
-  restarted, which is the risky half and deserves its own change.
+- ✅ **Restore** — pick a backup and replace everything, with an **Undo** that puts back what was
+  there before. Data is copied table by table inside one transaction rather than swapping the
+  database file: swapping would need the live connection closed and the app restarted, and would
+  carry the backup's migration history with it. Copying keeps this build's schema, so an older
+  backup restores fine with newer columns taking their defaults. A backup from a *newer* build is
+  refused rather than partly restored.
 
 ---
 
