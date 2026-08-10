@@ -11,12 +11,14 @@
     "expo": "~57.0.11",
     "expo-constants": "~57.0.9",
     "expo-device": "~57.0.1",
+    "expo-file-system": "~57.0.2",
     "expo-font": "~57.0.1",
     "expo-glass-effect": "~57.0.1",
     "expo-image": "~57.0.2",
     "expo-linking": "~57.0.5",
     "expo-mcp": "~0.2.1",
     "expo-router": "~57.0.11",
+    "expo-sharing": "~57.0.10",
     "expo-splash-screen": "~57.0.5",
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
@@ -70,15 +72,11 @@
     "emu": "bash scripts/emu-up.sh",
     "shot": "bash scripts/screenshot.sh",
     "apk": "cd android && taskset -c 0-3 ./gradlew app:assembleRelease -x lint -x test --build-cache -PreactNativeArchitectures=${PEACE_ABI:-arm64-v8a}",
-    "apk:emu": "PEACE_ABI=x86_64 npm run apk"
+    "apk:emu": "PEACE_ABI=x86_64 npm run apk",
+    "verify:lock": "bash scripts/verify-lock.sh"
   },
   "private": true,
   "engines": {
     "node": ">=24"
-  },
-  "overrides": {
-    "@emnapi/core": "1.11.3",
-    "@emnapi/runtime": "1.11.3",
-    "@emnapi/wasi-threads": "1.2.3"
   }
 }

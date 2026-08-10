@@ -32,6 +32,7 @@
         }
       ],
       "expo-sqlite",
+      "expo-sharing",
       "@react-native-community/datetimepicker",
       "./plugins/with-dark-theme",
       "./plugins/with-release-signing"
