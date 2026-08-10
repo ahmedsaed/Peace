@@ -105,6 +105,19 @@ Merging to `main` runs `.github/workflows/release.yml`, which publishes a GitHub
 `v<version>+build.<n>` with the signed APK attached. The tag carries the build number because the
 semver alone repeats across merges and the second release would collide.
 
+**A job output whose value contains a secret is silently DROPPED, not masked.** The APK artifact was
+named `peace-1.0.0-build28`, and `peace` is the value of the `PEACE_KEY_ALIAS` secret — so passing
+that name between jobs produced an empty string, and the release step failed on `".apk"` with "no
+matches found". `version` and `build-number` came through fine, which made it look like a typo in
+one line rather than a rule about all of them. **The tell is `***` where the value should be in the
+log.** Never build a cross-job output out of anything that might match a secret; glob for the file
+instead.
+
+**The release path cannot be tested from a pull request** — it only runs on push to `main`. Anything
+in the `publish` job is therefore unverified until it runs for real. Keep that job small, and make
+it fail loudly rather than publish something broken: a release with no APK attached looks
+installable and is not.
+
 Three things that are true only because CI caught them, and will bite again:
 
 - **`android/` is gitignored and generated.** CI runs `expo prebuild` itself. Never commit it,
