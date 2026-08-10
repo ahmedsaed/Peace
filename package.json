@@ -72,15 +72,11 @@
     "emu": "bash scripts/emu-up.sh",
     "shot": "bash scripts/screenshot.sh",
     "apk": "cd android && taskset -c 0-3 ./gradlew app:assembleRelease -x lint -x test --build-cache -PreactNativeArchitectures=${PEACE_ABI:-arm64-v8a}",
-    "apk:emu": "PEACE_ABI=x86_64 npm run apk"
+    "apk:emu": "PEACE_ABI=x86_64 npm run apk",
+    "verify:lock": "bash scripts/verify-lock.sh"
   },
   "private": true,
   "engines": {
     "node": ">=24"
-  },
-  "overrides": {
-    "@emnapi/core": "1.11.3",
-    "@emnapi/runtime": "1.11.3",
-    "@emnapi/wasi-threads": "1.2.3"
   }
 }
