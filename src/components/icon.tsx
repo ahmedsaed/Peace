@@ -26,6 +26,9 @@ const PATHS: Record<string, string> = {
   export: 'M11 3h2v8h3.5L12 16.5 7.5 11H11V3zM4 18h16v2.5H4V18z',
   info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 4h2v2h-2V6zm0 4h2v8h-2v-8z',
   back: 'M20 11v2H7.8l4.6 4.6-1.4 1.4L4 12l7-7 1.4 1.4L7.8 11H20z',
+  // Points right. `back` is a LEFT arrow — using it as a row affordance would
+  // read as "go back" on every settings row.
+  chevron: 'M8.6 4L7.2 5.4 13.8 12l-6.6 6.6L8.6 20l8-8-8-8z',
 
   // --- tab bar ---
   records: 'M5 2h14v20l-2.3-1.6L14.4 22l-2.4-1.7L9.6 22l-2.3-1.6L5 22V2zm3 5v2h8V7H8zm0 4v2h8v-2H8z',
@@ -100,6 +103,7 @@ const CHROME = [
   'export',
   'info',
   'back',
+  'chevron',
   'records',
   'analysis',
   'budgets',

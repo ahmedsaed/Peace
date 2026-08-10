@@ -16,6 +16,7 @@ import {
 import { restoreRecords } from '@/db/repo/transactions';
 import { formatMinor } from '@/lib/money';
 import { currentPeriod } from '@/lib/period';
+import { useSetting } from '@/state/settings';
 import { useUndoStore } from '@/state/undo';
 
 const EMPTY_SUMMARY: PeriodSummary = { expenseMinor: 0, incomeMinor: 0, balanceMinor: 0 };
@@ -27,6 +28,7 @@ const EMPTY_SUMMARY: PeriodSummary = { expenseMinor: 0, incomeMinor: 0, balanceM
 export default function RecordsScreen() {
   const router = useRouter();
   const [period, setPeriod] = useState(currentPeriod());
+  const homeCurrency = useSetting('homeCurrency');
   const [rows, setRows] = useState<Row[]>([]);
   const [summary, setSummary] = useState<PeriodSummary>(EMPTY_SUMMARY);
   const pendingUndo = useUndoStore((state) => state.pending);
@@ -67,9 +69,9 @@ export default function RecordsScreen() {
     <Screen testID="home-screen">
       <MonthHeader period={period} onChange={setPeriod}>
         <SummaryTrio
-          expense={formatMinor(summary.expenseMinor, 'EGP')}
-          income={formatMinor(summary.incomeMinor, 'EGP')}
-          balance={formatMinor(summary.balanceMinor, 'EGP')}
+          expense={formatMinor(summary.expenseMinor, homeCurrency)}
+          income={formatMinor(summary.incomeMinor, homeCurrency)}
+          balance={formatMinor(summary.balanceMinor, homeCurrency)}
           balanceMinor={summary.balanceMinor}
         />
       </MonthHeader>

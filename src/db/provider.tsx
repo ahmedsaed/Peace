@@ -4,6 +4,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 
 import migrations from '../../drizzle/migrations';
 import palette from '../constants/palette';
+import { useSettingsStore } from '../state/settings';
 import { db } from './client';
 import { seedDefaults } from './seed';
 import { getSetting } from './settings';
@@ -30,6 +31,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     if (!success) return null;
     try {
       seedDefaults(db, getSetting('homeCurrency'));
+      // Loaded here, behind the same gate, so no screen ever renders with the
+      // built-in defaults and then flicks to the stored values a frame later.
+      useSettingsStore.getState().load();
       return null;
     } catch (e) {
       return e instanceof Error ? e : new Error(String(e));

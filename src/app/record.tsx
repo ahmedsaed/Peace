@@ -31,8 +31,9 @@ import {
 } from '@/lib/calculator';
 import { byDensity, useDensity } from '@/lib/layout';
 import { formatMinor, groupDigits } from '@/lib/money';
-import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
+import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
+import { useSetting } from '@/state/settings';
 import { useUndoStore } from '@/state/undo';
 
 type RecordType = 'income' | 'expense' | 'transfer';
@@ -63,10 +64,19 @@ export default function RecordScreen() {
     return existing.amountMinor < 0 ? 'expense' : 'income';
   });
 
+  const defaultAccountId = useSetting('defaultAccountId');
+
   // A transfer can be opened from either leg; the form always presents it as
   // "from the account that lost money".
   const [accountId, setAccountId] = useState(() => {
-    if (!existing) return accounts[0]?.id ?? '';
+    if (!existing) {
+      // The setting is only a preference, never a guarantee: an account can be
+      // deleted or archived after being chosen as the default, and a form that
+      // opened with no account selected because of a stale id would be a
+      // confusing way to discover that. Fall back to the first account.
+      const preferred = accounts.find((a) => a.id === defaultAccountId);
+      return preferred?.id ?? accounts[0]?.id ?? '';
+    }
     if (existing.transferPairId && existing.amountMinor > 0) {
       return existing.counterAccountId ?? existing.accountId;
     }

@@ -117,9 +117,12 @@ work depends on Stage 2's per-record currency.
 
 ## Stage 2 — Money features
 
-- **Settings screen** — the preferences already exist and persist (`src/lib/settings.ts` defines
-  them, `src/db/settings.ts` stores them); only the UI is missing. Worth doing first, since
-  multi-currency has no meaning until home currency is changeable.
+- ✅ **Settings screen** — home currency and default account, both wired through to the screens
+  that use them. **Only settings that do something are shown**: `carryOver`, `viewMode` and
+  `showTotal` are stored but nothing reads them yet, and three switches that silently do nothing
+  would be worse than an empty screen — they ship with the features that consume them.
+  `src/state/settings.ts` is a write-through cache over the settings table, so a change repaints
+  every screen instead of waiting for a restart.
 - **Multi-currency** — per-account currency, per-record currency + `fxRate`, all reporting
   converted to home currency. Manual rate entry always available; optional rate fetch on top.
 - **Budgets** — per month, "copy from last month", progress bars, over-budget states

@@ -7,11 +7,13 @@ import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
 import { listAccountsWithBalance, totalBalance } from '@/db/repo/accounts';
 import { formatMinor } from '@/lib/money';
+import { useSetting } from '@/state/settings';
 
 export default function AccountsScreen() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<ReturnType<typeof listAccountsWithBalance>>([]);
   const [total, setTotal] = useState(0);
+  const homeCurrency = useSetting('homeCurrency');
 
   // Re-read on focus so a balance change, or a newly added account, shows up on
   // the way back from any other screen.
@@ -29,7 +31,7 @@ export default function AccountsScreen() {
       <View className="items-center bg-surface px-4 pb-4 pt-1">
         <Text className="mb-1 text-[10px] uppercase tracking-widest text-muted">All accounts</Text>
         <Text className="text-xl font-semibold text-ink" testID="accounts-total">
-          {formatMinor(total, 'EGP')}
+          {formatMinor(total, homeCurrency)}
         </Text>
       </View>
 
