@@ -29,6 +29,42 @@ Stage 1's finish line was never a feature list — it is *logging a real week of
 reaching for MyMoney*. **That test has been passed**: nine days of real records, and the only
 things it turned up were a broken split-screen layout and a handful of papercuts, all since fixed.
 
+## What Peace does that MyMoney doesn't
+
+Two different kinds of difference, kept apart on purpose.
+
+### Gaps in MyMoney that Peace closes
+
+Verified from screenshots of v6.6 and corroborated by its reviews — see
+[docs/research/mymoney.md](docs/research/mymoney.md). Nothing here is a guess about a
+competitor.
+
+| Gap in MyMoney | Peace | State |
+|---|---|---|
+| **No sub-categories** — one flat level, its most-requested feature | Two-tier categories, enforced at the repository layer so a sub-category can never sprout children of its own | ✅ shipped |
+| **No recurring transactions** — "Installments" is a *category*, re-typed by hand each month | `recurring_rules` table, lazy catch-up on app open | Stage 3 |
+| **No due dates or bill reminders** on budgets | Due dates on budget items | Stage 3 |
+| **No interest rate** on loan accounts | `interestRate` column exists on the schema | column only, no UI |
+| **No multi-device sync** | Also none, deliberately — the ledger stays on the phone | by design |
+
+### Choices Peace makes differently
+
+Not claims about what MyMoney lacks — these are decisions about how this app should behave.
+
+| | Why it exists |
+|---|---|
+| **One-handed entry** | The pickers sit at the top and the keypad at the bottom, so the bottom-right key walks the whole record — account, category, save. `=` still finishes a sum first, and the key's label says which of the three it will do. |
+| **Split-screen as a supported layout** | Records get logged with a bank notification open beside the app, leaving ~340dp of height. The keypad is pinned and everything above it scrolls; below 520dp the pickers collapse to icons and the note joins them on one line. |
+| **Per-record exchange rates** | A foreign purchase stores the settled amount, the rate used, *and* which home currency it was converted to. A purchase made when the dollar was fifty pounds stays at fifty forever. |
+| **No invented cross-currency total** | Valuing a whole balance needs today's rate, and the only rates here belong to past records. The accounts screen shows one line per currency held rather than one authoritative-looking number. |
+| **Undo after restoring a backup** | Restoring parks the previous state first, so recovering from a mistaken recovery is one tap. A backup you cannot get back out of is only half a safety net. |
+| **CSV carries both legs of a transfer** | The records list hides one leg so a transfer doesn't look like double spending; the export is a copy of the ledger, so per-account balances in the file add up. |
+| **Settings that do nothing are not shown** | `carryOver`, `viewMode` and `showTotal` are stored but nothing reads them yet. Three switches that silently do nothing is how an app teaches you to stop trusting it. |
+| **The build identifies itself** | Settings → About shows `1.0.0 (build 32)` and the commit, marked `-dirty` if it was built from uncommitted code. |
+
+Where Peace is still **behind**: no budgets screen, no analysis charts, no search, and no recurring
+payments. Those are Stages 2 and 3.
+
 ## Stack
 
 Expo SDK 57 · React Native 0.86 · React 19.2 · TypeScript · expo-router · NativeWind ·

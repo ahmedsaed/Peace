@@ -1,3 +1,5 @@
+import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -20,6 +22,21 @@ import '@/global.css';
  * menu.
  */
 export default function RootLayout() {
+  /**
+   * The wordmark font, loaded before anything renders.
+   *
+   * Rendering first and swapping later is worse than waiting: the header would
+   * visibly re-set itself a frame in. The wait is short and lands while the
+   * splash screen is still up, and the database provider below already gates on
+   * migrations anyway — so this adds no new kind of delay, only one more reason
+   * for the existing one.
+   *
+   * `error` is deliberately not fatal. A missing font is a cosmetic problem;
+   * refusing to open a ledger over it would not be.
+   */
+  const [fontsLoaded, fontError] = useFonts({ Pacifico_400Regular });
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     // Required by the drawer's swipe gesture. Without it the menu still opens
     // from the button but never from the edge, which reads as a broken drawer
