@@ -11,6 +11,15 @@
 export const SETTING_DEFAULTS = {
   /** ISO 4217. Everything in reporting is converted to this. */
   homeCurrency: 'EGP' as string,
+  /**
+   * Account pre-selected on a new record, or '' for "whichever comes first".
+   *
+   * Empty string rather than null so it rides the plain-string codec below —
+   * and because "no default" and "the default was deleted" should behave
+   * identically. The record screen falls back to the first account either way,
+   * so a stale id can never leave the form with no account selected.
+   */
+  defaultAccountId: '' as string,
   /** Roll an unspent monthly surplus into the next month. */
   carryOver: true as boolean,
   /** Default range for the Records and Analysis screens. */

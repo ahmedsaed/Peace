@@ -1,0 +1,90 @@
+appId: com.ahmed.peace
+---
+# Settings that actually change the app.
+#
+# The point of this flow is NOT that the settings screen renders — it is that
+# changing a setting moves a number on a different screen, and that the change
+# survives a restart. A settings screen whose switches do nothing is the exact
+# failure this asserts against.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# Baseline: the seeded home currency is EGP, so the accounts total is in E£.
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-total"
+    text: ".*E£.*"
+
+# --- change the home currency ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "settings-screen"
+- assertVisible:
+    id: "setting-home-currency"
+
+- tapOn:
+    id: "setting-home-currency"
+- assertVisible:
+    id: "sheet-currency"
+- tapOn: "US dollar"
+
+# The row reflects the new value immediately.
+- assertVisible: ".*US dollar.*"
+- takeScreenshot: 01-settings
+
+# THE ASSERTION THAT MATTERS. Back on a completely different screen, the total
+# must now be formatted in dollars. Asserting only that the settings row updated
+# would pass even if nothing else in the app read the setting.
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-total"
+    text: ".*\\$.*"
+- assertNotVisible:
+    id: "accounts-total"
+    text: ".*E£.*"
+
+# --- and it is persisted, not just held in memory ---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-total"
+    text: ".*\\$.*"
+
+# --- the default account setting reaches the record screen ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-default-account"
+- assertVisible:
+    id: "sheet-default-account"
+- tapOn: "Bank"
+- assertVisible: ".*Bank.*"
+
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+# A new record opens on Bank rather than the first account, which is Cash.
+- assertVisible: "Bank"
+- takeScreenshot: 02-default-account

@@ -180,6 +180,14 @@ app ignoring input. `pkill -f GradleDaemon`.
   with a fixed-height stack must pin what the user needs (the keypad) and let the rest scroll —
   see `src/lib/layout.ts` and the comment in `src/app/record.tsx`. Test it without split-screen
   using `adb shell wm size 1080x1150`, and `adb shell wm size reset` afterwards.
+- **A setting that nothing reads must not appear in Settings.** `SETTING_DEFAULTS` declares
+  preferences ahead of the features that consume them, which is fine — but rendering a control for
+  one before anything reads it ships a switch that silently does nothing. That is how an app
+  teaches its user to stop trusting it. Add the row in the same change as the code that honours it,
+  and prove it with a flow that asserts the value moving on a *different* screen.
+- **Settings are read through `src/state/settings.ts`, never `getSetting` in a component.** The
+  store is a write-through cache: SQLite stays the source of truth, and the in-memory copy is what
+  makes a change repaint every screen rather than only the one that made it.
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
 - **testIDs must be regex-safe** — letters, digits, hyphens between words. Maestro matches ids as
   **regular expressions**, so `key-op-+` reads as "`key-op` then one or more hyphens" and silently

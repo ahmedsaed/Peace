@@ -22,6 +22,7 @@ import {
 import { InvariantError } from '@/db/repo/categories';
 import type { Account } from '@/db/schema';
 import { formatMinor, parseAmountToMinor } from '@/lib/money';
+import { useSetting } from '@/state/settings';
 
 const TYPES: { value: Account['type']; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -40,7 +41,10 @@ export default function AccountScreen() {
 
   const [name, setName] = useState(existing?.name ?? '');
   const [type, setType] = useState<Account['type']>(existing?.type ?? 'cash');
-  const [currency, setCurrency] = useState(existing?.currency ?? 'EGP');
+  const homeCurrency = useSetting('homeCurrency');
+  // A new account almost always uses the home currency; a foreign-currency
+  // account is the exception worth typing, not the default worth assuming.
+  const [currency, setCurrency] = useState(existing?.currency ?? homeCurrency);
   const [opening, setOpening] = useState(
     existing ? String(existing.openingBalance / 100) : ''
   );
