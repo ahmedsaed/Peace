@@ -1,6 +1,6 @@
 import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { StackHeader } from '@/components/screen';
@@ -13,10 +13,19 @@ import {
   saveToFolder,
   type Exported,
 } from '@/db/backup';
+import {
+  currentCounts,
+  hasSafetyCopy,
+  pickBackup,
+  refreshAfterRestore,
+  restoreFrom,
+  RestoreError,
+  safetyCopy,
+} from '@/db/restore';
 
 type Kind = 'csv' | 'backup';
 type Destination = 'save' | 'share';
-type Busy = `${Kind}-${Destination}` | null;
+type Busy = `${Kind}-${Destination}` | 'restore' | 'undo' | null;
 
 /**
  * Export and backup.
@@ -35,6 +44,10 @@ export default function ExportScreen() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const count = recordCount();
+  // Re-read after every action rather than caching: a restore creates this
+  // file and an undo replaces it, so a stale value would either hide the way
+  // back or offer one that no longer exists.
+  const [canUndo, setCanUndo] = useState(hasSafetyCopy);
 
   const build = useCallback(
     async (kind: Kind): Promise<Exported> =>
@@ -79,6 +92,80 @@ export default function ExportScreen() {
     [build]
   );
 
+  const apply = useCallback(async (file: Parameters<typeof restoreFrom>[0], mode: 'restore' | 'undo') => {
+    setBusy(mode);
+    setError(null);
+    setDone(null);
+    try {
+      const result = await restoreFrom(file);
+      refreshAfterRestore();
+      setCanUndo(hasSafetyCopy());
+      setDone(
+        `${mode === 'undo' ? 'Undone' : 'Restored'} — ${result.copied.transactions} records and ` +
+          `${result.copied.accounts} accounts are now in the app. The previous state was kept, ` +
+          `so this can be reversed again.`
+      );
+    } catch (e) {
+      setCanUndo(hasSafetyCopy());
+      setError(e instanceof RestoreError || e instanceof Error ? e.message : 'Could not restore that file.');
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
+  /**
+   * Two gates before anything is replaced: the file picker, then a confirmation
+   * that states what is about to be lost in numbers. "Are you sure?" without a
+   * count is a dialog people dismiss by reflex.
+   */
+  const onRestore = useCallback(async () => {
+    setError(null);
+    setDone(null);
+
+    const picked = await pickBackup().catch(() => null);
+    if (!picked) return;
+
+    const before = currentCounts();
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Replace everything?',
+        `Your ${before.transactions} records and ${before.accounts} accounts will be replaced by the contents of ${picked.name}.\n\nA backup of your current data is saved first, so this can be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Replace', style: 'destructive', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) }
+      );
+    });
+    if (!confirmed) return;
+
+    await apply(picked, 'restore');
+  }, [apply]);
+
+  /**
+   * Put back what was there before the last restore.
+   *
+   * This is the same operation in the other direction — it takes its own safety
+   * copy on the way, so undo is itself undoable and the button stays available
+   * rather than being a one-shot.
+   */
+  const onUndo = useCallback(async () => {
+    const before = currentCounts();
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Undo the restore?',
+        `The ${before.transactions} records now in the app will be replaced by what was here before the last restore.`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Undo', style: 'destructive', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) }
+      );
+    });
+    if (!confirmed) return;
+    await apply(safetyCopy(), 'undo');
+  }, [apply]);
+
   return (
     <View className="flex-1 bg-ground" testID="export-screen">
       <StackHeader title="Export & backup" />
@@ -106,6 +193,36 @@ export default function ExportScreen() {
           onPress={run}
         />
 
+        <View className="mb-4 rounded-xl border border-expense/30 bg-surface p-4">
+          <View className="mb-2 flex-row items-center gap-2.5">
+            <Icon name="refresh" size={18} color={palette.expense} />
+            <Text className="text-base font-medium text-ink">Restore from a backup</Text>
+          </View>
+          <Text className="mb-4 text-sm leading-5 text-muted">
+            Replaces everything in the app with the contents of a backup file. Your current data is
+            backed up first, so this is undoable.
+          </Text>
+          <View className="flex-row gap-2">
+            <Button
+              label="Choose a backup"
+              working={busy === 'restore'}
+              disabled={busy !== null}
+              onPress={onRestore}
+              testID="restore-pick"
+              danger
+            />
+            {canUndo ? (
+              <Button
+                label="Undo last restore"
+                working={busy === 'undo'}
+                disabled={busy !== null}
+                onPress={onUndo}
+                testID="restore-undo"
+              />
+            ) : null}
+          </View>
+        </View>
+
         {error ? (
           <Text className="mt-4 px-1 text-sm text-expense" testID="export-error">
             {error}
@@ -127,9 +244,8 @@ export default function ExportScreen() {
         </Text>
 
         <Text className="mt-4 px-1 text-xs leading-5 text-muted opacity-70">
-          Restoring a backup is not built yet. The file is a standard SQLite database, so nothing is
-          locked up in the meantime — but until restore exists, treat a backup as an escape hatch
-          rather than a one-tap recovery.
+          A backup taken by a newer version of Peace is refused rather than partly restored. An
+          older one restores fine — columns added since simply take their defaults.
         </Text>
       </ScrollView>
     </View>
@@ -189,6 +305,7 @@ function Button({
   onPress,
   testID,
   primary = false,
+  danger = false,
 }: {
   label: string;
   working: boolean;
@@ -196,6 +313,7 @@ function Button({
   onPress: () => void;
   testID: string;
   primary?: boolean;
+  danger?: boolean;
 }) {
   return (
     <Pressable
@@ -204,12 +322,18 @@ function Button({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className={`rounded-lg px-4 py-2.5 active:opacity-80 ${
-        disabled ? 'bg-raised' : primary ? 'bg-accent' : 'border border-line'
+      className={`self-start rounded-lg px-4 py-2.5 active:opacity-80 ${
+        disabled
+          ? 'bg-raised'
+          : danger
+            ? 'border border-expense/40'
+            : primary
+              ? 'bg-accent'
+              : 'border border-line'
       }`}>
       <Text
         className={`text-sm font-semibold ${
-          disabled ? 'text-muted' : primary ? 'text-accent-ink' : 'text-ink'
+          disabled ? 'text-muted' : danger ? 'text-expense' : primary ? 'text-accent-ink' : 'text-ink'
         }`}>
         {working ? 'Working…' : label}
       </Text>
