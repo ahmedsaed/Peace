@@ -1,18 +1,20 @@
-import Constants from 'expo-constants';
 import { Image, ScrollView, Text, View } from 'react-native';
 
 import { StackHeader } from '@/components/screen';
+import { buildInfo } from '@/lib/build-info';
+import { formatCommit, formatVersion } from '@/lib/version';
 
 /**
  * The one drawer destination that is real rather than a placeholder — it has
- * nothing to wait for. It exists so the version number has a home, which is the
+ * nothing to wait for. It exists so the build identity has a home, which is the
  * first thing worth knowing when a sideloaded APK misbehaves.
  */
-const FACTS: { label: string; value: string }[] = [
-  { label: 'Version', value: Constants.expoConfig?.version ?? '—' },
-  { label: 'Package', value: 'com.ahmed.peace' },
-  { label: 'Data', value: 'One SQLite file on this device' },
-  { label: 'Network', value: 'None. Nothing is uploaded.' },
+const FACTS: { label: string; value: string; testID: string }[] = [
+  { label: 'Version', value: formatVersion(buildInfo), testID: 'about-version' },
+  { label: 'Commit', value: formatCommit(buildInfo), testID: 'about-commit' },
+  { label: 'Package', value: 'com.ahmed.peace', testID: 'about-package' },
+  { label: 'Data', value: 'One SQLite file on this device', testID: 'about-data' },
+  { label: 'Network', value: 'None. Nothing is uploaded.', testID: 'about-network' },
 ];
 
 export default function AboutScreen() {
@@ -41,7 +43,7 @@ export default function AboutScreen() {
                 i > 0 ? 'border-t border-line' : ''
               }`}>
               <Text className="text-sm text-muted">{fact.label}</Text>
-              <Text className="flex-1 text-right text-sm text-ink" testID={`about-${fact.label.toLowerCase()}`}>
+              <Text className="flex-1 text-right text-sm text-ink" testID={fact.testID}>
                 {fact.value}
               </Text>
             </View>
