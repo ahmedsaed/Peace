@@ -38,14 +38,22 @@ export function toCsv(rows: readonly (readonly string[])[]): string {
 }
 
 /**
- * Byte-order mark.
+ * NO BYTE-ORDER MARK.
  *
- * Excel assumes the system's legacy codepage for a .csv without one, so Arabic
- * notes arrive as mojibake — which is not a hypothetical here. Google Sheets
- * and every sane parser ignore it. Always write it.
+ * There was one. The reasoning was that Excel assumes the system codepage for a
+ * .csv without one and turns Arabic notes into mojibake, and that "every sane
+ * parser ignores it".
+ *
+ * Google Sheets does not ignore it. It renders the BOM as visible junk on the
+ * first header cell — `﻿date` instead of `date` — which breaks the column name
+ * for anything that then references it by header. That is a certain bug in the
+ * tool actually being used, traded against a hypothetical one in a tool that is
+ * not; Excel can still read UTF-8 correctly through Data > From Text/CSV.
+ *
+ * If Excel ever becomes the target, add the BOM back as an option rather than
+ * unconditionally, and check the header cell in Sheets before believing it is
+ * harmless.
  */
-export const BOM = '﻿';
-
 export function toCsvFile(rows: readonly (readonly string[])[]): string {
-  return BOM + toCsv(rows);
+  return toCsv(rows);
 }
