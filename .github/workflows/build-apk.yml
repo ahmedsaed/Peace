@@ -13,9 +13,12 @@ on:
       build-number:
         description: Commit count, which is also the Android versionCode
         value: ${{ jobs.apk.outputs.build-number }}
-      artifact:
-        description: Name of the uploaded artifact
-        value: ${{ jobs.apk.outputs.artifact }}
+      # NOT the artifact name. A job output whose value contains a secret is
+      # silently DROPPED rather than masked, and the artifact name starts with
+      # "peace" — which is the value of the PEACE_KEY_ALIAS secret. The
+      # consumer got an empty string, and `gh release create "$TAG" ".apk"`
+      # failed with "no matches found". The tell is `***` where the name should
+      # be in the log. Callers glob for *.apk instead.
 
 jobs:
   apk:
@@ -25,7 +28,6 @@ jobs:
     outputs:
       version: ${{ steps.identity.outputs.version }}
       build-number: ${{ steps.identity.outputs.build-number }}
-      artifact: ${{ steps.identity.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
         with:
