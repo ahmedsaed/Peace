@@ -17,7 +17,7 @@ account, and no network dependency anywhere in the core product.
 | 0 | Schema, design system, navigation shell, repository layer | ✅ done |
 | 1 | Daily driver — records, calculator keypad, edit/delete, accounts & categories | ✅ done |
 | — | App icon, side menu, search entry point (chrome, pulled ahead of Stage 2) | ✅ done |
-| 2 | Multi-currency, budgets, analysis, export | in progress — settings screen ✅ |
+| 2 | Multi-currency, budgets, analysis | in progress — settings ✅, export & backup ✅ |
 | 3 | Recurring payments | planned |
 | 4 | Receipt attachments | planned |
 | 5 | OCR + voice entry (Gemini Flash) | planned |
@@ -150,7 +150,8 @@ docs/                  research, roadmap, design system
 .maestro/              E2E flows
 ```
 
-Export and Search are routed and laid out but not yet wired — they are Stage 2.
+Search is routed and laid out but not yet wired. Restoring a backup is not built yet either —
+the file is a standard SQLite database, so nothing is locked up in the meantime.
 
 ## Rules that are not negotiable
 

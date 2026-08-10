@@ -34,6 +34,7 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Release APK for the emulator | `npm run apk:emu` (x86_64) |
 | Regenerate migrations | `npm run db:generate` (after editing `src/db/schema.ts`) |
 | Regenerate app icons | `npm i --no-save sharp && node scripts/make-icons.mjs` |
+| Check the lockfile like CI does | `npm run verify:lock` |
 | Validate the JS bundle without a device | `npx expo export --platform android` |
 | Dev server | `npm start` |
 
@@ -125,8 +126,20 @@ Three things that are true only because CI caught them, and will bite again:
 - **`expo-env.d.ts` is gitignored too**, so a fresh checkout has no ambient types. Anything the
   typechecker needs must live in the committed `types.d.ts`.
 - **`npm ci` is stricter than `npm install`.** It validates the lockfile against package.json and
-  rejects the inconsistent optional-dependency subtrees that `npm install` happily tolerates. Run
-  it in a clean directory before pushing a dependency change.
+  rejects the inconsistent optional-dependency subtrees that `npm install` happily tolerates.
+  **`npm run verify:lock` reproduces exactly that check in about a minute** — run it before pushing
+  any dependency change, because a working tree that already has `node_modules` will never show you
+  the problem.
+- **`.nvmrc` pins an exact version on purpose.** It used to say `24`, so CI installed whatever the
+  newest 24.x was and got a different bundled npm from the one here — and npm versions disagree
+  about how optional platform subtrees are recorded. The result was a lockfile that `npm ci`
+  accepted locally and rejected in CI, which makes local verification worthless. Bump it
+  deliberately, and run `npm run verify:lock` after you do.
+- **Be suspicious of `overrides`.** Two of them pinned `@emnapi/core` and `@emnapi/runtime`, which
+  npm had stopped hoisting — so the override named a package the lockfile no longer contained and
+  `npm ci` failed with `Missing: @emnapi/core@1.11.3 from lock file`. Removing them let npm nest
+  those packages under `@unrs/resolver-binding-wasm32-wasi` where they belong, and the lockfile
+  became self-consistent. An override that survives its original problem becomes the next one.
 
 **Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
 merging anything that touches a screen.
@@ -195,6 +208,12 @@ app ignoring input. `pkill -f GradleDaemon`.
   `120 + 35`. Never put `+ * ? . ( ) [ ] |` in a testID.
 - **A passing flow that asserts nothing specific proves only that the app did not crash.** Assert
   the value the user would check, not just that a screen appeared.
+- **A file that exists is not a file that has content.** The backup flow passed while producing a
+  **0-byte** `.db` — `File.copy()` is async and was being called synchronously, so the share sheet
+  offered an empty file under a perfectly correct filename. Nothing downstream could tell. Every
+  export now goes through a size check that throws, the size is rendered in the UI, and the flow
+  asserts a non-zero one. Anything that writes a file needs the same treatment: assert the bytes,
+  not the name.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

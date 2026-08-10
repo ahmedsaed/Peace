@@ -1,0 +1,80 @@
+appId: com.ahmed.peace
+---
+# Export and backup, end to end.
+#
+# The share sheet is system UI and its contents vary by device, so this does not
+# try to drive it. What it does assert is the part that can silently fail: that
+# a file was actually written, and named. `export-done` only appears after the
+# file exists on disk and the share sheet has been handed its uri — so a
+# filename appearing here means the whole chain ran.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# One record, so the export is not empty. An export of nothing would pass every
+# assertion below while proving nothing about the query.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-export"
+- assertVisible:
+    id: "export-screen"
+- assertVisible:
+    id: "export-count"
+    text: "1 record in the ledger."
+
+# --- CSV ---
+- tapOn:
+    id: "export-csv"
+# The share sheet is a separate window. Its CONTENTS are not asserted — they
+# differ by device and by mime type, and an earlier version of this flow waited
+# for the app name, which the chooser shows for a .csv but not for a .db.
+# Dismissing it resolves shareAsync, which is what renders the result.
+#
+# THE SIZE IS PART OF THE ASSERTION. An earlier version checked only the
+# filename, and passed while the backup was 0 bytes — `copy()` is async and was
+# being called synchronously, so the share sheet offered an empty file under a
+# perfectly correct name. Asserting a non-zero size is what makes this flow
+# mean "a backup exists" rather than "a backup was named".
+- waitForAnimationToEnd:
+    timeout: 8000
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      id: "export-done"
+      text: "peace-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.csv · [0-9]+ (B|KB|MB) is ready.*"
+    timeout: 15000
+- takeScreenshot: 01-export
+
+# --- full backup ---
+# The WAL checkpoint runs here. If it ever throws, this is what catches it —
+# the screen would show export-error instead of a filename.
+- tapOn:
+    id: "export-backup"
+- waitForAnimationToEnd:
+    timeout: 8000
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      id: "export-done"
+      text: "peace-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.db · [0-9]+ (B|KB|MB) is ready.*"
+    timeout: 15000
+- assertNotVisible:
+    id: "export-error"
