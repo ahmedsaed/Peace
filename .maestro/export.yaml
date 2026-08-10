@@ -42,7 +42,7 @@ appId: com.ahmed.peace
 
 # --- CSV ---
 - tapOn:
-    id: "export-csv"
+    id: "export-csv-share"
 # The share sheet is a separate window. Its CONTENTS are not asserted — they
 # differ by device and by mime type, and an earlier version of this flow waited
 # for the app name, which the chooser shows for a .csv but not for a .db.
@@ -59,7 +59,7 @@ appId: com.ahmed.peace
 - extendedWaitUntil:
     visible:
       id: "export-done"
-      text: "peace-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.csv · [0-9]+ (B|KB|MB) is ready.*"
+      text: "peace-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.csv · [0-9]+ (B|KB|MB) sent"
     timeout: 15000
 - takeScreenshot: 01-export
 
@@ -67,14 +67,14 @@ appId: com.ahmed.peace
 # The WAL checkpoint runs here. If it ever throws, this is what catches it —
 # the screen would show export-error instead of a filename.
 - tapOn:
-    id: "export-backup"
+    id: "export-backup-share"
 - waitForAnimationToEnd:
     timeout: 8000
 - pressKey: Back
 - extendedWaitUntil:
     visible:
       id: "export-done"
-      text: "peace-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.db · [0-9]+ (B|KB|MB) is ready.*"
+      text: "peace-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.db · [0-9]+ (B|KB|MB) sent"
     timeout: 15000
 - assertNotVisible:
     id: "export-error"

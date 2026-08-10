@@ -129,7 +129,9 @@ work depends on Stage 2's per-record currency.
 - **Analysis** — donut by category, ranked bars with %, cash-flow over time, **carry-over**
 - Search and filters — the screen and its entry point exist; the query does not
 - ✅ **Export CSV + backup** — done first, because a month of real records with no way out is a
-  worse risk than any missing feature. CSV carries every record and **both legs of each transfer**
+  worse risk than any missing feature. Both can be **saved to a folder on the device** (Storage
+  Access Framework, no permission needed) or sent through the share sheet. Share alone was not
+  enough: on a phone with no file manager claiming `text/csv` it offers only Drive and Gmail. CSV carries every record and **both legs of each transfer**
   (unlike the records list, which hides one) so per-account balances in the file add up. The backup
   is a byte copy of the SQLite file, taken after a `wal_checkpoint(TRUNCATE)` — without that it
   would silently omit the newest records, which are the ones you would notice missing.
