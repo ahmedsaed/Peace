@@ -39,10 +39,34 @@ export function listAccountsWithBalance(db: Db, includeArchived = false): Accoun
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 }
 
-export function totalBalance(db: Db): number {
-  return listAccountsWithBalance(db)
-    .filter((a) => !a.archived)
-    .reduce((sum, a) => sum + a.balanceMinor, 0);
+export type CurrencyTotal = { currency: string; balanceMinor: number };
+
+/**
+ * Balances grouped by the currency they are actually held in.
+ *
+ * NOT one converted number. Adding a dollar account to a pound account needs a
+ * rate for the whole balance as it stands today, and the only rates this app
+ * has are the ones attached to individual records — captured on the day each
+ * was entered, for an amount, not for a balance. Picking one of them to value
+ * everything else would invent a number that looks authoritative and is not.
+ *
+ * An opening balance has no rate attached at all, which is the same problem in
+ * its clearest form.
+ *
+ * So the screen shows what is true: how much sits in each currency. With a
+ * single currency — the normal case — that is exactly one row and reads as the
+ * total it always was.
+ */
+export function balanceByCurrency(db: Db): CurrencyTotal[] {
+  const totals = new Map<string, number>();
+  for (const account of listAccountsWithBalance(db)) {
+    if (account.archived) continue;
+    const key = account.currency.toUpperCase();
+    totals.set(key, (totals.get(key) ?? 0) + account.balanceMinor);
+  }
+  return [...totals.entries()]
+    .map(([currency, balanceMinor]) => ({ currency, balanceMinor }))
+    .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
 /** Thrown when a write would break a documented invariant. Re-exported for convenience. */
