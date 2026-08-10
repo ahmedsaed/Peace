@@ -107,6 +107,38 @@ export async function databaseBackup(now = new Date()): Promise<Exported> {
 }
 
 /**
+ * Copy an export into a folder the user picks.
+ *
+ * The share sheet alone was not enough: it offers whatever apps handle the mime
+ * type, and on a phone without a file-manager that handles `text/csv` there is
+ * no "save here" at all — you get Drive, Gmail and nothing local. Reported from
+ * a real device.
+ *
+ * `pickDirectoryAsync` is the Storage Access Framework, so it needs NO
+ * permission and no manifest entry: the user grants access to exactly the
+ * folder they chose, at the moment they choose it.
+ *
+ * Returns the saved size rather than the uri, because a SAF uri
+ * (`content://com.android.externalstorage...`) is meaningless to show someone.
+ */
+export async function saveToFolder(source: File): Promise<number> {
+  const folder = await Directory.pickDirectoryAsync();
+  await source.copy(folder);
+
+  // Verify by looking for it in the folder rather than trusting the copy — the
+  // same failure that produced a 0-byte backup would otherwise be invisible
+  // again, and this time the file is somewhere the app cannot re-read by path.
+  const written = folder
+    .list()
+    .find((entry): entry is File => entry instanceof File && entry.name === source.name);
+
+  if (!written || written.size <= 0) {
+    throw new Error(`Saved an empty file (${source.name}).`);
+  }
+  return written.size;
+}
+
+/**
  * Rows in the ledger, so the screen can say what is about to be exported.
  *
  * A real COUNT rather than `exportRows(db).length`: that would build every

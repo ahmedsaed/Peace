@@ -1,4 +1,4 @@
-import { BOM, escapeField, toCsv, toCsvFile } from './csv';
+import { escapeField, toCsv, toCsvFile } from './csv';
 
 describe('escapeField', () => {
   it('leaves ordinary text alone', () => {
@@ -64,16 +64,19 @@ describe('toCsv', () => {
 });
 
 describe('toCsvFile', () => {
-  it('leads with a byte-order mark', () => {
-    // Without it Excel reads the file in the system codepage and Arabic notes
-    // arrive as mojibake.
-    const out = toCsvFile([['note'], ['قهوة']]);
-    expect(out.startsWith(BOM)).toBe(true);
-    expect(out).toContain('قهوة');
+  /**
+   * The file used to start with a UTF-8 BOM, to stop Excel reading it in the
+   * system codepage. Google Sheets renders that BOM as visible junk on the
+   * first header cell — `﻿date` instead of `date` — which was reported from
+   * a real export. The header has to be usable as a column name.
+   */
+  it('does NOT lead with a byte-order mark', () => {
+    const out = toCsvFile([['date', 'note'], ['2026-08-10', 'x']]);
+    expect(out.charCodeAt(0)).not.toBe(0xfeff);
+    expect(out.startsWith('date,note')).toBe(true);
   });
 
-  it('uses the real BOM code point', () => {
-    expect(BOM).toBe('﻿');
-    expect(BOM).toHaveLength(1);
+  it('still writes non-ASCII notes as UTF-8', () => {
+    expect(toCsvFile([['note'], ['قهوة']])).toContain('قهوة');
   });
 });
