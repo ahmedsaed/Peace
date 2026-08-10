@@ -175,22 +175,65 @@ card account — type in the balance the bank shows, and Peace reports the diffe
 believes is outstanding. That is a check, not a second stored balance, and it keeps the
 "balances are derived, never stored" rule intact.
 
-## What a statement would settle
+## What the statement actually shows
 
-These four questions decide the data model, and one redacted statement answers all of them better
-than a phone call:
+Observed in the bank's app. Four kinds of row:
 
-1. Is the provisional Murabaha a **separate line item**, or are purchases posted at an inflated
-   amount?
-2. Does the reversal arrive as **one credit** on settlement, or per transaction?
-3. Is the 3% foreign commission its **own line**, or folded into the converted EGP figure?
-   (This decides whether "what did FX cost me this year" is answerable at all.)
-4. Does the statement carry the **original currency and amount**, or only EGP?
+| Row | What it is | Record it? |
+|---|---|---|
+| `PURCHASE XYZ` | the actual spend, with both the original currency and the EGP amount | **yes** — this is the record |
+| `FX MARKUP FEES` | the foreign-transaction fee, on its own line | **yes** — a real, permanent cost |
+| `Instalment - MURABHA LOAD` | the provisional Murabaha being booked | **no** — reversed on settlement |
+| `MURABHA ADJUST` | that booking being unwound | **no** — it undoes the row above |
 
-Everything above about Murabaha comes from the bank's public product page, not from a statement.
-The page says the Murabaha "is not carried out" when you pay in full, which does not obviously
-match money being taken and returned — so the model should be built on what the statement actually
-shows, not on this reading of a marketing page.
+This is close to the best possible outcome for the data model:
+
+- **The Murabaha is its own line, not baked into purchase amounts.** So the purchase rows are the
+  truth, and the two Murabaha rows can be ignored wholesale. If the bank had inflated every
+  purchase instead, every amount would have disagreed with the receipt and there would have been
+  nothing to skip.
+- **The FX fee is its own line**, so "what did foreign transactions cost me this year" is
+  answerable — it becomes an ordinary expense in a `Bank fees` category rather than an invisible
+  slice of a purchase.
+- **Both currencies are present**, so the original amount can be kept as metadata alongside the
+  settled EGP figure.
+
+**Caveat to the "ignore Murabaha" rule.** It only holds while the balance is paid in full, which is
+what makes `LOAD` and `ADJUST` cancel out. In a month that gets carried, part of the load is *not*
+reversed, and that part is a genuine expense. The rule is therefore **record whatever is not
+reversed**, which is zero in the normal case.
+
+## Making the bank app unnecessary
+
+The complaint that motivates this: the bank app is confusing and lags reality, so it does not get
+looked at, so nothing is checked. Peace can take over the "where did my money go" question
+entirely. It cannot take over "what is my exact balance", and pretending otherwise would reproduce
+the same untrustworthiness in a new place.
+
+**The irreducible unknown is the exchange rate.** The bank converts at the card scheme's settlement
+rate plus its own spread, on settlement day, not purchase day. Nothing on the device can know that
+number in advance — not even a live FX feed, which gives the mid-market rate rather than the
+bank's.
+
+So: **estimate at entry, confirm once.**
+
+1. **Card profile** on the account — FX markup %, cash-withdrawal fee and its minimum, statement
+   day, due day. Entered once, from the published terms.
+2. **At purchase**, enter what you actually know: `$10, Amazon`. Peace converts using the card's
+   last known effective rate, computes the markup fee from the profile, and writes the fee as its
+   own linked record in `Bank fees`. The record is flagged **estimated**.
+3. **On the statement**, one screen lists every estimated record. Correct the EGP figures once and
+   they become **confirmed**. Peace updates its effective rate from what actually happened, so the
+   next estimate is closer.
+4. **Murabaha rows are never entered at all.**
+
+What that buys: the month's spending is right in real time and correctly categorised, the FX fee is
+visible and countable, and the bank app is needed once a month for reconciliation instead of
+constantly for confusion.
+
+What it does not buy: a card balance that matches the bank to the piastre before settlement. That
+gap is the estimate, it is visible, and the reconciliation screen is where it gets closed — rather
+than being quietly wrong, which is the thing to avoid.
 
 ## Decisions
 
@@ -206,12 +249,19 @@ That removes interest from the slice and splits the refund work in two, leaving:
 
 1. Liability balances render as **owed** *(presentation)*
 2. **Refund flag** — a signed expense that nets against its category *(repo + record form)*
-3. **"Pay this card"** — pre-filled Bank → Card transfer *(account screen)*
-4. `statementDay` / `dueDay` and a derived statement view *(schema + account screen)*
-5. Foreign purchases store the **settled** amount *(Stage 2)*
-6. ~~Interest~~ — dropped
-7. *Later:* link a refund to the purchase it reverses
+3. **Card profile** — FX markup %, cash fee, statement day, due day *(schema + account form)*
+4. **Estimated foreign purchase** — enter the original currency, Peace converts at the card's last
+   known rate and auto-writes the markup fee *(record form + repo)*
+5. **Reconciliation screen** — confirm estimates against one statement, and learn the rate from
+   the corrections *(new screen)*
+6. **"Pay this card"** — pre-filled Bank → Card transfer *(account screen)*
+7. Foreign purchases store the **settled** amount, original amount as metadata *(Stage 2)*
+8. ~~Interest~~ — dropped
+9. *Later:* link a refund to the purchase it reverses
 
 Item 2 is the one that stops the numbers drifting, and it is the one that needs the most careful
 tests: relaxing "expense rows are negative" is exactly the class of change the repository layer
 exists to police.
+
+Items 3–5 are what make the bank app unnecessary day to day, and they depend on Stage 2's
+per-record currency and `fxRate` — so they land with it rather than before it.
