@@ -59,14 +59,20 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "app-title"
 
-# --- the drawer's placeholders are honest about being placeholders ---
+# --- Export is reachable from the drawer and is a real screen ---
+# It used to assert ".*Stage 2.*", the placeholder's own admission that it did
+# nothing. That assertion failing is what a placeholder becoming real looks
+# like, and the replacement has to be something only the working screen shows —
+# the ledger count. The export flow covers the files themselves.
 - tapOn:
     id: "nav-menu"
 - tapOn:
     id: "drawer-export"
 - assertVisible:
     id: "export-screen"
-- assertVisible: ".*Stage 2.*"
+- assertVisible:
+    id: "export-count"
+    text: "[0-9]+ records? in the ledger."
 - tapOn:
     id: "nav-back"
 

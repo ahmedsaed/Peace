@@ -195,6 +195,12 @@ app ignoring input. `pkill -f GradleDaemon`.
   `120 + 35`. Never put `+ * ? . ( ) [ ] |` in a testID.
 - **A passing flow that asserts nothing specific proves only that the app did not crash.** Assert
   the value the user would check, not just that a screen appeared.
+- **A file that exists is not a file that has content.** The backup flow passed while producing a
+  **0-byte** `.db` — `File.copy()` is async and was being called synchronously, so the share sheet
+  offered an empty file under a perfectly correct filename. Nothing downstream could tell. Every
+  export now goes through a size check that throws, the size is rendered in the UI, and the flow
+  asserts a non-zero one. Anything that writes a file needs the same treatment: assert the bytes,
+  not the name.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
