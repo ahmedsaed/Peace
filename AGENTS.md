@@ -66,11 +66,44 @@ To actually see the app: `npm run shot -- after-change` and read the returned PN
 Drive the UI with `adb shell input tap X Y`, `adb shell input text "..."`,
 `adb shell input keyevent KEYCODE_BACK`. Prefer Maestro flows in `.maestro/` for anything repeatable.
 
+## Versioning
+
+| Field | Where it comes from | When it changes |
+|---|---|---|
+| `version` (semver) | `app.json`, by hand | when a human decides a release deserves a new number |
+| `versionCode` | `git rev-list --count HEAD` | every commit |
+| `gitSha` | `git rev-parse --short HEAD` | every commit |
+
+`app.config.js` layers the last two onto the static `app.json`; `src/lib/build-info.ts` reads
+them back through `expo-constants`, and the About screen shows `1.0.0 (build 25)` plus the commit.
+A build made from a dirty tree is marked `-dirty`, because it is not reproducible from its sha and
+showing the sha unqualified is how you end up debugging code that was never in the APK.
+
+Three ways this breaks:
+
+- **`npm run apk` does not refresh the version.** `versionCode` is baked into
+  `android/app/build.gradle` by `expo prebuild`; Gradle alone reuses whatever is already there. Run
+  `npx expo prebuild --platform android` first, or the APK will carry a stale number and Android
+  will refuse the in-place upgrade. CI asserts the two agree.
+- **A shallow clone makes every build "build 1".** `actions/checkout` defaults to `fetch-depth: 1`,
+  so `git rev-list --count HEAD` returns 1. The workflows set `fetch-depth: 0` for this reason
+  alone.
+- Version numbers are only trustworthy in a release build. In development `Constants.expoConfig`
+  reflects whatever the dev server last evaluated.
+
 ## Working on this repo
 
 Development happens on branches with a PR into `main`. CI
 (`.github/workflows/pr.yml`) runs typecheck, lint and unit tests in ~1 min, then
 builds a signed APK and attaches it to the PR.
+
+**The APK build lives once**, in `.github/workflows/build-apk.yml`, called by both the PR and the
+release workflows. A release built by a drifting second copy of those steps would be a different
+artifact from the one that was reviewed.
+
+Merging to `main` runs `.github/workflows/release.yml`, which publishes a GitHub Release tagged
+`v<version>+build.<n>` with the signed APK attached. The tag carries the build number because the
+semver alone repeats across merges and the second release would collide.
 
 Three things that are true only because CI caught them, and will bite again:
 

@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import { type Href, router } from 'expo-router';
 import { type DrawerContentComponentProps } from 'expo-router/drawer';
 import { Image, Pressable, Text, View } from 'react-native';
@@ -6,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
-
-const VERSION = Constants.expoConfig?.version ?? '—';
+import { buildInfo } from '@/lib/build-info';
+import { formatVersion } from '@/lib/version';
 
 /**
  * What lives in the side menu, and what does not.
@@ -88,7 +87,9 @@ export function DrawerContent({ navigation }: DrawerContentComponentProps) {
 
       <View className="flex-1" />
 
-      <Text className="px-5 pb-3 text-xs text-muted opacity-60">Version {VERSION}</Text>
+      <Text className="px-5 pb-3 text-xs text-muted opacity-60" testID="drawer-version">
+        {formatVersion(buildInfo)}
+      </Text>
     </View>
   );
 }

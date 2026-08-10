@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Two merges in quick succession would otherwise race to create the same
+# release. Queue rather than cancel: an in-flight release that gets cancelled
+# leaves a tag with no APK attached to it.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Test, typecheck, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --ci
+
+  apk:
+    needs: check
+    uses: ./.github/workflows/build-apk.yml
+    secrets: inherit
+
+  publish:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: apk
+    permissions:
+      # Creating a release and pushing its tag. Everything else stays read-only.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.apk.outputs.artifact }}
+
+      # The tag is version + build number, not version alone. The semver only
+      # moves when a human decides it should, so several merges routinely share
+      # one — tagging on version alone would collide and the second release
+      # would fail or silently overwrite the first.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.apk.outputs.version }}
+          BUILD: ${{ needs.apk.outputs.build-number }}
+          ARTIFACT: ${{ needs.apk.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}+build.${BUILD}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::$TAG already exists — nothing to publish."
+            exit 0
+          fi
+
+          PREVIOUS=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')
+          if [ -n "$PREVIOUS" ]; then
+            NOTES=$(git log --pretty='- %s' "$(gh release view "$PREVIOUS" --json tagName --jq .tagName)..HEAD" 2>/dev/null || git log -20 --pretty='- %s')
+          else
+            NOTES=$(git log -20 --pretty='- %s')
+          fi
+
+          cat > notes.md <<EOF
+          Peace ${VERSION} (build ${BUILD})
+
+          Install the APK below. It is signed with the release key, so it
+          upgrades an existing install in place — no uninstall, no data loss.
+          arm64 only: it will not run on an x86_64 emulator.
+
+          Commit: \`$(git rev-parse --short HEAD)\`
+          Android versionCode: \`${BUILD}\`
+
+          ## Changes
+
+          ${NOTES}
+          EOF
+
+          gh release create "$TAG" "${ARTIFACT}.apk" \
+            --title "Peace ${VERSION} (build ${BUILD})" \
+            --notes-file notes.md \
+            --target "${GITHUB_SHA}"
