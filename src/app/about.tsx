@@ -1,6 +1,7 @@
 import { Image, ScrollView, Text, View } from 'react-native';
 
 import { StackHeader } from '@/components/screen';
+import { Wordmark } from '@/components/wordmark';
 import { buildInfo } from '@/lib/build-info';
 import { formatCommit, formatVersion } from '@/lib/version';
 
@@ -29,7 +30,7 @@ export default function AboutScreen() {
             style={{ width: 88, height: 88 }}
             resizeMode="contain"
           />
-          <Text className="text-2xl font-semibold tracking-tight text-accent">Peace</Text>
+          <Wordmark size={38} />
           <Text className="text-center text-sm leading-5 text-muted">
             An expense tracker that keeps its mouth shut. Everything you log stays on this phone.
           </Text>

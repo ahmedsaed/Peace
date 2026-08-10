@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
 import { addMonths, formatPeriod, type Period } from '@/lib/period';
 
@@ -54,11 +55,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
         testID="nav-menu"
         onPress={() => drawer.openDrawer()}
       />
-      <Text
-        className="flex-1 pl-1 text-xl font-semibold tracking-tight text-accent"
-        testID="app-title">
-        Peace
-      </Text>
+      <Wordmark style={{ flex: 1, paddingLeft: 4 }} testID="app-title" />
       {right}
       <HeaderButton
         icon="search"
