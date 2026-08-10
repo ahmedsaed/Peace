@@ -26,7 +26,8 @@ account, and no network dependency anywhere in the core product.
 Full plan and the reasoning behind the ordering: [docs/roadmap.md](docs/roadmap.md).
 
 Stage 1's finish line was never a feature list — it is *logging a real week of spending without
-reaching for MyMoney*. That test is still outstanding.
+reaching for MyMoney*. **That test has been passed**: nine days of real records, and the only
+things it turned up were a broken split-screen layout and a handful of papercuts, all since fixed.
 
 ## Stack
 
@@ -58,14 +59,37 @@ npm start             # Metro dev server
 | Boot emulator | `npm run emu` |
 | Screenshot the device | `npm run shot -- <name>` → prints a PNG path |
 | E2E flows | `npm run e2e` |
-| Standalone APK for a phone | `npm run apk` |
+| Standalone APK for a phone | `npm run apk` (arm64; `apk:emu` for x86_64) |
 | Regenerate migrations | `npm run db:generate` |
 
 ### Installing on a phone
 
-Distribution is **sideload only** — no Play Store, so no restricted-permission review. `npm run apk`
-produces a standalone arm64 APK at `android/app/build/outputs/apk/release/app-release.apk` with the
-JS bundle embedded, so it runs with no laptop attached. CI attaches the same APK to every PR.
+Distribution is **sideload only** — no Play Store, so no restricted-permission review.
+
+**The easiest way is the [Releases page](../../releases).** Every merge to `main` publishes a signed
+arm64 APK there. It upgrades an existing install in place — no uninstall, no data loss — because
+every build is signed with the same key and carries an increasing `versionCode`.
+
+`npm run apk` builds the same thing locally at
+`android/app/build/outputs/apk/release/app-release.apk`, with the JS bundle embedded so it runs
+with no laptop attached. CI also attaches an APK to every PR, for testing a change before it lands.
+
+### Versioning
+
+| Field | Source | Changes |
+|---|---|---|
+| `version` | `app.json`, edited by hand | when you decide a release deserves a new number |
+| `versionCode` | commit count | every commit |
+| commit sha | git | every commit |
+
+[`app.config.js`](app.config.js) layers the last two onto `app.json`. **Settings → About** shows
+`1.0.0 (build 25)` and the commit, so "which build am I actually running" is answerable from the
+phone. A build made from a tree with uncommitted changes is marked `-dirty`, since it cannot be
+reproduced from its sha.
+
+The commit count is what makes in-place upgrades work: Android requires a monotonically increasing
+`versionCode`, and a commit count gives one for free without a "bump version" commit that would
+itself change the number.
 
 ### Signing
 
@@ -92,6 +116,13 @@ Every PR to `main` runs [`.github/workflows/pr.yml`](.github/workflows/pr.yml):
 |---|---|
 | `check` | typecheck, lint, unit tests — about a minute, so it fails fast |
 | `apk` | `expo prebuild` + Gradle release build, uploaded as a downloadable artifact |
+
+Merging to `main` runs [`release.yml`](.github/workflows/release.yml), which repeats those checks
+and publishes a GitHub Release tagged `v<version>+build.<n>` with the APK attached.
+
+Both workflows call the **same** reusable build
+([`build-apk.yml`](.github/workflows/build-apk.yml)) rather than keeping two copies of the steps —
+a release built by a drifting second copy would not be the artifact that was reviewed.
 
 `android/` is gitignored and generated from `app.json` plus the config plugins, so CI runs
 `prebuild` itself rather than checking it out.

@@ -175,13 +175,19 @@ amount, keypad and date row are *pinned* to the bottom and everything above them
 short the window gets, the keys stay on screen and the squeeze is absorbed by scrolling. Shrinking
 type and padding alone would only have delayed the failure.
 
-Two rules that follow:
+Three rules that follow:
 
 - **Decide what must never move, and pin that.** For the record screen it is the keypad: a keypad
   you have to scroll to is worse than no keypad.
 - **Shrink to the touch target, then stop.** `tight` keys sit at the edge of the 44dp guideline.
   Going smaller trades a layout problem for a mis-tap problem, and a mis-typed amount is the more
   expensive of the two.
+- **Drop labels before you drop controls.** At `tight` the account and category pickers collapse to
+  44dp icon squares and the note joins them on the same line, which buys back ~120dp — enough that
+  nothing scrolls at all. The labels are the right thing to lose: each picker already shows its own
+  icon and colour, which is how it is recognised in the records list anyway, and the accessible
+  name still carries the full text. Both forms keep the **same testID**, so a flow never has to
+  know the density to find the account picker.
 
 ## Naming
 
