@@ -38,9 +38,17 @@ appId: com.ahmed.peace
     id: "drawer-about"
 - assertVisible:
     id: "about-screen"
+# Patterns, not literals: the build number changes with every commit and the
+# sha with every build, so pinning them would mean editing this flow on each
+# push — which is how an assertion stops being read and starts being updated on
+# autopilot. The shape is what matters, and it still fails if app.config.js
+# stops feeding the values through (they fall back to "0.0.0" and "unknown").
 - assertVisible:
     id: "about-version"
-    text: "1.0.0"
+    text: "[0-9]+\\.[0-9]+\\.[0-9]+ \\(build [0-9]+\\)"
+- assertVisible:
+    id: "about-commit"
+    text: "[0-9a-f]{7}(-dirty)?"
 - assertVisible:
     id: "about-package"
     text: "com.ahmed.peace"

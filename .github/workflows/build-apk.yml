@@ -1,0 +1,168 @@
+name: Build APK
+
+# Reusable so the PR workflow and the release workflow build the APK exactly the
+# same way. A release built by a second, drifting copy of these steps is worth
+# less than no release at all — it would be a different artifact from the one
+# that was reviewed.
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: Semver from app.json
+        value: ${{ jobs.apk.outputs.version }}
+      build-number:
+        description: Commit count, which is also the Android versionCode
+        value: ${{ jobs.apk.outputs.build-number }}
+      artifact:
+        description: Name of the uploaded artifact
+        value: ${{ jobs.apk.outputs.artifact }}
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      build-number: ${{ steps.identity.outputs.build-number }}
+      artifact: ${{ steps.identity.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # versionCode comes from `git rev-list --count HEAD` (see
+          # app.config.js). The default shallow clone has exactly one commit, so
+          # every build would claim versionCode 1 and Android would refuse the
+          # upgrade. This is the only reason for the full history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          # From .nvmrc, so CI uses the same npm as local development. npm 10
+          # and 11 record optional platform dependencies differently, and the
+          # mismatch makes `npm ci` reject a lockfile that is perfectly valid.
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          # apksigner lives in build-tools. Gradle downloads what it needs for
+          # the build itself, but the verify step below runs its own binary, so
+          # ask for it explicitly rather than hoping it is already there.
+          packages: 'build-tools;36.0.0'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json', 'app.config.js', 'plugins/**') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - run: npm ci
+
+      - name: Resolve build identity
+        id: identity
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          BUILD=$(git rev-list --count HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build-number=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "artifact=peace-$VERSION-build$BUILD" >> "$GITHUB_OUTPUT"
+          echo "Building Peace $VERSION (build $BUILD) from $(git rev-parse --short HEAD)"
+
+      # android/ is gitignored — it is generated from app.json plus the config
+      # plugins, so CI has to produce it rather than check it out.
+      - name: Prebuild native project
+        run: npx expo prebuild --platform android --no-install
+
+      # An assertion, not a log line. versionCode is what lets an APK upgrade an
+      # existing install; if the shallow-clone trap above ever comes back it
+      # would silently produce 1 here, and the only symptom would be Android
+      # refusing to install the update on a phone.
+      - name: Verify versionCode made it into the build
+        env:
+          EXPECTED: ${{ steps.identity.outputs.build-number }}
+        run: |
+          ACTUAL=$(grep -oP 'versionCode\s+\K[0-9]+' android/app/build.gradle | head -1)
+          echo "versionCode in build.gradle: $ACTUAL (expected $EXPECTED)"
+          [ "$ACTUAL" = "$EXPECTED" ] || {
+            echo "::error::versionCode is $ACTUAL but this commit is build $EXPECTED."
+            exit 1
+          }
+
+      # Secrets are unavailable to pull requests from forks. The signing plugin
+      # falls back to the debug keystore in that case, so the build still
+      # produces an installable (if not upgrade-compatible) APK.
+      - name: Decode signing key
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.PEACE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/peace-release.jks"
+          echo "PEACE_STORE_FILE=$RUNNER_TEMP/peace-release.jks" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        env:
+          ORG_GRADLE_PROJECT_PEACE_STORE_FILE: ${{ env.PEACE_STORE_FILE }}
+          ORG_GRADLE_PROJECT_PEACE_STORE_PASSWORD: ${{ secrets.PEACE_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_PEACE_KEY_ALIAS: ${{ secrets.PEACE_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_PEACE_KEY_PASSWORD: ${{ secrets.PEACE_KEY_PASSWORD }}
+        working-directory: android
+        # arm64 only: it covers every phone since ~2017 and roughly quarters the
+        # C++ compile time versus building all four ABIs.
+        run: ./gradlew app:assembleRelease -x lint -x test -PreactNativeArchitectures=arm64-v8a
+
+      # An assertion, not a log line: if the secrets were present, the APK MUST
+      # carry our certificate. Without this check a misconfigured secret would
+      # silently fall back to debug signing and produce an APK that cannot
+      # upgrade anyone's install — the failure would only surface on a phone.
+      #
+      # apksigner, not keytool: these APKs use signature scheme v2/v3 with no
+      # legacy JAR signature, and keytool reports "Not a signed jar file".
+      - name: Verify signing identity
+        env:
+          SIGNED: ${{ env.PEACE_STORE_FILE }}
+        run: |
+          set -o pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1)
+
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner not found under $ANDROID_HOME/build-tools"
+            ls -la "$ANDROID_HOME/build-tools" || true
+            exit 1
+          fi
+          echo "using $APKSIGNER"
+
+          CERTS=$("$APKSIGNER" verify --print-certs "$APK")
+          echo "$CERTS" | grep -E "Signer #1 certificate (DN|SHA-256)" || true
+
+          if [ -n "$SIGNED" ]; then
+            echo "$CERTS" | grep -q "CN=Peace" || {
+              echo "::error::Release key was configured but the APK is not signed with it."
+              exit 1
+            }
+            echo "signed with the release key"
+          else
+            echo "::warning::No signing secrets available — this APK is debug-signed and cannot upgrade an existing install."
+          fi
+
+      # Named for the build rather than the commit so a downloaded APK is
+      # identifiable on disk weeks later.
+      - name: Name the APK for humans
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk \
+             "${{ steps.identity.outputs.artifact }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.identity.outputs.artifact }}
+          path: ${{ steps.identity.outputs.artifact }}.apk
+          retention-days: 30
+          if-no-files-found: error

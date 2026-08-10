@@ -265,6 +265,9 @@ export default function RecordScreen() {
   // The note keeps a floor rather than a fixed height: with room it grows like a
   // web textarea, without room it stops at something still usable.
   const noteMinHeight = byDensity(density, { regular: 120, compact: 76, tight: 48 });
+  // Below this there is not enough height for a labelled picker row AND a note
+  // block, so they merge into one line. See the comment at that branch.
+  const compact = density === 'tight';
 
   return (
     <View
@@ -338,50 +341,98 @@ export default function RecordScreen() {
           })}
         </View>
 
-        <View className={`mx-4 flex-row gap-3 ${gap}`}>
-          <PickerButton
-            label={type === 'transfer' ? 'From' : 'Account'}
-            value={account?.name}
-            icon={account?.icon}
-            color={account?.color}
-            onPress={() => setSheet('account')}
-            testID="pick-account"
-          />
-          {type === 'transfer' ? (
-            <PickerButton
-              label="To"
-              value={accounts.find((a) => a.id === toAccountId)?.name}
-              icon={accounts.find((a) => a.id === toAccountId)?.icon}
-              color={accounts.find((a) => a.id === toAccountId)?.color}
-              onPress={() => setSheet('toAccount')}
-              testID="pick-to-account"
-            />
-          ) : (
-            <PickerButton
-              label="Category"
-              value={category?.name}
-              icon={category?.icon ?? 'categories'}
-              color={category?.color}
-              onPress={() => setSheet('category')}
-              testID="pick-category"
-            />
-          )}
-        </View>
+        {/* One row instead of three when the window is short: the two pickers
+            collapse to their icons and the note takes the rest of the line.
+            That is ~120dp back, which is the difference between scrolling to
+            reach the note and everything being on screen at once.
 
-        {/* Notes claims every pixel left between the pickers and the amount, the
-            way a web textarea fills its container — down to a floor, below which
-            it stops shrinking and the block scrolls instead. */}
-        <TextInput
-          value={note}
-          onChangeText={setNote}
-          placeholder="Add notes"
-          placeholderTextColor={palette.muted}
-          multiline
-          textAlignVertical="top"
-          testID="record-note"
-          style={{ minHeight: noteMinHeight }}
-          className={`mx-4 flex-1 rounded-lg bg-surface px-4 py-3 text-base text-ink ${gap}`}
-        />
+            The labels are what get dropped, and they are the right thing to
+            drop: the account and category are each shown by their own icon and
+            colour, which is how they are recognised in the list anyway. The
+            accessible name still carries the full text. */}
+        {compact ? (
+          <View className={`mx-4 flex-row items-center gap-2 ${gap}`}>
+            <PickerSquare
+              label={`${type === 'transfer' ? 'From account' : 'Account'}: ${account?.name ?? 'choose'}`}
+              icon={account?.icon}
+              color={account?.color}
+              onPress={() => setSheet('account')}
+              testID="pick-account"
+            />
+            {type === 'transfer' ? (
+              <PickerSquare
+                label={`To account: ${accounts.find((a) => a.id === toAccountId)?.name ?? 'choose'}`}
+                icon={accounts.find((a) => a.id === toAccountId)?.icon ?? 'transfer'}
+                color={accounts.find((a) => a.id === toAccountId)?.color}
+                onPress={() => setSheet('toAccount')}
+                testID="pick-to-account"
+              />
+            ) : (
+              <PickerSquare
+                label={`Category: ${category?.name ?? 'choose'}`}
+                icon={category?.icon ?? 'categories'}
+                color={category?.color}
+                onPress={() => setSheet('category')}
+                testID="pick-category"
+              />
+            )}
+            <TextInput
+              value={note}
+              onChangeText={setNote}
+              placeholder="Notes"
+              placeholderTextColor={palette.muted}
+              testID="record-note"
+              className="h-11 flex-1 rounded-lg bg-surface px-3 text-sm text-ink"
+            />
+          </View>
+        ) : (
+          <>
+            <View className={`mx-4 flex-row gap-3 ${gap}`}>
+              <PickerButton
+                label={type === 'transfer' ? 'From' : 'Account'}
+                value={account?.name}
+                icon={account?.icon}
+                color={account?.color}
+                onPress={() => setSheet('account')}
+                testID="pick-account"
+              />
+              {type === 'transfer' ? (
+                <PickerButton
+                  label="To"
+                  value={accounts.find((a) => a.id === toAccountId)?.name}
+                  icon={accounts.find((a) => a.id === toAccountId)?.icon}
+                  color={accounts.find((a) => a.id === toAccountId)?.color}
+                  onPress={() => setSheet('toAccount')}
+                  testID="pick-to-account"
+                />
+              ) : (
+                <PickerButton
+                  label="Category"
+                  value={category?.name}
+                  icon={category?.icon ?? 'categories'}
+                  color={category?.color}
+                  onPress={() => setSheet('category')}
+                  testID="pick-category"
+                />
+              )}
+            </View>
+
+            {/* Notes claims every pixel left between the pickers and the amount,
+                the way a web textarea fills its container — down to a floor,
+                below which it stops shrinking and the block scrolls instead. */}
+            <TextInput
+              value={note}
+              onChangeText={setNote}
+              placeholder="Add notes"
+              placeholderTextColor={palette.muted}
+              multiline
+              textAlignVertical="top"
+              testID="record-note"
+              style={{ minHeight: noteMinHeight }}
+              className={`mx-4 flex-1 rounded-lg bg-surface px-4 py-3 text-base text-ink ${gap}`}
+            />
+          </>
+        )}
       </ScrollView>
 
       <View
@@ -498,6 +549,43 @@ export default function RecordScreen() {
         testID="sheet-category"
       />
     </View>
+  );
+}
+
+/**
+ * The icon-only form of PickerButton, for short windows.
+ *
+ * Same testID as the labelled version on purpose: which one renders is a
+ * function of the window height, and a flow that had to know the density before
+ * it could find the account picker would be testing the layout rather than the
+ * app.
+ */
+function PickerSquare({
+  label,
+  icon,
+  color,
+  onPress,
+  testID,
+}: {
+  label: string;
+  icon?: string | null;
+  color?: string | null;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className="h-11 w-11 items-center justify-center rounded-lg bg-surface active:opacity-70">
+      <View
+        className="h-7 w-7 items-center justify-center rounded-full"
+        style={{ backgroundColor: color ?? '#6B5B4A' }}>
+        <Icon name={icon ?? 'dots'} size={14} color="#FFFFFF" />
+      </View>
+    </Pressable>
   );
 }
 

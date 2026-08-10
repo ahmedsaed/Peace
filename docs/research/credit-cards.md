@@ -68,6 +68,44 @@ If they are usually tied to a purchase, linking the refund to the original recor
 extra column — it makes "show me what this actually cost" answerable, and lets a full reversal be
 one tap. If they are mostly standalone, a plain flag is enough.
 
+### 2b. The charge that gets taken and then given back — Murabaha
+
+The specific card in use is **Banque Misr Kenana**, which is an *Islamic* card running on
+"Murabaha covered by Wakala". That is not a variant of interest, it is a different contract, and it
+is why the behaviour looks strange in a tracker.
+
+In a Murabaha the bank buys the goods and resells them to you at cost plus a **fixed mark-up**,
+payable over time. The mark-up has to be fixed and known upfront — a charge that accrues with
+elapsed time would be interest, which is the thing being avoided. So the bank books the whole
+marked-up amount as debt the moment a transaction is treated as Murabaha. Settle early and it
+returns the unearned portion. That rebate has a name too: **ibra'**.
+
+**So yes, this is common.** It is standard for Islamic cards, not a quirk of one bank.
+
+From the published Kenana terms:
+
+- **3% monthly** Murabaha rate, applied *only* if the full statement balance is not settled by the
+  26th of the following month. Pay in full and "the Murabaha process is not carried out".
+- Grace period **up to 56 days**
+- International transactions: **3% of transaction value**
+- Cash withdrawal in Egypt: 5%, minimum EGP 50
+- Minimum payment = the Murabaha premium
+
+The observed behaviour — money taken, then returned once settled — is consistent with the bank
+booking the Murabaha *provisionally* and reversing it on full settlement. The published terms
+describe the end state; the statement shows the intermediate one.
+
+**The distinction that fixes the ledger.** There are two kinds of "extra money" on this card and
+they are not the same thing:
+
+| | What it is | Comes back? | How to record it |
+|---|---|---|---|
+| 3% foreign commission, 5% cash fee, annual fee | a real, permanent cost | never | expense, `Bank fees`, on the card |
+| provisional Murabaha premium | the bank's booking, not your spending | yes, on settlement | see below |
+
+Recording the second as an expense and its reversal as income is *precisely* what makes the monthly
+totals drift: one month inflated, the next credited back as income that was never earned.
+
 ### 3. Foreign purchases settled at the bank's rate
 
 A card in EGP used abroad shows one number at the till and a different number on the statement,
@@ -112,6 +150,47 @@ Ordered by how much drift each removes per unit of work:
 | 5 | Foreign purchases store the **settled** amount; original amount and rate as metadata | Stage 2 |
 
 1 and 3 are cheap. 2 is the one that fixes the numbers. 4 and 5 can wait.
+
+## The open choice: mirror the statement, or record reality
+
+This is the one decision the rest hangs off, and it is a philosophy question rather than a
+technical one.
+
+**(A) Mirror the statement.** Record everything the bank posts, provisional Murabaha charges and
+their reversals included. The card balance in Peace always matches the bank's app. Cost: more data
+entry, and every month distorts unless each reversal is linked back to the charge it undoes.
+
+**(B) Record economic reality.** Record purchases and the real fees; skip provisional postings that
+are known to reverse. Every month is truthful as it stands. Cost: the card balance disagrees with
+the bank's app during the window between posting and settlement.
+
+**Recommendation: (B).** Peace exists to answer "where did my money go", not to reproduce the
+bank's ledger. Since the balance is paid in full inside the grace period, the Murabaha premium
+always nets to zero, so recording it is pure noise — and (A) is exactly the mechanism that produced
+the drift in MyMoney.
+
+(B) does lose something real: you can no longer check the app against the statement, which is how a
+forgotten record gets caught. So it should be paired with a **reconciliation** affordance on the
+card account — type in the balance the bank shows, and Peace reports the difference and what it
+believes is outstanding. That is a check, not a second stored balance, and it keeps the
+"balances are derived, never stored" rule intact.
+
+## What a statement would settle
+
+These four questions decide the data model, and one redacted statement answers all of them better
+than a phone call:
+
+1. Is the provisional Murabaha a **separate line item**, or are purchases posted at an inflated
+   amount?
+2. Does the reversal arrive as **one credit** on settlement, or per transaction?
+3. Is the 3% foreign commission its **own line**, or folded into the converted EGP figure?
+   (This decides whether "what did FX cost me this year" is answerable at all.)
+4. Does the statement carry the **original currency and amount**, or only EGP?
+
+Everything above about Murabaha comes from the bank's public product page, not from a statement.
+The page says the Murabaha "is not carried out" when you pay in full, which does not obviously
+match money being taken and returned — so the model should be built on what the statement actually
+shows, not on this reading of a marketing page.
 
 ## Decisions
 
