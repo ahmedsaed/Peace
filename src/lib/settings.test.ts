@@ -33,3 +33,23 @@ describe('settings codec', () => {
     expect(SETTING_DEFAULTS.homeCurrency).toBe('EGP');
   });
 });
+
+describe('defaultAccountId', () => {
+  it('defaults to "no preference" rather than guessing an account', () => {
+    // An id baked in as a default would point at nothing on a fresh install,
+    // and the record screen would open with no account selected.
+    expect(SETTING_DEFAULTS.defaultAccountId).toBe('');
+  });
+
+  it('round-trips an id through the plain-string codec', () => {
+    const id = 'seed:acc:cash';
+    expect(encodeSetting('defaultAccountId', id)).toBe(id);
+    expect(decodeSetting('defaultAccountId', encodeSetting('defaultAccountId', id))).toBe(id);
+  });
+
+  it('treats an empty stored value as "no preference", not as missing', () => {
+    // Clearing the setting writes '', which must decode to '' and not fall back
+    // to some other account.
+    expect(decodeSetting('defaultAccountId', '')).toBe('');
+  });
+});
