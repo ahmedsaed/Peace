@@ -1,0 +1,210 @@
+appId: com.ahmed.peace
+---
+# Search across the whole ledger: text, filters, and the totals over the matches.
+#
+# The assertions here are the NUMBERS, not the presence of a list. A search
+# screen that returns every record for every query would still show rows, still
+# scroll, and still look entirely correct — only the count and the total say
+# whether the query did anything.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- three records to search, chosen so the filters have something to separate ---
+
+# 1. E£250 under Coffee, a SUB-category of Food.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Coffee"
+- tapOn:
+    id: "record-note"
+- inputText: "Cilantro flat white"
+- hideKeyboard
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+# 2. E£80 under Restaurants — a DIFFERENT sub-category of the same parent.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Restaurants"
+- tapOn:
+    id: "record-note"
+- inputText: "dinner"
+- hideKeyboard
+- tapOn:
+    id: "key-8"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+# 3. E£9,000 of income, so the type filter has both sides to choose between.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-income"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Salary"
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+# --- the screen opens with nothing searched ---
+- tapOn:
+    id: "nav-search"
+- assertVisible:
+    id: "search-screen"
+# An empty query must NOT return the ledger. If this ever starts showing rows,
+# search has quietly become the records list with its month navigator removed.
+- assertVisible: "Search every record"
+- assertNotVisible:
+    id: "search-count"
+
+# --- text matches the note ---
+- tapOn:
+    id: "search-input"
+- inputText: "Cilantro"
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+# The total over the matches, not over the month. This is the assertion that
+# fails if the query stops filtering.
+- assertVisible:
+    id: "search-expense"
+    text: "-E£250.00"
+- assertVisible: "Coffee"
+- assertNotVisible: "dinner"
+- takeScreenshot: 01-search-note
+
+# --- text matches the CATEGORY name, which appears in no note ---
+- eraseText
+- inputText: "Restaurants"
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- assertVisible:
+    id: "search-expense"
+    text: "-E£80.00"
+
+# --- a query that matches nothing says so, rather than showing everything ---
+- eraseText
+- inputText: "zzzz"
+- assertVisible: "No records match"
+- assertVisible:
+    id: "search-count"
+    text: "0 records"
+
+# --- clearing the text returns to the prompt, not to a full list ---
+- eraseText
+- assertVisible: "Search every record"
+
+# --- filter by the PARENT category: both sub-categories have to come back ---
+- hideKeyboard
+- tapOn:
+    id: "search-filters"
+- assertVisible:
+    id: "search-filter-panel"
+# The chip labels are asserted in full because Android measured "This year" a
+# fraction wider than it then laid out, wrapped it onto a second line the chip
+# has no height for, and rendered "This" inside a chip sized for "This year".
+# Nothing about that looks like a wrap, so only the text catches it.
+- assertVisible:
+    id: "filter-range-year"
+    text: "This year"
+- assertVisible:
+    id: "filter-range-quarter"
+    text: "Last 3 months"
+- tapOn:
+    id: "filter-category"
+- tapOn: "Food"
+# Picking "Food" and being told there are no records — because every one of them
+# is filed under Coffee or Restaurants — is the filter lying about the data.
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- assertVisible:
+    id: "search-expense"
+    text: "-E£330.00"
+# The filter button carries the count while the panel is collapsed.
+- assertVisible:
+    id: "search-filter-count"
+    text: "1"
+- takeScreenshot: 02-search-category
+
+# --- clearing puts it back ---
+- tapOn:
+    id: "filter-clear"
+- assertVisible: "Search every record"
+
+# --- filter by type ---
+- tapOn:
+    id: "filter-kind-income"
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- assertVisible:
+    id: "search-income"
+    text: "E£9,000.00"
+# Income only: the two expenses must not be in the total.
+- assertNotVisible:
+    id: "search-expense"
+
+# Tapping the selected chip clears it — the only undo that is where the filter
+# was set.
+- tapOn:
+    id: "filter-kind-income"
+- assertVisible: "Search every record"
+
+# --- filter by amount, unsigned ---
+# 250 is stored as -25000. A signed comparison would miss it and this would
+# come back with only the salary.
+- tapOn:
+    id: "filter-min"
+- inputText: "100"
+- hideKeyboard
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- assertVisible:
+    id: "search-expense"
+    text: "-E£250.00"
+
+# --- a result opens the record it stands for ---
+- tapOn:
+    id: "search-filters"
+- tapOn: "Coffee"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "amount-display"
+    text: "250"
+- assertVisible: "Cilantro flat white"
+- takeScreenshot: 03-search-opens-record

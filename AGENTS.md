@@ -216,6 +216,23 @@ app ignoring input. `pkill -f GradleDaemon`.
 - **Settings are read through `src/state/settings.ts`, never `getSetting` in a component.** The
   store is a write-through cache: SQLite stays the source of truth, and the in-memory copy is what
   makes a change repaint every screen rather than only the one that made it.
+- **`LIKE` treats `%` and `_` as wildcards, and nothing warns you.** A user searching for "50%"
+  matches the entire ledger; "Lunc_" matches "Lunch". Both look exactly like an ordinary search
+  that found more than expected, which is why it survives review. Text goes through
+  `likePattern` in `src/lib/search-query.ts` and every query carries `ESCAPE '\'` — and the test
+  that catches a missing `ESCAPE` is the one searching for a note that *really does* contain a
+  percent sign, not the one searching for a bare `%`. A bare `%` returns nothing either way.
+- **A total under a capped list must be computed over the whole match, not the rows on screen.**
+  Search caps its list at 300 because a one-letter query matches most of a ledger. Summing the
+  array that was capped gives a number that silently means "the first 300 of them" — worse than
+  showing no total at all. Two queries: one for the rows, one aggregate for the figures. The test
+  runs with `limit: 1` and asserts the full total.
+- **A rule kept in a parallel list is a rule that gets forgotten — make it structural.** Which
+  glyphs the category picker may offer used to be a second list of names filtered out of the path
+  map, and it was forgotten on the very next glyph added: `filter` went into the paths and not into
+  `CHROME`, which would have offered a funnel as a category icon. `icon.tsx` now holds three
+  separate maps and `ICON_NAMES` *is* the category one, so a glyph's group is where it is written.
+  Look for the same shape wherever a comment says "remember to also add it to…".
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
 - **testIDs must be regex-safe** — letters, digits, hyphens between words. Maestro matches ids as
   **regular expressions**, so `key-op-+` reads as "`key-op` then one or more hyphens" and silently
