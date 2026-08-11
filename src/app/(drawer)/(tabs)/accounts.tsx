@@ -5,14 +5,14 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
-import { listAccountsWithBalance, totalBalance } from '@/db/repo/accounts';
+import { balanceByCurrency, listAccountsWithBalance, type CurrencyTotal } from '@/db/repo/accounts';
 import { formatMinor } from '@/lib/money';
 import { useSetting } from '@/state/settings';
 
 export default function AccountsScreen() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<ReturnType<typeof listAccountsWithBalance>>([]);
-  const [total, setTotal] = useState(0);
+  const [totals, setTotals] = useState<CurrencyTotal[]>([]);
   const homeCurrency = useSetting('homeCurrency');
 
   // Re-read on focus so a balance change, or a newly added account, shows up on
@@ -20,7 +20,7 @@ export default function AccountsScreen() {
   useFocusEffect(
     useCallback(() => {
       setAccounts(listAccountsWithBalance(db));
-      setTotal(totalBalance(db));
+      setTotals(balanceByCurrency(db));
     }, [])
   );
 
@@ -28,11 +28,27 @@ export default function AccountsScreen() {
     <Screen testID="accounts-screen">
       {/* No "Accounts" caption: the active tab already says which screen this
           is, and repeating it cost a row of height for no information. */}
+      {/* One row per currency held, rather than one converted number.
+          Valuing a whole balance needs a rate for today, and the only rates
+          this app has belong to individual past records — see
+          balanceByCurrency. With a single currency, which is the normal case,
+          this is exactly the one line it always was. */}
       <View className="items-center bg-surface px-4 pb-4 pt-1">
         <Text className="mb-1 text-[10px] uppercase tracking-widest text-muted">All accounts</Text>
-        <Text className="text-xl font-semibold text-ink" testID="accounts-total">
-          {formatMinor(total, homeCurrency)}
-        </Text>
+        {totals.length === 0 ? (
+          <Text className="text-xl font-semibold text-ink" testID="accounts-total">
+            {formatMinor(0, homeCurrency)}
+          </Text>
+        ) : (
+          totals.map((total, index) => (
+            <Text
+              key={total.currency}
+              className={`font-semibold text-ink ${index === 0 ? 'text-xl' : 'text-base'}`}
+              testID={index === 0 ? 'accounts-total' : `accounts-total-${total.currency}`}>
+              {formatMinor(total.balanceMinor, total.currency)}
+            </Text>
+          ))
+        )}
       </View>
 
       <ScrollView contentContainerClassName="p-4 gap-3">

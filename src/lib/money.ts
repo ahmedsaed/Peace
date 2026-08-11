@@ -122,6 +122,50 @@ export function groupDigits(entry: string): string {
   return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + rest;
 }
 
+/**
+ * Round half AWAY FROM ZERO, which `Math.round` does not do.
+ *
+ * `Math.round(-0.5)` is -0, because it rounds toward +∞. Applied to money that
+ * makes a converted expense and a converted income of the same size come out a
+ * unit apart, so a spend and its refund would no longer cancel.
+ */
+function roundHalfAwayFromZero(value: number): number {
+  return value < 0 ? -Math.round(-value) : Math.round(value);
+}
+
+/**
+ * Convert minor units from one currency to another.
+ *
+ * `rate` is the natural human one — how many MAJOR units of `to` you get for
+ * one MAJOR unit of `from`. "50" for USD→EGP means fifty pounds to the dollar.
+ *
+ * The `10 ** (decTo - decFrom)` term is the part that is easy to miss and
+ * impossible to notice in an EGP-only app: minor units are not comparable
+ * across currencies. Yen has no decimal places, so ¥1000 is 1000 minor units
+ * while E£1000 is 100,000 — multiplying by the rate alone would be wrong by a
+ * factor of a hundred. Dinars go the other way, with three.
+ *
+ * Returns an integer, because the result is money and money is integer minor
+ * units everywhere else in this app.
+ */
+export function convertMinor(
+  amountMinor: number,
+  from: string,
+  to: string,
+  rate: number
+): number {
+  if (from.toUpperCase() === to.toUpperCase() && rate === 1) return amountMinor;
+  const scale = 10 ** (decimalsFor(to) - decimalsFor(from));
+
+  // `toPrecision(15)` before rounding, because binary floating point cannot
+  // hold a decimal rate exactly: E£50.00 at 3.03 yen to the pound comes out as
+  // 151.49999999999997 rather than 151.5, and rounds DOWN to ¥151. Trimming to
+  // 15 significant digits — well inside a double's ~17 — discards the noise
+  // without touching any figure a currency rate could legitimately carry.
+  const exact = Number((amountMinor * rate * scale).toPrecision(15));
+  return roundHalfAwayFromZero(exact);
+}
+
 /** Sum minor units safely. Integers only, so no drift. */
 export function sumMinor(amounts: number[]): number {
   return amounts.reduce((acc, n) => acc + n, 0);

@@ -110,8 +110,44 @@ export const transactions = sqliteTable(
      */
     amountMinor: integer('amount_minor').notNull(),
     currency: text('currency').notNull().default('EGP'),
-    /** Rate to the home currency at time of entry; 1 when already in home currency. */
+    /**
+     * How many HOME-currency major units one major unit of `currency` was worth
+     * when this was entered. 1 when the record is already in home currency.
+     *
+     * Captured per record rather than looked up: a purchase made when the
+     * dollar was fifty pounds stays at fifty forever. Re-converting history at
+     * today's rate would silently rewrite what last month cost.
+     */
     fxRate: real('fx_rate').notNull().default(1),
+    /**
+     * `amountMinor` converted to the home currency, in ITS minor units.
+     *
+     * Stored rather than computed, because every report sums it and
+     * `amount * rate` is float arithmetic — doing it per row at read time is
+     * how drift gets into totals. Money stays integer minor units here as
+     * everywhere else.
+     *
+     * NULL means "no conversion applies", i.e. the record is already in the
+     * home currency. That is what makes this column addable without touching a
+     * single existing row: every record written before multi-currency existed
+     * was in the home currency by definition, so NULL is already the right
+     * answer for all of them. Read it as
+     * `COALESCE(home_amount_minor, amount_minor)`.
+     */
+    homeAmountMinor: integer('home_amount_minor'),
+    /**
+     * WHICH home currency `homeAmountMinor` is expressed in.
+     *
+     * Without this, changing the home currency silently relabels history: a
+     * record converted to pounds would be summed into a dollar total and shown
+     * with a dollar sign. The conversion is only meaningful against the
+     * currency it was made for, so that currency has to travel with it.
+     *
+     * NULL alongside a NULL amount means "written before this existed, in
+     * whatever the home currency was then" — those records are valued only when
+     * their own currency still matches today's home currency.
+     */
+    homeCurrency: text('home_currency'),
     note: text('note'),
 
     /**

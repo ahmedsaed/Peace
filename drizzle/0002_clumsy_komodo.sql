@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `home_currency` text;

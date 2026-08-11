@@ -123,8 +123,32 @@ work depends on Stage 2's per-record currency.
   would be worse than an empty screen — they ship with the features that consume them.
   `src/state/settings.ts` is a write-through cache over the settings table, so a change repaints
   every screen instead of waiting for a restart.
-- **Multi-currency** — per-account currency, per-record currency + `fxRate`, all reporting
-  converted to home currency. Manual rate entry always available; optional rate fetch on top.
+- ✅ **Multi-currency** — a record in an account that does not hold the home currency asks for a
+  rate and stores the converted amount alongside the original. Month totals sum the converted
+  amount; each account keeps showing what it actually holds.
+
+  Three decisions worth knowing:
+
+  - **The converted amount is stored, not computed.** `amount x rate` is float arithmetic, and
+    doing it per row at read time is how drift gets into totals. Money stays integer minor units.
+  - **The rate is captured per record.** A purchase made when the dollar was fifty pounds stays at
+    fifty forever; re-converting history at today's rate would silently rewrite what last month
+    cost.
+  - **There is no single cross-currency "all accounts" number.** Valuing a whole balance needs a
+    rate for today, and the only rates here belong to individual past records. The screen shows one
+    row per currency held — with a single currency, which is the normal case, that is the one line
+    it always was.
+
+  The rate is **fetched** from [Frankfurter](https://frankfurter.dev) when a foreign account is
+  chosen, and can be overridden by typing. Its **v2** dataset is the one that matters: v1 carries
+  only the ECB's 31 currencies, which do not include EGP and would have been useless for the one
+  conversion this app actually needs.
+
+  **The network is a convenience, never a requirement.** Every failure path ends with the field
+  simply staying manual, and the screen says so. Fetching is triggered by choosing the account, not
+  by opening the screen — an effect on mount would put a request in front of every record,
+  including the overwhelming majority that need no rate at all. Existing records are never
+  re-fetched: their rate is history.
 - **Budgets** — per month, "copy from last month", progress bars, over-budget states
 - **Analysis** — donut by category, ranked bars with %, cash-flow over time, **carry-over**
 - Search and filters — the screen and its entry point exist; the query does not

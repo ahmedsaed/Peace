@@ -41,18 +41,22 @@ appId: com.ahmed.peace
 - assertVisible: ".*US dollar.*"
 - takeScreenshot: 01-settings
 
-# THE ASSERTION THAT MATTERS. Back on a completely different screen, the total
-# must now be formatted in dollars. Asserting only that the settings row updated
+# THE ASSERTION THAT MATTERS. Back on a completely different screen, the MONTH
+# TOTAL must now be in dollars. Asserting only that the settings row updated
 # would pass even if nothing else in the app read the setting.
+#
+# Deliberately not the accounts total: since multi-currency, that shows what
+# each account actually HOLDS, one line per currency. An EGP account stays in
+# pounds no matter what the reporting currency is, which is the point.
 - tapOn:
     id: "nav-back"
 - tapOn:
-    id: "tab-accounts"
+    id: "tab-index"
 - assertVisible:
-    id: "accounts-total"
+    id: "summary-expense"
     text: ".*\\$.*"
 - assertNotVisible:
-    id: "accounts-total"
+    id: "summary-expense"
     text: ".*E£.*"
 
 # --- and it is persisted, not just held in memory ---
@@ -61,10 +65,8 @@ appId: com.ahmed.peace
     visible:
       id: "home-screen"
     timeout: 90000
-- tapOn:
-    id: "tab-accounts"
 - assertVisible:
-    id: "accounts-total"
+    id: "summary-expense"
     text: ".*\\$.*"
 
 # --- the default account setting reaches the record screen ---
