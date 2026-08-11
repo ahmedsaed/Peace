@@ -234,6 +234,20 @@ app ignoring input. `pkill -f GradleDaemon`.
   array that was capped gives a number that silently means "the first 300 of them" — worse than
   showing no total at all. Two queries: one for the rows, one aggregate for the figures. The test
   runs with `limit: 1` and asserts the full total.
+- **Percentages that are rounded independently do not add up to 100.** Three equal slices print
+  33.3 three times, and a legend summing to 99.9 reads as a bug on a screen whose whole job is
+  accounting for money. `sharePercents` in `src/lib/analysis.ts` distributes the error by largest
+  remainder and breaks ties on the earlier index, so the same data never reorders itself between
+  two renders. Drive chart *geometry* from the amounts, never from the rounded percentages, or the
+  ring shows a hairline of background wherever the rounding went.
+- **A single 100% slice is the arc a donut cannot draw.** Start and end land on the same point, so
+  the renderer draws *nothing at all* — and one category owning a whole month is common, not an
+  edge case. It has to be special-cased into two half-circles. Same family: an SVG path containing
+  `NaN` renders nothing on Android rather than throwing.
+- **Group by month in JS, not with SQLite's `localtime`.** That modifier reads the *process*
+  timezone, so the same database buckets differently on a phone set to Cairo and on CI set to UTC,
+  and an 11pm purchase on the 31st lands in the wrong month. `periodBounds` gets local calendar
+  boundaries right and is tested; N indexed range queries cost nothing next to being correct.
 - **A default that only works for someone with history is a dead feature.** `suggestBudgets` first
   averaged the three months *before* the one being budgeted, which returns nothing for a ledger a
   few weeks old — precisely the person who has never set a budget, i.e. the entire audience. It now
@@ -301,7 +315,7 @@ Three separate OOM kills were hit while setting this up, each with a different c
    by default, and it lingers for 2 hours after the build. Fixed in `~/.gradle/gradle.properties`
    with `kotlin.compiler.execution.strategy=in-process`. If a build dies mysteriously, check for
    a stray `KotlinCompileDaemon` process first.
-2. **ninja's C++ compilers during `:app:buildCMakeDebug`.** Skia, reanimated and worklets compile
+2. **ninja's C++ compilers during `:app:buildCMakeDebug`.** Reanimated and worklets compile
    native code, and ninja defaults its job count to `nproc` (16 here) — 16 concurrent compilers,
    each a few hundred MB, none of them governed by any Gradle heap setting. Fix: run Gradle under
    `taskset -c 0-3`, which caps the affinity the whole process tree derives its job count from.

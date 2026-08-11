@@ -179,7 +179,41 @@ work depends on Stage 2's per-record currency.
 
   Carry-over is still not built: `carryOver` remains a stored setting that nothing reads, so no
   switch is shown for it.
-- **Analysis** — donut by category, ranked bars with %, cash-flow over time, **carry-over**
+- ✅ **Analysis** — a category ring with ranked shares, and income against spending over the last
+  six months. Expense and income each get the same chart rather than one getting a chart and the
+  other a number.
+
+  Five decisions worth knowing:
+
+  - **The donut is hand-drawn SVG, and the chart libraries are gone.** `victory-native` and
+    `@shopify/react-native-skia` were in package.json and *nothing imported them* — while
+    `librnskia.so` was **11.7 MB of a 58 MB APK**. Every icon in the app is already an inline
+    `react-native-svg` path, so a ring is a few arc commands. The geometry lives in
+    `src/lib/analysis.ts` and is unit-tested, which is more than the library would have given.
+  - **Percentages always total exactly 100.** Rounding each share independently does not: three
+    equal slices give 33.3 three times and a legend summing to 99.9, which reads as a bug on a
+    screen whose whole job is accounting for money. The error is distributed by largest remainder,
+    ties broken on the earlier index so a legend never reorders itself between two renders of the
+    same data.
+  - **A single category owning the month is the case a donut cannot draw.** Start and end land on
+    the same point, so the naive arc renders *nothing at all*. One full slice is drawn as two
+    half-circles instead. Angles come from the amounts rather than the rounded percentages, or the
+    ring would show a hairline of background wherever the rounding went.
+  - **The roll-up matches Budgets.** Spending under Coffee lands on Food, on both screens, from one
+    shared query in `src/db/repo/spend.ts` — two hand-kept copies of a money query is exactly how
+    one screen ends up quietly disagreeing with another.
+  - **Cash flow is N separate queries, not one `GROUP BY strftime`.** Grouping in SQL needs
+    SQLite's `localtime` modifier, which reads the *process* timezone — so the same database would
+    bucket differently on a phone set to Cairo and on CI set to UTC, and an 11pm purchase on the
+    31st would land in the wrong month. `periodBounds` already gets local calendar boundaries right
+    and is tested; six indexed range queries cost nothing next to being correct.
+
+  Uncategorised money and records with no home-currency value are each reported on their own line.
+  A donut is a claim to account for a whole, so anything left out of it has to be said out loud.
+
+- **Carry-over** — an unspent surplus rolling into the next month. Still the one unfinished piece of
+  Stage 2. `carryOver` remains a stored setting that nothing reads, so no switch is shown for it;
+  it changes what every budget number means and deserves its own pass.
 - ✅ **Search and filters** — free text across the note, the category and both account names, plus
   filters for type, account, category, amount range and date range. Five decisions worth knowing:
 
