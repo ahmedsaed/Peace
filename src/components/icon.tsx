@@ -11,9 +11,22 @@ import Svg, { Path } from 'react-native-svg';
  *
  * Paths are 24x24, single-path, designed to stay legible at 14px inside a
  * 26px circle.
+ *
+ * THE SPLIT INTO THREE MAPS IS THE POINT. Which glyphs the category picker may
+ * offer used to be a second, parallel list of names, and keeping two things in
+ * step by hand is a rule that gets forgotten — `filter` was added to the paths
+ * and left out of the list on its first commit, which would have offered a
+ * funnel as a category icon. Here a glyph's group *is* where it is written, so
+ * there is nothing left to forget.
  */
-const PATHS: Record<string, string> = {
-  // --- app chrome: header buttons and the side menu ---
+
+/**
+ * Navigation and chrome. These name a section or an action, not a category, so
+ * the picker must never offer them — a category called "Groceries" wearing the
+ * hamburger-menu glyph is a bug that only ever shows up in a screenshot.
+ */
+const CHROME_PATHS = {
+  // --- header buttons and the side menu ---
   menu: 'M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h18v2H3v-2z',
   // The lens is a ring, and a ring in a fill-only Path needs the inner circle
   // wound the *opposite* way (sweep-flag 1 against the outer's 0). Same winding
@@ -43,10 +56,18 @@ const PATHS: Record<string, string> = {
     'M4 2h16v20H4V2zm3 4v3h10V6H7zm0 6v2h3v-2H7zm7 0v2h3v-2h-3zm-7 4v2h3v-2H7zm7 0v2h3v-2h-3z',
   accounts: 'M3 6h18v12H3V6zm2 3v6h14V9H5zm10 1.5h3v3h-3v-3z',
   categories: 'M2 11V3h8l11 11-8 8L2 11zm4-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+} as const;
 
-  // --- categories ---
+/**
+ * Everything the category and account icon pickers offer, in the order they are
+ * offered. Adding a glyph here is all it takes to make it pickable.
+ *
+ * `receipt` and `tag` duplicate the chrome glyphs `records` and `categories`,
+ * which is fine and deliberate: chrome is never offered, so each shape still
+ * appears exactly once in the picker.
+ */
+const CATEGORY_PATHS = {
   food: 'M8 2v8H6V2H4v8a4 4 0 0 0 3 3.9V22h2v-8.1A4 4 0 0 0 12 10V2h-2v8H8V2zm9 0c-1.7 0-3 2.7-3 6 0 2.6.8 4.8 2 5.6V22h2V2z',
-  fork: 'M8 2v8H6V2H4v8a4 4 0 0 0 3 3.9V22h2v-8.1A4 4 0 0 0 12 10V2h-2v8H8V2zm9 0c-1.7 0-3 2.7-3 6 0 2.6.8 4.8 2 5.6V22h2V2z',
   cart: 'M4 4h2l2.7 9.6a2 2 0 0 0 2 1.4h6.6a2 2 0 0 0 1.9-1.4L21 7H7m1 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0zm8 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0z',
   cup: 'M4 4h13v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V4zm13 2h2a2 2 0 0 1 0 4h-2V6zM3 18h15v2H3v-2z',
   bus: 'M4 16V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10h-1.5a2 2 0 1 1-4 0h-5a2 2 0 1 1-4 0H4zm2-9v4h12V7H6z',
@@ -90,49 +111,39 @@ const PATHS: Record<string, string> = {
   // already the Installments category — a transfer and a recurring charge
   // looking identical in the list is a real misread.
   transfer: 'M4 8h11V5l5 4.5-5 4.5v-3H4V8zm16 8H9v-3l-5 4.5L9 22v-3h11v-3z',
-};
+} as const;
+
+/**
+ * Slugs that draw a glyph a *pickable* slug already draws.
+ *
+ * `fork` and `food` are the same path, and both are seeded (Restaurants uses
+ * `fork`, its Food parent uses `food`), so offering both gave the picker two
+ * identical circles and no way to tell which one you had chosen. The slug has
+ * to keep resolving, though — dropping it would render every seeded Restaurants
+ * row as `dots`.
+ */
+const ALIAS_PATHS = {
+  fork: 'M8 2v8H6V2H4v8a4 4 0 0 0 3 3.9V22h2v-8.1A4 4 0 0 0 12 10V2h-2v8H8V2zm9 0c-1.7 0-3 2.7-3 6 0 2.6.8 4.8 2 5.6V22h2V2z',
+} as const;
+
+/**
+ * Every slug that resolves to a glyph. Rendering looks here; the picker does
+ * not. A slug defined in two groups would have one definition silently win, so
+ * `icon.test.ts` asserts the three groups are disjoint.
+ */
+const PATHS: Record<string, string> = { ...CHROME_PATHS, ...CATEGORY_PATHS, ...ALIAS_PATHS };
 
 export type IconName = keyof typeof PATHS;
 
-/**
- * Navigation and chrome glyphs. They name a section or an action, not a
- * category, so the icon picker must not offer them — a category called
- * "Groceries" with a hamburger-menu icon is a bug that only shows up in a
- * screenshot. Every glyph added above the category block belongs here too.
- */
-const CHROME = [
-  'menu',
-  'search',
-  'filter',
-  'settings',
-  'export',
-  'info',
-  'back',
-  'chevron',
-  'records',
-  'analysis',
-  'budgets',
-  'accounts',
-  'categories',
-];
+/** Exported for the tests that police the groups. Not for rendering. */
+export const ICON_GROUPS = {
+  chrome: CHROME_PATHS,
+  category: CATEGORY_PATHS,
+  alias: ALIAS_PATHS,
+} as const;
 
-/**
- * Slugs that draw a glyph another *pickable* slug already draws. `fork` and
- * `food` are the same path, and both are seeded (Restaurants uses `fork`, its
- * Food parent uses `food`), so the picker offered two identical circles — you
- * could not tell which one you had chosen. The slug stays in `PATHS` because
- * dropping it would render every seeded Restaurants row as `dots`.
- *
- * `receipt` and `tag` are NOT listed here: they duplicate `records` and
- * `categories`, which are chrome and already filtered out, so each glyph still
- * appears exactly once in the picker.
- */
-const ALIASES = ['fork'];
-
-/** Every slug the icon picker may offer. */
-export const ICON_NAMES = Object.keys(PATHS).filter(
-  (n) => !CHROME.includes(n) && !ALIASES.includes(n)
-);
+/** Every slug the icon picker may offer — by construction, not by filtering. */
+export const ICON_NAMES = Object.keys(CATEGORY_PATHS);
 
 export function hasIcon(name: string): boolean {
   return name in PATHS;
