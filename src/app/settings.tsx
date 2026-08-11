@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
@@ -14,12 +14,14 @@ import { useSettingsStore } from '@/state/settings';
 /**
  * Settings.
  *
- * ONLY SETTINGS THAT DO SOMETHING APPEAR HERE. `carryOver`, `viewMode` and
- * `showTotal` are defined and stored, but nothing reads them until budgets and
- * analysis exist — so showing them would be three switches that silently do
- * nothing, which is worse than an empty screen and exactly the kind of thing
- * that teaches you to stop trusting an app. They land with the features that
- * consume them.
+ * ONLY SETTINGS THAT DO SOMETHING APPEAR HERE. `viewMode` and `showTotal` are
+ * defined and stored, but nothing reads them yet — so showing them would be two
+ * switches that silently do nothing, which is worse than an empty screen and
+ * exactly the kind of thing that teaches you to stop trusting an app. They land
+ * with the features that consume them.
+ *
+ * `carryOver` appeared the moment the Records and Analysis screens started
+ * reading it, which is the same rule from the other direction.
  */
 export default function SettingsScreen() {
   const settings = useSettingsStore((state) => state.settings);
@@ -73,10 +75,20 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        <Section title="Reporting">
+          <Toggle
+            label="Carry the balance forward"
+            hint="Show what each month started with, and your running total. Nothing is added to any budget — a limit stays a limit."
+            value={settings.carryOver}
+            onChange={(next) => update('carryOver', next)}
+            testID="setting-carry-over"
+            last
+          />
+        </Section>
+
         <Text className="px-1 pt-6 text-xs leading-5 text-muted opacity-70">
-          Budget carry-over and the default date range arrive with budgets and analysis. The Gemini
-          API key comes with receipt capture — it is stored on this device and never included in a
-          build.
+          The default date range arrives with a screen that reads it. The Gemini API key comes with
+          receipt capture — it is stored on this device and never included in a build.
         </Text>
       </ScrollView>
 
@@ -114,6 +126,49 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <View>
       <Text className="mb-2 px-1 text-[10px] uppercase tracking-widest text-muted">{title}</Text>
       <View className="overflow-hidden rounded-xl bg-surface">{children}</View>
+    </View>
+  );
+}
+
+/**
+ * A row whose value is a switch rather than a destination.
+ *
+ * The whole row is not pressable: a switch already has its own hit target, and
+ * a row that toggles on tap AND carries a switch gives two controls for one
+ * value that can disagree about what a tap meant.
+ */
+function Toggle({
+  label,
+  hint,
+  value,
+  onChange,
+  testID,
+  last = false,
+}: {
+  label: string;
+  hint: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+  testID: string;
+  last?: boolean;
+}) {
+  return (
+    <View
+      className={`flex-row items-center gap-3 px-4 py-3.5 ${
+        last ? '' : 'border-b border-line'
+      }`}>
+      <View className="flex-1">
+        <Text className="text-[15px] text-ink">{label}</Text>
+        <Text className="text-xs leading-4 text-muted">{hint}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        testID={testID}
+        accessibilityLabel={label}
+        trackColor={{ false: palette.line, true: palette.accent }}
+        thumbColor={palette.ink}
+      />
     </View>
   );
 }

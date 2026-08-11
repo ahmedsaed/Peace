@@ -1,0 +1,160 @@
+appId: com.ahmed.peace
+---
+# Carry-over: what each month started with, and the running total.
+#
+# NOT budget carry-over. A limit that grows when you fail to use it is not a
+# limit — this reports a running cash position and leaves every budget alone.
+#
+# The assertion that matters is the RECONCILIATION: brought forward plus the
+# month's balance has to equal what the Accounts screen says you hold. If those
+# two disagree, one screen is lying and the user cannot tell which.
+#
+# Records are logged TODAY and the flow then steps forward a month, rather than
+# back-dating anything. Driving the native date dialog to a specific day is
+# fragile, and "this month's net is next month's opening" exercises exactly the
+# same query.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- a fresh ledger has nothing to carry, and says nothing at all ---
+# "E£0.00 brought forward → E£0.00 now" is a sentence that teaches you to ignore
+# the line, so it stays hidden until there is a position to report.
+- assertNotVisible:
+    id: "summary-brought-forward"
+
+# --- earn 9,000, spend 2,000 ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-income"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Salary"
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Coffee"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- assertVisible:
+    id: "summary-balance"
+    text: "E£7,000.00"
+# Still nothing before THIS month, so still no line. This is the assertion that
+# fails if the carry query stops respecting the month boundary and starts
+# counting the records inside the month it is opening.
+- assertNotVisible:
+    id: "summary-brought-forward"
+- takeScreenshot: 01-carry-this-month
+
+# --- next month opens on what this one left ---
+- tapOn:
+    id: "month-next"
+- assertVisible:
+    id: "summary-brought-forward"
+    text: "E£7,000.00 brought forward"
+- assertVisible:
+    id: "summary-running"
+    text: "E£7,000.00 now"
+# The month itself is empty — the running total is entirely what was carried.
+- assertVisible:
+    id: "summary-balance"
+    text: "E£0.00"
+- takeScreenshot: 02-carry-next-month
+
+# --- THE RECONCILIATION: the two screens must agree ---
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-total"
+    text: "E£7,000.00"
+
+# --- a budget is NOT touched by any of this ---
+# The whole design decision in one assertion: 2,000 spent against a 2,000 limit
+# is 100%, and next month's limit is the limit that was set, not the limit plus
+# whatever went unspent.
+# No month navigation here: each tab keeps its OWN period state, so Budgets
+# opens on the current month regardless of where Records was left. Stepping back
+# would land on an empty month and set a limit against no spending at all.
+- tapOn:
+    id: "tab-budgets"
+- scrollUntilVisible:
+    element:
+      id: "budget-row-seed-cat-food"
+    direction: DOWN
+- tapOn:
+    id: "budget-row-seed-cat-food"
+- inputText: "2000"
+- tapOn:
+    id: "budget-save"
+- assertVisible:
+    id: "budget-percent-seed-cat-food"
+    text: "100%"
+
+# --- turn it off, and the position line goes ---
+# A setting that nothing reads must not be shown; the other half of that rule is
+# that the switch has to move a number on a DIFFERENT screen.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "setting-carry-over"
+- tapOn:
+    id: "setting-carry-over"
+- tapOn:
+    id: "nav-back"
+
+- tapOn:
+    id: "month-next"
+- assertNotVisible:
+    id: "summary-brought-forward"
+- assertNotVisible:
+    id: "summary-running"
+# The month's own figures are untouched by the setting — it adds a line, it does
+# not change what BALANCE means.
+- assertVisible:
+    id: "summary-balance"
+    text: "E£0.00"
+
+# --- and back on again ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-carry-over"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "month-next"
+- assertVisible:
+    id: "summary-running"
+    text: "E£7,000.00 now"
