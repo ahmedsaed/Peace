@@ -20,7 +20,16 @@ export const SETTING_DEFAULTS = {
    * so a stale id can never leave the form with no account selected.
    */
   defaultAccountId: '' as string,
-  /** Roll an unspent monthly surplus into the next month. */
+  /**
+   * Show what each month started with, and the running total.
+   *
+   * NOT a budget feature. Budget carry-over — an unspent limit growing next
+   * month's limit — was considered and rejected: a limit that gets easier every
+   * time you fail to use it is not a limit, and the questions it forces (does
+   * it compound, does an overspend carry as a debt) all exist because the idea
+   * fights itself. What genuinely carries between months is money, so this
+   * reports a running cash position and leaves every budget alone.
+   */
   carryOver: true as boolean,
   /** Default range for the Records and Analysis screens. */
   viewMode: 'monthly' as 'daily' | 'weekly' | 'monthly' | 'yearly',

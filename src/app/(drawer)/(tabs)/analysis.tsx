@@ -14,6 +14,7 @@ import {
   type Breakdown,
   type CashFlowPoint,
 } from '@/db/repo/analysis';
+import { broughtForward, runningTotals } from '@/db/repo/carry';
 import type { CategoryKind } from '@/db/repo/spend';
 import { rankSlices, type RankedSlice } from '@/lib/analysis';
 import { testIdSlug as slug } from '@/lib/id';
@@ -33,15 +34,26 @@ const CASH_FLOW_MONTHS = 6;
 
 export default function AnalysisScreen() {
   const homeCurrency = useSetting('homeCurrency');
+  const carryOver = useSetting('carryOver');
   const [period, setPeriod] = useState(currentPeriod());
   const [kind, setKind] = useState<CategoryKind>('expense');
   const [breakdown, setBreakdown] = useState<Breakdown>(EMPTY);
   const [flow, setFlow] = useState<CashFlowPoint[]>([]);
+  const [flowOpening, setFlowOpening] = useState(0);
 
   const refresh = useCallback(() => {
     setBreakdown(categoryBreakdown(db, period, kind, homeCurrency));
-    setFlow(cashFlow(db, period, { months: CASH_FLOW_MONTHS, homeCurrency }));
-  }, [period, kind, homeCurrency]);
+    const points = cashFlow(db, period, { months: CASH_FLOW_MONTHS, homeCurrency });
+    setFlow(points);
+    // The strip starts at its OLDEST month, not at the month being viewed —
+    // taking the carry for `period` would start the line at today's position and
+    // then add the same months again on top of it.
+    setFlowOpening(
+      carryOver && points.length > 0
+        ? broughtForward(db, points[0].period, homeCurrency).amountMinor
+        : 0
+    );
+  }, [period, kind, homeCurrency, carryOver]);
 
   // On focus rather than on mount: every number here moves when a record is
   // logged, and returning from the record screen has to show that.
@@ -96,7 +108,13 @@ export default function AnalysisScreen() {
 
         <Footnotes breakdown={breakdown} kind={kind} homeCurrency={homeCurrency} />
 
-        <CashFlow points={flow} homeCurrency={homeCurrency} current={period} />
+        <CashFlow
+          points={flow}
+          homeCurrency={homeCurrency}
+          current={period}
+          carryOver={carryOver}
+          startingMinor={flowOpening}
+        />
       </ScrollView>
     </Screen>
   );
@@ -209,12 +227,21 @@ function CashFlow({
   points,
   homeCurrency,
   current,
+  carryOver,
+  startingMinor,
 }: {
   points: CashFlowPoint[];
   homeCurrency: string;
   current: Period;
+  carryOver: boolean;
+  startingMinor: number;
 }) {
   const peak = cashFlowPeak(points);
+  const running = runningTotals(
+    startingMinor,
+    points.map((p) => p.netMinor)
+  );
+  const runningEnd = running.length > 0 ? running[running.length - 1] : startingMinor;
   if (peak === 0) return null;
 
   return (
@@ -274,6 +301,26 @@ function CashFlow({
           );
         })}
       </View>
+
+      {/* The running position across the same months.
+          The bars answer "was this month unusual"; this answers "am I actually
+          accumulating anything", which is the question underneath it. Only
+          shown with carry-over on, because without a starting figure a running
+          total would begin at zero and be a different, wronger number. */}
+      {carryOver ? (
+        <View className="mt-3 flex-row items-baseline justify-between">
+          <Text className="text-[11px] text-muted">
+            Started {formatMinor(startingMinor, homeCurrency)}
+          </Text>
+          <Text
+            className={`text-xs font-semibold ${
+              runningEnd < 0 ? 'text-expense' : 'text-ink'
+            }`}
+            testID="analysis-running-end">
+            {formatMinor(runningEnd, homeCurrency)} now
+          </Text>
+        </View>
+      ) : null}
 
       <Text className="mt-3 text-[11px] text-muted" testID="analysis-cashflow-net">
         {netSentence(points, homeCurrency)}

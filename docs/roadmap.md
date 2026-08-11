@@ -177,8 +177,7 @@ work depends on Stage 2's per-record currency.
     with no home-currency value, and limits written in another currency are each reported on their
     own line rather than silently folded in or dropped.
 
-  Carry-over is still not built: `carryOver` remains a stored setting that nothing reads, so no
-  switch is shown for it.
+  Budgets deliberately have **no carry-over**. See the carry-over entry below for why.
 - ✅ **Analysis** — a category ring with ranked shares, and income against spending over the last
   six months. Expense and income each get the same chart rather than one getting a chart and the
   other a number.
@@ -211,9 +210,37 @@ work depends on Stage 2's per-record currency.
   Uncategorised money and records with no home-currency value are each reported on their own line.
   A donut is a claim to account for a whole, so anything left out of it has to be said out loud.
 
-- **Carry-over** — an unspent surplus rolling into the next month. Still the one unfinished piece of
-  Stage 2. `carryOver` remains a stored setting that nothing reads, so no switch is shown for it;
-  it changes what every budget number means and deserves its own pass.
+- ✅ **Carry-over** — but not the one that was planned.
+
+  **Budget carry-over was considered and rejected.** The original idea was MyMoney's: an unspent
+  limit grows next month's limit, so E£800 left on a E£2,000 Food budget makes September's E£2,800.
+  Written out, it does not survive contact with what a budget *is* — a limit that gets easier every
+  time you fail to use it is not a limit. And every question the design forces has no good answer:
+
+  - Does it compound? Chained, a category you rarely touch accumulates without bound — six untouched
+    months of E£2,000 is E£14,000 in the seventh, and the progress bar stops meaning anything. Not
+    chained, and it is an arbitrary one-month rule dressed up as a principle.
+  - Does an overspend carry as a debt? If not, overspending is free and the limit is a suggestion.
+    If so, one bad month quietly punishes the next, and the limit has to be floored at zero to stop
+    it going negative.
+
+  Both awkward questions exist because the concept fights itself. So budgets keep no memory at all.
+
+  **What actually carries between months is money**, which is a running cash position and needs no
+  exceptions. The Records header shows what the month opened with and what it leaves you holding;
+  the Analysis cash-flow strip shows the same line across six months, turning "was this month
+  unusual" into "am I accumulating anything".
+
+  Two decisions worth knowing:
+
+  - **Account opening balances count.** They have no date, so they belong before all time. Leaving
+    them out would put the running total permanently below the Accounts screen by however much you
+    started with, and neither screen would say why. A foreign-currency opening balance is *reported*
+    rather than converted — there is no stored rate for "money that was already there", so any
+    conversion would be at a rate nobody chose.
+  - **Brought forward + this month's balance = the Accounts total.** That identity is the whole
+    reason to trust the figure, and `carry.test.ts` pins it directly rather than testing the two
+    sides separately.
 - ✅ **Search and filters** — free text across the note, the category and both account names, plus
   filters for type, account, category, amount range and date range. Five decisions worth knowing:
 
