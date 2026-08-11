@@ -31,6 +31,20 @@ for _ in $(seq 1 180); do
     adb shell settings put global window_animation_scale 0 || true
     adb shell settings put global transition_animation_scale 0 || true
     adb shell settings put global animator_duration_scale 0 || true
+
+    # Suppress Android's "System UI isn't responding" / ANR dialogs.
+    #
+    # This machine is tight on RAM, so the first launch after a boot regularly
+    # makes SystemUI miss its deadline and Android throws up a modal that sits
+    # on top of the app and swallows every tap. Maestro then fails on its FIRST
+    # assertion — `home-screen is visible` — which reads exactly like a broken
+    # app rather than a busy emulator, and costs a screenshot every time to
+    # work out that the app underneath was fine all along. It has now done that
+    # three times.
+    #
+    # Only ever set on the throwaway test AVD, where an ANR dialog carries no
+    # information anybody is going to act on.
+    adb shell settings put global hide_error_dialogs 1 || true
     echo "emulator ready"
     exit 0
   fi
