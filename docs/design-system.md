@@ -243,6 +243,28 @@ Three rules that follow:
   name still carries the full text. Both forms keep the **same testID**, so a flow never has to
   know the density to find the account picker.
 
+Search applies the first rule with a different answer. What must never move there is the **result**,
+so the filter panel is the thing that gives way: it is bounded to `max(190dp, 40% of the window)`
+and scrolls inside that, which keeps the count and the total on screen at 340dp with a row or two
+of results under them. Filters you have to scroll are a mild annoyance; a filter you cannot see the
+effect of is the reason nobody trusts the filter.
+
+**The filters are inline, not a sheet.** A sheet would have to open the account and category
+pickers on top of itself, and a modal over a modal is unreliable on Android — but the better reason
+is that inline leaves the results visible while a filter is being changed, which is what tells you
+whether the filter did what you meant.
+
+### A chip label can wrap into a chip that has no room for it
+
+`filter-range-year` rendered as **"This"** inside a pill correctly sized for "This year". Android
+measured the text a fraction wider than the width it then laid out in, so the label wrapped to a
+second line and the chip's single-line height clipped it. Nothing about the result looks like a
+wrap — it looks like deliberate truncation, which is why it survived a full-height screenshot and
+only appeared at split-screen height.
+
+Every chip label carries `numberOfLines={1}`, and the E2E flow asserts the **full text** of the two
+longest chips. Asserting the testID alone would have passed throughout.
+
 ## Naming
 
 The app is **Peace** — as in peace of mind. Lowercase `peace` remains the project slug and the

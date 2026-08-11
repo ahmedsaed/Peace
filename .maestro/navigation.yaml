@@ -76,12 +76,20 @@ appId: com.ahmed.peace
 - tapOn:
     id: "nav-back"
 
-# --- search opens from the header, and says it is not wired yet ---
+# --- search opens from the header ---
+# It used to assert "Search is not wired up yet", the placeholder's own
+# admission that it did nothing. What replaces it has to be something only the
+# working screen shows — the filter panel. The search flow covers the queries.
 - tapOn:
     id: "nav-search"
 - assertVisible:
     id: "search-input"
-- assertVisible: "Search is not wired up yet"
+- tapOn:
+    id: "search-filters"
+- assertVisible:
+    id: "search-filter-panel"
+- assertVisible:
+    id: "filter-kind-expense"
 - tapOn:
     id: "nav-back"
 - assertVisible:
