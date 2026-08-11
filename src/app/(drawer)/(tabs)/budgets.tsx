@@ -20,6 +20,7 @@ import {
 } from '@/db/repo/budgets';
 import { budgetFraction, budgetPercent, budgetState, remainingMinor } from '@/lib/budget';
 import { formatMinor, minorToMajor, parseAmountToMinor } from '@/lib/money';
+import { testIdSlug as slug } from '@/lib/id';
 import { formatPeriod, currentPeriod, type Period } from '@/lib/period';
 import { useSetting } from '@/state/settings';
 
@@ -32,15 +33,6 @@ const EMPTY: BudgetSummary = {
   unvaluedCount: 0,
   staleCount: 0,
 };
-
-/**
- * Category ids carry colons (`seed:cat:food`). Maestro matches testIDs as
- * regular expressions, so they are reduced to letters, digits and hyphens
- * rather than interpolated raw.
- */
-function slug(categoryId: string): string {
-  return categoryId.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
 
 export default function BudgetsScreen() {
   const homeCurrency = useSetting('homeCurrency');

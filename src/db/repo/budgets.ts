@@ -1,13 +1,14 @@
-import { and, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+import { and, eq, lt, sql } from 'drizzle-orm';
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { roundUpSuggestion } from '../../lib/budget';
 import { decimalsFor } from '../../lib/money';
-import { addMonths, periodBounds, type Period } from '../../lib/period';
+import { addMonths, type Period } from '../../lib/period';
 import { newId } from '../../lib/id';
 import * as schema from '../schema';
-import { budgets, categories, transactions } from '../schema';
+import { budgets, categories } from '../schema';
 import { InvariantError } from './categories';
+import { topLevelCategories, totalsByTopCategory } from './spend';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -72,77 +73,12 @@ export type BudgetSummary = {
   staleCount: number;
 };
 
-/**
- * Spend per TOP-LEVEL category for one month, in the home currency.
- *
- * The roll-up is the reason this is not a plain GROUP BY category_id: a record
- * filed under "Coffee" has to land on "Food", or a parent budget would report
- * zero while the money was plainly gone. `COALESCE(parent_id, id)` does it in
- * one pass, and since categories are only two levels deep there is no recursion
- * to get wrong.
- */
-function spendByTopCategory(
-  db: Db,
-  period: Period,
-  homeCurrency: string
-): { byCategory: Map<string, number>; uncategorised: number; unvalued: number } {
-  const { start, end } = periodBounds(period);
-  const home = sql`${homeCurrency.toUpperCase()}`;
-
-  // NULL when the record has no value in today's home currency, so it falls out
-  // of SUM rather than being added as if its number meant something it does not.
-  const valued = sql<number>`case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home}
-      then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end`;
-
-  const rows = db
-    .select({
-      topId: sql<string | null>`coalesce(${categories.parentId}, ${categories.id})`,
-      spent: sql<number>`coalesce(sum(${valued}), 0)`,
-      unvalued: sql<number>`coalesce(sum(case when ${valued} is null then 1 else 0 end), 0)`,
-    })
-    .from(transactions)
-    .leftJoin(categories, eq(categories.id, transactions.categoryId))
-    .where(
-      and(
-        gte(transactions.occurredAt, start),
-        lt(transactions.occurredAt, end),
-        // Transfers are neither spending nor income — counting them would make
-        // moving money between your own accounts look like blowing a budget.
-        isNull(transactions.transferPairId),
-        lt(transactions.amountMinor, 0)
-      )
-    )
-    .groupBy(sql`coalesce(${categories.parentId}, ${categories.id})`)
-    .all();
-
-  const byCategory = new Map<string, number>();
-  let uncategorised = 0;
-  let unvalued = 0;
-
-  for (const row of rows) {
-    unvalued += Number(row.unvalued ?? 0);
-    const spent = Math.abs(Number(row.spent ?? 0));
-    // A record with no category cannot be budgeted, but it is still money out.
-    // Dropping it silently would leave the totals here disagreeing with the
-    // month total on the records screen, with nothing on either screen saying why.
-    if (row.topId === null) uncategorised += spent;
-    else byCategory.set(row.topId, spent);
-  }
-
-  return { byCategory, uncategorised, unvalued };
-}
-
 export function listBudgets(
   db: Db,
   period: Period,
   homeCurrency = 'EGP'
 ): BudgetSummary {
-  const tops = db
-    .select()
-    .from(categories)
-    .where(and(isNull(categories.parentId), eq(categories.kind, 'expense')))
-    .orderBy(categories.sortOrder, categories.name)
-    .all();
+  const tops = topLevelCategories(db, 'expense');
 
   const limits = new Map(
     db
@@ -153,7 +89,12 @@ export function listBudgets(
       .map((b) => [b.categoryId, b])
   );
 
-  const { byCategory, uncategorised, unvalued } = spendByTopCategory(db, period, homeCurrency);
+  const { byCategory, uncategorised, unvalued } = totalsByTopCategory(
+    db,
+    period,
+    'expense',
+    homeCurrency
+  );
 
   const budgeted: BudgetRow[] = [];
   const unbudgeted: BudgetRow[] = [];
@@ -351,7 +292,7 @@ export function suggestBudgets(
 
   for (let i = 1; i <= months; i++) {
     const past = addMonths(period, -i);
-    const { byCategory } = spendByTopCategory(db, past, homeCurrency);
+    const { byCategory } = totalsByTopCategory(db, past, 'expense', homeCurrency);
     if (byCategory.size === 0) continue;
 
     monthsWithData++;
@@ -366,7 +307,7 @@ export function suggestBudgets(
     // No complete month to average. Fall back to the month being budgeted, so
     // someone three weeks into using the app gets a starting point instead of
     // being told to come back later — they are the whole audience for this.
-    const { byCategory } = spendByTopCategory(db, period, homeCurrency);
+    const { byCategory } = totalsByTopCategory(db, period, 'expense', homeCurrency);
     if (byCategory.size === 0) return { suggestions: [], monthsWithData: 0, basis: 'none' };
 
     basis = 'current-month';
@@ -374,12 +315,7 @@ export function suggestBudgets(
     for (const [categoryId, spent] of byCategory) totals.set(categoryId, spent);
   }
 
-  const tops = db
-    .select()
-    .from(categories)
-    .where(and(isNull(categories.parentId), eq(categories.kind, 'expense')))
-    .orderBy(categories.sortOrder, categories.name)
-    .all();
+  const tops = topLevelCategories(db, 'expense');
 
   const decimals = decimalsFor(homeCurrency);
   const suggestions: Suggestion[] = [];
