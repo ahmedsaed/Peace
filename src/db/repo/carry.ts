@@ -1,7 +1,8 @@
-import { and, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, eq, lt, sql } from 'drizzle-orm';
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { periodBounds, type Period } from '../../lib/period';
+import { movesPosition } from './predicates';
 import * as schema from '../schema';
 import { accounts, transactions } from '../schema';
 
@@ -77,12 +78,10 @@ export function broughtForward(
     .where(
       and(
         lt(transactions.occurredAt, start),
-        // TRANSFERS ARE EXCLUDED. Both legs are in the table and they cancel, so
-        // including them would be harmless arithmetic — but only by accident,
-        // and only while both legs are valuable in the home currency. One leg
-        // on a dollar account and one on a pound account would leave half a
-        // transfer in the total.
-        isNull(transactions.transferPairId)
+        // The POSITION, so adjustments count and transfers do not — see
+        // predicates.ts for why transfers are excluded rather than left to
+        // cancel.
+        movesPosition()
       )
     )
     .get();
@@ -136,7 +135,7 @@ export function totalHeld(db: Db, homeCurrency = 'EGP'): number {
     .select({ total: sql<number>`coalesce(sum(${valued}), 0)` })
     .from(transactions)
     .innerJoin(accounts, eq(accounts.id, transactions.accountId))
-    .where(isNull(transactions.transferPairId))
+    .where(movesPosition())
     .get();
 
   return Number(opening?.total ?? 0) + Number(moved?.total ?? 0);

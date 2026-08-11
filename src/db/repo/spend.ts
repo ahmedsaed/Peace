@@ -2,6 +2,7 @@ import { and, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { periodBounds, type Period } from '../../lib/period';
+import { countsAsSpending } from './predicates';
 import * as schema from '../schema';
 import { categories, transactions } from '../schema';
 
@@ -65,10 +66,11 @@ export function totalsByTopCategory(
       and(
         gte(transactions.occurredAt, start),
         lt(transactions.occurredAt, end),
-        // Transfers are neither spending nor income. Counting them would make
-        // moving money between your own accounts look like a month's worth of
-        // expenditure — and would inflate both sides by the same amount.
-        isNull(transactions.transferPairId),
+        // Neither a transfer leg nor a balance correction is spending: one
+        // would make moving money between your own accounts look like a
+        // month's expenditure, the other would drop phantom spending into
+        // whichever month you reconciled in. One definition, in predicates.ts.
+        countsAsSpending(),
         direction
       )
     )
