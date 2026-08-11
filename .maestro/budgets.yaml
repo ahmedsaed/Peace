@@ -1,0 +1,201 @@
+appId: com.ahmed.peace
+---
+# Budgets end to end: the first-run offer, the roll-up from sub-categories, the
+# progress states, and editing a limit by hand.
+#
+# The assertions are NUMBERS. A budget screen that ignored the ledger entirely
+# would still render rows, bars and percentages, and would still look right.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- an empty ledger has nothing to suggest, and says so ---
+- tapOn:
+    id: "tab-budgets"
+- assertVisible:
+    id: "budgets-screen"
+- assertVisible:
+    id: "budget-total-none"
+# Maestro matches the WHOLE text, so a substring of the hint would never match —
+# hence the wildcards. The date is left out for the same reason: pinning
+# "August 2026" would mean editing this flow every month.
+- assertVisible: "No budget for .*"
+- assertVisible: "Log a few expenses first.*"
+
+# --- two expenses, both filed under SUB-categories ---
+# Coffee sits under Food and Taxi under Transportation, so every number below
+# only appears if spending rolls up to the category the budget is set on.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Coffee"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Taxi"
+- tapOn:
+    id: "key-8"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+# --- the offer is built from what was actually spent ---
+- tapOn:
+    id: "tab-budgets"
+# No complete month exists, so this must fall back to the month being budgeted.
+# An earlier version returned nothing here, which is precisely the person who
+# has never set a budget being told to come back later.
+- assertVisible:
+    id: "budget-offer"
+- assertVisible:
+    id: "budget-offer-basis"
+    text: "No full month to go on yet.*"
+# E£240 under Coffee is offered against FOOD, its parent — the roll-up.
+- assertVisible:
+    id: "budget-suggestion-seed-cat-food"
+- assertVisible: "E£240.00"
+- assertVisible:
+    id: "budget-suggestion-seed-cat-transport"
+# The note under the button has to agree with the line above it. It read
+# "Rounded up from your average" directly beneath "no full month to go on yet" —
+# two sentences contradicting each other about the number being committed to.
+- assertVisible:
+    id: "budget-offer-note"
+    text: "A starting point, not a target.*"
+- takeScreenshot: 01-budget-offer
+
+- tapOn:
+    id: "budget-apply"
+
+# --- applied, and immediately at 100% because the offer came from this month ---
+- assertVisible:
+    id: "budget-total-budget"
+    text: "E£320.00"
+- assertVisible:
+    id: "budget-total-spent"
+    text: "E£320.00"
+- assertVisible:
+    id: "budget-percent-seed-cat-food"
+    text: "100%"
+- takeScreenshot: 02-budget-applied
+
+# --- raise Food's limit by hand, and watch the row follow ---
+- tapOn:
+    id: "budget-row-seed-cat-food"
+- assertVisible:
+    id: "budget-editor"
+# The field opens on the CURRENT limit, not empty. Empty means "remove", so an
+# editor that opened blank would delete the budget of anyone who just looked.
+- assertVisible:
+    id: "budget-input"
+    text: "240"
+- eraseText
+- inputText: "800"
+- tapOn:
+    id: "budget-save"
+
+- assertVisible:
+    id: "budget-percent-seed-cat-food"
+    text: "30%"
+- assertVisible:
+    id: "budget-amounts-seed-cat-food"
+    text: "E£240.00 of E£800.00"
+- assertVisible:
+    id: "budget-left-seed-cat-food"
+    text: "E£560.00 left"
+- assertVisible:
+    id: "budget-total-budget"
+    text: "E£880.00"
+
+# --- overspend Transportation and check the row changes state ---
+# Its limit is E£80 against E£80 spent. One more taxi puts it over.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Taxi"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "tab-budgets"
+- assertVisible:
+    id: "budget-percent-seed-cat-transport"
+    text: "138%"
+# "over", not "left". The sign is derived from one signed number, so the two can
+# never disagree — this is the assertion that proves it.
+- assertVisible:
+    id: "budget-left-seed-cat-transport"
+    text: "E£30.00 over"
+- assertVisible:
+    id: "budget-total-left"
+    text: "E£530.00"
+- takeScreenshot: 03-budget-over
+
+# --- a category with no limit still reports what it is costing ---
+- assertVisible: "Not budgeted"
+
+# --- removing a limit puts the category back ---
+- tapOn:
+    id: "budget-row-seed-cat-transport"
+- tapOn:
+    id: "budget-remove"
+- assertVisible:
+    id: "budget-total-budget"
+    text: "E£800.00"
+- assertNotVisible:
+    id: "budget-percent-seed-cat-transport"
+# It moved to the unbudgeted section, still showing its spend.
+- assertVisible:
+    id: "budget-spent-seed-cat-transport"
+    text: "E£110.00 spent"
+
+# --- next month starts clean, and offers to copy this one ---
+- tapOn:
+    id: "month-next"
+- assertVisible:
+    id: "budget-total-none"
+- assertVisible:
+    id: "budget-copy"
+- tapOn:
+    id: "budget-copy"
+- assertVisible:
+    id: "budget-total-budget"
+    text: "E£800.00"
+# Nothing was spent next month, so the limit is untouched — proof the copy
+# brought the budget across and not the spending with it.
+- assertVisible:
+    id: "budget-total-spent"
+    text: "E£0.00"
+- assertVisible:
+    id: "budget-percent-seed-cat-food"
+    text: "0%"
+- takeScreenshot: 04-budget-copied

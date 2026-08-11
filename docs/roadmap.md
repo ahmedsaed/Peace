@@ -149,7 +149,36 @@ work depends on Stage 2's per-record currency.
   by opening the screen — an effect on mount would put a request in front of every record,
   including the overwhelming majority that need no rate at all. Existing records are never
   re-fetched: their rate is history.
-- **Budgets** — per month, "copy from last month", progress bars, over-budget states
+- ✅ **Budgets** — a limit per category per month, with progress bars and an over-budget state.
+  Four decisions worth knowing:
+
+  - **Top-level expense categories only.** A limit at any depth needs a rule for what happens when
+    a parent and its child both have one, and every version of that rule is invisible until it
+    surprises someone. Restricting to the top level makes "a parent's spending includes its
+    children" the whole story: a record filed under Coffee lands on Food, nothing is counted twice,
+    and the total is always the sum of the rows above it. Income is excluded because a limit on
+    money coming in is a target, not a budget, and would need the opposite of every colour.
+  - **The first run suggests amounts from what you actually spent.** MyMoney's only affordance is
+    "copy from past months", which is useless in the month you start: there is nothing to copy, so
+    it opens on a blank screen asking for nineteen numbers you have no basis for. That is the most
+    likely reason the feature goes unused. Peace offers an amount per category, rounded **up** —
+    a limit rounded down is one you are guaranteed to breach in a month that looks like the last
+    three.
+  - **A ledger with no complete month still gets an offer.** The average divides by the months that
+    contain spending, not by the window, or a three-week-old ledger would suggest a third of what
+    the person spends. And when *no* earlier month has data it falls back to the month being
+    budgeted — that user, weeks in and never having budgeted, is the entire audience. It is
+    deliberately **not** extrapolated to a full month: rent logged on the 2nd would be multiplied by
+    fifteen, and a confidently wrong number is worse than a modest one. The screen says which of
+    the three bases it used, because the sentence has to change with the number.
+  - **TOTAL SPENT is spending against the budget**, not the month's expenses. Adding unbudgeted
+    categories in would make it the figure the records screen already shows, and would make "over
+    budget" true on any month with a single unwatched purchase. Uncategorised spending, records
+    with no home-currency value, and limits written in another currency are each reported on their
+    own line rather than silently folded in or dropped.
+
+  Carry-over is still not built: `carryOver` remains a stored setting that nothing reads, so no
+  switch is shown for it.
 - **Analysis** — donut by category, ranked bars with %, cash-flow over time, **carry-over**
 - ✅ **Search and filters** — free text across the note, the category and both account names, plus
   filters for type, account, category, amount range and date range. Five decisions worth knowing:

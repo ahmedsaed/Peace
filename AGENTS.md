@@ -227,6 +227,15 @@ app ignoring input. `pkill -f GradleDaemon`.
   array that was capped gives a number that silently means "the first 300 of them" — worse than
   showing no total at all. Two queries: one for the rows, one aggregate for the figures. The test
   runs with `limit: 1` and asserts the full total.
+- **A default that only works for someone with history is a dead feature.** `suggestBudgets` first
+  averaged the three months *before* the one being budgeted, which returns nothing for a ledger a
+  few weeks old — precisely the person who has never set a budget, i.e. the entire audience. It now
+  falls back to the month being budgeted and says which basis it used. Whenever a feature reads
+  past data, work out what it does on day one.
+- **When the number changes, the sentence above it has to change too.** The budget offer read
+  "Rounded up from your average" directly beneath "No full month to go on yet" — two lines
+  contradicting each other about the figure the user was being asked to commit to. Copy tied to a
+  computed value belongs in the same conditional as the value.
 - **A rule kept in a parallel list is a rule that gets forgotten — make it structural.** Which
   glyphs the category picker may offer used to be a second list of names filtered out of the path
   map, and it was forgotten on the very next glyph added: `filter` went into the paths and not into
