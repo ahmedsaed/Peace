@@ -81,6 +81,18 @@ export type AccountInput = {
   interestRate?: number | null;
   icon?: string | null;
   color?: string | null;
+
+  /**
+   * Card profile. All optional and all per-account — there is deliberately no
+   * "Kenana mode", because one bank's rules baked into the app is a rule every
+   * other card then needs excusing from.
+   */
+  creditLimit?: number | null;
+  /** Basis points: 3% is 300. Never a float — see the schema comment. */
+  foreignFeeBp?: number | null;
+  cashFeeBp?: number | null;
+  statementDay?: number | null;
+  dueDay?: number | null;
 };
 
 export function getAccount(db: Db, id: string): Account | undefined {
@@ -105,6 +117,11 @@ export function createAccount(db: Db, input: AccountInput): Account {
       currency: input.currency ?? 'EGP',
       openingBalance: input.openingBalance ?? 0,
       interestRate: input.interestRate ?? null,
+      creditLimit: input.creditLimit ?? null,
+      foreignFeeBp: input.foreignFeeBp ?? null,
+      cashFeeBp: input.cashFeeBp ?? null,
+      statementDay: input.statementDay ?? null,
+      dueDay: input.dueDay ?? null,
       icon: input.icon ?? 'wallet',
       color: input.color ?? '#6B5B4A',
       sortOrder: Number(highest?.max ?? -1) + 1,

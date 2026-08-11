@@ -23,6 +23,7 @@ import { useUndoStore } from '@/state/undo';
 const EMPTY_SUMMARY: PeriodSummary = {
   expenseMinor: 0,
   incomeMinor: 0,
+  adjustmentMinor: 0,
   balanceMinor: 0,
   unvaluedCount: 0,
 };

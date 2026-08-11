@@ -132,6 +132,9 @@ describe('periodSummary', () => {
     expect(periodSummary(db, '2026-08')).toEqual({
       expenseMinor: 0,
       incomeMinor: 0,
+      // No corrections in these months; the field is asserted so a future
+      // adjustment leaking into income or expense fails here.
+      adjustmentMinor: 0,
       balanceMinor: 0,
       // These records are all in the home currency, so none are excluded.
       unvaluedCount: 0,
@@ -161,6 +164,9 @@ describe('periodSummary', () => {
     expect(periodSummary(db, '2026-08')).toEqual({
       expenseMinor: -10_000,
       incomeMinor: 1_250_000,
+      // No corrections in these months; the field is asserted so a future
+      // adjustment leaking into income or expense fails here.
+      adjustmentMinor: 0,
       balanceMinor: 1_240_000,
       // These records are all in the home currency, so none are excluded.
       unvaluedCount: 0,
@@ -186,6 +192,9 @@ describe('periodSummary', () => {
     expect(periodSummary(db, '2026-08')).toEqual({
       expenseMinor: -8000,
       incomeMinor: 0,
+      // No corrections in these months; the field is asserted so a future
+      // adjustment leaking into income or expense fails here.
+      adjustmentMinor: 0,
       balanceMinor: -8000,
       // These records are all in the home currency, so none are excluded.
       unvaluedCount: 0,
@@ -211,6 +220,7 @@ describe('groupByDay', () => {
     note: null,
     occurredAt: new Date(2026, 7, day, hour),
     isTransfer: false,
+    isAdjustment: false,
     categoryName: null,
     categoryIcon: null,
     categoryColor: null,
