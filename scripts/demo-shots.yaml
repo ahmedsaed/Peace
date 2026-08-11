@@ -17,7 +17,7 @@ appId: com.ahmed.peace
 #   Food            840 + 265 + 95  = 1,200  of 2,000    60%   comfortable
 #   Bills           380 + 500       =   880  of 1,000    88%   close
 #   Installments    4,500           = 4,500  of 5,000    90%   close
-#   Transportation  140 + 600       =   740  of   500   148%   over by 240
+#   Transportation  600 + 140       =   740  of   500   148%   over by 240
 #   Shopping        1,200                     unbudgeted
 #
 # Food's 1,200 is spread across three SUB-categories, so the shot shows the
@@ -37,6 +37,10 @@ appId: com.ahmed.peace
     id: "type-income"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Salary"
+    direction: DOWN
 - tapOn: "Salary"
 - tapOn:
     id: "record-note"
@@ -60,6 +64,10 @@ appId: com.ahmed.peace
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Groceries"
+    direction: DOWN
 - tapOn: "Groceries"
 - tapOn:
     id: "record-note"
@@ -78,6 +86,10 @@ appId: com.ahmed.peace
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Restaurants"
+    direction: DOWN
 - tapOn: "Restaurants"
 - tapOn:
     id: "record-note"
@@ -96,6 +108,10 @@ appId: com.ahmed.peace
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Coffee"
+    direction: DOWN
 - tapOn: "Coffee"
 - tapOn:
     id: "record-note"
@@ -113,6 +129,10 @@ appId: com.ahmed.peace
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Electricity"
+    direction: DOWN
 - tapOn: "Electricity"
 - tapOn:
     id: "record-note"
@@ -131,6 +151,10 @@ appId: com.ahmed.peace
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Internet"
+    direction: DOWN
 - tapOn: "Internet"
 - tapOn:
     id: "record-note"
@@ -146,32 +170,21 @@ appId: com.ahmed.peace
     id: "record-save"
 
 # --- Transportation, which ends up over budget ---
+# Both under Taxi. `Fuel` would have been the natural second one and is a trap:
+# it is a child of CAR, not Transportation, so the 600 would have rolled up to a
+# category with no budget and the over-budget row would never have appeared.
 - tapOn:
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Taxi"
+    direction: DOWN
 - tapOn: "Taxi"
 - tapOn:
     id: "record-note"
 - inputText: "Airport run"
-- hideKeyboard
-- tapOn:
-    id: "key-1"
-- tapOn:
-    id: "key-4"
-- tapOn:
-    id: "key-0"
-- tapOn:
-    id: "record-save"
-
-- tapOn:
-    id: "fab"
-- tapOn:
-    id: "pick-category"
-- tapOn: "Fuel"
-- tapOn:
-    id: "record-note"
-- inputText: "Full tank"
 - hideKeyboard
 - tapOn:
     id: "key-6"
@@ -182,11 +195,37 @@ appId: com.ahmed.peace
 - tapOn:
     id: "record-save"
 
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Taxi"
+    direction: DOWN
+- tapOn: "Taxi"
+- tapOn:
+    id: "record-note"
+- inputText: "To the office"
+- hideKeyboard
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
 # --- the big one, and one deliberately left unbudgeted ---
 - tapOn:
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Installments"
+    direction: DOWN
 - tapOn: "Installments"
 - tapOn:
     id: "record-note"
@@ -207,6 +246,10 @@ appId: com.ahmed.peace
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Shopping"
+    direction: DOWN
 - tapOn: "Shopping"
 - tapOn:
     id: "record-note"
@@ -240,6 +283,10 @@ appId: com.ahmed.peace
     id: "fab"
 - tapOn:
     id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Groceries"
+    direction: DOWN
 - tapOn: "Groceries"
 - tapOn:
     id: "record-note"
@@ -322,23 +369,40 @@ appId: com.ahmed.peace
 - takeScreenshot: budgets
 
 # ===========================================================================
-# 4. Search — matching an account name, and totalling what it finds
+# 4. Search — the filters, and the total over what was found
 # ===========================================================================
+# Deliberately a FILTERED result rather than a text search. Typing "Cash"
+# matches all ten records, which produces a screenshot almost identical to the
+# records list — a wasted tile in a six-image grid. Filtering by Food returns
+# three, so the shot shows search actually narrowing something, shows the
+# filter panel, and shows the parent-matches-children rule: none of these three
+# records is filed under Food itself.
 - tapOn:
     id: "tab-index"
 - tapOn:
     id: "nav-search"
 - tapOn:
-    id: "search-input"
-- inputText: "Cash"
+    id: "search-filters"
+- tapOn:
+    id: "filter-category"
+- scrollUntilVisible:
+    element:
+      text: "Food"
+    direction: DOWN
+- tapOn: "Food"
+# The search field has autoFocus, so the keyboard springs back the moment the
+# picker closes and covers two of the three results. Without this the shot is a
+# screenshot of a keyboard.
 - hideKeyboard
 - assertVisible:
     id: "search-count"
-    text: "10 records"
+    text: "3 records"
 - assertVisible:
     id: "search-expense"
-    text: "-E£8,520.00"
-- assertVisible:
-    id: "search-income"
-    text: "E£18,000.00"
+    text: "-E£1,200.00"
+# All three have to be on screen, or the tile shows a filter that found things
+# the reader cannot see.
+- assertVisible: "Groceries"
+- assertVisible: "Restaurants"
+- assertVisible: "Coffee"
 - takeScreenshot: search

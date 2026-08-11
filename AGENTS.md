@@ -173,6 +173,13 @@ an ABI mismatch. `npm run apk:emu` builds x86_64 for the emulator; `npm run apk`
 real phone. Check with `adb shell getprop ro.product.cpu.abi` against
 `unzip -l …/app-release.apk | grep lib/`.
 
+**"System UI isn't responding" fails the FIRST assertion of the first flow after a boot.** On a
+tight-memory machine SystemUI misses its deadline during the first launch, Android throws a modal
+over the app, and it swallows every tap — so Maestro dies on `home-screen is visible` looking
+exactly like a broken app, while the app underneath is rendering perfectly. `scripts/emu-up.sh` now
+sets `hide_error_dialogs 1` on the test AVD. If a flow ever fails on its launch gate again, take a
+screenshot before believing it.
+
 **Kill the Gradle daemon after a native build, not just before.** It idles at ~3 GB for hours; left
 alive next to the emulator it starves the system, and the first symptom is Android's
 "System UI isn't responding" dialog swallowing every `adb shell input tap` — which looks like the
