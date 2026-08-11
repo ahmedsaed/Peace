@@ -234,6 +234,16 @@ app ignoring input. `pkill -f GradleDaemon`.
   array that was capped gives a number that silently means "the first 300 of them" — worse than
   showing no total at all. Two queries: one for the rows, one aggregate for the figures. The test
   runs with `limit: 1` and asserts the full total.
+- **A feature whose design keeps forcing awkward questions is usually the wrong feature.** Budget
+  carry-over — an unspent limit growing next month's limit — had two questions with no good answer
+  (does it compound into an unbounded balance? does an overspend carry as a debt?). Both existed
+  because a limit that gets easier when you fail to use it is not a limit. Budgets keep no memory;
+  what carries between months is *money*, and a running cash position needs no exceptions at all.
+  When the exceptions pile up, re-read the premise before designing around them.
+- **Two screens showing the same money must reconcile, and a test must say so.** `broughtForward` +
+  this month's balance is exactly the Accounts total, opening balances included — `carry.test.ts`
+  asserts that identity directly rather than testing each side on its own. Without it the two
+  screens can drift apart and the user has no way to tell which one is lying.
 - **Percentages that are rounded independently do not add up to 100.** Three equal slices print
   33.3 three times, and a legend summing to 99.9 reads as a bug on a screen whose whole job is
   accounting for money. `sharePercents` in `src/lib/analysis.ts` distributes the error by largest

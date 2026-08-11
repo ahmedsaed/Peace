@@ -17,7 +17,7 @@ account, and no network dependency anywhere in the core product.
 | 0 | Schema, design system, navigation shell, repository layer | ✅ done |
 | 1 | Daily driver — records, calculator keypad, edit/delete, accounts & categories | ✅ done |
 | — | App icon, side menu, search entry point (chrome, pulled ahead of Stage 2) | ✅ done |
-| 2 | Budgets, analysis, search | in progress — settings ✅, export/backup/restore ✅, multi-currency ✅, search ✅, budgets ✅, analysis ✅ · carry-over remaining |
+| 2 | Budgets, analysis, search | ✅ done |
 | 3 | Recurring payments | planned |
 | 4 | Receipt attachments | planned |
 | 5 | OCR + voice entry (Gemini Flash) | planned |
@@ -91,11 +91,11 @@ Not claims about what MyMoney lacks — these are decisions about how this app s
 | **Budgets that suggest themselves** | MyMoney's only way to start a month is "copy from past months", which is useless in the month you start — there is nothing to copy, so it opens on a blank screen asking for nineteen numbers you have no basis for. Peace offers a limit per category derived from what you actually spent, rounded up, and says whether it is averaging real months or falling back to this one. |
 | **Search totals what it found** | Matching rows with no total leaves you adding them up by hand, and "how much did I spend on coffee" is the question behind most searches. The total is a separate aggregate over *every* match, so capping the list at 300 rows never changes the number above it. |
 | **A parent category matches its children** | Filtering by "Food" returns the records filed under Coffee and Restaurants. Being told there are none, because they are all one level down, is the filter lying about the data. |
-| **Settings that do nothing are not shown** | `carryOver`, `viewMode` and `showTotal` are stored but nothing reads them yet. Three switches that silently do nothing is how an app teaches you to stop trusting it. |
+| **Budgets have no carry-over** | An unspent limit rolling into next month is the feature MyMoney offers and Peace deliberately does not. A limit that gets easier every time you fail to use it is not a limit — and every question it forces (does it compound? does an overspend carry as a debt?) has no good answer, because the idea fights itself. What carries between months is *money*: the Records header shows what each month opened with and what it leaves you holding, and that figure reconciles exactly with the Accounts total. |
+| **Settings that do nothing are not shown** | `viewMode` and `showTotal` are stored but nothing reads them yet. Two switches that silently do nothing is how an app teaches you to stop trusting it. `carryOver` appeared the moment two screens started reading it. |
 | **The build identifies itself** | Settings → About shows `1.0.0 (build 32)` and the commit, marked `-dirty` if it was built from uncommitted code. |
 
-Where Peace is still **behind**: no recurring payments, and budget carry-over is not wired. Those
-are the last of Stage 2 and Stage 3.
+Where Peace is still **behind**: no recurring payments. That is Stage 3.
 
 ## Stack
 
