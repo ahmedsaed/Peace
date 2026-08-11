@@ -21,11 +21,14 @@ appId: com.ahmed.peace
       id: "home-screen"
     timeout: 90000
 
-# --- a fresh ledger has nothing to carry, and says nothing at all ---
-# "E£0.00 brought forward → E£0.00 now" is a sentence that teaches you to ignore
-# the line, so it stays hidden until there is a position to report.
+# --- carry-over is on by default, so the third cell is the position ---
+# The testID moves with the label. `summary-balance` and `summary-running` are
+# two different numbers, and one id covering both would make every assertion
+# below ambiguous about which it had read.
+- assertVisible:
+    id: "summary-running"
 - assertNotVisible:
-    id: "summary-brought-forward"
+    id: "summary-balance"
 
 # --- earn 9,000, spend 2,000 ---
 - tapOn:
@@ -62,28 +65,28 @@ appId: com.ahmed.peace
 - tapOn:
     id: "record-save"
 
+# Nothing came before this month, so the position is exactly the month's net.
+# This fails if the carry query stops respecting the month boundary and starts
+# counting the records inside the month it is opening — that would double the
+# 7,000.
 - assertVisible:
-    id: "summary-balance"
+    id: "summary-running"
     text: "E£7,000.00"
-# Still nothing before THIS month, so still no line. This is the assertion that
-# fails if the carry query stops respecting the month boundary and starts
-# counting the records inside the month it is opening.
-- assertNotVisible:
-    id: "summary-brought-forward"
 - takeScreenshot: 01-carry-this-month
 
 # --- next month opens on what this one left ---
 - tapOn:
     id: "month-next"
-- assertVisible:
-    id: "summary-brought-forward"
-    text: "E£7,000.00 brought forward"
+# The month itself is empty, so this 7,000 is ENTIRELY what was carried in —
+# income and expense both read zero beside it.
 - assertVisible:
     id: "summary-running"
-    text: "E£7,000.00 now"
-# The month itself is empty — the running total is entirely what was carried.
+    text: "E£7,000.00"
 - assertVisible:
-    id: "summary-balance"
+    id: "summary-expense"
+    text: "E£0.00"
+- assertVisible:
+    id: "summary-income"
     text: "E£0.00"
 - takeScreenshot: 02-carry-next-month
 
@@ -131,15 +134,13 @@ appId: com.ahmed.peace
     id: "setting-carry-over"
 - tapOn:
     id: "nav-back"
-
-- tapOn:
-    id: "month-next"
-- assertNotVisible:
-    id: "summary-brought-forward"
+# No month-next here: the Records tab kept September while we were away, and
+# stepping again would drift into October — still passing, but asserting about a
+# month the flow never set up.
+# With it off the cell goes back to being the month's own net: an empty month
+# reads E£0.00 where a moment ago it read the E£7,000 position.
 - assertNotVisible:
     id: "summary-running"
-# The month's own figures are untouched by the setting — it adds a line, it does
-# not change what BALANCE means.
 - assertVisible:
     id: "summary-balance"
     text: "E£0.00"
@@ -153,8 +154,8 @@ appId: com.ahmed.peace
     id: "setting-carry-over"
 - tapOn:
     id: "nav-back"
-- tapOn:
-    id: "month-next"
 - assertVisible:
     id: "summary-running"
-    text: "E£7,000.00 now"
+    text: "E£7,000.00"
+- assertNotVisible:
+    id: "summary-balance"

@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { SectionList, Text, View } from 'react-native';
+import { SectionList, Text } from 'react-native';
 
 import { RecordRow } from '@/components/record-row';
 import { Snackbar } from '@/components/snackbar';
@@ -97,40 +97,24 @@ export default function RecordsScreen() {
   return (
     <Screen testID="home-screen">
       <MonthHeader period={period} onChange={setPeriod}>
+        {/* The third cell carries EITHER the month's net or the running
+            position, never both and never an extra row. "Balance" is
+            income minus expense for this month; "Now" is what you are actually
+            holding, which is the more useful of the two once there is a
+            position to hold — and it is the number the Accounts screen shows,
+            so the two agree by construction.
+
+            What is lost is the month's own net, which is no longer printed
+            anywhere. It is the difference of the two cells beside it, so both
+            operands stay on screen. */}
         <SummaryTrio
           expense={formatMinor(summary.expenseMinor, homeCurrency)}
           income={formatMinor(summary.incomeMinor, homeCurrency)}
-          balance={formatMinor(summary.balanceMinor, homeCurrency)}
-          balanceMinor={summary.balanceMinor}
+          balance={formatMinor(carryOver ? running : summary.balanceMinor, homeCurrency)}
+          balanceMinor={carryOver ? running : summary.balanceMinor}
+          balanceLabel={carryOver ? 'Now' : 'Balance'}
+          balanceTestID={carryOver ? 'summary-running' : 'summary-balance'}
         />
-        {/* What you started the month holding, and what it leaves you with.
-            Shown only when carry-over is on, because it changes what the
-            BALANCE above it means: balance is the month, this is the position.
-
-            Deliberately a separate line rather than a fourth cell in the trio —
-            the trio is three facts about this month, and "brought forward" is a
-            fact about every month before it.
-
-            Hidden when nothing carried, because on a fresh ledger there really
-            is nothing to bring forward and "E£0.00 brought forward → E£0.00 now"
-            is a sentence that teaches the reader to ignore the line. It appears
-            the first month there is a position to report. */}
-        {carryOver && carried.amountMinor !== 0 ? (
-          <View className="mt-2 flex-row justify-center gap-2">
-            <Text className="text-[11px] text-muted" testID="summary-brought-forward">
-              {formatMinor(carried.amountMinor, homeCurrency)} brought forward
-            </Text>
-            <Text className="text-[11px] text-muted">→</Text>
-            <Text
-              className={`text-[11px] font-semibold ${
-                running < 0 ? 'text-expense' : 'text-ink'
-              }`}
-              testID="summary-running">
-              {formatMinor(running, homeCurrency)} now
-            </Text>
-          </View>
-        ) : null}
-
         {/* Under-reporting in silence is the thing to avoid. This happens when
             the home currency is changed after records exist: their value in the
             new one is unknown, so they are excluded and counted rather than
