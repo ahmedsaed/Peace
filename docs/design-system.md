@@ -65,6 +65,29 @@ and costs nothing to load.
 Money **always** uses tabular figures (`font-variant-numeric: tabular-nums`). Amounts sit in a
 right-aligned column, and proportional digits make that column visibly ragged.
 
+## The wordmark
+
+"Peace" is set in **Pacifico**, a brush script, at 26px in the header and 38px on About. Everything
+else stays on the system sans — the script is the app's one flourish, and a second decorative face
+would make it a theme rather than a signature.
+
+Three things it needs that a sans does not:
+
+- **More size.** 26px next to the 20px semibold sans it replaced, because a script's strokes read
+  optically smaller.
+- **An explicit line height.** Pacifico has tall ascenders and deep descenders; the default clips
+  the loop of the P against the status bar. `lineHeight: size * 1.45`, and `includeFontPadding:
+  false` so Android does not add its own.
+- **One place to check.** A font that fails to load falls back SILENTLY to the system sans, and the
+  only symptom is a wordmark that looks slightly ordinary. It lives in
+  [`src/components/wordmark.tsx`](../src/components/wordmark.tsx) and is loaded once in the root
+  layout, which holds render until it is ready rather than letting the header re-set itself a frame
+  in. A load failure is deliberately not fatal — a missing font is cosmetic, and refusing to open a
+  ledger over it would not be.
+
+It costs ~308KB in the APK, which is more than the other candidates put together. That was a
+deliberate trade for the one piece of personality the interface has.
+
 ## Icons
 
 Hand-drawn inline SVG in [`src/components/icon.tsx`](../../src/components/icon.tsx), resolved from

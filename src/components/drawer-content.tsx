@@ -4,6 +4,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
 import { buildInfo } from '@/lib/build-info';
 import { formatVersion } from '@/lib/version';
@@ -62,7 +63,7 @@ export function DrawerContent({ navigation }: DrawerContentComponentProps) {
           resizeMode="contain"
         />
         <View>
-          <Text className="text-lg font-semibold tracking-tight text-accent">Peace</Text>
+          <Wordmark size={24} />
           <Text className="text-xs text-muted">Local-first. Nothing leaves the phone.</Text>
         </View>
       </View>
