@@ -6,7 +6,6 @@
     "@expo-google-fonts/pacifico": "^0.4.1",
     "@expo/ui": "~57.0.9",
     "@react-native-community/datetimepicker": "9.1.0",
-    "@shopify/react-native-skia": "2.6.2",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "expo": "~57.0.11",
@@ -39,7 +38,6 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1",
     "tailwindcss": "^3.4.19",
-    "victory-native": "^41.26.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
