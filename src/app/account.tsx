@@ -12,6 +12,9 @@ import {
   Segmented,
   TextField,
 } from '@/components/form';
+import { Icon } from '@/components/icon';
+import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
+import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import {
   createAccount,
@@ -22,6 +25,7 @@ import {
 import { InvariantError } from '@/db/repo/categories';
 import type { Account } from '@/db/schema';
 import { formatMinor, parseAmountToMinor } from '@/lib/money';
+import { CURRENCIES, currencyName } from '@/lib/currencies';
 import { useSetting } from '@/state/settings';
 
 const TYPES: { value: Account['type']; label: string }[] = [
@@ -31,6 +35,13 @@ const TYPES: { value: Account['type']; label: string }[] = [
   { value: 'savings', label: 'Savings' },
   { value: 'loan', label: 'Loan' },
 ];
+
+const CURRENCY_OPTIONS: PickerOption[] = CURRENCIES.map((c) => ({
+  id: c.code,
+  label: c.name,
+  icon: 'cash',
+  detail: c.code,
+}));
 
 export default function AccountScreen() {
   const router = useRouter();
@@ -51,6 +62,7 @@ export default function AccountScreen() {
   const [icon, setIcon] = useState(existing?.icon ?? 'wallet');
   const [color, setColor] = useState(existing?.color ?? '#6B5B4A');
   const [archived, setArchived] = useState(existing?.archived ?? false);
+  const [sheet, setSheet] = useState<'currency' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const openingMinor = opening.trim() === '' ? 0 : parseAmountToMinor(opening, currency);
@@ -111,14 +123,19 @@ export default function AccountScreen() {
         <View className="flex-row gap-3">
           <View className="flex-1">
             <Field label="Currency">
-              <TextField
-                value={currency}
-                onChangeText={(next) => setCurrency(next.toUpperCase())}
-                placeholder="EGP"
-                autoCapitalize="characters"
-                maxLength={3}
+              {/* A picker, not free text. Typing three letters invites "USDD",
+                  "eg" and "£" — and a currency that is not a real ISO code
+                  formats as itself and converts against nothing. The same list
+                  the settings screen uses. */}
+              <Pressable
+                onPress={() => setSheet('currency')}
                 testID="account-currency"
-              />
+                accessibilityRole="button"
+                accessibilityLabel={`Currency, ${currencyName(currency)}`}
+                className="flex-row items-center justify-between rounded-lg bg-surface px-4 py-3 active:bg-raised">
+                <Text className="text-base text-ink">{currency}</Text>
+                <Icon name="chevron" size={14} color={palette.muted} />
+              </Pressable>
             </Field>
           </View>
           <View className="flex-1">
@@ -182,6 +199,20 @@ export default function AccountScreen() {
           </Text>
         ) : null}
       </ScrollView>
+
+      <PickerSheet
+        visible={sheet === 'currency'}
+        title="Account currency"
+        options={CURRENCY_OPTIONS}
+        selectedId={currency}
+        onSelect={(code) => {
+          setCurrency(code);
+          setSheet(null);
+        }}
+        onClose={() => setSheet(null)}
+        testID="sheet-account-currency"
+      />
+
     </View>
   );
 }

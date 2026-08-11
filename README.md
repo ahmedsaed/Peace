@@ -17,7 +17,7 @@ account, and no network dependency anywhere in the core product.
 | 0 | Schema, design system, navigation shell, repository layer | ✅ done |
 | 1 | Daily driver — records, calculator keypad, edit/delete, accounts & categories | ✅ done |
 | — | App icon, side menu, search entry point (chrome, pulled ahead of Stage 2) | ✅ done |
-| 2 | Multi-currency, budgets, analysis | in progress — settings ✅, export/backup/restore ✅ |
+| 2 | Budgets, analysis, search | in progress — settings ✅, export/backup/restore ✅, multi-currency ✅ |
 | 3 | Recurring payments | planned |
 | 4 | Receipt attachments | planned |
 | 5 | OCR + voice entry (Gemini Flash) | planned |

@@ -19,7 +19,12 @@ import { currentPeriod } from '@/lib/period';
 import { useSetting } from '@/state/settings';
 import { useUndoStore } from '@/state/undo';
 
-const EMPTY_SUMMARY: PeriodSummary = { expenseMinor: 0, incomeMinor: 0, balanceMinor: 0 };
+const EMPTY_SUMMARY: PeriodSummary = {
+  expenseMinor: 0,
+  incomeMinor: 0,
+  balanceMinor: 0,
+  unvaluedCount: 0,
+};
 
 /**
  * Records — the default tab, because logging a spend is why the app gets
@@ -36,8 +41,11 @@ export default function RecordsScreen() {
 
   const refresh = useCallback(() => {
     setRows(listRecordsForPeriod(db, period));
-    setSummary(periodSummary(db, period));
-  }, [period]);
+    setSummary(periodSummary(db, period, homeCurrency));
+    // homeCurrency belongs here: changing it changes what the totals MEAN, and
+    // without it the screen would keep showing figures computed against the
+    // previous one until something else happened to trigger a refresh.
+  }, [period, homeCurrency]);
 
   // Re-read on focus rather than on mount: returning from the add-record screen
   // has to show the record that was just saved.
@@ -74,6 +82,16 @@ export default function RecordsScreen() {
           balance={formatMinor(summary.balanceMinor, homeCurrency)}
           balanceMinor={summary.balanceMinor}
         />
+        {/* Under-reporting in silence is the thing to avoid. This happens when
+            the home currency is changed after records exist: their value in the
+            new one is unknown, so they are excluded and counted rather than
+            summed in as if their numbers meant something they do not. */}
+        {summary.unvaluedCount > 0 ? (
+          <Text className="mt-2 text-center text-[11px] text-muted" testID="summary-unvalued">
+            {summary.unvaluedCount === 1 ? '1 record is' : `${summary.unvaluedCount} records are`} not
+            counted — no {homeCurrency} value
+          </Text>
+        ) : null}
       </MonthHeader>
 
       {rows.length === 0 ? (

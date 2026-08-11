@@ -11,7 +11,7 @@ import {
   deleteAccount,
   getAccount,
   listAccountsWithBalance,
-  totalBalance,
+  balanceByCurrency,
   updateAccount,
 } from './accounts';
 import {
@@ -35,6 +35,17 @@ const sqlDeleteAccount = (id: string) => sql`delete from accounts where id = ${i
 
 const CASH = accountId('cash');
 const BANK = accountId('bank');
+
+/**
+ * These tests all use a single currency, where "the total" is unambiguous.
+ * balanceByCurrency returns one row in that case, and this collapses it back to
+ * the number the assertions were written against.
+ */
+function homeTotal(db: TestDb): number {
+  const rows = balanceByCurrency(db);
+  expect(rows.length).toBeLessThanOrEqual(1);
+  return rows[0]?.balanceMinor ?? 0;
+}
 
 describe('category invariants', () => {
   let db: TestDb;
@@ -216,13 +227,13 @@ describe('transfers', () => {
   });
 
   it('moves money between accounts without changing the total', () => {
-    const before = totalBalance(db);
+    const before = homeTotal(db);
     createTransfer(db, { fromAccountId: BANK, toAccountId: CASH, amountMinor: 500_00 });
 
     const byId = new Map(listAccountsWithBalance(db).map((a) => [a.id, a.balanceMinor]));
     expect(byId.get(BANK)).toBe(-50_000);
     expect(byId.get(CASH)).toBe(50_000);
-    expect(totalBalance(db)).toBe(before);
+    expect(homeTotal(db)).toBe(before);
   });
 
   it('refuses a transfer to the same account', () => {
@@ -254,7 +265,7 @@ describe('transfers', () => {
 
     expect(deleteRecord(db, out.id)).toHaveLength(2);
     expect(db.select().from(transactions).all()).toHaveLength(0);
-    expect(totalBalance(db)).toBe(0);
+    expect(homeTotal(db)).toBe(0);
   });
 
   it('deletes only the one row for a normal record', () => {
@@ -379,7 +390,7 @@ describe('editing transfers', () => {
     const updated = updateTransfer(db, out.id, { amountMinor: 750_00 });
     expect(updated.out.amountMinor).toBe(-75_000);
     expect(updated.in.amountMinor).toBe(75_000);
-    expect(totalBalance(db)).toBe(0);
+    expect(homeTotal(db)).toBe(0);
   });
 
   it('can be edited from either leg', () => {
@@ -455,12 +466,12 @@ describe('delete and restore', () => {
 
     const removed = deleteRecord(db, leg.id);
     expect(removed).toHaveLength(2);
-    expect(totalBalance(db)).toBe(0);
+    expect(homeTotal(db)).toBe(0);
 
     restoreRecords(db, removed);
     expect(db.select().from(transactions).all()).toHaveLength(2);
     // A half-restored transfer would leave money created or destroyed.
-    expect(totalBalance(db)).toBe(0);
+    expect(homeTotal(db)).toBe(0);
     expect(listAccountsWithBalance(db).find((a) => a.id === BANK)!.balanceMinor).toBe(-50_000);
   });
 

@@ -1,4 +1,4 @@
-import { formatMinor, groupDigits, parseAmountToMinor, sumMinor } from './money';
+import { convertMinor, formatMinor, groupDigits, parseAmountToMinor, sumMinor } from './money';
 
 describe('parseAmountToMinor', () => {
   it('parses plain decimals into minor units', () => {
@@ -88,5 +88,59 @@ describe('groupDigits', () => {
     expect(groupDigits('Cannot divide by zero')).toBe('Cannot divide by zero');
     expect(groupDigits('-12')).toBe('-12');
     expect(groupDigits('')).toBe('');
+  });
+});
+
+describe('convertMinor', () => {
+  it('is an identity for the same currency at rate 1', () => {
+    expect(convertMinor(15500, 'EGP', 'EGP', 1)).toBe(15500);
+    expect(convertMinor(-15500, 'EGP', 'EGP', 1)).toBe(-15500);
+  });
+
+  it('converts between two 2-decimal currencies', () => {
+    // $1.00 at fifty pounds to the dollar is E£50.00.
+    expect(convertMinor(100, 'USD', 'EGP', 50)).toBe(5000);
+    expect(convertMinor(-2599, 'USD', 'EGP', 50)).toBe(-129950);
+  });
+
+  /**
+   * The case that is invisible in an EGP-only app. Minor units are NOT
+   * comparable across currencies: yen has no decimal places, so multiplying by
+   * the rate alone is wrong by a factor of a hundred.
+   */
+  it('handles a zero-decimal currency', () => {
+    // ¥1000 at 0.33 pounds to the yen is E£330.00 — 33000 piastres, not 330.
+    expect(convertMinor(1000, 'JPY', 'EGP', 0.33)).toBe(33000);
+    // And back the other way: E£50.00 at 3.03 yen to the pound is ¥152.
+    //
+    // This one is also the float-dust guard: 5000 * 3.03 * 0.01 evaluates to
+    // 151.49999999999997 in binary floating point, so a naive round gives 151
+    // and quietly loses half a unit on every conversion.
+    expect(convertMinor(5000, 'EGP', 'JPY', 3.03)).toBe(152);
+  });
+
+  it('handles a three-decimal currency', () => {
+    // 1.000 KWD at 160 pounds to the dinar is E£160.00.
+    expect(convertMinor(1000, 'KWD', 'EGP', 160)).toBe(16000);
+  });
+
+  /**
+   * Math.round rounds toward +infinity, so -0.5 becomes -0. Applied to money
+   * that makes a converted expense and a converted income of the same size come
+   * out a unit apart — a spend and its refund would stop cancelling.
+   */
+  it('rounds symmetrically around zero', () => {
+    const rate = 1.005; // chosen so the result lands exactly on .5
+    const income = convertMinor(100, 'USD', 'EGP', rate);
+    const expense = convertMinor(-100, 'USD', 'EGP', rate);
+    expect(income).toBe(-expense);
+    expect(income + expense).toBe(0);
+  });
+
+  it('always returns an integer', () => {
+    for (const rate of [0.333333, 1.7, 49.99, 3.14159]) {
+      expect(Number.isInteger(convertMinor(12345, 'USD', 'EGP', rate))).toBe(true);
+      expect(Number.isInteger(convertMinor(12345, 'JPY', 'KWD', rate))).toBe(true);
+    }
   });
 });
