@@ -369,7 +369,26 @@ appId: com.ahmed.peace
 - takeScreenshot: budgets
 
 # ===========================================================================
-# 4. Search — the filters, and the total over what was found
+# 4. Analysis — the category ring and the ranked shares
+# ===========================================================================
+- tapOn:
+    id: "tab-analysis"
+# Installments is 4,500 of the 8,520 spent. The share is asserted because a ring
+# drawn from the wrong total still looks exactly like a ring.
+- assertVisible:
+    id: "analysis-total"
+    text: "E£8,520.00"
+- assertVisible:
+    id: "analysis-percent-seed-cat-installments"
+    text: "52.8%"
+# Food's 1,200 is three sub-categories rolled up, same as the budget tile.
+- assertVisible:
+    id: "analysis-percent-seed-cat-food"
+    text: "14.1%"
+- takeScreenshot: analysis
+
+# ===========================================================================
+# 5. Search — the filters, and the total over what was found
 # ===========================================================================
 # Deliberately a FILTERED result rather than a text search. Typing "Cash"
 # matches all ten records, which produces a screenshot almost identical to the

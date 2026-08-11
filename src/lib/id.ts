@@ -20,3 +20,16 @@ export function newId(): string {
     return v.toString(16);
   });
 }
+
+/**
+ * A row id reduced to something safe to interpolate into a `testID`.
+ *
+ * Maestro matches testIDs as REGULAR EXPRESSIONS, and seeded category ids carry
+ * colons (`seed:cat:food`). Colons happen to be literal in a regex, but the
+ * rule in AGENTS.md is letters, digits and hyphens — following it here means
+ * never having to work out which punctuation is safe on the day an id format
+ * changes.
+ */
+export function testIdSlug(id: string): string {
+  return id.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+}

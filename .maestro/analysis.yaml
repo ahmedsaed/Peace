@@ -1,0 +1,147 @@
+appId: com.ahmed.peace
+---
+# Analysis: the category ring, the ranked shares, and the cash-flow strip.
+#
+# The assertions are the PERCENTAGES and the totals. A chart screen that ignored
+# the ledger would still draw a ring, still render rows and still look like a
+# chart — the numbers are the only thing that says it read the data.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- an empty month has nothing to chart, and says which side is empty ---
+# `home-screen` being visible does not mean the tab bar has been laid out yet.
+# Waiting for the tab itself is a no-op when it is ready and a wait when it is
+# not — without it the tap lands on nothing and the flow fails on the next
+# assertion, looking like a broken screen.
+- assertVisible:
+    id: "tab-analysis"
+- tapOn:
+    id: "tab-analysis"
+- assertVisible:
+    id: "analysis-screen"
+- assertVisible: "No spending in .*"
+
+# --- two expenses under SUB-categories, and one income ---
+# Coffee sits under Food and Taxi under Transportation, so the shares below only
+# come out right if spending rolls up to the parent.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Coffee"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Taxi"
+- tapOn:
+    id: "key-8"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-income"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Salary"
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+# --- the expense ring ---
+- tapOn:
+    id: "tab-analysis"
+- assertVisible:
+    id: "analysis-donut"
+- assertVisible:
+    id: "analysis-total"
+    text: "E£320.00"
+# 240 of 320 and 80 of 320. These are the assertions that fail if the roll-up
+# breaks, if the shares are computed against the wrong total, or if income leaks
+# into the expense side.
+- assertVisible:
+    id: "analysis-percent-seed-cat-food"
+    text: "75.0%"
+- assertVisible:
+    id: "analysis-percent-seed-cat-transport"
+    text: "25.0%"
+# Unsigned, in the expense colour — the same convention Budgets uses
+# ("E£1,200.00 of E£2,000.00"). A wedge cannot be negative, and the sign would
+# be the only thing on this screen carrying it.
+- assertVisible:
+    id: "analysis-amount-seed-cat-food"
+    text: "E£240.00"
+- takeScreenshot: 01-analysis-expense
+
+# --- the income side is a different chart, not the same one relabelled ---
+- tapOn:
+    id: "analysis-kind-income"
+- assertVisible:
+    id: "analysis-total"
+    text: "E£9,000.00"
+# A single category owning the whole month is the case a donut cannot draw as an
+# arc — start and end land on the same point, so a naive implementation renders
+# nothing at all. The ring has to still be there.
+- assertVisible:
+    id: "analysis-donut"
+- assertVisible:
+    id: "analysis-percent-seed-cat-salary"
+    text: "100.0%"
+- assertNotVisible:
+    id: "analysis-percent-seed-cat-food"
+- takeScreenshot: 02-analysis-income
+
+# --- the expense side is still the expense side on the way back ---
+- tapOn:
+    id: "analysis-kind-expense"
+- assertVisible:
+    id: "analysis-total"
+    text: "E£320.00"
+
+# --- cash flow across months ---
+- scrollUntilVisible:
+    element:
+      id: "analysis-cashflow"
+    direction: DOWN
+- assertVisible:
+    id: "analysis-cashflow-net"
+    text: "E£8,680.00 kept across 6 months."
+- takeScreenshot: 03-analysis-cashflow
+
+# --- a month with nothing in it says so rather than drawing an empty ring ---
+- scrollUntilVisible:
+    element:
+      id: "month-prev"
+    direction: UP
+- tapOn:
+    id: "month-prev"
+- assertVisible: "No spending in .*"
+- assertNotVisible:
+    id: "analysis-donut"
