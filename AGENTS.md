@@ -188,6 +188,13 @@ app ignoring input. `pkill -f GradleDaemon`.
   on device while Node returns `"E£12,500.00"`. A green `npm test` proves nothing about currency
   rendering. Anything touching `Intl` must be checked with a screenshot on a real device, and
   symbols belong in `SYMBOL_OVERRIDES` rather than trusting the platform.
+- **The rate fetch must never be load-bearing.** Peace is local-first; a plane, a dead signal or a
+  dead API cannot stop a record being saved. Every failure in `src/lib/fx.ts` ends with the rate
+  field staying manual and the screen saying why. It also has a timeout — without one, a captive
+  portal leaves the button spinning and the user cannot tell whether to wait or to type.
+- **Do not collapse a network error into a friendly sentence and nothing else.** The first version
+  did, and when it failed on a device that plainly had a working network there was nothing to debug
+  from. Friendly message for the user, `console.warn` with the real error for whoever has to fix it.
 - **Minor units are not comparable across currencies.** Yen has no decimal places, dinars have
   three — so converting is `amount x rate x 10 ** (decTo - decFrom)`, and the scale term is
   invisible in an EGP-only app right up until it is wrong by a factor of a hundred. Use

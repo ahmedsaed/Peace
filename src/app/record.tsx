@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -29,6 +29,7 @@ import {
   inputDot,
   inputOp,
 } from '@/lib/calculator';
+import { ageInDays, fetchRate, formatRateDate, RateError } from '@/lib/fx';
 import { byDensity, useDensity } from '@/lib/layout';
 import { convertMinor, formatMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
@@ -126,6 +127,70 @@ export default function RecordScreen() {
   );
   const fxRate = Number(rateText);
   const rateValid = rateText.trim() !== '' && Number.isFinite(fxRate) && fxRate > 0;
+
+  /**
+   * Where the number in the rate field came from, so the screen can say. A rate
+   * the user typed and a rate a central bank published are not the same claim,
+   * and only one of them should carry a date.
+   */
+  const [rateSource, setRateSource] = useState<string | null>(null);
+  const [rateError, setRateError] = useState<string | null>(null);
+  const [fetchingRate, setFetchingRate] = useState(false);
+
+  const fetchFor = useCallback(
+    async (from: string) => {
+      setFetchingRate(true);
+      setRateError(null);
+      try {
+        const fetched = await fetchRate(from, homeCurrency);
+        setRateText(String(fetched.rate));
+        const age = ageInDays(fetched.date, new Date());
+        // Central banks do not publish at weekends, so an older date is normal
+        // rather than an error — but it has to be visible, because a Friday
+        // rate used on a Monday is a real difference in what something cost.
+        setRateSource(
+          age <= 0
+            ? `Frankfurter · ${formatRateDate(fetched.date)}`
+            : `Frankfurter · ${formatRateDate(fetched.date)} (${age}d old)`
+        );
+      } catch (error) {
+        setRateSource(null);
+        setRateError(error instanceof RateError ? error.message : 'Could not fetch the rate.');
+      } finally {
+        setFetchingRate(false);
+      }
+    },
+    [homeCurrency]
+  );
+
+  const onFetchRate = useCallback(() => void fetchFor(currency), [fetchFor, currency]);
+
+  /**
+   * Fetching is triggered by CHOOSING the account, not by opening the screen.
+   *
+   * An effect on mount would put a network request in front of every record,
+   * including the overwhelming majority that are in the home currency and need
+   * no rate at all — and it would fire again on every remount. Selecting a
+   * foreign account is the moment a rate becomes necessary, so that is where it
+   * happens; the button covers everything else.
+   *
+   * Never for an existing record: its rate is history, and today's number must
+   * not quietly overwrite what something actually cost.
+   */
+  const onPickAccount = useCallback(
+    (pickedId: string) => {
+      setAccountId(pickedId);
+      setSheet(null);
+
+      const picked = accounts.find((a) => a.id === pickedId);
+      const pickedCurrency = picked?.currency ?? homeCurrency;
+      const nowForeign = pickedCurrency.toUpperCase() !== homeCurrency.toUpperCase();
+      if (nowForeign && !existing && rateText.trim() === '') {
+        void fetchFor(pickedCurrency);
+      }
+    },
+    [accounts, existing, fetchFor, homeCurrency, rateText]
+  );
 
   // Only categories of the matching kind are offered — a category is income XOR
   // expense, so showing all of them would just invite an invalid pick.
@@ -440,32 +505,6 @@ export default function RecordScreen() {
           })}
         </View>
 
-        {/* Only when the account holds something other than the home currency,
-            which for most people is never. An always-visible rate field would
-            be clutter on every record to serve a handful. */}
-        {foreign ? (
-          <View className={`mx-4 flex-row items-center gap-2 rounded-lg bg-surface px-3 py-2 ${gap}`}>
-            <Text className="text-sm text-muted">1 {currency} =</Text>
-            <TextInput
-              value={rateText}
-              onChangeText={setRateText}
-              placeholder="rate"
-              placeholderTextColor={palette.muted}
-              keyboardType="decimal-pad"
-              testID="record-rate"
-              className="min-w-16 flex-1 py-1 text-sm text-ink"
-            />
-            <Text className="text-sm text-muted">{homeCurrency}</Text>
-            <Text
-              className={`text-sm ${homePreview === null ? 'text-line' : 'text-accent'}`}
-              testID="record-home-preview">
-              {homePreview === null
-                ? 'rate needed'
-                : `= ${formatMinor(type === 'income' ? homePreview : -homePreview, homeCurrency)}`}
-            </Text>
-          </View>
-        ) : null}
-
         {/* One row instead of three when the window is short: the two pickers
             collapse to their icons and the note takes the rest of the line.
             That is ~120dp back, which is the difference between scrolling to
@@ -560,25 +599,81 @@ export default function RecordScreen() {
         )}
       </ScrollView>
 
-      <View
-        className={`mx-4 flex-row items-center justify-end gap-4 rounded-lg bg-surface px-4 ${pad} ${gap}`}>
-        <Text
-          className={`font-light text-ink ${amountText}`}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          // The calculator's `entry` stays raw; grouping is display only, and
-          // must never be parsed back.
-          testID="amount-display">
-          {groupDigits(calc.entry)}
-        </Text>
-        <Pressable
-          onPress={() => setCalc(backspace)}
-          hitSlop={12}
-          testID="key-backspace"
-          accessibilityRole="button"
-          accessibilityLabel="Backspace">
-          <Text className="text-2xl text-muted">&#9003;</Text>
-        </Pressable>
+      {/* The amount owns a full block now, with the currency it is in on the
+          left and — only when that is not the home currency — the rate and what
+          it comes to underneath. The currency is INFORMATION, not a control: it
+          follows the account, because an account whose rows are in mixed
+          currencies could not have a balance at all. */}
+      <View className={`mx-4 rounded-lg bg-surface px-4 ${pad} ${gap}`}>
+        <View className="flex-row items-center gap-3">
+          <Text className="text-sm font-medium text-muted" testID="amount-currency">
+            {currency}
+          </Text>
+          <Text
+            className={`flex-1 text-right font-light text-ink ${amountText}`}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            // The calculator's `entry` stays raw; grouping is display only, and
+            // must never be parsed back.
+            testID="amount-display">
+            {groupDigits(calc.entry)}
+          </Text>
+          <Pressable
+            onPress={() => setCalc(backspace)}
+            hitSlop={12}
+            testID="key-backspace"
+            accessibilityRole="button"
+            accessibilityLabel="Backspace">
+            <Text className="text-2xl text-muted">&#9003;</Text>
+          </Pressable>
+        </View>
+
+        {foreign ? (
+          <View className="mt-2 border-t border-line pt-2">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-xs text-muted">1 {currency} =</Text>
+              <TextInput
+                value={rateText}
+                onChangeText={(next) => {
+                  setRateText(next);
+                  // Typed over: the number is the user's now, so stop calling it
+                  // the bank's.
+                  setRateSource(null);
+                }}
+                placeholder="rate"
+                placeholderTextColor={palette.muted}
+                keyboardType="decimal-pad"
+                testID="record-rate"
+                className="min-w-14 py-0.5 text-sm font-medium text-ink"
+              />
+              <Text className="flex-1 text-xs text-muted">{homeCurrency}</Text>
+              <Pressable
+                onPress={onFetchRate}
+                disabled={fetchingRate}
+                hitSlop={10}
+                testID="record-rate-fetch"
+                accessibilityRole="button"
+                accessibilityLabel="Fetch today's rate">
+                <Text className={`text-xs ${fetchingRate ? 'text-line' : 'text-accent'}`}>
+                  {fetchingRate ? 'fetching…' : 'fetch'}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View className="mt-1 flex-row items-center justify-between">
+              <Text className="text-[11px] text-muted" testID="record-rate-source">
+                {rateError ?? rateSource ?? 'rate from your bank statement, or tap fetch'}
+              </Text>
+              <Text
+                className={`text-sm ${homePreview === null ? 'text-line' : 'text-accent'}`}
+                testID="record-home-preview">
+                {homePreview === null
+                  ? 'rate needed'
+                  : formatMinor(type === 'income' ? homePreview : -homePreview, homeCurrency)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {calc.error || error ? (
@@ -646,10 +741,7 @@ export default function RecordScreen() {
         title={type === 'transfer' ? 'From account' : 'Account'}
         options={accountOptions}
         selectedId={accountId}
-        onSelect={(pickedId) => {
-          setAccountId(pickedId);
-          setSheet(null);
-        }}
+        onSelect={onPickAccount}
         onClose={() => setSheet(null)}
         testID="sheet-account"
       />

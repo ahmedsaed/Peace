@@ -139,7 +139,16 @@ work depends on Stage 2's per-record currency.
     row per currency held — with a single currency, which is the normal case, that is the one line
     it always was.
 
-  Still to come: fetching rates rather than typing them.
+  The rate is **fetched** from [Frankfurter](https://frankfurter.dev) when a foreign account is
+  chosen, and can be overridden by typing. Its **v2** dataset is the one that matters: v1 carries
+  only the ECB's 31 currencies, which do not include EGP and would have been useless for the one
+  conversion this app actually needs.
+
+  **The network is a convenience, never a requirement.** Every failure path ends with the field
+  simply staying manual, and the screen says so. Fetching is triggered by choosing the account, not
+  by opening the screen — an effect on mount would put a request in front of every record,
+  including the overwhelming majority that need no rate at all. Existing records are never
+  re-fetched: their rate is history.
 - **Budgets** — per month, "copy from last month", progress bars, over-budget states
 - **Analysis** — donut by category, ranked bars with %, cash-flow over time, **carry-over**
 - Search and filters — the screen and its entry point exist; the query does not
