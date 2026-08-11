@@ -227,6 +227,12 @@ app ignoring input. `pkill -f GradleDaemon`.
   array that was capped gives a number that silently means "the first 300 of them" — worse than
   showing no total at all. Two queries: one for the rows, one aggregate for the figures. The test
   runs with `limit: 1` and asserts the full total.
+- **A rule kept in a parallel list is a rule that gets forgotten — make it structural.** Which
+  glyphs the category picker may offer used to be a second list of names filtered out of the path
+  map, and it was forgotten on the very next glyph added: `filter` went into the paths and not into
+  `CHROME`, which would have offered a funnel as a category icon. `icon.tsx` now holds three
+  separate maps and `ICON_NAMES` *is* the category one, so a glyph's group is where it is written.
+  Look for the same shape wherever a comment says "remember to also add it to…".
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
 - **testIDs must be regex-safe** — letters, digits, hyphens between words. Maestro matches ids as
   **regular expressions**, so `key-op-+` reads as "`key-op` then one or more hyphens" and silently

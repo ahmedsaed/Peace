@@ -104,8 +104,21 @@ Two rules for adding a path:
 - A **ring** (the search lens, the About badge) needs its inner subpath wound the *opposite* way —
   `sweep-flag 1` against the outer's `0`. Same winding under non-zero fill gives a solid disc,
   which reads as a lollipop rather than a magnifier.
-- Chrome glyphs (`menu`, `search`, `settings`, `export`, `info`, `back`) must be added to `CHROME`
-  in the same file, or they leak into the category icon picker.
+- **Write the path into the group it belongs to**, and there is nothing else to remember. The file
+  holds three maps — `CHROME_PATHS` (header, tab bar, side menu), `CATEGORY_PATHS` (everything the
+  picker offers, in the order it offers them) and `ALIAS_PATHS` (a slug that must keep resolving
+  but draws a shape a pickable slug already draws). `ICON_NAMES` *is* the category map; rendering
+  looks at all three merged.
+
+  This used to be a parallel list of names — add a path, then remember to also add it to `CHROME`
+  — and the rule was forgotten the first time it was tested: `filter` was added to the paths and
+  left out of the list, which would have offered a funnel as a category icon. A rule that has to be
+  remembered is a rule that gets forgotten, so it was made structural instead. `icon.test.ts`
+  asserts the groups are disjoint, that no chrome glyph or alias reaches the picker, that no two
+  *pickable* slugs draw the identical path, and that every icon named by the seed data resolves.
+
+  `receipt` and `tag` duplicate the chrome glyphs `records` and `categories` on purpose: chrome is
+  never offered, so each shape still appears exactly once in the picker.
 
 ## App icon
 
