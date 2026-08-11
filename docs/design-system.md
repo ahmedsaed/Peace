@@ -104,8 +104,21 @@ Two rules for adding a path:
 - A **ring** (the search lens, the About badge) needs its inner subpath wound the *opposite* way —
   `sweep-flag 1` against the outer's `0`. Same winding under non-zero fill gives a solid disc,
   which reads as a lollipop rather than a magnifier.
-- Chrome glyphs (`menu`, `search`, `settings`, `export`, `info`, `back`) must be added to `CHROME`
-  in the same file, or they leak into the category icon picker.
+- **Write the path into the group it belongs to**, and there is nothing else to remember. The file
+  holds three maps — `CHROME_PATHS` (header, tab bar, side menu), `CATEGORY_PATHS` (everything the
+  picker offers, in the order it offers them) and `ALIAS_PATHS` (a slug that must keep resolving
+  but draws a shape a pickable slug already draws). `ICON_NAMES` *is* the category map; rendering
+  looks at all three merged.
+
+  This used to be a parallel list of names — add a path, then remember to also add it to `CHROME`
+  — and the rule was forgotten the first time it was tested: `filter` was added to the paths and
+  left out of the list, which would have offered a funnel as a category icon. A rule that has to be
+  remembered is a rule that gets forgotten, so it was made structural instead. `icon.test.ts`
+  asserts the groups are disjoint, that no chrome glyph or alias reaches the picker, that no two
+  *pickable* slugs draw the identical path, and that every icon named by the seed data resolves.
+
+  `receipt` and `tag` duplicate the chrome glyphs `records` and `categories` on purpose: chrome is
+  never offered, so each shape still appears exactly once in the picker.
 
 ## App icon
 
@@ -242,6 +255,28 @@ Three rules that follow:
   icon and colour, which is how it is recognised in the records list anyway, and the accessible
   name still carries the full text. Both forms keep the **same testID**, so a flow never has to
   know the density to find the account picker.
+
+Search applies the first rule with a different answer. What must never move there is the **result**,
+so the filter panel is the thing that gives way: it is bounded to `max(190dp, 40% of the window)`
+and scrolls inside that, which keeps the count and the total on screen at 340dp with a row or two
+of results under them. Filters you have to scroll are a mild annoyance; a filter you cannot see the
+effect of is the reason nobody trusts the filter.
+
+**The filters are inline, not a sheet.** A sheet would have to open the account and category
+pickers on top of itself, and a modal over a modal is unreliable on Android — but the better reason
+is that inline leaves the results visible while a filter is being changed, which is what tells you
+whether the filter did what you meant.
+
+### A chip label can wrap into a chip that has no room for it
+
+`filter-range-year` rendered as **"This"** inside a pill correctly sized for "This year". Android
+measured the text a fraction wider than the width it then laid out in, so the label wrapped to a
+second line and the chip's single-line height clipped it. Nothing about the result looks like a
+wrap — it looks like deliberate truncation, which is why it survived a full-height screenshot and
+only appeared at split-screen height.
+
+Every chip label carries `numberOfLines={1}`, and the E2E flow asserts the **full text** of the two
+longest chips. Asserting the testID alone would have passed throughout.
 
 ## Naming
 

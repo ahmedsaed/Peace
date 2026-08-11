@@ -151,7 +151,28 @@ work depends on Stage 2's per-record currency.
   re-fetched: their rate is history.
 - **Budgets** — per month, "copy from last month", progress bars, over-budget states
 - **Analysis** — donut by category, ranked bars with %, cash-flow over time, **carry-over**
-- Search and filters — the screen and its entry point exist; the query does not
+- ✅ **Search and filters** — free text across the note, the category and both account names, plus
+  filters for type, account, category, amount range and date range. Five decisions worth knowing:
+
+  - **It is not scoped to a month.** The reason to reach for search is that you do not remember
+    *when*; the month navigator is already the answer when you do.
+  - **An empty query returns nothing, not everything.** Every record ever entered is not a search
+    result — it is the records list with its navigator removed, and it is also the slowest thing
+    the app could do on the keystroke that clears the field.
+  - **The totals are a separate aggregate over every match**, not a sum of the rows on screen. The
+    list is capped at 300 (a one-letter search matches most of a ledger), and a cap that quietly
+    changed the total would make the total worse than useless. The screen says when it caps.
+  - **A parent category matches its children.** Filtering by "Food" and being told there are no
+    records — because every one of them is filed under Coffee or Restaurants — is the filter lying
+    about the data.
+  - **The wildcards are escaped.** SQLite's `LIKE` reads `%` and `_` as wildcards, so an unescaped
+    `%` matches the whole ledger while looking exactly like an ordinary search that found more than
+    expected. `likePattern` escapes them and every query carries `ESCAPE`.
+
+  Amount bounds are **unsigned magnitudes** matched against `abs(amount_minor)`, because the number
+  the user is searching for is the one on the row — an expense reads as "E£250", not "-250".
+  Transfers appear once, as the outgoing leg, exactly as the records list shows them, and are
+  excluded from the income and expense totals.
 - ✅ **Export CSV + backup** — done first, because a month of real records with no way out is a
   worse risk than any missing feature. Both can be **saved to a folder on the device** (Storage
   Access Framework, no permission needed) or sent through the share sheet. Share alone was not
