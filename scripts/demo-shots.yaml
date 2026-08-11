@@ -1,0 +1,408 @@
+appId: com.ahmed.peace
+---
+# Regenerates the README screenshots from a seeded demo ledger.
+#
+# NOT in .maestro/, on purpose: `npm run e2e` runs that whole directory, and
+# this takes several minutes while asserting almost nothing. Run `npm run shots`.
+#
+# It is a flow rather than a set of hand-taken captures because hand-taken
+# screenshots rot. The moment a colour, a label or a layout changes, the README
+# is quietly advertising an app that no longer exists — and nothing fails, so
+# nobody notices. This regenerates all four in one command.
+#
+# THE LEDGER BELOW IS INVENTED. The repository is public and real records do not
+# go in it. The amounts are chosen so the budget screen shows every state at
+# once — a screenshot of four identical bars demonstrates nothing:
+#
+#   Food            840 + 265 + 95  = 1,200  of 2,000    60%   comfortable
+#   Bills           380 + 500       =   880  of 1,000    88%   close
+#   Installments    4,500           = 4,500  of 5,000    90%   close
+#   Transportation  600 + 140       =   740  of   500   148%   over by 240
+#   Shopping        1,200                     unbudgeted
+#
+# Food's 1,200 is spread across three SUB-categories, so the shot shows the
+# roll-up working rather than only asserting it in a unit test.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- income first, so the month reads as a real month and not a deficit ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-income"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Salary"
+    direction: DOWN
+- tapOn: "Salary"
+- tapOn:
+    id: "record-note"
+- inputText: "August salary"
+- hideKeyboard
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-8"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+# --- Food, across three sub-categories ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Groceries"
+    direction: DOWN
+- tapOn: "Groceries"
+- tapOn:
+    id: "record-note"
+- inputText: "Weekly shop"
+- hideKeyboard
+- tapOn:
+    id: "key-8"
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Restaurants"
+    direction: DOWN
+- tapOn: "Restaurants"
+- tapOn:
+    id: "record-note"
+- inputText: "Dinner out"
+- hideKeyboard
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-6"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Coffee"
+    direction: DOWN
+- tapOn: "Coffee"
+- tapOn:
+    id: "record-note"
+- inputText: "Flat white"
+- hideKeyboard
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "record-save"
+
+# --- Bills ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Electricity"
+    direction: DOWN
+- tapOn: "Electricity"
+- tapOn:
+    id: "record-note"
+- inputText: "July meter"
+- hideKeyboard
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-8"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Internet"
+    direction: DOWN
+- tapOn: "Internet"
+- tapOn:
+    id: "record-note"
+- inputText: "Fibre"
+- hideKeyboard
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+# --- Transportation, which ends up over budget ---
+# Both under Taxi. `Fuel` would have been the natural second one and is a trap:
+# it is a child of CAR, not Transportation, so the 600 would have rolled up to a
+# category with no budget and the over-budget row would never have appeared.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Taxi"
+    direction: DOWN
+- tapOn: "Taxi"
+- tapOn:
+    id: "record-note"
+- inputText: "Airport run"
+- hideKeyboard
+- tapOn:
+    id: "key-6"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Taxi"
+    direction: DOWN
+- tapOn: "Taxi"
+- tapOn:
+    id: "record-note"
+- inputText: "To the office"
+- hideKeyboard
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+# --- the big one, and one deliberately left unbudgeted ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Installments"
+    direction: DOWN
+- tapOn: "Installments"
+- tapOn:
+    id: "record-note"
+- inputText: "Phone, 6 of 12"
+- hideKeyboard
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Shopping"
+    direction: DOWN
+- tapOn: "Shopping"
+- tapOn:
+    id: "record-note"
+- inputText: "Winter jacket"
+- hideKeyboard
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+# ===========================================================================
+# 1. Records — the month at a glance
+# ===========================================================================
+- assertVisible:
+    id: "records-list"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£8,520.00"
+- takeScreenshot: records
+
+# ===========================================================================
+# 2. Record entry — pickers, note, keypad, and the flow key
+# ===========================================================================
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Groceries"
+    direction: DOWN
+- tapOn: "Groceries"
+- tapOn:
+    id: "record-note"
+- inputText: "Seoudi, weekly"
+- hideKeyboard
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-5"
+- assertVisible:
+    id: "amount-display"
+    text: "425"
+- takeScreenshot: record
+- tapOn:
+    id: "record-cancel"
+
+# ===========================================================================
+# 3. Budgets — four limits chosen to show every state at once
+# ===========================================================================
+- tapOn:
+    id: "tab-budgets"
+
+- scrollUntilVisible:
+    element:
+      id: "budget-row-seed-cat-food"
+    direction: DOWN
+- tapOn:
+    id: "budget-row-seed-cat-food"
+- inputText: "2000"
+- tapOn:
+    id: "budget-save"
+
+- scrollUntilVisible:
+    element:
+      id: "budget-row-seed-cat-bills"
+    direction: DOWN
+- tapOn:
+    id: "budget-row-seed-cat-bills"
+- inputText: "1000"
+- tapOn:
+    id: "budget-save"
+
+- scrollUntilVisible:
+    element:
+      id: "budget-row-seed-cat-installments"
+    direction: DOWN
+- tapOn:
+    id: "budget-row-seed-cat-installments"
+- inputText: "5000"
+- tapOn:
+    id: "budget-save"
+
+- scrollUntilVisible:
+    element:
+      id: "budget-row-seed-cat-transport"
+    direction: DOWN
+- tapOn:
+    id: "budget-row-seed-cat-transport"
+- inputText: "500"
+- tapOn:
+    id: "budget-save"
+
+- scrollUntilVisible:
+    element:
+      id: "budget-total-budget"
+    direction: UP
+# The assertions that keep the screenshot honest. If the roll-up ever broke,
+# Food would read 0% and this would capture a wrong screen rather than fail.
+- assertVisible:
+    id: "budget-percent-seed-cat-food"
+    text: "60%"
+- assertVisible:
+    id: "budget-left-seed-cat-transport"
+    text: "E£240.00 over"
+- assertVisible:
+    id: "budget-total-budget"
+    text: "E£8,500.00"
+- takeScreenshot: budgets
+
+# ===========================================================================
+# 4. Search — the filters, and the total over what was found
+# ===========================================================================
+# Deliberately a FILTERED result rather than a text search. Typing "Cash"
+# matches all ten records, which produces a screenshot almost identical to the
+# records list — a wasted tile in a six-image grid. Filtering by Food returns
+# three, so the shot shows search actually narrowing something, shows the
+# filter panel, and shows the parent-matches-children rule: none of these three
+# records is filed under Food itself.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "nav-search"
+- tapOn:
+    id: "search-filters"
+- tapOn:
+    id: "filter-category"
+- scrollUntilVisible:
+    element:
+      text: "Food"
+    direction: DOWN
+- tapOn: "Food"
+# The search field has autoFocus, so the keyboard springs back the moment the
+# picker closes and covers two of the three results. Without this the shot is a
+# screenshot of a keyboard.
+- hideKeyboard
+- assertVisible:
+    id: "search-count"
+    text: "3 records"
+- assertVisible:
+    id: "search-expense"
+    text: "-E£1,200.00"
+# All three have to be on screen, or the tile shows a filter that found things
+# the reader cannot see.
+- assertVisible: "Groceries"
+- assertVisible: "Restaurants"
+- assertVisible: "Coffee"
+- takeScreenshot: search
