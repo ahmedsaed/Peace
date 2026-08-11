@@ -17,7 +17,7 @@ account, and no network dependency anywhere in the core product.
 | 0 | Schema, design system, navigation shell, repository layer | ✅ done |
 | 1 | Daily driver — records, calculator keypad, edit/delete, accounts & categories | ✅ done |
 | — | App icon, side menu, search entry point (chrome, pulled ahead of Stage 2) | ✅ done |
-| 2 | Budgets, analysis, search | in progress — settings ✅, export/backup/restore ✅, multi-currency ✅, search ✅ |
+| 2 | Budgets, analysis, search | in progress — settings ✅, export/backup/restore ✅, multi-currency ✅, search ✅, budgets ✅ |
 | 3 | Recurring payments | planned |
 | 4 | Receipt attachments | planned |
 | 5 | OCR + voice entry (Gemini Flash) | planned |
@@ -59,13 +59,14 @@ Not claims about what MyMoney lacks — these are decisions about how this app s
 | **No invented cross-currency total** | Valuing a whole balance needs today's rate, and the only rates here belong to past records. The accounts screen shows one line per currency held rather than one authoritative-looking number. |
 | **Undo after restoring a backup** | Restoring parks the previous state first, so recovering from a mistaken recovery is one tap. A backup you cannot get back out of is only half a safety net. |
 | **CSV carries both legs of a transfer** | The records list hides one leg so a transfer doesn't look like double spending; the export is a copy of the ledger, so per-account balances in the file add up. |
+| **Budgets that suggest themselves** | MyMoney's only way to start a month is "copy from past months", which is useless in the month you start — there is nothing to copy, so it opens on a blank screen asking for nineteen numbers you have no basis for. Peace offers a limit per category derived from what you actually spent, rounded up, and says whether it is averaging real months or falling back to this one. |
 | **Search totals what it found** | Matching rows with no total leaves you adding them up by hand, and "how much did I spend on coffee" is the question behind most searches. The total is a separate aggregate over *every* match, so capping the list at 300 rows never changes the number above it. |
 | **A parent category matches its children** | Filtering by "Food" returns the records filed under Coffee and Restaurants. Being told there are none, because they are all one level down, is the filter lying about the data. |
 | **Settings that do nothing are not shown** | `carryOver`, `viewMode` and `showTotal` are stored but nothing reads them yet. Three switches that silently do nothing is how an app teaches you to stop trusting it. |
 | **The build identifies itself** | Settings → About shows `1.0.0 (build 32)` and the commit, marked `-dirty` if it was built from uncommitted code. |
 
-Where Peace is still **behind**: no budgets screen, no analysis charts, and no recurring payments.
-Those are the rest of Stage 2 and Stage 3.
+Where Peace is still **behind**: no analysis charts and no recurring payments. Those are the rest
+of Stage 2 and Stage 3.
 
 ## Stack
 
