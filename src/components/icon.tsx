@@ -20,6 +20,10 @@ const PATHS: Record<string, string> = {
   // and non-zero fill would give a solid disc, which reads as a lollipop.
   search:
     'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zm0 2.2a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 1 1 0-8.6zM15.2 16.6l1.4-1.4 4.9 4.9-1.4 1.4z',
+  // A funnel, not the three-sliders glyph — `settings` already uses sliders,
+  // and two controls one row apart drawn from the same shape would be read as
+  // the same button.
+  filter: 'M3 4h18v2.2l-7 7V21l-4-2.4v-5.4l-7-7V4z',
   // Sliders rather than a gear: eight gear teeth turn to mush at 20px.
   settings:
     'M3 6h9v2H3V6zm14 0h4v2h-4V6zm-4-3h4v8h-4V3zM3 16h4v2H3v-2zm9 0h9v2h-9v-2zM7 13h4v8H7v-8z',
@@ -99,6 +103,7 @@ export type IconName = keyof typeof PATHS;
 const CHROME = [
   'menu',
   'search',
+  'filter',
   'settings',
   'export',
   'info',
