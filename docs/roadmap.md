@@ -227,8 +227,12 @@ work depends on Stage 2's per-record currency.
   Both awkward questions exist because the concept fights itself. So budgets keep no memory at all.
 
   **What actually carries between months is money**, which is a running cash position and needs no
-  exceptions. The Records header shows what the month opened with and what it leaves you holding;
-  the Analysis cash-flow strip shows the same line across six months, turning "was this month
+  exceptions. The Records header's third cell shows it: with carry-over on it reads **Now** — what
+  you are actually holding — and with it off it reads **Balance**, this month's net, as before. One
+  cell either way, because a fourth column or a line beneath the row is a whole extra band of chrome
+  above the thing you opened the app to do. The cost is that the month's own net stops being
+  printed; it is the difference of the two cells beside it, so both operands stay on screen. The
+  Analysis cash-flow strip carries the same figure across six months, turning "was this month
   unusual" into "am I accumulating anything".
 
   Two decisions worth knowing:

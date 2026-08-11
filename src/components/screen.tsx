@@ -166,12 +166,26 @@ export function SummaryTrio({
   income,
   balance,
   balanceMinor,
+  balanceLabel = 'Balance',
+  balanceTestID = 'summary-balance',
 }: {
   expense: string;
   income: string;
   balance: string;
   /** Drives the balance colour. Passed separately so this stays presentational. */
   balanceMinor: number;
+  /**
+   * The third cell is either the month's net ("Balance") or the running
+   * position ("Now"), depending on whether carry-over is on. It stays ONE cell
+   * either way: a fourth column, or a line under the row, is a whole extra band
+   * of chrome above the thing you actually came to look at.
+   *
+   * The testID moves with the label on purpose. Two different numbers under one
+   * id would make every assertion about it ambiguous — and a flow that cannot
+   * tell which of the two it is reading is a flow that proves nothing.
+   */
+  balanceLabel?: string;
+  balanceTestID?: string;
 }) {
   const cell = (label: string, value: string, tone: string, testID: string) => (
     <View className="flex-1 items-center">
@@ -186,13 +200,14 @@ export function SummaryTrio({
     <View className="mt-3 flex-row">
       {cell('Expense', expense, 'text-expense', 'summary-expense')}
       {cell('Income', income, 'text-income', 'summary-income')}
-      {/* Balance takes its colour from its sign. Showing a month you overspent
-          in the income colour is exactly backwards. */}
+      {/* Takes its colour from its sign. Showing a month you overspent — or a
+          position you are underwater on — in the income colour is exactly
+          backwards. */}
       {cell(
-        'Balance',
+        balanceLabel,
         balance,
         balanceMinor < 0 ? 'text-expense' : 'text-income',
-        'summary-balance'
+        balanceTestID
       )}
     </View>
   );
