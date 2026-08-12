@@ -377,6 +377,16 @@ app ignoring input. `pkill -f GradleDaemon`.
   The line was dead, not the test weak. Deleting it put the rule back in one place, where mutating
   it now fails tests in both files. When a mutant survives, ask whether the code is redundant before
   assuming the assertion is.
+- **A new capability belongs on the screen that already has its inputs, not on a screen of its
+  own.** Recurring rules first got a whole page: name, amount, and chip lists standing in for the
+  account and category pickers — a worse copy of the record screen, and a second place to fix every
+  time either changed. Repeating is now a property you set while entering the record, and the rules
+  screen kept only what a list can do that a form cannot: pause, delete, and see what is scheduled.
+  Ask what the new screen would duplicate before building it.
+- **A rule created from a record must be advanced past that record's own date.** The rule starts on
+  the day the record is dated, so the occurrence just written is immediately owed — and the screen
+  offers it back as a due row, showing one payment twice. Write the record, create the rule, then
+  settle the first occurrence.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
