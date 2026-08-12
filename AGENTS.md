@@ -387,6 +387,15 @@ app ignoring input. `pkill -f GradleDaemon`.
   the day the record is dated, so the occurrence just written is immediately owed — and the screen
   offers it back as a due row, showing one payment twice. Write the record, create the rule, then
   settle the first occurrence.
+- **`!` is the one construct that turns a compile-time guarantee into a runtime promise.** The
+  rules screen passed its sheet handlers as closures over state — `acting!.active` — and `acting` is
+  null whenever the sheet is closed, which is almost always. Typecheck clean, lint clean, 748 unit
+  tests green, and the screen was a hard crash on first open. Hand the value down from where it is
+  known non-null instead of asserting it where it is not.
+- **Android's `Intl` shortens September to "Sept", not "Sep".** Hermes ships different ICU data from
+  Node, so a `[A-Z][a-z]{2}` month pattern that passes everywhere else fails on device — and
+  `assertVisible` matches WHOLE text, so four letters simply do not match three. Same family as the
+  currency-symbol rule above: anything formatted through `Intl` has to be seen on a device.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

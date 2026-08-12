@@ -40,8 +40,9 @@ appId: com.ahmed.peace
 - tapOn:
     id: "key-0"
 
-# Nothing repeats until asked.
-- assertVisible: "Does not repeat"
+# The button is an icon with no text, so its state is not assertable by label —
+# what IS assertable is that opening it offers no repeat yet, and that a rule
+# exists afterwards. Both are checked below.
 - tapOn:
     id: "record-repeat"
 - assertVisible:
@@ -57,8 +58,6 @@ appId: com.ahmed.peace
 - tapOn:
     id: "repeat-save"
 
-# Back on the record screen, the button now reports the schedule.
-- assertVisible: "Every month on the .*"
 - takeScreenshot: 02-record-with-repeat
 - tapOn:
     id: "record-save"
@@ -74,6 +73,20 @@ appId: com.ahmed.peace
     id: "due-actions"
 - takeScreenshot: 03-saved-once
 
+# --- and it is visible in NEXT month, before it is owed ---
+# Most of why anyone writes a rule down: next month's rent should be in next
+# month's list. It is greyed and in no total, because it has not happened.
+- tapOn:
+    id: "month-next"
+- assertVisible: "Upcoming"
+- assertVisible: "Bills"
+- assertVisible:
+    id: "summary-expense"
+    text: "E£0.00"
+- takeScreenshot: 05-upcoming
+- tapOn:
+    id: "month-prev"
+
 # --- the rule exists, and says what it will do ---
 - tapOn:
     id: "nav-menu"
@@ -82,15 +95,27 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "recurring-screen"
 - assertVisible: "Every month on the .*"
-# Next run is in the FUTURE: the occurrence just written is settled, not owed.
-- assertVisible: ".*next 20.*"
+# The next run reads as a DATE a person can parse — the redesign replaced a raw
+# "next 2026-09-12" with "12 Sep". That it is in the future is what matters:
+# the occurrence just written is settled, not still owed.
+# `[a-z]+`, not `[a-z]{2}`: Android renders September as "Sept", not "Sep" —
+# Hermes ships different ICU data from Node, and `assertVisible` matches WHOLE
+# text, so a four-letter month simply does not match a three-letter pattern.
+- assertVisible: "[0-9]{1,2} [A-Z][a-z]+"
 - takeScreenshot: 04-rules
 
 # --- pausing stops it without deleting anything ---
-- tapOn:
-    id: "rule-toggle-bills"
+# Behind a long press, the same gesture a record uses — a destructive action
+# does not earn a permanent button on every row.
+- longPressOn: "Bills"
 - assertVisible:
-    id: "rule-toggle-bills"
+    id: "rule-actions"
+- assertVisible:
+    id: "rule-delete"
+- takeScreenshot: 06-rule-actions
+- tapOn:
+    id: "rule-toggle"
+- assertVisible: "Paused"
 - tapOn:
     id: "nav-back"
 - assertVisible:
