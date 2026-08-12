@@ -1,151 +1,246 @@
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { StackHeader } from '@/components/screen';
+import { Icon } from '@/components/icon';
+import { EmptyState, StackHeader } from '@/components/screen';
+import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { deleteRule, listRules, setRuleActive } from '@/db/repo/recurring';
-import { testIdSlug } from '@/lib/id';
 import { formatMinor } from '@/lib/money';
-import { describeRecurrence } from '@/lib/recurrence';
+import { describeRecurrence, fromYmd } from '@/lib/recurrence';
+
+type Rule = ReturnType<typeof listRules>[number];
 
 /**
- * The standing orders that exist — and NOTHING for creating one.
+ * The standing orders that exist — and nothing for creating one.
  *
  * Rules are made on the record screen, by tapping Repeat while entering the
  * payment itself. This screen had its own form once: name, amount, and chip
  * lists standing in for the account and category pickers. It was a worse copy
  * of a screen that already existed, and a second place to fix every time either
- * changed. Pausing, deleting and seeing what is scheduled are the jobs a list
- * can do that the record screen cannot.
+ * changed.
  *
- * A rule never writes to the ledger by itself. What it owes turns up as a grey
- * row on the records list to be added, edited or skipped, because a rule with a
- * typo in it that posts silently corrupts months of history before anyone
- * notices.
+ * What is left is a LIST, and it is built like the records list: a row is a
+ * line of facts, and the actions live behind a long press. Pause and Delete
+ * buttons under every rule turned four standing orders into sixteen things to
+ * read, and put a destructive action on screen permanently for something done
+ * once a year.
  */
 export default function RecurringScreen() {
-  const router = useRouter();
   const [version, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
   void version;
 
   const rules = listRules(db);
+  const [acting, setActing] = useState<Rule | null>(null);
 
-  const onDelete = (id: string, label: string) => {
-      Alert.alert(
-        `Delete "${label}"?`,
-        'Records it has already created are kept — deleting a rule never deletes history.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => {
-              deleteRule(db, id);
-              refresh();
-            },
+  const paused = rules.filter((r) => !r.active).length;
+
+  const onDelete = (rule: Rule) => {
+    setActing(null);
+    Alert.alert(
+      `Delete "${rule.name ?? 'this rule'}"?`,
+      'Records it has already created are kept — deleting a rule never deletes history.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteRule(db, rule.id);
+            refresh();
           },
-        ]
-      );
+        },
+      ]
+    );
   };
 
   return (
     <View className="flex-1 bg-ground" testID="recurring-screen">
       <StackHeader title="Recurring" />
 
-      <ScrollView contentContainerClassName="px-4 pb-10 pt-4" keyboardShouldPersistTaps="handled">
-        {/* Form above the list: below it, the inputs drift under the keyboard
-            as rules accumulate — the same mistake the portfolio screen made. */}
-        <Label>Rules</Label>
-        {rules.length === 0 ? (
-          <Text className="px-1 text-sm text-muted" testID="rule-empty">
-            Nothing recurring yet. A rule saves re-typing the same record every month.
+      {rules.length === 0 ? (
+        <EmptyState
+          icon="refresh"
+          title="Nothing repeats yet"
+          hint="Tap the repeat button while entering a record to save it as a rule."
+        />
+      ) : (
+        <ScrollView contentContainerClassName="px-4 pb-10 pt-4">
+          {/* One line, not a paragraph: what is on this page, and how much of it
+              is switched off. */}
+          <Text className="mb-3 px-1 text-sm text-muted" testID="rule-count">
+            {rules.length === 1 ? '1 rule' : `${rules.length} rules`}
+            {paused > 0 ? ` · ${paused} paused` : ''}
           </Text>
-        ) : (
-          <View className="rounded-xl bg-surface">
+
+          <View className="overflow-hidden rounded-xl bg-surface">
             {rules.map((rule, index) => (
-              <View
+              <RuleRow
                 key={rule.id}
-                className={`p-4 ${index > 0 ? 'border-t border-line' : ''}`}
-                testID={`rule-${testIdSlug((rule.name ?? 'rule').toLowerCase())}`}>
-                <View className="flex-row items-center gap-2">
-                  <Text
-                    className={`flex-1 text-[15px] ${rule.active ? 'text-ink' : 'text-muted'}`}
-                    numberOfLines={1}>
-                    {rule.name ?? 'Recurring'}
-                  </Text>
-                  <Text className={`text-[15px] ${rule.active ? 'text-ink' : 'text-muted'}`}>
-                    {formatMinor(rule.amountMinor, rule.currency)}
-                  </Text>
-                </View>
-
-                <Text className="mt-0.5 text-xs text-muted">
-                  {describeRecurrence({
-                    frequency: rule.frequency,
-                    interval: rule.interval,
-                    anchorDay: rule.anchorDay,
-                    startsOn: rule.startsOn,
-                    endsOn: rule.endsOn,
-                  })}
-                  {rule.autoPost ? ' · automatic' : ''}
-                  {rule.nextRunOn ? ` · next ${rule.nextRunOn}` : ' · finished'}
-                </Text>
-
-                <View className="mt-3 flex-row gap-2">
-                  <Button
-                    label={rule.active ? 'Pause' : 'Resume'}
-                    onPress={() => {
-                      setRuleActive(db, rule.id, !rule.active);
-                      refresh();
-                    }}
-                    testID={`rule-toggle-${testIdSlug((rule.name ?? 'rule').toLowerCase())}`}
-                  />
-                  <Button
-                    label="Delete"
-                    onPress={() => onDelete(rule.id, rule.name ?? 'this rule')}
-                    testID={`rule-delete-${testIdSlug((rule.name ?? 'rule').toLowerCase())}`}
-                    danger
-                  />
-                </View>
-              </View>
+                rule={rule}
+                first={index === 0}
+                onLongPress={() => setActing(rule)}
+              />
             ))}
           </View>
-        )}
 
-        <Text className="mt-6 px-1 text-xs leading-5 text-muted">
-          Rules are made while entering a record — tap Repeat on the new-record screen. What a rule
-          owes then turns up on the records list in grey: tap one to edit it before adding, or hold
-          it to add or skip.
-        </Text>
+          <Text className="mt-4 px-1 text-xs leading-5 text-muted">
+            Hold a rule to pause or delete it. What one owes turns up on the records list in grey.
+          </Text>
+        </ScrollView>
+      )}
 
-        <Pressable onPress={() => router.back()} className="mt-6 self-start px-1 py-2">
-          <Text className="text-sm text-muted">Back to records</Text>
-        </Pressable>
-      </ScrollView>
+      {/* The rule is handed BACK by the sheet rather than read from state with
+          a `!` assertion. The sheet only renders its actions when it has one,
+          so this is the place where non-null is actually known — asserting it
+          in the parent reads `.active` on null the moment the sheet is closed. */}
+      <RuleActions
+        rule={acting}
+        onClose={() => setActing(null)}
+        onToggle={(rule) => {
+          setRuleActive(db, rule.id, !rule.active);
+          setActing(null);
+          refresh();
+        }}
+        onDelete={onDelete}
+      />
     </View>
   );
 }
 
-function Label({ children }: { children: string }) {
+function RuleRow({
+  rule,
+  first,
+  onLongPress,
+}: {
+  rule: Rule;
+  first: boolean;
+  onLongPress: () => void;
+}) {
+  const schedule = describeRecurrence({
+    frequency: rule.frequency,
+    interval: rule.interval,
+    anchorDay: rule.anchorDay,
+    startsOn: rule.startsOn,
+    endsOn: rule.endsOn,
+  });
+
   return (
-    <Text className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
-      {children}
-    </Text>
+    <Pressable
+      onLongPress={onLongPress}
+      testID={`rule-${slug(rule.name)}`}
+      accessibilityRole="button"
+      accessibilityLabel={`${rule.name ?? 'Recurring'}, ${schedule}`}
+      className={`flex-row items-center gap-3 px-4 py-3.5 active:bg-raised ${
+        first ? '' : 'border-t border-line'
+      } ${rule.active ? '' : 'opacity-50'}`}>
+      <View className="h-8 w-8 items-center justify-center rounded-full bg-raised">
+        <Icon name="refresh" size={15} color={rule.active ? palette.accent : palette.muted} />
+      </View>
+
+      <View className="flex-1">
+        <Text className="text-[15px] text-ink" numberOfLines={1}>
+          {rule.name ?? 'Recurring'}
+        </Text>
+        <Text className="text-xs text-muted" numberOfLines={1}>
+          {schedule}
+          {rule.autoPost ? ' · automatic' : ''}
+        </Text>
+      </View>
+
+      {/* Amount and next date stack on the right, so the eye runs down two
+          columns rather than along four facts crammed into one line. */}
+      <View className="items-end">
+        <Text className="text-[15px] text-ink">{formatMinor(rule.amountMinor, rule.currency)}</Text>
+        <Text className="text-xs text-muted">{whenNext(rule)}</Text>
+      </View>
+    </Pressable>
   );
 }
 
-function Button({
+/** `12 Sep`, or why there is no next one. Never the raw `2026-09-12`. */
+function whenNext(rule: Rule): string {
+  if (!rule.active) return 'Paused';
+  if (!rule.nextRunOn) return 'Finished';
+  return fromYmd(rule.nextRunOn).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+/**
+ * Actions behind a long press — the same gesture a record uses.
+ *
+ * Pausing is rare and deleting is destructive, so neither earns a permanent
+ * button on every row.
+ */
+function RuleActions({
+  rule,
+  onClose,
+  onToggle,
+  onDelete,
+}: {
+  rule: Rule | null;
+  onClose: () => void;
+  onToggle: (rule: Rule) => void;
+  onDelete: (rule: Rule) => void;
+}) {
+  return (
+    <Modal visible={rule !== null} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
+
+      <View
+        className="rounded-t-2xl border-t border-line bg-ground pb-8"
+        style={{ elevation: 16 }}
+        testID="rule-actions">
+        {rule ? (
+          <>
+            <View className="border-b border-line px-5 py-4">
+              <Text className="text-base font-semibold text-ink" numberOfLines={1}>
+                {rule.name ?? 'Recurring'}
+              </Text>
+              <Text className="text-xs text-muted" numberOfLines={1}>
+                {formatMinor(rule.amountMinor, rule.currency)} · {whenNext(rule)}
+              </Text>
+            </View>
+
+            <Action
+              icon={rule.active ? 'clock' : 'refresh'}
+              label={rule.active ? 'Pause' : 'Resume'}
+              hint={
+                rule.active
+                  ? 'Owes nothing until you turn it back on'
+                  : 'Starts owing again from its next date'
+              }
+              onPress={() => onToggle(rule)}
+              testID="rule-toggle"
+            />
+            <Action
+              icon="dots"
+              label="Delete"
+              hint="Records it already created are kept"
+              onPress={() => onDelete(rule)}
+              testID="rule-delete"
+              danger
+            />
+          </>
+        ) : null}
+      </View>
+    </Modal>
+  );
+}
+
+function Action({
+  icon,
   label,
+  hint,
   onPress,
   testID,
-  primary = false,
   danger = false,
 }: {
+  icon: string;
   label: string;
+  hint: string;
   onPress: () => void;
   testID: string;
-  primary?: boolean;
   danger?: boolean;
 }) {
   return (
@@ -154,15 +249,19 @@ function Button({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className={`self-start rounded-lg px-4 py-2.5 active:opacity-80 ${
-        danger ? 'border border-expense/40' : primary ? 'bg-accent' : 'border border-line'
-      }`}>
-      <Text
-        className={`text-sm font-semibold ${
-          danger ? 'text-expense' : primary ? 'text-accent-ink' : 'text-ink'
-        }`}>
-        {label}
-      </Text>
+      className="flex-row items-center gap-4 px-5 py-3.5 active:bg-surface">
+      <Icon name={icon} size={18} color={danger ? palette.expense : palette.ink} />
+      <View className="flex-1">
+        <Text className={`text-[15px] ${danger ? 'text-expense' : 'text-ink'}`}>{label}</Text>
+        <Text className="text-xs text-muted">{hint}</Text>
+      </View>
     </Pressable>
   );
 }
+
+/** Predictable in a flow, unlike the row's UUID. */
+const slug = (name: string | null) =>
+  (name ?? 'rule')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');

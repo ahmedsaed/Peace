@@ -20,8 +20,10 @@ import { and, asc, eq, isNotNull, lte } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { newId } from '../../lib/id';
+import { periodBounds, type Period } from '../../lib/period';
 import {
   firstOccurrenceOnOrAfter,
+  isAfterEnd,
   nextOccurrenceAfter,
   occurrencesDue,
   toYmd,
@@ -203,6 +205,77 @@ export function dueProposals(db: Db, today = toYmd(new Date())): DueSummary {
   }
 
   return { proposals, truncatedRuleIds };
+}
+
+
+/**
+ * What is COMING in a given month, as opposed to what is owed.
+ *
+ * A monthly rent should be visible in next month's list — that is most of why
+ * anyone writes the rule down. `dueProposals` deliberately stops at today,
+ * because it answers "what do I need to decide about"; this answers "what is
+ * already spoken for", which is a different question and belongs to whatever
+ * month is being looked at.
+ *
+ * DISPLAY ONLY. These carry no actions, and the reason is an ordering hazard
+ * rather than principle: a rule advances past the LATEST date it has handled,
+ * so accepting September while August is still owed would swallow August
+ * silently. When the date arrives the same occurrence turns up in
+ * `dueProposals` and gains its actions there.
+ */
+export function upcomingProposals(
+  db: Db,
+  period: Period,
+  today = toYmd(new Date()),
+  cap = 30
+): Proposal[] {
+  const { start, end } = periodBounds(period);
+  const firstOfMonth = toYmd(start);
+  // `end` is midnight on the 1st of the NEXT month, so this bound is exclusive.
+  const firstOfNextMonth = toYmd(end);
+
+  // Strictly after today: an occurrence falling today is owed, not upcoming,
+  // and showing it in both places would offer the same payment twice.
+  const from = firstOfMonth > today ? firstOfMonth : nextDay(today);
+
+  const rules = db
+    .select()
+    .from(recurringRules)
+    .where(eq(recurringRules.active, true))
+    .orderBy(asc(recurringRules.nextRunOn))
+    .all();
+
+  const proposals: Proposal[] = [];
+
+  for (const rule of rules) {
+    const recurrence = asRecurrence(rule);
+    let cursor = firstOccurrenceOnOrAfter(recurrence, from);
+
+    while (cursor !== null && cursor < firstOfNextMonth && proposals.length < cap) {
+      if (isAfterEnd(recurrence, cursor)) break;
+      proposals.push({
+        ruleId: rule.id,
+        ruleName: rule.name ?? 'Recurring',
+        type: rule.type,
+        accountId: rule.accountId,
+        counterAccountId: rule.counterAccountId,
+        categoryId: rule.categoryId,
+        amountMinor: rule.amountMinor,
+        currency: rule.currency,
+        note: rule.note,
+        occurredOn: cursor,
+      });
+      cursor = nextOccurrenceAfter(recurrence, cursor);
+    }
+  }
+
+  return proposals.sort((a, b) => a.occurredOn.localeCompare(b.occurredOn));
+}
+
+function nextDay(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const date = new Date(y, m - 1, d + 1);
+  return toYmd(date);
 }
 
 /**

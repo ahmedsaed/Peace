@@ -7,6 +7,7 @@ import {
   catchUp,
   postProposals,
   skipProposals,
+  upcomingProposals,
   type Proposal,
 } from '@/db/repo/recurring';
 import { RecordActions } from '@/components/record-actions';
@@ -70,6 +71,8 @@ export default function RecordsScreen() {
    * pending row in `transactions` would be the expensive answer.
    */
   const [due, setDue] = useState<Proposal[]>([]);
+  /** Already spoken for, in the month being viewed. Display only. */
+  const [upcoming, setUpcoming] = useState<Proposal[]>([]);
   const [actingDue, setActingDue] = useState<Proposal | null>(null);
   const pendingUndo = useUndoStore((state) => state.pending);
   const clearUndo = useUndoStore((state) => state.clear);
@@ -85,6 +88,9 @@ export default function RecordsScreen() {
     // Everything outstanding, whatever month it fell in. An occurrence missed
     // in August must not hide in a month nobody scrolls back to.
     setDue(catchUp(db).proposals);
+    // Belongs to the month being LOOKED AT, unlike the due list, which is
+    // everything outstanding whenever it fell.
+    setUpcoming(upcomingProposals(db, period));
     // homeCurrency belongs here: changing it changes what the totals MEAN, and
     // without it the screen would keep showing figures computed against the
     // previous one until something else happened to trigger a refresh.
@@ -125,10 +131,23 @@ export default function RecordsScreen() {
 
   // Due rows sit at the TOP, above today, because they are the only thing on
   // this screen that is waiting on a decision.
-  const sections =
-    due.length > 0
-      ? [{ key: 'due', title: due.length === 1 ? 'Due' : `Due · ${due.length}`, data: due as (Row | Proposal)[] }, ...dayGroups]
-      : dayGroups;
+  const sections = [
+    ...(due.length > 0
+      ? [
+          {
+            key: 'due',
+            title: due.length === 1 ? 'Due' : `Due · ${due.length}`,
+            data: due as (Row | Proposal)[],
+          },
+        ]
+      : []),
+    ...dayGroups,
+    // LAST, and after the real records: these have not happened. Above them
+    // they would read as the newest thing in the month.
+    ...(upcoming.length > 0
+      ? [{ key: 'upcoming', title: 'Upcoming', data: upcoming as (Row | Proposal)[] }]
+      : []),
+  ];
 
   return (
     <Screen testID="home-screen">
@@ -195,7 +214,13 @@ export default function RecordsScreen() {
                     },
                   })
                 }
-                onLongPress={() => setActingDue(item)}
+                // Only what is OWED can be acted on. A rule advances past the
+                // latest date it has handled, so accepting a future occurrence
+                // would silently swallow everything still owed before it.
+                onLongPress={
+                  upcoming.includes(item) ? undefined : () => setActingDue(item)
+                }
+                upcoming={upcoming.includes(item)}
               />
             ) : (
               <RecordRow

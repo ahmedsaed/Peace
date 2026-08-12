@@ -15,6 +15,7 @@ import {
   RecurringError,
   setRuleActive,
   skipProposals,
+  upcomingProposals,
 } from './recurring';
 
 function seed() {
@@ -266,5 +267,73 @@ describe('listing', () => {
     const db = seed();
     rent(db);
     expect(listRules(db).map((r) => r.name)).toEqual(['Rent']);
+  });
+});
+
+/**
+ * What is already spoken for, in whatever month is being looked at. Most of why
+ * anyone writes a rule down is to see next month's rent in next month's list.
+ */
+describe('upcoming occurrences', () => {
+  it('shows a monthly rule in a future month', () => {
+    const db = seed();
+    rent(db);
+    expect(upcomingProposals(db, '2026-04', '2026-01-15').map((p) => p.occurredOn)).toEqual([
+      '2026-04-01',
+    ]);
+  });
+
+  it('shows the rest of the current month, but not what has already passed', () => {
+    const db = seed();
+    rent(db, { frequency: 'weekly', startsOn: '2026-01-05' });
+
+    // Standing on the 15th: the 5th and 12th are behind and belong to `due`.
+    const dates = upcomingProposals(db, '2026-01', '2026-01-15').map((p) => p.occurredOn);
+    expect(dates).toEqual(['2026-01-19', '2026-01-26']);
+  });
+
+  /**
+   * The overlap that would show one payment twice. An occurrence falling TODAY
+   * is owed, so it belongs to `dueProposals` — listing it here as well would
+   * put the same row on screen in two sections.
+   */
+  it('excludes an occurrence falling exactly today', () => {
+    const db = seed();
+    rent(db);
+
+    expect(dueProposals(db, '2026-02-01').proposals.map((p) => p.occurredOn)).toContain(
+      '2026-02-01'
+    );
+    expect(upcomingProposals(db, '2026-02', '2026-02-01').map((p) => p.occurredOn)).not.toContain(
+      '2026-02-01'
+    );
+  });
+
+  it('stays inside the month it was asked about', () => {
+    const db = seed();
+    rent(db);
+    const dates = upcomingProposals(db, '2026-03', '2026-01-15').map((p) => p.occurredOn);
+    expect(dates).toEqual(['2026-03-01']);
+  });
+
+  it('ignores a paused rule', () => {
+    const db = seed();
+    rent(db);
+    setRuleActive(db, 'rule-rent', false);
+    expect(upcomingProposals(db, '2026-04', '2026-01-15')).toEqual([]);
+  });
+
+  it('stops at the rule end date', () => {
+    const db = seed();
+    rent(db, { endsOn: '2026-02-28' });
+    expect(upcomingProposals(db, '2026-04', '2026-01-15')).toEqual([]);
+  });
+
+  it('lists several occurrences of a frequent rule in date order', () => {
+    const db = seed();
+    rent(db, { frequency: 'weekly', startsOn: '2026-01-01' });
+    const dates = upcomingProposals(db, '2026-03', '2026-01-15').map((p) => p.occurredOn);
+    expect(dates).toEqual([...dates].sort());
+    expect(dates.length).toBeGreaterThan(3);
   });
 });

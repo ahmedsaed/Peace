@@ -21,13 +21,23 @@ import { formatMinor } from '@/lib/money';
 export function ProposalRow({
   proposal,
   currency,
+  upcoming = false,
   onPress,
   onLongPress,
 }: {
   proposal: Proposal;
   currency: string;
+  /**
+   * Not owed yet — it belongs to a day that has not arrived.
+   *
+   * Shown so a monthly rent is visible in next month's list, which is most of
+   * why anyone writes the rule down. It carries no actions: a rule advances
+   * past the latest date it has handled, so accepting a future occurrence would
+   * silently swallow everything still owed before it.
+   */
+  upcoming?: boolean;
   onPress: () => void;
-  onLongPress: () => void;
+  onLongPress?: () => void;
 }) {
   const sign = proposal.type === 'income' ? '' : '-';
 
@@ -37,7 +47,9 @@ export function ProposalRow({
       onLongPress={onLongPress}
       testID={`due-${proposal.ruleId}-${proposal.occurredOn}`}
       accessibilityRole="button"
-      className="flex-row items-center gap-3 px-4 py-3 active:bg-surface">
+      className={`flex-row items-center gap-3 px-4 py-3 active:bg-surface ${
+        upcoming ? 'opacity-60' : ''
+      }`}>
       <View className="h-7 w-7 items-center justify-center rounded-full border border-dashed border-line">
         <Icon name="refresh" size={14} color={palette.muted} />
       </View>
@@ -50,7 +62,9 @@ export function ProposalRow({
             occurrence missed in August shows up in today's list — otherwise it
             would sit in a month nobody scrolls back to — but it must not
             pretend to be from today. */}
-        <Text className="text-xs text-muted opacity-70">due {formatDue(proposal.occurredOn)}</Text>
+          <Text className="text-xs text-muted opacity-70">
+          {upcoming ? formatDue(proposal.occurredOn) : `due ${formatDue(proposal.occurredOn)}`}
+        </Text>
       </View>
 
       <Text className="text-[15px] text-muted">

@@ -641,56 +641,71 @@ export default function RecordScreen() {
         onClose={() => setRepeatOpen(false)}
         onChange={setRepeat}
       />
-      <View className={`flex-row items-center justify-between px-4 ${pad}`}>
+      <View className={`relative flex-row items-center justify-between px-4 ${pad}`}>
         <Pressable
           onPress={() => router.back()}
           testID="record-cancel"
           accessibilityRole="button"
-          className="rounded-lg border border-line px-5 py-2.5 active:opacity-70">
+          className="h-10 justify-center rounded-lg border border-line px-5 active:opacity-70">
           <Text className="text-sm font-medium text-muted">Cancel</Text>
         </Pressable>
 
-        <View className="items-center">
+        {/* Centred on the SCREEN, not on the space left over.
+            Laid out in the flow between Cancel and the two buttons on the
+            right, `justify-between` puts it wherever the leftover gap happens
+            to be — so it drifted left the moment the repeat button widened that
+            side. Taken out of the flow it stays put whatever the buttons do.
+
+            `pointerEvents="none"` because it now overlays the whole row and
+            would otherwise swallow taps aimed at the buttons underneath. */}
+        <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
           <Text className="text-sm font-medium text-muted" testID="record-title">
             {/* Names the ACTION you are in, not the row that will result.
                 Duplicating a refund still produces a refund, but "Refund" here
                 would leave you wondering which of the two things you tapped. */}
             {isEdit ? 'Edit record' : refundOf ? 'Refund' : copyOf ? 'Duplicate' : 'New record'}
           </Text>
+        </View>
 
+        <View className="flex-row items-center gap-2">
           {/* Repeating is a property of the record you are entering, so it is
-              entered here rather than on a screen of its own — the amount,
-              account and category pickers already live on this screen and
-              should not be built a second time somewhere worse. */}
+              set here rather than on a screen of its own — the amount, account
+              and category pickers already live on this screen and should not be
+              built a second time somewhere worse.
+
+              An icon alone, so the WHOLE state is carried by how it looks: tinted
+              and outlined in the accent when this record repeats, plain when it
+              does not. The schedule in words lives in the sheet, where there is
+              room for it and where it is being chosen. */}
           {!isEdit ? (
             <Pressable
               onPress={() => setRepeatOpen(true)}
               testID="record-repeat"
               accessibilityRole="button"
-              accessibilityLabel="Repeat"
-              className="mt-0.5 flex-row items-center gap-1 active:opacity-70">
-              <Icon name="refresh" size={12} color={repeat ? palette.accent : palette.muted} />
-              <Text
-                className={`text-xs ${repeat ? 'font-medium text-accent' : 'text-muted'}`}
-                numberOfLines={1}>
-                {describeRepeat(repeat, toYmd(occurredAt))}
-              </Text>
+              accessibilityState={{ selected: !!repeat }}
+              // Without a label this button is unreadable to a screen reader,
+              // and the schedule is exactly what someone would want read out.
+              accessibilityLabel={`Repeat: ${describeRepeat(repeat, toYmd(occurredAt))}`}
+              className={`h-10 w-10 items-center justify-center rounded-lg border active:opacity-70 ${
+                repeat ? 'border-accent bg-accent/15' : 'border-line'
+              }`}>
+              <Icon name="refresh" size={18} color={repeat ? palette.accent : palette.muted} />
             </Pressable>
           ) : null}
-        </View>
 
-        <Pressable
-          onPress={onSave}
-          disabled={!canSave}
-          testID="record-save"
-          accessibilityRole="button"
-          className={`rounded-lg px-7 py-2.5 active:opacity-80 ${
-            canSave ? 'bg-accent' : 'bg-surface'
-          }`}>
-          <Text className={`text-sm font-semibold ${canSave ? 'text-accent-ink' : 'text-line'}`}>
-            Save
-          </Text>
-        </Pressable>
+          <Pressable
+            onPress={onSave}
+            disabled={!canSave}
+            testID="record-save"
+            accessibilityRole="button"
+            className={`h-10 justify-center rounded-lg px-7 active:opacity-80 ${
+              canSave ? 'bg-accent' : 'bg-surface'
+            }`}>
+            <Text className={`text-sm font-semibold ${canSave ? 'text-accent-ink' : 'text-line'}`}>
+              Save
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* `flexGrow: 1` lets the note expand into spare room on a full-height
