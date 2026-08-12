@@ -1,0 +1,149 @@
+appId: com.ahmed.peace
+---
+# The rebalancing tool.
+#
+# The assertions that matter are the AMOUNTS. A flow that only checked the
+# screen rendered would pass just as happily against a split that sends money
+# to the wrong class, or one that quietly loses a piastre in rounding — and
+# both of those look completely plausible on screen.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-portfolio"
+- assertVisible:
+    id: "portfolio-screen"
+
+# --- targets have to reach exactly 100% ---
+- tapOn:
+    id: "portfolio-class-name"
+- inputText: "Stocks"
+- tapOn:
+    id: "portfolio-class-target"
+- inputText: "60"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-class-add"
+
+# Sixty on its own is incomplete, and the running total says so rather than
+# waiting until the user tries to rebalance.
+- assertVisible:
+    id: "portfolio-target-total"
+    text: "60.0% of 100%"
+
+# And it REFUSES to plan against an unfinished allocation. Confident-looking
+# amounts derived from a target the user has not finished stating would be
+# worse than no amounts at all.
+- scrollUntilVisible:
+    element:
+      id: "portfolio-contribution"
+    direction: DOWN
+- tapOn:
+    id: "portfolio-contribution"
+- inputText: "100"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-plan"
+- assertVisible:
+    id: "portfolio-error"
+    text: ".*add up to 100%.*"
+- assertNotVisible:
+    id: "portfolio-plan-result"
+- scrollUntilVisible:
+    element:
+      id: "portfolio-class-name"
+    direction: UP
+
+- tapOn:
+    id: "portfolio-class-name"
+- inputText: "Bonds"
+- tapOn:
+    id: "portfolio-class-target"
+- inputText: "40"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-class-add"
+- assertVisible:
+    id: "portfolio-target-total"
+    text: "100.0% of 100%"
+- takeScreenshot: 01-targets
+
+# --- holdings, deliberately off balance ---
+# 700 of stocks and 300 of bonds against a 60/40 target: stocks are ahead.
+- tapOn:
+    id: "portfolio-holding-name"
+- inputText: "Index fund"
+# By testID, not by the word "Stocks" — that text also appears in the target
+# list above, and a text match would be ambiguous about which one it meant.
+- tapOn:
+    id: "portfolio-pick-stocks"
+- tapOn:
+    id: "portfolio-holding-units"
+- inputText: "7"
+- tapOn:
+    id: "portfolio-holding-price"
+- inputText: "100"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-holding-add"
+
+- tapOn:
+    id: "portfolio-holding-name"
+- inputText: "Bond fund"
+- tapOn:
+    id: "portfolio-pick-bonds"
+- tapOn:
+    id: "portfolio-holding-units"
+- inputText: "3"
+- tapOn:
+    id: "portfolio-holding-price"
+- inputText: "100"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-holding-add"
+
+- assertVisible:
+    id: "portfolio-total"
+    text: "E£1,000.00"
+
+# --- drift is the gap a person would check ---
+- scrollUntilVisible:
+    element:
+      id: "portfolio-drift"
+    direction: DOWN
+- assertVisible: "\\+10.0%"
+- assertVisible: "-10.0%"
+- takeScreenshot: 02-drift
+
+# --- the contribution goes where it is needed ---
+- scrollUntilVisible:
+    element:
+      id: "portfolio-contribution"
+    direction: DOWN
+- tapOn:
+    id: "portfolio-contribution"
+# The refusal check above already typed into this field, and `inputText`
+# APPENDS. Without this the amount becomes "100100" — which is not a bug in the
+# app: a contribution that large against a 1,000 portfolio leaves both classes
+# underweight, so both correctly get a share and neither says "nothing needed".
+- eraseText
+- inputText: "100"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-plan"
+- assertVisible:
+    id: "portfolio-plan-result"
+
+# THE ASSERTION THAT MATTERS. Stocks are already ahead, so the whole hundred
+# goes to bonds and nothing is sold. Asserting only that a plan appeared would
+# pass against a split that did the exact opposite.
+- assertVisible: "nothing needed"
+- assertVisible: "E£100.00"
+- takeScreenshot: 03-plan

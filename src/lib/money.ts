@@ -129,7 +129,7 @@ export function groupDigits(entry: string): string {
  * makes a converted expense and a converted income of the same size come out a
  * unit apart, so a spend and its refund would no longer cancel.
  */
-function roundHalfAwayFromZero(value: number): number {
+export function roundHalfAwayFromZero(value: number): number {
   return value < 0 ? -Math.round(-value) : Math.round(value);
 }
 

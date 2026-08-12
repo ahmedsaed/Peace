@@ -34,6 +34,11 @@ import { categoryBreakdown } from './repo/analysis';
 import { listBudgets, setBudget } from './repo/budgets';
 import { createCardPurchase, withFeeRows } from './repo/card';
 import { broughtForward, totalHeld } from './repo/carry';
+import {
+  createAssetClass,
+  createHolding,
+  portfolioSnapshot,
+} from './repo/portfolio';
 import { periodSummary } from './repo/records';
 import { createRecord, createTransfer } from './repo/transactions';
 
@@ -147,6 +152,20 @@ function buildLedger(db: Db) {
   // Budgets sit on TOP-LEVEL categories; Restaurants rolls up into Food.
   setBudget(db, catId('food'), PERIOD, 8_000_00);
   setBudget(db, catId('clothing'), PERIOD, 1_000_00);
+
+  // The portfolio keeps its own tables and never touches the ledger — which is
+  // exactly why it is easy to forget in a restore. `copyFromBackup` picks up a
+  // new COLUMN on its own; a new TABLE has to be listed in RESTORE_TABLES by
+  // hand, so it is the one thing here with no automatic safety net.
+  createAssetClass(db, { id: 'pf-stocks', name: 'Stocks', targetBp: 6_000 });
+  createAssetClass(db, { id: 'pf-bonds', name: 'Bonds', targetBp: 4_000 });
+  createHolding(db, {
+    id: 'pf-fund',
+    name: 'Index fund',
+    assetClassId: 'pf-stocks',
+    unitsMicro: 12_347_000,
+    priceMinor: 4_183,
+  });
 }
 
 /**
@@ -180,6 +199,7 @@ function snapshot(db: Db) {
     feeRowsForPurchase: withFeeRows(db, 'txn-rome')
       .map((r) => r.id)
       .sort(),
+    portfolio: portfolioSnapshot(db),
   };
 }
 
@@ -313,6 +333,22 @@ describe('a restored ledger still means the same thing', () => {
 
     it('keeps both transfer legs, so the accounts still balance', () => {
       expect(totalHeld(live.db)).toBe(totalHeld(backup.db));
+    });
+
+    /**
+     * The portfolio has no automatic safety net. A new COLUMN copies itself,
+     * because the column set is intersected at run time — a new TABLE does not,
+     * and is simply not copied by anything until someone adds it to
+     * RESTORE_TABLES. Losing an entire feature's data is the quietest failure
+     * available here.
+     */
+    it('keeps the portfolio, which no other total would reveal', () => {
+      const portfolio = portfolioSnapshot(live.db);
+      expect(portfolio.classes.map((c) => c.name)).toEqual(['Stocks', 'Bonds']);
+      expect(portfolio.targetsComplete).toBe(true);
+      // 12.347 units at 41.83 = 516.48
+      expect(portfolio.totalValueMinor).toBe(51_648);
+      expect(portfolio.holdings[0].unitsMicro).toBe(12_347_000);
     });
   });
 });

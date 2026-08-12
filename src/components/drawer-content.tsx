@@ -26,6 +26,13 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
     testID: 'drawer-settings',
   },
   {
+    icon: 'analysis',
+    label: 'Portfolio',
+    hint: 'Target allocation and rebalancing',
+    href: '/portfolio',
+    testID: 'drawer-portfolio',
+  },
+  {
     icon: 'export',
     label: 'Export & backup',
     hint: 'CSV out, full backup and restore',
