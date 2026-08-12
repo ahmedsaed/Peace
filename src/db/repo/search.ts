@@ -21,7 +21,7 @@ import {
 } from '../../lib/search-query';
 import * as schema from '../schema';
 import { accounts, categories, transactions } from '../schema';
-import { countsAsSpending } from './predicates';
+import { countsAsSpending, onExpenseSide, onIncomeSide } from './predicates';
 import type { RecordRow } from './records';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
@@ -98,10 +98,10 @@ function conditions(
 
   switch (query.kind) {
     case 'expense':
-      where.push(isNull(transactions.transferPairId), lt(transactions.amountMinor, 0));
+      where.push(isNull(transactions.transferPairId), onExpenseSide());
       break;
     case 'income':
-      where.push(isNull(transactions.transferPairId), sql`${transactions.amountMinor} > 0`);
+      where.push(isNull(transactions.transferPairId), onIncomeSide());
       break;
     case 'transfer':
       where.push(isNotNull(transactions.transferPairId));
@@ -173,6 +173,7 @@ export function searchRecords(
       occurredAt: transactions.occurredAt,
       transferPairId: transactions.transferPairId,
       isAdjustment: transactions.isAdjustment,
+      isRefund: transactions.isRefund,
       categoryName: categories.name,
       categoryIcon: categories.icon,
       categoryColor: categories.color,
@@ -203,8 +204,8 @@ export function searchRecords(
   const totals = db
     .select({
       matches: sql<number>`count(*)`,
-      expense: sql<number>`coalesce(sum(case when ${spendable} and ${transactions.amountMinor} < 0 then ${valued} else 0 end), 0)`,
-      income: sql<number>`coalesce(sum(case when ${spendable} and ${transactions.amountMinor} > 0 then ${valued} else 0 end), 0)`,
+      expense: sql<number>`coalesce(sum(case when ${spendable} and ${onExpenseSide()} then ${valued} else 0 end), 0)`,
+      income: sql<number>`coalesce(sum(case when ${spendable} and ${onIncomeSide()} then ${valued} else 0 end), 0)`,
       unvalued: sql<number>`coalesce(sum(case when ${spendable} and upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) <> ${home} then 1 else 0 end), 0)`,
     })
     .from(transactions)

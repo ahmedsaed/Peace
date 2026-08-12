@@ -10,10 +10,10 @@ shipped after it.
 | 1 | Liability balances shown as **owed**, with available credit | ✅ shipped |
 | — | **Balance corrections** — an adjustment that moves the balance and never spending | ✅ shipped |
 | — | Per-card **fee profile** (limit, foreign %, cash %) rather than one bank's rules in the app | ✅ shipped |
-| 2 | **Refund** as a negative expense against the original category | not built |
-| 3 | **"Pay this card"** pre-filling a Bank → Card transfer | not built |
-| 4 | `statementDay` / `dueDay` and a derived statement view | columns only |
-| 5 | Foreign purchases store the settled amount, fee computed from the card | not built |
+| 2 | **Refund** as a negative expense against the original category | ✅ shipped |
+| 3 | **"Pay this card"** — became a prefill on the transfer, not a button | ✅ shipped |
+| 4 | `statementDay` / `dueDay` and a derived statement view | **not planned** — see below |
+| 5 | Foreign purchases store the settled amount, fee computed from the card | ✅ shipped |
 
 Two things the shipped slice settled that this document had left open:
 
@@ -200,22 +200,52 @@ card account — type in the balance the bank shows, and Peace reports the diffe
 believes is outstanding. That is a check, not a second stored balance, and it keeps the
 "balances are derived, never stored" rule intact.
 
-## What a statement would settle
+## What a statement settled
 
-These four questions decide the data model, and one redacted statement answers all of them better
-than a phone call:
+These four questions decided the data model. Three are now answered from the real statement, which
+is why the shipped design looks the way it does.
 
-1. Is the provisional Murabaha a **separate line item**, or are purchases posted at an inflated
-   amount?
-2. Does the reversal arrive as **one credit** on settlement, or per transaction?
-3. Is the 3% foreign commission its **own line**, or folded into the converted EGP figure?
-   (This decides whether "what did FX cost me this year" is answerable at all.)
-4. Does the statement carry the **original currency and amount**, or only EGP?
+| | Question | Answer |
+|---|---|---|
+| 1 | Provisional Murabaha: separate line, or purchases posted inflated? | **Separate line** |
+| 2 | Reversal: one credit on settlement, or per transaction? | Unknown — too many lines to tell |
+| 3 | Is the 3% foreign commission its own line? | **Its own line** |
+| 4 | Does the statement carry the original currency and amount? | **Yes** |
 
-Everything above about Murabaha comes from the bank's public product page, not from a statement.
-The page says the Murabaha "is not carried out" when you pay in full, which does not obviously
-match money being taken and returned — so the model should be built on what the statement actually
-shows, not on this reading of a marketing page.
+**(1) mattered most, and came out the good way.** With the mark-up on its own line, a recorded
+purchase matches the bank's purchase line exactly — a E£1,000 dinner is E£1,000 on both — so any
+single transaction can be checked against the statement, and the provisional lines are noise that is
+simply never recorded. Had purchases posted *inflated* instead, every line would have disagreed by a
+different amount and spot-checking would have been impossible.
+
+That confirms **(B) record economic reality** as the right choice, and adds one rule of thumb:
+
+> **Reconcile after settlement, not mid-cycle.** Between a purchase and settlement the bank's
+> balance carries provisional mark-up that is going to reverse. Reconciling inside that window
+> imports the mark-up and is wrong again once it unwinds.
+
+**(3) and (4) both validate the shipped design**: the commission is a separate record filed under
+Bank fees, exactly as the statement presents it, and `originalCurrency` / `originalAmountMinor`
+mirror figures the bank actually provides rather than something Peace invents.
+
+**(2) stays open and matters least.** It only decides how noisy the reversal looks; nothing is
+recorded either way.
+
+## Why the statement view is not planned
+
+`statementDay` and `dueDay` exist as columns and are deliberately unread. The idea was to split the
+balance into "due by the 26th" and "lands on next month's statement", since it is the *statement*
+balance that must clear to avoid the Murabaha.
+
+Two reasons it was dropped:
+
+- **Paying in full always covers the statement balance.** Paying the total is early, never short, so
+  the split protects against nothing.
+- **The only real prize was a due-date reminder, and the bank already sends one.** Rebuilding an
+  alert someone already receives competes with the bank's own.
+
+The columns stay because they cost nothing and the question could return if the payment habit
+changes. Nothing reads them, and no UI offers them.
 
 ## Decisions
 
@@ -229,14 +259,22 @@ Settled on 2026-08-09.
 
 That removes interest from the slice and splits the refund work in two, leaving:
 
-1. Liability balances render as **owed** *(presentation)*
-2. **Refund flag** — a signed expense that nets against its category *(repo + record form)*
-3. **"Pay this card"** — pre-filled Bank → Card transfer *(account screen)*
-4. `statementDay` / `dueDay` and a derived statement view *(schema + account screen)*
-5. Foreign purchases store the **settled** amount *(Stage 2)*
+1. ✅ Liability balances render as **owed** *(presentation)*
+2. ✅ **Refund** — reached by long-pressing the purchase it reverses, so it inherits that account and category rather than being filed by hand
+3. ✅ **Paying a card** — became a prefill on the transfer rather than a button. Transferring into a
+   card already *was* paying it; only the amount was missing.
+4. ~~`statementDay` / `dueDay`~~ — not planned, see above
+5. ✅ Foreign purchases store the **settled** amount, with the fee computed from the card
 6. ~~Interest~~ — dropped
 7. *Later:* link a refund to the purchase it reverses
 
-Item 2 is the one that stops the numbers drifting, and it is the one that needs the most careful
-tests: relaxing "expense rows are negative" is exactly the class of change the repository layer
-exists to police.
+Also shipped, and not on the original list: **balance corrections**. A card drifts, and the fix has
+to move the balance without inventing a purchase — which turned out to need a second kind of
+non-spending row alongside transfer legs, and a single home for that rule in
+`src/db/repo/predicates.ts`.
+
+**Everything on this list has now shipped.** Item 2 was the one that stops the numbers drifting, and
+relaxing "expense rows are negative" was exactly the class of change the repository layer exists to
+police: the SQL was fixed to decide sides by `isRefund` rather than by sign, and three JavaScript
+callers were then found still doing the old test — caught by an E2E flow that duplicated a refund
+and produced income.

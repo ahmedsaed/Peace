@@ -1,0 +1,175 @@
+appId: com.ahmed.peace
+---
+# Long-press a record: Refund · Duplicate · Delete.
+#
+# The refund is the point. Logged as INCOME — which is what the seeded "Refunds"
+# category invites — a returned E£800 purchase makes the month report E£800 more
+# income than was earned AND E£800 more expense than was spent. The net comes
+# out right, which is exactly why that bug survives; every category breakdown is
+# a lie and Clothing keeps a purchase that was undone.
+#
+# So the assertions below are the CATEGORY totals, not the net.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- buy a jacket for E£800 ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Clothing"
+    direction: DOWN
+- tapOn: "Clothing"
+- tapOn:
+    id: "key-8"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£800.00"
+
+# --- long press offers the three actions ---
+- longPressOn: "Clothing"
+- assertVisible:
+    id: "record-actions"
+- assertVisible:
+    id: "action-refund"
+- assertVisible:
+    id: "action-duplicate"
+- assertVisible:
+    id: "action-delete"
+- takeScreenshot: 01-record-actions
+
+# --- refund it ---
+# Starting from the record means the account and category come with it. Picking
+# a category by hand is exactly how a return ends up reducing whichever one
+# happened to be on screen.
+- tapOn:
+    id: "action-refund"
+- assertVisible:
+    id: "record-title"
+    text: "Refund"
+- assertVisible: "Clothing"
+- assertVisible:
+    id: "amount-display"
+    text: "800"
+- takeScreenshot: 02-refund-prefilled
+- tapOn:
+    id: "record-save"
+
+# --- it nets against the category, and never touches income ---
+- assertVisible:
+    id: "summary-expense"
+    text: "E£0.00"
+- assertVisible:
+    id: "summary-income"
+    text: "E£0.00"
+# The row reads as a refund, not as earnings — the colour is what a reader
+# checks at a glance, and green would say "earned".
+- assertVisible: ".*refunded.*"
+- takeScreenshot: 03-refunded
+
+# --- the category chart agrees ---
+- tapOn:
+    id: "tab-analysis"
+- assertVisible: "No spending in .*"
+
+# --- a PARTIAL refund leaves what it did not cover ---
+# Four at dinner, three settle up.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Restaurants"
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- longPressOn: "Restaurants"
+- tapOn:
+    id: "action-refund"
+# The amount arrives filled in with the whole purchase and is meant to be
+# edited — a part payment is the common case, not the exception.
+- eraseText
+- tapOn:
+    id: "key-7"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£25.00"
+
+# --- a refund offers NEITHER refund nor duplicate ---
+# Refunding a refund is not a thing. Duplicating one appears to serve the shared
+# dinner where three people settle separately — but that is served better by
+# refunding the ORIGINAL purchase three times, so each refund derives from the
+# thing it reverses instead of from another refund.
+- longPressOn: ".*refunded.*"
+- assertVisible:
+    id: "record-actions"
+- assertNotVisible:
+    id: "action-refund"
+- assertNotVisible:
+    id: "action-duplicate"
+- assertVisible:
+    id: "action-delete"
+- takeScreenshot: 04-refund-actions
+- back
+
+# --- duplicating an ordinary record does work ---
+# On a category that has NOT been refunded. Clothing and Restaurants each have
+# two rows by now, and a long press takes whichever comes first — which is the
+# refund, and a refund deliberately offers no Duplicate. Coffee is unique, so
+# the flow addresses exactly the row it means.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Coffee"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- longPressOn: "Coffee"
+- tapOn:
+    id: "action-duplicate"
+- assertVisible:
+    id: "record-title"
+    text: "Duplicate"
+- assertVisible:
+    id: "amount-display"
+    text: "50"
+- tapOn:
+    id: "record-save"
+# Clothing 800 spent less 800 refunded = 0. Restaurants 100 less 75 = 25.
+# Coffee 50 twice = 100. Total 125, and income never moved.
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£125.00"
+- assertVisible:
+    id: "summary-income"
+    text: "E£0.00"
+- takeScreenshot: 05-duplicated
