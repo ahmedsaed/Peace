@@ -34,6 +34,7 @@
       "expo-sqlite",
       "expo-sharing",
       "expo-secure-store",
+      "expo-background-task",
       "@react-native-community/datetimepicker",
       "./plugins/with-dark-theme",
       "./plugins/with-release-signing"
