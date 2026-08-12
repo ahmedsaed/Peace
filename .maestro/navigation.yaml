@@ -1,4 +1,7 @@
 appId: com.ahmed.peace
+# `core` runs on `npm run e2e:fast` — the chrome every screen hangs off.
+tags:
+  - core
 ---
 # The side menu and the search entry point.
 #

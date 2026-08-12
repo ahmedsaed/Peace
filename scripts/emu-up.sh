@@ -4,6 +4,21 @@
 set -euo pipefail
 
 AVD="${AVD:-peace_test}"
+
+# Rendering backend. Every Maestro command re-dumps the UI hierarchy and waits
+# on rendering to settle, so this is the single biggest lever on suite wall
+# time — the work is per-STEP, and the suite runs hundreds of them.
+#
+# MEASURED, do not "optimise" this again without re-measuring. `host` looks
+# tempting because WSLg exposes /dev/dri — but what sits behind it here is
+# `llvmpipe`, Mesa's CPU rasteriser, and the emulator says so outright:
+#
+#   ERROR | Your GPU cannot be used for hardware rendering.
+#   INFO  | Found physical GPU 'llvmpipe (...)', type: VK_PHYSICAL_DEVICE_TYPE_CPU
+#
+# So `host` is still software, just a slower software path: the refund flow took
+# 149s on `host` against 123s on `swiftshader_indirect`, a 21% regression.
+PEACE_GPU="${PEACE_GPU:-swiftshader_indirect}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
 
@@ -16,7 +31,7 @@ fi
 echo "booting AVD '$AVD' (headless)..."
 nohup emulator -avd "$AVD" \
   -no-window -no-audio -no-boot-anim -no-snapshot-save \
-  -gpu swiftshader_indirect \
+  -gpu "$PEACE_GPU" \
   > /tmp/emulator-"$AVD".log 2>&1 &
 
 adb wait-for-device

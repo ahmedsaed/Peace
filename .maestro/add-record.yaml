@@ -1,4 +1,7 @@
 appId: com.ahmed.peace
+# `core` runs on `npm run e2e:fast` — the core action: logging a spend.
+tags:
+  - core
 ---
 # Logs an expense end to end: category picker (including a sub-category), the
 # calculator keypad, and Save writing through the repository layer.
