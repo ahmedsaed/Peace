@@ -112,9 +112,9 @@ appId: com.ahmed.peace
 # --- deleting the purchase takes its commission with it ---
 - tapOn:
     id: "tab-index"
-- tapOn: "Restaurants"
+- longPressOn: "Restaurants"
 - tapOn:
-    id: "record-delete"
+    id: "action-delete"
 - assertVisible:
     id: "summary-expense"
     text: "E£0.00"

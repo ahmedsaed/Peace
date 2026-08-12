@@ -246,6 +246,26 @@ export const transactions = sqliteTable(
      * Neither is ever written by hand — see `src/db/repo/predicates.ts`.
      */
     isAdjustment: integer('is_adjustment', { mode: 'boolean' }).notNull().default(false),
+
+    /**
+     * MONEY COMING BACK ON THE EXPENSE SIDE.
+     *
+     * Return E£800 of shoes and log it as Income, and that month reports E£800
+     * more income than you earned AND E£800 more expense than you spent. The
+     * net comes out right, which is why it survives — but every category
+     * breakdown is a lie, and Clothing keeps a purchase that was undone.
+     *
+     * A refund is a POSITIVE amount on an EXPENSE-kind row. That breaks the
+     * rule the ledger has relied on since the first commit — that the sign of
+     * `amount_minor` tells you which side a row belongs to — so the side is now
+     * decided by `onExpenseSide` / `onIncomeSide` in predicates.ts, and never by
+     * a bare sign test again.
+     *
+     * Not to be confused with lending someone money: that was never spending,
+     * and belongs in an account of its own so the balance shows what you are
+     * owed.
+     */
+    isRefund: integer('is_refund', { mode: 'boolean' }).notNull().default(false),
     /**
      * The other account in a transfer, denormalised onto BOTH legs.
      * Redundant with the sibling row, but it lets the records list render

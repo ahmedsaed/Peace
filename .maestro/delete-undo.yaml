@@ -1,4 +1,7 @@
 appId: com.ahmed.peace
+# `core` runs on `npm run e2e:fast` — the destructive path, and getting it back.
+tags:
+  - core
 ---
 # Deleting a record, and the undo offer appearing.
 #
@@ -34,11 +37,14 @@ appId: com.ahmed.peace
     id: "record-save"
 - assertVisible: "-E£50.00"
 
-- tapOn: "Restaurants"
+# Delete now lives behind a LONG PRESS on the row, not at the bottom of the edit
+# form — opening a record to change it in order to remove it was a strange way
+# in, and it put a destructive control beside Save.
+- longPressOn: "Restaurants"
 - assertVisible:
-    id: "record-delete"
+    id: "record-actions"
 - tapOn:
-    id: "record-delete"
+    id: "action-delete"
 
 - assertVisible: "No records this month"
 - assertNotVisible: "-E£50.00"
