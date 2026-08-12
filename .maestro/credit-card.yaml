@@ -136,6 +136,24 @@ appId: com.ahmed.peace
 - assertVisible: "Kenana · not counted as spending"
 - takeScreenshot: 04-correction-listed
 
+# --- paying the card fills in what it owes ---
+# Not a button: transferring into a card IS paying it, and the app already had
+# that. Only the amount was missing, which meant leaving the screen to look it
+# up. It fills only when nothing has been typed — overwriting a part payment
+# someone deliberately entered would be worse than no prefill at all.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-transfer"
+- tapOn:
+    id: "pick-to-account"
+- tapOn: "Kenana"
+- assertVisible:
+    id: "amount-display"
+    text: "520"
+- tapOn:
+    id: "record-cancel"
+
 # --- it stays out of the charts and the budgets too ---
 - tapOn:
     id: "tab-analysis"
