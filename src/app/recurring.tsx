@@ -5,7 +5,7 @@ import { Icon } from '@/components/icon';
 import { EmptyState, StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
-import { deleteRule, listRules, setRuleActive } from '@/db/repo/recurring';
+import { deleteRule, listRules, nextProposalDate, setRuleActive } from '@/db/repo/recurring';
 import { formatMinor } from '@/lib/money';
 import { describeRecurrence, fromYmd } from '@/lib/recurrence';
 
@@ -79,6 +79,10 @@ export default function RecurringScreen() {
               <RuleRow
                 key={rule.id}
                 rule={rule}
+                // Derived, not stored: a `next_run_on` column would be a second
+                // copy of what the schedule already knows, and the two would
+                // eventually disagree.
+                next={nextProposalDate(db, rule)}
                 first={index === 0}
                 onLongPress={() => setActing(rule)}
               />
@@ -111,10 +115,12 @@ export default function RecurringScreen() {
 
 function RuleRow({
   rule,
+  next,
   first,
   onLongPress,
 }: {
   rule: Rule;
+  next: string | null;
   first: boolean;
   onLongPress: () => void;
 }) {
@@ -153,17 +159,17 @@ function RuleRow({
           columns rather than along four facts crammed into one line. */}
       <View className="items-end">
         <Text className="text-[15px] text-ink">{formatMinor(rule.amountMinor, rule.currency)}</Text>
-        <Text className="text-xs text-muted">{whenNext(rule)}</Text>
+        <Text className="text-xs text-muted">{whenNext(rule, next)}</Text>
       </View>
     </Pressable>
   );
 }
 
 /** `12 Sep`, or why there is no next one. Never the raw `2026-09-12`. */
-function whenNext(rule: Rule): string {
+function whenNext(rule: Rule, next: string | null): string {
   if (!rule.active) return 'Paused';
-  if (!rule.nextRunOn) return 'Finished';
-  return fromYmd(rule.nextRunOn).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  if (!next) return 'Finished';
+  return fromYmd(next).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 /**
@@ -198,7 +204,7 @@ function RuleActions({
                 {rule.name ?? 'Recurring'}
               </Text>
               <Text className="text-xs text-muted" numberOfLines={1}>
-                {formatMinor(rule.amountMinor, rule.currency)} · {whenNext(rule)}
+                {formatMinor(rule.amountMinor, rule.currency)}
               </Text>
             </View>
 

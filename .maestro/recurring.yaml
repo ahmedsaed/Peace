@@ -84,6 +84,30 @@ appId: com.ahmed.peace
     id: "summary-expense"
     text: "E£0.00"
 - takeScreenshot: 05-upcoming
+
+# Every grey row is actionable, owed or not — paying next month early is a real
+# thing, and a row you can see and tap but not act on explains nothing.
+- longPressOn: "Bills"
+- assertVisible:
+    id: "due-actions"
+- assertVisible:
+    id: "due-add"
+- assertVisible:
+    id: "due-dismiss"
+- back
+
+# Tapping it opens a FILLED form: the amount, account and category are the whole
+# reason the rule was written down, and re-typing them is what it exists to stop.
+- tapOn: "Bills"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "amount-display"
+    text: "5,000"
+- assertVisible: "Bills"
+- takeScreenshot: 07-due-prefilled
+- tapOn:
+    id: "record-cancel"
 - tapOn:
     id: "month-prev"
 

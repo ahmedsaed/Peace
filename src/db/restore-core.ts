@@ -45,6 +45,7 @@ export const RESTORE_TABLES = [
   // which `copyFromBackup` picks up on its own, a new TABLE has to be added
   // here by hand. That asymmetry is the whole reason restore-fidelity.test.ts
   // asserts figures rather than columns.
+  'recurring_skips',
   'asset_classes',
   'holdings',
 ] as const;

@@ -12,7 +12,7 @@ import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { InvariantError, listCategoryTree } from '@/db/repo/categories';
 import { describeRepeat, RepeatSheet, type Repeat } from '@/components/repeat-sheet';
-import { advanceRule, createRule } from '@/db/repo/recurring';
+import { createRule, getRule, markHandled } from '@/db/repo/recurring';
 import { toYmd } from '@/lib/recurrence';
 import {
   createRecord,
@@ -92,6 +92,16 @@ export default function RecordScreen() {
     () => (refundOf ? getRecord(db, refundOf) : copyOf ? getRecord(db, copyOf) : undefined),
     [refundOf, copyOf]
   );
+
+  /**
+   * The rule a due row came from.
+   *
+   * Tapping one of those rows has to arrive at a FILLED form — the amount, the
+   * account and the category are the whole reason the rule was written down,
+   * and re-typing them is what this feature exists to stop. Editing before
+   * saving is the point ("the rent went up"), not re-entering from scratch.
+   */
+  const rule = useMemo(() => (fromRule ? getRule(db, fromRule) : undefined), [fromRule]);
   // Refunding a record, editing one that already is, or duplicating one:
   // "refund" is a property of the row, not of how the screen was opened.
   const isRefund = (!!refundOf && !!source) || !!source?.isRefund || !!existing?.isRefund;
@@ -103,6 +113,7 @@ export default function RecordScreen() {
     // NEVER `amountMinor < 0` on its own. A refund is the one expense with a
     // positive amount, so the sign alone would present it as Income — and
     // saving from there would write it back as income.
+    if (rule) return rule.type;
     const from = source ?? existing;
     if (!from) return 'expense';
     if (from.transferPairId) return 'transfer';
@@ -115,6 +126,7 @@ export default function RecordScreen() {
   // A transfer can be opened from either leg; the form always presents it as
   // "from the account that lost money".
   const [accountId, setAccountId] = useState(() => {
+    if (rule) return rule.accountId;
     if (source) return source.accountId;
     if (!existing) {
       // The setting is only a preference, never a guarantee: an account can be
@@ -133,6 +145,7 @@ export default function RecordScreen() {
     // A duplicated transfer has to carry its DESTINATION. Falling through to
     // "whichever account happens to be second" produced a form that looked
     // filled in and pointed somewhere else entirely.
+    if (rule) return rule.counterAccountId ?? accounts[1]?.id ?? null;
     const from = existing ?? source;
     if (!from) return accounts[1]?.id ?? null;
     if (from.transferPairId && from.amountMinor > 0) return from.accountId;
@@ -140,12 +153,17 @@ export default function RecordScreen() {
   });
 
   const [categoryId, setCategoryId] = useState<string | null>(
-    existing?.categoryId ?? source?.categoryId ?? null
+    rule?.categoryId ?? existing?.categoryId ?? source?.categoryId ?? null
   );
-  const [note, setNote] = useState(existing?.note ?? source?.note ?? '');
+  const [note, setNote] = useState(rule?.note ?? existing?.note ?? source?.note ?? '');
   // Dated TODAY for a refund or a copy: the money comes back, or goes out
   // again, on the day it happens — not on the day of the record it came from.
-  const [occurredAt, setOccurredAt] = useState<Date>(existing?.occurredAt ?? new Date());
+  const [occurredAt, setOccurredAt] = useState<Date>(() => {
+    // Dated the day it was DUE. A rent payment settled a week late still
+    // belongs to the week it was owed, and every period total groups by day.
+    if (dueOn) return new Date(`${dueOn}T12:00:00`);
+    return existing?.occurredAt ?? new Date();
+  });
   /**
    * How this record repeats, if it does.
    *
@@ -176,6 +194,7 @@ export default function RecordScreen() {
   const homeCurrency = useSetting('homeCurrency');
 
   const [calc, setCalc] = useState(() => {
+    if (rule) return calcFromMinor(rule.amountMinor, rule.currency);
     const from = existing ?? source;
     return from ? calcFromMinor(from.amountMinor, from.currency) : initialCalc();
   });
@@ -535,7 +554,7 @@ export default function RecordScreen() {
 
       // Only after the write succeeded. Advancing first would lose the
       // occurrence if the save then threw.
-      if (fromRule && dueOn) advanceRule(db, fromRule, dueOn);
+      if (fromRule && dueOn) markHandled(db, fromRule, dueOn);
 
       /**
        * Turn this record into a standing order.
@@ -562,7 +581,11 @@ export default function RecordScreen() {
           startsOn,
           endsOn: repeat.endsOn,
         });
-        advanceRule(db, rule.id, startsOn);
+        // The record for today has just been written, but it was written
+        // before this rule existed, so it does not carry the link that would
+        // mark the occurrence handled. Close it out explicitly, or the rule
+        // proposes the very payment that created it.
+        markHandled(db, rule.id, startsOn);
       }
 
       router.back();
