@@ -50,6 +50,13 @@
       "when": 1786552420612,
       "tag": "0006_fine_dreaming_celestial",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1786569298180,
+      "tag": "0007_free_hawkeye",
+      "breakpoints": true
     }
   ]
 }

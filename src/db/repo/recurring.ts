@@ -1,22 +1,32 @@
 /**
- * Recurring rules, and the records they owe you.
+ * Recurring rules, and the records they propose.
  *
- * THE REVIEW QUEUE STORES NOTHING. A rule that is due produces *proposals*
- * computed on the spot from its schedule — there is no half-written row in the
- * ledger, no pending flag for every total to remember to exclude, and no
- * cleanup if the user never looks. A proposal exists exactly as long as the
- * rule is still owed it.
+ * EVERY OCCURRENCE IS INDEPENDENT. A rule proposes records; each one is
+ * approved or dismissed on its own, and September does not care about August.
  *
- * That falls out of the one rule this feature has to obey: A WRONG RULE MUST
- * NOT CORRUPT HISTORY. Records appear when the user says so; `nextRunOn` only
- * moves once something has actually been written or explicitly skipped, so
- * closing the app mid-review changes nothing at all.
+ * This replaced a single `next_run_on` cursor, which could express "handled up
+ * to here" and nothing finer — so occurrences had to be dealt with in order,
+ * and acting out of order had to be forbidden. That constraint came from the
+ * storage, not from anything true about standing orders.
+ *
+ * Progress is therefore read from two places, neither of them a pointer:
+ *
+ *   Approved  the transaction itself, which carries `recurring_rule_id` and its
+ *             date. Having been added IS the record of having been added.
+ *   Dismissed a row in `recurring_skips`, because declining leaves nothing else
+ *             behind.
+ *
+ * A proposal is any occurrence in range that appears in neither.
+ *
+ * The one rule this feature has to obey is unchanged: A WRONG RULE MUST NOT
+ * CORRUPT HISTORY. Nothing is written until the user says so, and closing the
+ * app mid-review changes nothing at all.
  *
  * Catch-up runs on app open rather than on a schedule, for the same reason the
  * Drive backup does: Android will not honour a sideloaded app's alarms.
  */
 
-import { and, asc, eq, isNotNull, lte } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { newId } from '../../lib/id';
@@ -30,7 +40,7 @@ import {
   type Recurrence,
 } from '../../lib/recurrence';
 import * as schema from '../schema';
-import { recurringRules } from '../schema';
+import { recurringRules, recurringSkips, transactions } from '../schema';
 import { createRecord, createTransfer } from './transactions';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
@@ -162,67 +172,85 @@ export type DueSummary = {
  * Derived, never stored. Calling this twice returns the same answer and changes
  * nothing — which is what makes it safe to run on every app open.
  */
-export function dueProposals(db: Db, today = toYmd(new Date())): DueSummary {
-  const rules = db
-    .select()
-    .from(recurringRules)
-    .where(
-      and(
-        eq(recurringRules.active, true),
-        isNotNull(recurringRules.nextRunOn),
-        lte(recurringRules.nextRunOn, today)
-      )
-    )
-    .orderBy(asc(recurringRules.nextRunOn))
+/**
+ * Occurrences of a rule that have been dealt with, either way.
+ *
+ * Approved ones are read from the LEDGER — a transaction carries its rule and
+ * its date, so its existence is the record of approval. Dismissed ones come
+ * from `recurring_skips`. Nothing here is a cursor, so nothing here cares what
+ * order they were handled in.
+ */
+function handledDates(db: Db, ruleId: string): Set<string> {
+  const posted = db
+    .select({ occurredAt: transactions.occurredAt })
+    .from(transactions)
+    .where(eq(transactions.recurringRuleId, ruleId))
     .all();
 
+  const skipped = db
+    .select({ occurredOn: recurringSkips.occurredOn })
+    .from(recurringSkips)
+    .where(eq(recurringSkips.ruleId, ruleId))
+    .all();
+
+  return new Set([
+    // A transfer writes TWO rows for one occurrence; a Set folds them together.
+    ...posted.map((row) => toYmd(row.occurredAt)),
+    ...skipped.map((row) => row.occurredOn),
+  ]);
+}
+
+const proposalFrom = (rule: Rule, occurredOn: string): Proposal => ({
+  ruleId: rule.id,
+  ruleName: rule.name ?? 'Recurring',
+  type: rule.type,
+  accountId: rule.accountId,
+  counterAccountId: rule.counterAccountId,
+  categoryId: rule.categoryId,
+  amountMinor: rule.amountMinor,
+  currency: rule.currency,
+  note: rule.note,
+  occurredOn,
+});
+
+const activeRules = (db: Db): Rule[] =>
+  db
+    .select()
+    .from(recurringRules)
+    .where(eq(recurringRules.active, true))
+    .orderBy(asc(recurringRules.startsOn))
+    .all();
+
+/**
+ * Everything a rule has proposed up to today and that has not been dealt with.
+ *
+ * Generated from the schedule every time rather than tracked, so the answer
+ * cannot drift from the rule. Reading it changes nothing, which is what makes
+ * it safe to call on every app open.
+ */
+export function dueProposals(db: Db, today = toYmd(new Date())): DueSummary {
   const proposals: Proposal[] = [];
   const truncatedRuleIds: string[] = [];
 
-  for (const rule of rules) {
+  for (const rule of activeRules(db)) {
     const { dates, truncated } = occurrencesDue(
       asRecurrence(rule),
-      rule.nextRunOn!,
+      rule.startsOn,
       today,
       CATCH_UP_CAP
     );
     if (truncated) truncatedRuleIds.push(rule.id);
 
+    const handled = handledDates(db, rule.id);
     for (const occurredOn of dates) {
-      proposals.push({
-        ruleId: rule.id,
-        ruleName: rule.name ?? 'Recurring',
-        type: rule.type,
-        accountId: rule.accountId,
-        counterAccountId: rule.counterAccountId,
-        categoryId: rule.categoryId,
-        amountMinor: rule.amountMinor,
-        currency: rule.currency,
-        note: rule.note,
-        occurredOn,
-      });
+      if (!handled.has(occurredOn)) proposals.push(proposalFrom(rule, occurredOn));
     }
   }
 
+  proposals.sort((a, b) => a.occurredOn.localeCompare(b.occurredOn));
   return { proposals, truncatedRuleIds };
 }
 
-
-/**
- * What is COMING in a given month, as opposed to what is owed.
- *
- * A monthly rent should be visible in next month's list — that is most of why
- * anyone writes the rule down. `dueProposals` deliberately stops at today,
- * because it answers "what do I need to decide about"; this answers "what is
- * already spoken for", which is a different question and belongs to whatever
- * month is being looked at.
- *
- * DISPLAY ONLY. These carry no actions, and the reason is an ordering hazard
- * rather than principle: a rule advances past the LATEST date it has handled,
- * so accepting September while August is still owed would swallow August
- * silently. When the date arrives the same occurrence turns up in
- * `dueProposals` and gains its actions there.
- */
 export function upcomingProposals(
   db: Db,
   period: Period,
@@ -234,37 +262,21 @@ export function upcomingProposals(
   // `end` is midnight on the 1st of the NEXT month, so this bound is exclusive.
   const firstOfNextMonth = toYmd(end);
 
-  // Strictly after today: an occurrence falling today is owed, not upcoming,
-  // and showing it in both places would offer the same payment twice.
+  // Strictly after today: an occurrence falling today is proposed by
+  // `dueProposals`, and listing it here as well would put one payment on screen
+  // in two sections.
   const from = firstOfMonth > today ? firstOfMonth : nextDay(today);
-
-  const rules = db
-    .select()
-    .from(recurringRules)
-    .where(eq(recurringRules.active, true))
-    .orderBy(asc(recurringRules.nextRunOn))
-    .all();
 
   const proposals: Proposal[] = [];
 
-  for (const rule of rules) {
+  for (const rule of activeRules(db)) {
     const recurrence = asRecurrence(rule);
+    const handled = handledDates(db, rule.id);
     let cursor = firstOccurrenceOnOrAfter(recurrence, from);
 
     while (cursor !== null && cursor < firstOfNextMonth && proposals.length < cap) {
       if (isAfterEnd(recurrence, cursor)) break;
-      proposals.push({
-        ruleId: rule.id,
-        ruleName: rule.name ?? 'Recurring',
-        type: rule.type,
-        accountId: rule.accountId,
-        counterAccountId: rule.counterAccountId,
-        categoryId: rule.categoryId,
-        amountMinor: rule.amountMinor,
-        currency: rule.currency,
-        note: rule.note,
-        occurredOn: cursor,
-      });
+      if (!handled.has(cursor)) proposals.push(proposalFrom(rule, cursor));
       cursor = nextOccurrenceAfter(recurrence, cursor);
     }
   }
@@ -278,23 +290,6 @@ function nextDay(ymd: string): string {
   return toYmd(date);
 }
 
-/**
- * Move a rule past the occurrences just dealt with.
- *
- * Takes the LAST date handled rather than a count, so posting and skipping
- * share one definition of "done up to here" — and so a partially handled batch
- * leaves the rule owing exactly the rest.
- */
-function advancePast(db: Db, rule: Rule, handledThrough: string): void {
-  db.update(recurringRules)
-    .set({
-      lastRunOn: handledThrough,
-      nextRunOn: nextOccurrenceAfter(asRecurrence(rule), handledThrough),
-      updatedAt: new Date(),
-    })
-    .where(eq(recurringRules.id, rule.id))
-    .run();
-}
 
 /** Write one proposal into the ledger. */
 function write(db: Db, proposal: Proposal): void {
@@ -328,76 +323,60 @@ function write(db: Db, proposal: Proposal): void {
 }
 
 /**
- * Accept some proposals, writing them into the ledger.
+ * Approve them: the records are written, and that is the whole of it.
  *
- * All of one rule's accepted dates are written and the rule advances past the
- * LATEST of them, so accepting an older occurrence while leaving a newer one
- * cannot quietly swallow the newer one.
+ * Nothing else is updated. The transaction carries its rule and its date, so
+ * the ledger itself is the record of approval — there is no second place to
+ * keep in step, and no order to respect.
  */
 export function postProposals(db: Db, proposals: Proposal[]): number {
-  if (proposals.length === 0) return 0;
-
-  const byRule = new Map<string, Proposal[]>();
-  for (const proposal of proposals) {
-    byRule.set(proposal.ruleId, [...(byRule.get(proposal.ruleId) ?? []), proposal]);
-  }
-
   let written = 0;
-  for (const [ruleId, group] of byRule) {
-    const rule = getRule(db, ruleId);
-    if (!rule) continue;
-
-    const sorted = [...group].sort((a, b) => a.occurredOn.localeCompare(b.occurredOn));
-    for (const proposal of sorted) {
-      write(db, proposal);
-      written++;
-    }
-    advancePast(db, rule, sorted[sorted.length - 1].occurredOn);
+  for (const proposal of proposals) {
+    // Approving the same occurrence twice would write it twice, and the second
+    // one would look exactly like a real payment.
+    if (handledDates(db, proposal.ruleId).has(proposal.occurredOn)) continue;
+    write(db, proposal);
+    written++;
   }
   return written;
 }
 
 /**
- * Decline them: the rule moves on and NOTHING is written.
+ * Decline them: nothing is written to the ledger, and the occurrence is
+ * remembered as dismissed so it stops being proposed.
  *
- * A month you did not actually pay is a real thing — a subscription paused, a
- * salary that arrived late. Skipping has to be as easy as accepting, or the
- * only way out is editing the ledger afterwards.
+ * A month you did not pay is a real thing — a paused subscription, a salary
+ * that came late — so this has to be as easy as approving.
  */
-/**
- * Mark a rule handled up to a date without writing anything here.
- *
- * Used when the record was created SOMEWHERE ELSE — tapping a due row opens the
- * ordinary record screen, and saving there writes the record through the normal
- * path. The rule still has to be told, or the same occurrence comes back due
- * tomorrow and gets entered twice.
- */
-export function advanceRule(db: Db, ruleId: string, handledThrough: string): void {
-  const rule = getRule(db, ruleId);
-  if (rule) advancePast(db, rule, handledThrough);
-}
-
 export function skipProposals(db: Db, proposals: Proposal[]): void {
-  const latest = new Map<string, string>();
   for (const proposal of proposals) {
-    const current = latest.get(proposal.ruleId);
-    if (!current || proposal.occurredOn > current) latest.set(proposal.ruleId, proposal.occurredOn);
-  }
-
-  for (const [ruleId, handledThrough] of latest) {
-    const rule = getRule(db, ruleId);
-    if (rule) advancePast(db, rule, handledThrough);
+    db.insert(recurringSkips)
+      .values({
+        id: newId(),
+        ruleId: proposal.ruleId,
+        occurredOn: proposal.occurredOn,
+      })
+      // Dismissing twice is the same as dismissing once.
+      .onConflictDoNothing()
+      .run();
   }
 }
 
 /**
- * Post everything from rules the user marked `autoPost`, and return what is
- * left for review.
+ * Mark an occurrence handled without writing anything to the ledger.
  *
- * The split is the point: a rule you trust (rent, salary) lands without asking,
- * while anything else waits. Both paths go through the same writer, so they
- * cannot disagree about what a generated record looks like.
+ * Needed for one case: tapping a proposed row opens the ordinary record screen,
+ * and the user is free to CHANGE THE DATE before saving. The saved record then
+ * carries the rule but a different date, so it no longer answers for the
+ * occurrence it came from — which would go on being proposed forever.
+ *
+ * Recorded as a dismissal, which is exactly what it is from the schedule's
+ * point of view: that date produced no record of its own.
  */
+export function markHandled(db: Db, ruleId: string, occurredOn: string): void {
+  skipProposals(db, [{ ruleId, occurredOn } as Proposal]);
+}
+
 export function catchUp(db: Db, today = toYmd(new Date())): DueSummary {
   const { proposals, truncatedRuleIds } = dueProposals(db, today);
 
@@ -409,4 +388,28 @@ export function catchUp(db: Db, today = toYmd(new Date())): DueSummary {
 
   postProposals(db, automatic);
   return { proposals: forReview, truncatedRuleIds };
+}
+
+/**
+ * The next occurrence a rule will propose, for the rules list.
+ *
+ * Derived rather than stored. A `next_run_on` column would be a second copy of
+ * something the schedule already knows, and the two would eventually disagree —
+ * which is the whole reason the cursor was removed.
+ */
+export function nextProposalDate(db: Db, rule: Rule, today = toYmd(new Date())): string | null {
+  if (!rule.active) return null;
+
+  const recurrence = asRecurrence(rule);
+  const handled = handledDates(db, rule.id);
+
+  // Look forward from today only: anything earlier that is still unhandled is
+  // already on the records list, where it can be acted on.
+  let cursor = firstOccurrenceOnOrAfter(recurrence, today);
+  for (let guard = 0; cursor !== null && guard < 400; guard++) {
+    if (isAfterEnd(recurrence, cursor)) return null;
+    if (!handled.has(cursor)) return cursor;
+    cursor = nextOccurrenceAfter(recurrence, cursor);
+  }
+  return null;
 }

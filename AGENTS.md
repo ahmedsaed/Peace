@@ -396,6 +396,14 @@ app ignoring input. `pkill -f GradleDaemon`.
   Node, so a `[A-Z][a-z]{2}` month pattern that passes everywhere else fails on device — and
   `assertVisible` matches WHOLE text, so four letters simply do not match three. Same family as the
   currency-symbol rule above: anything formatted through `Intl` has to be seen on a device.
+- **Storing progress as a POINTER invents rules the domain does not have.** Recurring occurrences
+  were tracked with a single `next_run_on` cursor, which can express "handled up to here" and
+  nothing finer — so occurrences had to be dealt with in order, acting out of order had to be
+  forbidden, and future rows had to be made inert. Every one of those rules protected the storage,
+  not the user. Occurrences are independent: approved is read from the LEDGER (a transaction carries
+  its rule and its date, so its existence IS the approval) and dismissed from `recurring_skips`. A
+  proposal is anything in range that appears in neither. When a model keeps forcing awkward rules,
+  suspect the model.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

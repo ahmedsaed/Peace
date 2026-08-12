@@ -438,6 +438,37 @@ export const settings = sqliteTable('settings', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().default(now),
 });
 
+
+/**
+ * Occurrences the user declined.
+ *
+ * A recurring rule proposes records; each one is approved or dismissed on its
+ * own. "Approved" needs no storage — the transaction itself carries
+ * `recurring_rule_id` and its date, so it IS the record of having been added.
+ * Dismissing leaves nothing behind, so it is written here.
+ *
+ * This replaced a single `next_run_on` cursor on the rule. A cursor can express
+ * "handled up to here" and nothing finer, which forced occurrences to be dealt
+ * with in order — a constraint that came from the storage rather than from
+ * anything true about standing orders. September does not care about August.
+ */
+export const recurringSkips = sqliteTable(
+  'recurring_skips',
+  {
+    id: text('id').primaryKey(),
+    ruleId: text('rule_id')
+      .notNull()
+      .references(() => recurringRules.id, { onDelete: 'cascade' }),
+    /** The occurrence date, `YYYY-MM-DD`. */
+    occurredOn: text('occurred_on').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+  },
+  (table) => [
+    // Dismissing twice is the same as dismissing once.
+    uniqueIndex('idx_skip_rule_date').on(table.ruleId, table.occurredOn),
+  ]
+);
+
 // ---------------------------------------------------------------------------
 // Portfolio
 // ---------------------------------------------------------------------------
@@ -511,6 +542,7 @@ export type NewRecurringRule = typeof recurringRules.$inferInsert;
 export type Attachment = typeof attachments.$inferSelect;
 export type NewAttachment = typeof attachments.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
+export type RecurringSkip = typeof recurringSkips.$inferSelect;
 export type AssetClassRow = typeof assetClasses.$inferSelect;
 export type NewAssetClassRow = typeof assetClasses.$inferInsert;
 export type HoldingRow = typeof holdings.$inferSelect;

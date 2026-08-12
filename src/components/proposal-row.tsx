@@ -37,7 +37,7 @@ export function ProposalRow({
    */
   upcoming?: boolean;
   onPress: () => void;
-  onLongPress?: () => void;
+  onLongPress: () => void;
 }) {
   const sign = proposal.type === 'income' ? '' : '-';
 
@@ -96,8 +96,8 @@ export function ProposalActions({
   proposal: Proposal | null;
   currency: string;
   onClose: () => void;
-  onAdd: () => void;
-  onDismiss: () => void;
+  onAdd: (proposal: Proposal) => void;
+  onDismiss: (proposal: Proposal) => void;
 }) {
   return (
     <Modal visible={proposal !== null} transparent animationType="slide" onRequestClose={onClose}>
@@ -123,14 +123,14 @@ export function ProposalActions({
               icon="records"
               label="Add it"
               hint="Writes the record, dated the day it was due"
-              onPress={onAdd}
+              onPress={() => onAdd(proposal)}
               testID="due-add"
             />
             <Action
               icon="dots"
               label="Not this time"
               hint="Skips this one only — the rule carries on"
-              onPress={onDismiss}
+              onPress={() => onDismiss(proposal)}
               testID="due-dismiss"
               danger
             />
