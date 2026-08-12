@@ -2,8 +2,11 @@ import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { DriveBackup } from '@/components/drive-backup';
 import { Icon } from '@/components/icon';
 import { StackHeader } from '@/components/screen';
+import { backupDue, describeAge } from '@/lib/drive-backup';
+import { useSetting } from '@/state/settings';
 import palette from '@/constants/palette';
 import {
   csvExport,
@@ -44,6 +47,14 @@ export default function ExportScreen() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const count = recordCount();
+  const driveAccount = useSetting('driveAccount');
+  const lastBackupAt = useSetting('driveLastBackupAt');
+  // Captured once rather than read during render — `Date.now()` in a render
+  // body is impure, and two renders of the same props would disagree.
+  const [now] = useState(() => Date.now());
+  const cadence = useSetting('driveCadence');
+  const covered = driveAccount.length > 0 && lastBackupAt > 0;
+  const overdue = covered && backupDue({ cadence, lastBackupAt }, now);
   // Re-read after every action rather than caching: a restore creates this
   // file and an undo replaces it, so a stale value would either hide the way
   // back or offer one that no longer exists.
@@ -171,36 +182,73 @@ export default function ExportScreen() {
       <StackHeader title="Export & backup" />
 
       <ScrollView contentContainerClassName="px-4 pb-10 pt-4">
-        <Text className="mb-4 px-1 text-sm leading-5 text-muted" testID="export-count">
-          {count === 1 ? '1 record' : `${count} records`} in the ledger.
-        </Text>
+        {/* The answer first.
+            Someone opens this screen to find out whether they are covered, not
+            to browse four equally-weighted options. Everything below is how to
+            change that answer; this is the answer. */}
+        <View className="mb-6 px-1">
+          <Text className="text-2xl font-semibold text-ink" testID="export-count">
+            {count === 1 ? '1 record' : `${count} records`} in the ledger.
+          </Text>
+          {/* Red means OVERDUE, never merely unconfigured. Alarming someone
+              about a feature they have not opted into is how an app teaches its
+              user to ignore its warnings. */}
+          <Text
+            className={`mt-1 text-sm ${overdue ? 'text-expense' : 'text-muted'}`}
+            testID="export-freshness">
+            {driveAccount
+              ? `${describeAge(lastBackupAt > 0 ? lastBackupAt : null, now)} to Drive${
+                  overdue ? ' · overdue' : ''
+                }`
+              : 'No off-device backup yet'}
+          </Text>
+        </View>
 
-        <Action
-          icon="export"
-          title="Export CSV"
-          body="Every record, both legs of each transfer, ready for a spreadsheet. Readable anywhere — but it is not a backup: it carries no settings and cannot be imported back."
-          busy={busy}
-          kind="csv"
-          onPress={run}
-        />
+        {/* The live one, and the only one that happens without being asked. */}
+        <SectionLabel>Automatic</SectionLabel>
+        <DriveBackup />
 
-        <Action
-          icon="shield"
-          title="Back up everything"
-          body="A copy of the database file: every record, account, category and setting. Keep a copy somewhere off the phone. Any SQLite tool can open it, so your data outlives this app."
-          busy={busy}
-          kind="backup"
-          onPress={run}
-        />
+        {/* One card, two rows. These were two full-sized cards with four lines
+            of body each, which gave a spreadsheet export the same weight as the
+            thing that actually protects the ledger. */}
+        <SectionLabel>A copy you keep</SectionLabel>
+        <View className="mb-6 overflow-hidden rounded-xl bg-surface">
+          <ExportRow
+            icon="shield"
+            title="Backup file"
+            body="Complete and restorable. Any SQLite tool can open it."
+            kind="backup"
+            busy={busy}
+            onPress={run}
+          />
+          <View className="h-px bg-line" />
+          <ExportRow
+            icon="export"
+            title="Spreadsheet"
+            body="Readable anywhere. Carries no settings and cannot be restored."
+            kind="csv"
+            busy={busy}
+            onPress={run}
+          />
 
-        <View className="mb-4 rounded-xl border border-expense/30 bg-surface p-4">
-          <View className="mb-2 flex-row items-center gap-2.5">
-            <Icon name="refresh" size={18} color={palette.expense} />
-            <Text className="text-base font-medium text-ink">Restore from a backup</Text>
-          </View>
-          <Text className="mb-4 text-sm leading-5 text-muted">
-            Replaces everything in the app with the contents of a backup file. Your current data is
-            backed up first, so this is undoable.
+          {error ? (
+            <Text className="px-4 pb-4 text-sm text-expense" testID="export-error">
+              {error}
+            </Text>
+          ) : done ? (
+            <Text className="px-4 pb-4 text-sm text-income" testID="export-done">
+              {done}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Quiet by design. Destructive, rarely wanted, and previously wearing a
+            red border that made it compete with the things you came here for. */}
+        <SectionLabel>Replace everything</SectionLabel>
+        <View className="mb-4 rounded-xl bg-surface p-4">
+          <Text className="mb-3 text-sm leading-5 text-muted">
+            Restoring replaces the ledger with a backup file. Your current data is saved first, so
+            it is undoable.
           </Text>
           <View className="flex-row gap-2">
             <Button
@@ -223,16 +271,6 @@ export default function ExportScreen() {
           </View>
         </View>
 
-        {error ? (
-          <Text className="mt-4 px-1 text-sm text-expense" testID="export-error">
-            {error}
-          </Text>
-        ) : done ? (
-          <Text className="mt-4 px-1 text-sm text-income" testID="export-done">
-            {done}
-          </Text>
-        ) : null}
-
         {/* Learned the hard way on a real device: Android refuses to grant
             folder access to the Download root — the picker shows "Can't use
             this folder" with no explanation of what would work. Documents is
@@ -252,7 +290,16 @@ export default function ExportScreen() {
   );
 }
 
-function Action({
+/** A quiet group heading. Hierarchy without another box. */
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <Text className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+      {children}
+    </Text>
+  );
+}
+
+function ExportRow({
   icon,
   title,
   body,
@@ -270,14 +317,17 @@ function Action({
   const anyBusy = busy !== null;
 
   return (
-    <View className="mb-4 rounded-xl bg-surface p-4">
-      <View className="mb-2 flex-row items-center gap-2.5">
+    <View className="p-4">
+      <View className="mb-1 flex-row items-center gap-2.5">
         <Icon name={icon} size={18} color={palette.accent} />
         <Text className="text-base font-medium text-ink">{title}</Text>
       </View>
-      <Text className="mb-4 text-sm leading-5 text-muted">{body}</Text>
+      {/* One line, not four. The long explanations were written when this screen
+          had two things on it; with five they read as a wall and got skipped —
+          which is worse than saying less. */}
+      <Text className="mb-3 pl-[30px] text-sm leading-5 text-muted">{body}</Text>
 
-      <View className="flex-row gap-2">
+      <View className="flex-row gap-2 pl-[30px]">
         <Button
           label="Save to device"
           working={busy === `${kind}-save`}

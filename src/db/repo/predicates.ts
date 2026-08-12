@@ -77,3 +77,38 @@ export function onIncomeSide(): SQL {
 export function movesAccountBalance(): SQL {
   return sql`1 = 1`;
 }
+
+export type LedgerSide = 'expense' | 'income' | 'transfer' | 'correction';
+
+/**
+ * The same question as `onExpenseSide` / `onIncomeSide`, asked in JAVASCRIPT.
+ *
+ * The SQL rules above were written first, and the sign test then survived in
+ * four JavaScript callers that had to answer the same question without a query.
+ * Three were found by an E2E flow; the fourth was the CSV export, which
+ * cheerfully wrote every refund out as `income` — so a spreadsheet built from a
+ * Peace export reported more income than was earned and more expense than was
+ * spent, with a net that came out right and hid it.
+ *
+ * Having the rule in SQL only is what made that possible. It lives in both
+ * languages now, in one file, and the ORDER is the rule: a row's sign means
+ * nothing until transfers, corrections and refunds have been taken out of the
+ * way.
+ *
+ * A refund is deliberately reported as `expense` rather than as a fifth kind.
+ * Its amount is positive, so summing the expense side NETS — which is the whole
+ * point of the feature, and what anyone filtering a spreadsheet by
+ * `type = expense` will expect. Whether a particular row was a refund is
+ * carried alongside, never in place of, its side.
+ */
+export function ledgerSide(row: {
+  transferPairId?: string | null;
+  isAdjustment?: boolean | null;
+  isRefund?: boolean | null;
+  amountMinor: number;
+}): LedgerSide {
+  if (row.transferPairId) return 'transfer';
+  if (row.isAdjustment) return 'correction';
+  if (row.isRefund) return 'expense';
+  return row.amountMinor < 0 ? 'expense' : 'income';
+}

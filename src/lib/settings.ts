@@ -37,6 +37,28 @@ export const SETTING_DEFAULTS = {
   showTotal: true as boolean,
   /** Which Gemini model the AI features call. Not a secret. */
   geminiModel: 'gemini-flash-latest' as string,
+
+  /**
+   * How often to copy the database to Google Drive. `off` until connected.
+   *
+   * These three live in `settings` rather than in secure storage because none
+   * of them is a credential — and because they SHOULD travel in a backup. A
+   * restored ledger that remembers it was backing up weekly is right; the
+   * passphrase, which must not be in the file it encrypts, lives in
+   * `secrets.ts` instead.
+   */
+  driveCadence: 'off' as 'off' | 'daily' | 'weekly' | 'monthly',
+  /**
+   * Epoch ms of the last SUCCESSFUL upload, 0 for never.
+   *
+   * Read by the settings row, which reports its age and complains when it is
+   * overdue. That is the whole reliability story for a backup that runs when it
+   * can rather than on a guaranteed schedule: it cannot promise it ran, so it
+   * has to make it obvious when it did not.
+   */
+  driveLastBackupAt: 0 as number,
+  /** The connected account, shown so it is obvious WHERE backups are going. */
+  driveAccount: '' as string,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

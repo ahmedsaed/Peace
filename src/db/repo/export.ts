@@ -4,6 +4,7 @@ import { alias, type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { decimalsFor, minorToMajor } from '../../lib/money';
 import * as schema from '../schema';
 import { accounts, categories, transactions } from '../schema';
+import { ledgerSide } from './predicates';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -24,6 +25,14 @@ export const CSV_HEADER = [
   'note',
   'transfer_pair_id',
   'id',
+  /**
+   * Appended, never inserted — see above.
+   *
+   * `type` reports a refund as `expense`, because its amount is positive and
+   * summing the expense side is then correct. That is the right arithmetic and
+   * the wrong place to lose the fact, so the fact goes here.
+   */
+  'is_refund',
 ] as const;
 
 /** Local date and time, split, because a spreadsheet sorts and filters them separately. */
@@ -63,6 +72,8 @@ export function exportRows(db: Db): string[][] {
       note: transactions.note,
       occurredAt: transactions.occurredAt,
       transferPairId: transactions.transferPairId,
+      isAdjustment: transactions.isAdjustment,
+      isRefund: transactions.isRefund,
       accountName: accounts.name,
       counterAccountName: counter.name,
       categoryName: categories.name,
@@ -78,12 +89,13 @@ export function exportRows(db: Db): string[][] {
 
   return rows.map((row) => {
     const { date, time } = localParts(row.occurredAt);
-    const type = row.transferPairId ? 'transfer' : row.amountMinor < 0 ? 'expense' : 'income';
 
     return [
       date,
       time,
-      type,
+      // NEVER a bare `amountMinor < 0` — a refund is an expense with a positive
+      // amount, and a correction is neither side. See `ledgerSide`.
+      ledgerSide(row),
       minorToMajor(row.amountMinor, row.currency).toFixed(decimalsFor(row.currency)),
       row.currency,
       row.accountName,
@@ -93,6 +105,7 @@ export function exportRows(db: Db): string[][] {
       row.note ?? '',
       row.transferPairId ?? '',
       row.id,
+      row.isRefund ? '1' : '',
     ];
   });
 }

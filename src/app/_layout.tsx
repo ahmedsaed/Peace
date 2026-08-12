@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import palette from '@/constants/palette';
 import { DatabaseProvider } from '@/db/provider';
+import { DriveCatchUp } from '@/state/drive';
 
 import '@/global.css';
 
@@ -46,6 +47,10 @@ export default function RootLayout() {
         {/* The app is dark-only, so the status bar is always light-on-dark. */}
         <StatusBar style="light" />
         <DatabaseProvider>
+          {/* Backs up to Drive if one is due. Renders nothing, blocks nothing,
+              and swallows every failure — see the file for why the app being
+              opened IS the scheduler rather than a fallback behind one. */}
+          <DriveCatchUp />
           <Stack
             screenOptions={{
               headerShown: false,

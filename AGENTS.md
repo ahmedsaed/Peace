@@ -239,7 +239,11 @@ app ignoring input. `pkill -f GradleDaemon`.
   income — and saving from there flips the sign and makes it one. Use `onExpenseSide` /
   `onIncomeSide` from `src/db/repo/predicates.ts`. This was fixed in the SQL first and then found
   again, by an E2E flow, in three JavaScript callers: `updateRecord` and two initialisers in
-  `record.tsx`. Fixing the query layer is not fixing the rule.
+  `record.tsx`. Fixing the query layer is not fixing the rule. **A FOURTH caller was found later
+  still** — the CSV export, which had no flow watching it and wrote every refund out as `income`,
+  so a spreadsheet built from an export showed more income than was earned and more expense than
+  was spent with a net that came out right and hid it. The rule now exists in JavaScript as
+  `ledgerSide` in `predicates.ts`, beside the SQL. Never answer the question anywhere else.
 - **A second reason to exclude a row is a second place to forget it.** There are now two kinds of
   row that are not ordinary spending — a transfer leg and a balance correction — and they have
   DIFFERENT consequences: both stay out of income and expense, but a correction still moves the
@@ -306,6 +310,39 @@ app ignoring input. `pkill -f GradleDaemon`.
   export now goes through a size check that throws, the size is rendered in the UI, and the flow
   asserts a non-zero one. Anything that writes a file needs the same treatment: assert the bytes,
   not the name.
+- **Google withdrew custom URI scheme redirects for Android OAuth clients**, and deprecated
+  loopback redirects with them — so `expo-auth-session` cannot carry a Google grant on this
+  platform at all. That leaves the device flow (RFC 8628) or the native Sign-In SDK. Both were
+  built; the native one won because **an Android OAuth client has no client secret**. It is
+  identified by package name plus the SHA-1 of the signing certificate, so there is nothing to
+  paste into Settings, nothing to bake in from CI, nothing extractable from the APK, and **no
+  refresh token to store** — `getTokens` mints one from the grant on the device. Credentials you
+  never hold are credentials you cannot leak.
+- **An APK signed with an unregistered certificate fails sign-in with `DEVELOPER_ERROR` and no
+  further detail.** Debug and release builds are signed differently and each needs its own Android
+  OAuth client. `google-auth.ts` names this case explicitly, because the raw code sends you looking
+  at scopes and consent screens for an afternoon.
+- **Disconnecting Drive calls `signOut`, NEVER `revokeAccess`.** Revoking withdraws the grant, and
+  Google deletes the app-data folder when that happens — so a user tapping "Disconnect" to pause
+  backups would silently destroy every backup they had. Disconnecting and deleting must never be
+  the same gesture.
+- **Prune old backups AFTER a successful upload, never before.** Pruning first means a failed
+  upload leaves the user with fewer backups than they started with: the system destroying its own
+  safety margin at the exact moment it is failing. Mutating the order fails two tests in
+  `drive.test.ts`.
+- **Everything needed to open a sealed backup travels inside the file** — salt, scrypt cost, nonce
+  and tag. A fresh install on a new phone needs the file and the passphrase and NOTHING else. The
+  first version generated a random 256-bit key instead, which is cryptographically stronger and
+  useless: it lived in the device's secure store, so the one scenario backups exist for is exactly
+  the scenario where the key is gone. Whenever a recovery feature holds a secret, ask what survives
+  the device.
+- **Passphrases are NFC-normalised.** The same accented character can be typed as one code point or
+  two depending on the keyboard, and the two hash differently — so restoring on a new phone would
+  reject the passphrase the user is certain is right. A recovery bug that only appears on the worst
+  day.
+- **The Drive copy is a convenience, not the safety net.** `appdata` is unreachable from any
+  browser and is scoped to the OAuth client, so deleting the Cloud project orphans the bytes
+  permanently. The reachable backup is still the local one written to a folder the user picks.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
