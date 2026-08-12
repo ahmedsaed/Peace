@@ -2,6 +2,13 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { SectionList, Text } from 'react-native';
 
+import { ProposalActions, ProposalRow } from '@/components/proposal-row';
+import {
+  catchUp,
+  postProposals,
+  skipProposals,
+  type Proposal,
+} from '@/db/repo/recurring';
 import { RecordActions } from '@/components/record-actions';
 import { RecordRow } from '@/components/record-row';
 import { Snackbar } from '@/components/snackbar';
@@ -40,6 +47,10 @@ const NO_CARRY: BroughtForward = {
  * Records — the default tab, because logging a spend is why the app gets
  * opened.
  */
+/** Due rows carry a rule and a date; records carry an id. */
+const isProposal = (row: Row | Proposal): row is Proposal =>
+  (row as Proposal).ruleId !== undefined;
+
 export default function RecordsScreen() {
   const router = useRouter();
   const [period, setPeriod] = useState(currentPeriod());
@@ -52,6 +63,14 @@ export default function RecordsScreen() {
   // the bottom of the edit form it meant opening a record to change it in order
   // to remove it, with a destructive action next to Save.
   const [acting, setActing] = useState<Row | null>(null);
+  /**
+   * Records that rules say are owed but which do not exist yet.
+   *
+   * Derived on every refresh, never stored — see `proposal-row.tsx` for why a
+   * pending row in `transactions` would be the expensive answer.
+   */
+  const [due, setDue] = useState<Proposal[]>([]);
+  const [actingDue, setActingDue] = useState<Proposal | null>(null);
   const pendingUndo = useUndoStore((state) => state.pending);
   const clearUndo = useUndoStore((state) => state.clear);
   const offerUndo = useUndoStore((state) => state.offer);
@@ -63,6 +82,9 @@ export default function RecordsScreen() {
     // before this month, which is the one query here that grows with the age of
     // the ledger.
     setCarried(carryOver ? broughtForward(db, period, homeCurrency) : NO_CARRY);
+    // Everything outstanding, whatever month it fell in. An occurrence missed
+    // in August must not hide in a month nobody scrolls back to.
+    setDue(catchUp(db).proposals);
     // homeCurrency belongs here: changing it changes what the totals MEAN, and
     // without it the screen would keep showing figures computed against the
     // previous one until something else happened to trigger a refresh.
@@ -95,11 +117,18 @@ export default function RecordsScreen() {
   // report the same underlying problem twice with two different numbers.
   const unvaluedTotal = summary.unvaluedCount + carried.unvaluedCount;
 
-  const sections = groupByDay(rows).map((group) => ({
+  const dayGroups = groupByDay(rows).map((group) => ({
     key: group.key,
     title: group.heading,
-    data: group.rows,
+    data: group.rows as (Row | Proposal)[],
   }));
+
+  // Due rows sit at the TOP, above today, because they are the only thing on
+  // this screen that is waiting on a decision.
+  const sections =
+    due.length > 0
+      ? [{ key: 'due', title: due.length === 1 ? 'Due' : `Due · ${due.length}`, data: due as (Row | Proposal)[] }, ...dayGroups]
+      : dayGroups;
 
   return (
     <Screen testID="home-screen">
@@ -134,7 +163,11 @@ export default function RecordsScreen() {
         ) : null}
       </MonthHeader>
 
-      {rows.length === 0 ? (
+      {/* `sections`, not `rows`. A month with no records but something DUE is
+          not empty — gating on records alone hid the due rows behind the empty
+          state, which is precisely the case the feature exists for: a fresh
+          month where the standing orders have not been added yet. */}
+      {sections.length === 0 ? (
         <EmptyState
           icon="records"
           title="No records this month"
@@ -143,14 +176,35 @@ export default function RecordsScreen() {
       ) : (
         <SectionList
           sections={sections}
-          keyExtractor={(row) => row.id}
-          renderItem={({ item }) => (
-            <RecordRow
-              row={item}
-              onPress={() => router.push({ pathname: '/record', params: { id: item.id } })}
-              onLongPress={() => setActing(item)}
-            />
-          )}
+          keyExtractor={(row) =>
+            isProposal(row) ? `due-${row.ruleId}-${row.occurredOn}` : row.id
+          }
+          renderItem={({ item }) =>
+            isProposal(item) ? (
+              <ProposalRow
+                proposal={item}
+                currency={homeCurrency}
+                // A tap edits it: the rent went up, so change the amount and
+                // save. The record screen writes it and tells the rule.
+                onPress={() =>
+                  router.push({
+                    pathname: '/record',
+                    params: {
+                      fromRule: item.ruleId,
+                      dueOn: item.occurredOn,
+                    },
+                  })
+                }
+                onLongPress={() => setActingDue(item)}
+              />
+            ) : (
+              <RecordRow
+                row={item}
+                onPress={() => router.push({ pathname: '/record', params: { id: item.id } })}
+                onLongPress={() => setActing(item)}
+              />
+            )
+          }
           renderSectionHeader={({ section }) => (
             <Text className="bg-ground px-4 pb-1.5 pt-4 text-xs font-semibold text-muted">
               {section.title}
@@ -163,6 +217,24 @@ export default function RecordsScreen() {
       )}
 
       <Fab onPress={() => router.push('/record')} raised={!!pendingUndo} />
+
+      <ProposalActions
+        proposal={actingDue}
+        currency={homeCurrency}
+        onClose={() => setActingDue(null)}
+        onAdd={() => {
+          postProposals(db, [actingDue!]);
+          setActingDue(null);
+          refresh();
+        }}
+        onDismiss={() => {
+          // Skips this occurrence only. The rule carries on, because a month
+          // you did not pay is an ordinary thing, not a reason to stop.
+          skipProposals(db, [actingDue!]);
+          setActingDue(null);
+          refresh();
+        }}
+      />
 
       <RecordActions
         row={acting}

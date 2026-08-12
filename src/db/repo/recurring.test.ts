@@ -1,0 +1,270 @@
+/**
+ * @jest-environment node
+ */
+import { createTestDb, type TestDb } from '../../test/db';
+import { createAccount } from './accounts';
+import { createCategory } from './categories';
+import { periodSummary } from './records';
+import {
+  catchUp,
+  createRule,
+  dueProposals,
+  getRule,
+  listRules,
+  postProposals,
+  RecurringError,
+  setRuleActive,
+  skipProposals,
+} from './recurring';
+
+function seed() {
+  const { db } = createTestDb();
+  createAccount(db, { id: 'bank', name: 'Bank', currency: 'EGP' });
+  createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP' });
+  createCategory(db, { id: 'installments', name: 'Installments', kind: 'expense', sortOrder: 0 });
+  createCategory(db, { id: 'salary', name: 'Salary', kind: 'income', sortOrder: 0 });
+  return db;
+}
+
+const rent = (db: TestDb, over: Partial<Parameters<typeof createRule>[1]> = {}) =>
+  createRule(db, {
+    id: 'rule-rent',
+    name: 'Rent',
+    type: 'expense',
+    accountId: 'bank',
+    categoryId: 'installments',
+    amountMinor: 500_000,
+    frequency: 'monthly',
+    startsOn: '2026-01-01',
+    ...over,
+  });
+
+describe('creating a rule', () => {
+  it('schedules its first run on the start date', () => {
+    const db = seed();
+    expect(rent(db).nextRunOn).toBe('2026-01-01');
+  });
+
+  it('refuses an amount of zero', () => {
+    const db = seed();
+    expect(() => rent(db, { amountMinor: 0 })).toThrow(RecurringError);
+  });
+
+  it('refuses a transfer with nowhere to transfer to', () => {
+    const db = seed();
+    expect(() => rent(db, { type: 'transfer', counterAccountId: null })).toThrow(/move money into/);
+  });
+
+  it('refuses an end date before the start', () => {
+    const db = seed();
+    expect(() => rent(db, { endsOn: '2025-12-01' })).toThrow(/cannot be before/);
+  });
+});
+
+/**
+ * Nothing is stored: a proposal exists exactly as long as the rule is still
+ * owed it. Reading them twice must therefore be identical and must change
+ * nothing — that is what makes it safe on every app open.
+ */
+describe('what is owed', () => {
+  it('lists one occurrence per period missed', () => {
+    const db = seed();
+    rent(db);
+
+    const { proposals } = dueProposals(db, '2026-03-15');
+    expect(proposals.map((p) => p.occurredOn)).toEqual(['2026-01-01', '2026-02-01', '2026-03-01']);
+  });
+
+  it('is idempotent — reading does not advance anything', () => {
+    const db = seed();
+    rent(db);
+
+    const first = dueProposals(db, '2026-03-15');
+    const second = dueProposals(db, '2026-03-15');
+    expect(second.proposals).toEqual(first.proposals);
+    expect(getRule(db, 'rule-rent')!.nextRunOn).toBe('2026-01-01');
+  });
+
+  it('ignores a paused rule', () => {
+    const db = seed();
+    rent(db);
+    setRuleActive(db, 'rule-rent', false);
+    expect(dueProposals(db, '2026-03-15').proposals).toEqual([]);
+  });
+
+  it('says when a rule owes more than one pass can generate', () => {
+    const db = seed();
+    rent(db, { frequency: 'daily', startsOn: '2024-01-01' });
+    const { proposals, truncatedRuleIds } = dueProposals(db, '2026-01-01');
+    expect(proposals).toHaveLength(60);
+    expect(truncatedRuleIds).toEqual(['rule-rent']);
+  });
+});
+
+describe('accepting proposals', () => {
+  it('writes the records and moves the rule on', () => {
+    const db = seed();
+    rent(db);
+
+    const { proposals } = dueProposals(db, '2026-02-15');
+    expect(postProposals(db, proposals)).toBe(2);
+
+    expect(periodSummary(db, '2026-01').expenseMinor).toBe(-500_000);
+    expect(periodSummary(db, '2026-02').expenseMinor).toBe(-500_000);
+    expect(getRule(db, 'rule-rent')!.nextRunOn).toBe('2026-03-01');
+    expect(getRule(db, 'rule-rent')!.lastRunOn).toBe('2026-02-01');
+  });
+
+  /** Posting twice is the failure that quietly doubles someone's rent. */
+  it('does not post the same occurrence twice', () => {
+    const db = seed();
+    rent(db);
+
+    postProposals(db, dueProposals(db, '2026-02-15').proposals);
+    const second = dueProposals(db, '2026-02-15');
+
+    expect(second.proposals).toEqual([]);
+    expect(postProposals(db, second.proposals)).toBe(0);
+    expect(periodSummary(db, '2026-01').expenseMinor).toBe(-500_000);
+  });
+
+  it('dates the record on the day it was due, not today', () => {
+    const db = seed();
+    rent(db);
+    postProposals(db, dueProposals(db, '2026-03-15').proposals);
+
+    // Three months materialised at once still land in their own months.
+    expect(periodSummary(db, '2026-01').expenseMinor).toBe(-500_000);
+    expect(periodSummary(db, '2026-03').expenseMinor).toBe(-500_000);
+  });
+
+  it('writes income on the income side', () => {
+    const db = seed();
+    createRule(db, {
+      id: 'rule-salary',
+      name: 'Salary',
+      type: 'income',
+      accountId: 'bank',
+      categoryId: 'salary',
+      amountMinor: 900_000,
+      frequency: 'monthly',
+      startsOn: '2026-01-25',
+    });
+
+    postProposals(db, dueProposals(db, '2026-01-31').proposals);
+    expect(periodSummary(db, '2026-01').incomeMinor).toBe(900_000);
+  });
+
+  it('writes a transfer as a transfer, counting as neither side', () => {
+    const db = seed();
+    createRule(db, {
+      id: 'rule-savings',
+      name: 'To savings',
+      type: 'transfer',
+      accountId: 'bank',
+      counterAccountId: 'cash',
+      amountMinor: 100_000,
+      frequency: 'monthly',
+      startsOn: '2026-01-05',
+    });
+
+    postProposals(db, dueProposals(db, '2026-01-31').proposals);
+
+    const summary = periodSummary(db, '2026-01');
+    expect(summary.expenseMinor).toBe(0);
+    expect(summary.incomeMinor).toBe(0);
+  });
+
+  /**
+   * Accepting an older occurrence while a newer one is still owed must not
+   * swallow the newer one — the rule advances past the LATEST date handled, and
+   * the rest stays owing.
+   */
+  it('leaves the occurrences that were not accepted still owing', () => {
+    const db = seed();
+    rent(db);
+
+    const { proposals } = dueProposals(db, '2026-03-15');
+    postProposals(db, proposals.slice(0, 1));
+
+    expect(dueProposals(db, '2026-03-15').proposals.map((p) => p.occurredOn)).toEqual([
+      '2026-02-01',
+      '2026-03-01',
+    ]);
+  });
+});
+
+/**
+ * A month you did not actually pay is a real thing — a paused subscription, a
+ * salary that came late. Skipping has to be as easy as accepting.
+ */
+describe('skipping proposals', () => {
+  it('writes nothing and still moves the rule on', () => {
+    const db = seed();
+    rent(db);
+
+    skipProposals(db, dueProposals(db, '2026-02-15').proposals);
+
+    expect(periodSummary(db, '2026-01').expenseMinor).toBe(0);
+    expect(getRule(db, 'rule-rent')!.nextRunOn).toBe('2026-03-01');
+    expect(dueProposals(db, '2026-02-15').proposals).toEqual([]);
+  });
+});
+
+describe('catch-up on app open', () => {
+  it('posts what the user trusts and holds back the rest', () => {
+    const db = seed();
+    rent(db, { id: 'rule-rent', autoPost: true });
+    createRule(db, {
+      id: 'rule-gym',
+      name: 'Gym',
+      type: 'expense',
+      accountId: 'bank',
+      categoryId: 'installments',
+      amountMinor: 30_000,
+      frequency: 'monthly',
+      startsOn: '2026-01-10',
+      autoPost: false,
+    });
+
+    const { proposals } = catchUp(db, '2026-01-31');
+
+    // Rent landed by itself; the gym is waiting to be looked at.
+    expect(periodSummary(db, '2026-01').expenseMinor).toBe(-500_000);
+    expect(proposals.map((p) => p.ruleId)).toEqual(['rule-gym']);
+    expect(getRule(db, 'rule-rent')!.nextRunOn).toBe('2026-02-01');
+    // The un-posted rule has NOT moved on — it still owes January.
+    expect(getRule(db, 'rule-gym')!.nextRunOn).toBe('2026-01-10');
+  });
+
+  it('is safe to run repeatedly', () => {
+    const db = seed();
+    rent(db, { autoPost: true });
+
+    catchUp(db, '2026-02-15');
+    catchUp(db, '2026-02-15');
+    catchUp(db, '2026-02-15');
+
+    expect(periodSummary(db, '2026-01').expenseMinor).toBe(-500_000);
+    expect(periodSummary(db, '2026-02').expenseMinor).toBe(-500_000);
+  });
+
+  it('stops for good once the rule has ended', () => {
+    const db = seed();
+    rent(db, { autoPost: true, endsOn: '2026-02-01' });
+
+    catchUp(db, '2026-06-01');
+
+    expect(periodSummary(db, '2026-03').expenseMinor).toBe(0);
+    expect(getRule(db, 'rule-rent')!.nextRunOn).toBeNull();
+    expect(dueProposals(db, '2027-01-01').proposals).toEqual([]);
+  });
+});
+
+describe('listing', () => {
+  it('returns the rules', () => {
+    const db = seed();
+    rent(db);
+    expect(listRules(db).map((r) => r.name)).toEqual(['Rent']);
+  });
+});

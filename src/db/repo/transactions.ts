@@ -34,6 +34,13 @@ export type RecordInput = {
    * caller working unchanged.
    */
   homeCurrency?: string;
+  /**
+   * The rule that generated this record, when one did.
+   *
+   * Kept so a generated row can be traced back to its schedule — and so
+   * deleting a rule can leave its history alone (the column is `set null`).
+   */
+  recurringRuleId?: string | null;
   note?: string | null;
   occurredAt?: Date;
   id?: string;
@@ -47,6 +54,13 @@ export type TransferInput = {
   currency?: string;
   fxRate?: number;
   homeCurrency?: string;
+  /**
+   * The rule that generated this record, when one did.
+   *
+   * Kept so a generated row can be traced back to its schedule — and so
+   * deleting a rule can leave its history alone (the column is `set null`).
+   */
+  recurringRuleId?: string | null;
   note?: string | null;
   occurredAt?: Date;
 };
@@ -114,6 +128,7 @@ export function createRecord(db: Db, input: RecordInput): Transaction {
       isRefund: refund,
       note: input.note ?? null,
       occurredAt: input.occurredAt ?? new Date(),
+      recurringRuleId: input.recurringRuleId ?? null,
     })
     .run();
 
@@ -148,6 +163,7 @@ export function createTransfer(db: Db, input: TransferInput): { out: Transaction
     note: input.note ?? null,
     occurredAt,
     transferPairId: pairId,
+    recurringRuleId: input.recurringRuleId ?? null,
     // A transfer has no category by definition — it is not spending.
     categoryId: null,
   };
