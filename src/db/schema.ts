@@ -175,6 +175,41 @@ export const transactions = sqliteTable(
      * their own currency still matches today's home currency.
      */
     homeCurrency: text('home_currency'),
+    /**
+     * WHAT YOU ACTUALLY HANDED OVER ABROAD. Metadata, never summed.
+     *
+     * A card denominated in EGP and used in Rome is charged in EGP at the
+     * bank's rate, so `amount_minor` — the number that moves the account — must
+     * be the settled EGP. Store the euros there instead and the card balance
+     * can never agree with the statement, which is a permanent, guaranteed
+     * drift.
+     *
+     * That leaves nowhere to answer "what did this cost in euros", hence these.
+     * They exist to be read back, never to be added up.
+     *
+     * Three pairs of currency fields now hang off a row, so to be explicit:
+     *   currency + amountMinor          what moved the ACCOUNT
+     *   homeCurrency + homeAmountMinor  what it is worth for REPORTING
+     *   originalCurrency + originalAmountMinor   what was HANDED OVER
+     */
+    originalAmountMinor: integer('original_amount_minor'),
+    originalCurrency: text('original_currency'),
+
+    /**
+     * Set on a card fee, pointing at the purchase that incurred it.
+     *
+     * A foreign-transaction commission is a real, permanent cost and gets its
+     * own row so "what did FX cost me this year" stays answerable — folded into
+     * the purchase it would be invisible for ever and would overstate whatever
+     * category the purchase was filed under.
+     *
+     * Cascade so a deleted purchase cannot leave its fee behind. `deleteRecord`
+     * also collects the fee explicitly, because the undo buffer has to be able
+     * to put BOTH back — a cascade the undo does not know about is silent data
+     * loss the moment someone taps Undo.
+     */
+    feeForId: text('fee_for_id'),
+
     note: text('note'),
 
     /**
