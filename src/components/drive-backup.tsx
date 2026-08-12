@@ -7,7 +7,7 @@ import { formatBytes } from '@/db/backup';
 import { checkLatestBackup, listDriveBackups, restoreFromDrive, runBackup } from '@/db/drive';
 import { currentCounts, refreshAfterRestore } from '@/db/restore';
 import type { DriveFile } from '@/lib/drive-api';
-import { CADENCES, describeAge, describeCadence, backupDue } from '@/lib/drive-backup';
+import { CADENCES, describeCadence } from '@/lib/drive-backup';
 import { connect, disconnect, reconnectSilently } from '@/lib/google-auth';
 import { assertUsablePassphrase, MIN_PASSPHRASE } from '@/lib/seal';
 import { getPassphrase, setPassphrase } from '@/lib/secrets';
@@ -31,22 +31,11 @@ type Busy = 'connect' | 'backup' | 'check' | 'passphrase' | 'list' | 'restore' |
 export function DriveBackup() {
   const account = useSetting('driveAccount');
   const cadence = useSetting('driveCadence');
-  const lastBackupAt = useSetting('driveLastBackupAt');
   const update = useSettingsStore((state) => state.update);
 
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  /**
-   * "Now", captured in state rather than read during render.
-   *
-   * `Date.now()` in a render body is impure — the React Compiler refuses it,
-   * and rightly: two renders of the same props would disagree about the age.
-   * Refreshed from `guard` when an action completes, which is an event handler
-   * and therefore the legitimate place to do it; a `useEffect` that called
-   * `setNow` would only trade this rule for `set-state-in-effect`.
-   */
-  const [now, setNow] = useState(() => Date.now());
   const [sealed, setSealed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -82,7 +71,6 @@ export function DriveBackup() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Something went wrong.');
     } finally {
-      setNow(Date.now());
       setBusy(null);
     }
   }, []);
@@ -214,8 +202,9 @@ export function DriveBackup() {
     [guard, draft]
   );
 
+  // Freshness and overdue-ness are reported once, by the screen header. This
+  // card is where you ACT on it.
   const connected = account.length > 0;
-  const overdue = connected && lastBackupAt > 0 && backupDue({ cadence, lastBackupAt }, now);
 
   return (
     <View className="mb-4 rounded-xl bg-surface p-4" testID="drive-section">
@@ -226,10 +215,14 @@ export function DriveBackup() {
 
       {!connected ? (
         <>
+          {/* This said backups were "removed if you disconnect the app", which
+              was FALSE — Disconnect signs out and deliberately deletes nothing,
+              and the confirmation dialog says so. Two pieces of copy on one
+              screen disagreeing about whether your backups survive is worse
+              than either being wrong alone. */}
           <Text className="mb-4 text-sm leading-5 text-muted">
-            Keeps a copy in a private folder only Peace can see — invisible in your Drive, and
-            removed if you disconnect the app. Set a passphrase and it is encrypted before it
-            leaves the phone.
+            A copy in a private folder only Peace can see, invisible in your Drive. Set a
+            passphrase and it is encrypted before it leaves the phone.
           </Text>
           <Button
             label="Connect Google Drive"
@@ -242,17 +235,13 @@ export function DriveBackup() {
         </>
       ) : (
         <>
-          <Text className="mb-1 text-sm text-muted" testID="drive-account">
+          {/* Just the account. How fresh the backup is now lives once, at the
+              top of the screen — saying it twice on one page made neither
+              instance feel authoritative. */}
+          <Text className="mb-4 text-sm text-muted" testID="drive-account">
             {account}
           </Text>
-          <Text
-            className={`mb-4 text-sm ${overdue ? 'text-expense' : 'text-muted'}`}
-            testID="drive-age">
-            {describeAge(lastBackupAt > 0 ? lastBackupAt : null, now)}
-            {overdue ? ' · overdue' : ''}
-          </Text>
 
-          <Text className="mb-2 text-xs uppercase tracking-wide text-muted">How often</Text>
           <View className="mb-4 flex-row flex-wrap gap-2">
             {CADENCES.map((option) => (
               <Chip
@@ -284,13 +273,13 @@ export function DriveBackup() {
           </View>
 
           <View className="mb-4 border-t border-line pt-4">
-            <Text className="mb-1 text-sm text-ink">
-              {sealed ? 'Encrypted with your passphrase' : 'Uploaded unencrypted'}
-            </Text>
-            <Text className="mb-3 text-xs leading-5 text-muted" testID="drive-seal-state">
+            {/* One line instead of a heading plus a paragraph. The warning that
+                earns its place is the irreversible one; the rest was reassurance
+                nobody reads twice. */}
+            <Text className="mb-3 text-sm leading-5 text-muted" testID="drive-seal-state">
               {sealed
-                ? 'Only your passphrase opens these backups — not Google, and not us. Lose it and they are gone for good.'
-                : `Google can read an unencrypted backup. A passphrase of ${MIN_PASSPHRASE} characters or more fixes that, and is the only thing you need to restore on a new phone.`}
+                ? 'Encrypted — only your passphrase opens these. Lose it and they are gone for good.'
+                : `Not encrypted, so Google can read them. A passphrase of ${MIN_PASSPHRASE}+ characters is all you need to restore on a new phone.`}
             </Text>
 
             {editing ? (
@@ -345,10 +334,12 @@ export function DriveBackup() {
             )}
           </View>
 
-          {/* Restoring is the reason the rest of this exists, and `appdata` is
-              reachable by nothing but this app — so without a picker here, a
-              backup in Drive could be read by no software on earth. */}
-          <View className="mb-4 border-t border-line pt-4">
+          {/* The two rare actions share a row rather than each getting a
+              divider and a block of their own. Restoring is the reason the rest
+              of this exists — `appdata` is reachable by nothing but this app,
+              so without a picker here a backup in Drive could be read by no
+              software on earth. */}
+          <View className="flex-row gap-2 border-t border-line pt-4">
             <Button
               label="Restore from Drive"
               working={busy === 'list'}
@@ -357,16 +348,14 @@ export function DriveBackup() {
               testID="drive-restore-open"
               danger
             />
+            <Button
+              label="Disconnect"
+              working={false}
+              disabled={busy !== null}
+              onPress={onDisconnect}
+              testID="drive-disconnect"
+            />
           </View>
-
-          <Button
-            label="Disconnect"
-            working={false}
-            disabled={busy !== null}
-            onPress={onDisconnect}
-            testID="drive-disconnect"
-            danger
-          />
 
           <Modal
             visible={choices !== null}
