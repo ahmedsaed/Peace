@@ -343,6 +343,25 @@ app ignoring input. `pkill -f GradleDaemon`.
 - **The Drive copy is a convenience, not the safety net.** `appdata` is unreachable from any
   browser and is scoped to the OAuth client, so deleting the Cloud project orphans the bytes
   permanently. The reachable backup is still the local one written to a folder the user picks.
+- **A recurring occurrence is computed from the rule's START by index, never from the one that
+  fired last.** A monthly rule anchored to the 31st must fire on 28 February and then on 31 MARCH.
+  Derive each date by adding a month to the previous one and February poisons every month after it
+  — the rule silently walks back to the 28th forever, and a payment is three days early for the
+  rest of its life. Deriving occurrence *n* from the start means clamping applies to one month and
+  cannot leak. Same design gives 29 February yearly its 29th back in the next leap year.
+- **What a rule owes is DERIVED, never stored.** A pending row in `transactions` would be a third
+  reason for every total to exclude something — forever, and in backups, exports, search and
+  analysis — for records that are not real yet. Due rows are merged into the records list at render
+  time, so the blast radius is one screen. `nextRunOn` moves only once something has actually been
+  written or explicitly skipped, so closing the app mid-decision changes nothing.
+- **Tell the rule only AFTER the record is written.** Tapping a due row opens the ordinary record
+  screen — editing the amount first is the point, because "the rent went up" is the common case —
+  so the write happens elsewhere and `advanceRule` runs after it returns. Advancing first loses the
+  occurrence if the save then throws; not advancing at all enters it twice tomorrow.
+- **An empty state must be gated on what is RENDERED, not on one of its sources.** The records list
+  checked `rows.length === 0` and knew nothing about due rows, so a month with no records but a
+  standing order owing money rendered "No records this month" and hid the very thing the feature
+  exists for. Gate on the merged sections. Every unit test passed throughout.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
