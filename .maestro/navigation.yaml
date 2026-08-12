@@ -33,7 +33,14 @@ tags:
 - assertVisible: "Settings"
 - assertVisible: "Export & backup"
 - assertVisible: "About"
-- assertVisible: ".*Local-first.*"
+# The tagline is a CLAIM, and it has to match what the app does. Disconnected,
+# nothing does leave the phone; connecting Drive changes the sentence, because
+# copy that contradicts the screen it sits on is worse than copy saying less.
+- assertVisible: "Local-first. Nothing leaves the phone."
+# No backup card before Drive is set up — a card reading "never backed up" to
+# someone who never asked for backups is nagging, not information.
+- assertNotVisible:
+    id: "drawer-backup-card"
 - takeScreenshot: 01-drawer
 
 # --- About is a real screen, so assert what it reports ---

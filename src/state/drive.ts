@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { runBackup } from '@/db/drive';
+import { syncBackgroundBackup } from '@/lib/background-backup';
 import { backupDue } from '@/lib/drive-backup';
 import { useSetting, useSettingsStore } from '@/state/settings';
 
@@ -101,4 +102,18 @@ export function useDriveCatchUp(): void {
     });
     return () => subscription.remove();
   }, []);
+
+  /**
+   * Keep the OS schedule in step with the settings.
+   *
+   * Its OWN effect, keyed on the two values that decide it. Folded into the
+   * mount-only effect above it would never see a later change — connecting
+   * Drive, or switching the cadence off, would leave the schedule describing
+   * whatever was true when the app launched.
+   *
+   * Idempotent, so re-running it costs a registration check and nothing else.
+   */
+  useEffect(() => {
+    void syncBackgroundBackup(account, cadence);
+  }, [account, cadence]);
 }

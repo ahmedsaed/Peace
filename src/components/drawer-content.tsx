@@ -1,5 +1,6 @@
 import { type Href, router } from 'expo-router';
 import { type DrawerContentComponentProps } from 'expo-router/drawer';
+import { useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,7 +8,9 @@ import { Icon } from '@/components/icon';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
 import { buildInfo } from '@/lib/build-info';
+import { backupDue, describeAge } from '@/lib/drive-backup';
 import { formatVersion } from '@/lib/version';
+import { useSetting } from '@/state/settings';
 
 /**
  * What lives in the side menu, and what does not.
@@ -61,6 +64,15 @@ export function DrawerContent({ navigation }: DrawerContentComponentProps) {
   // Close first, then navigate. Pushing onto the root stack does not dismiss
   // the drawer by itself, so it would still be sitting open behind the new
   // screen when you came back.
+  const driveAccount = useSetting('driveAccount');
+  const cadence = useSetting('driveCadence');
+  const lastBackupAt = useSetting('driveLastBackupAt');
+  // Captured once: `Date.now()` in a render body is impure, and two renders of
+  // the same props would disagree about the age.
+  const [now] = useState(() => Date.now());
+  const connected = driveAccount.length > 0;
+  const overdue = connected && lastBackupAt > 0 && backupDue({ cadence, lastBackupAt }, now);
+
   const go = (href: Href) => {
     navigation.closeDrawer();
     router.push(href);
@@ -78,7 +90,13 @@ export function DrawerContent({ navigation }: DrawerContentComponentProps) {
         />
         <View>
           <Wordmark size={24} />
-          <Text className="text-xs text-muted">Local-first. Nothing leaves the phone.</Text>
+          {/* "Nothing leaves the phone" stops being true the moment Drive is
+              connected — and it would sit directly above a card saying when it
+              last left. Copy that contradicts the screen it is on is worse than
+              copy that says less. */}
+          <Text className="text-xs text-muted">
+            {connected ? 'Local-first. Backed up to your Drive.' : 'Local-first. Nothing leaves the phone.'}
+          </Text>
         </View>
       </View>
 
@@ -101,6 +119,31 @@ export function DrawerContent({ navigation }: DrawerContentComponentProps) {
       </View>
 
       <View className="flex-1" />
+
+      {/* Only when there is something to report. A card saying "never backed
+          up" to someone who has not set Drive up is nagging about a feature
+          they did not ask for. */}
+      {connected ? (
+        <Pressable
+          onPress={() => go('/export')}
+          testID="drawer-backup-card"
+          accessibilityRole="button"
+          accessibilityLabel="Backup status"
+          className="mx-4 mb-3 flex-row items-center gap-3 rounded-xl bg-raised px-4 py-3 active:opacity-80">
+          <Icon name="cloud" size={18} color={overdue ? palette.expense : palette.muted} />
+          <View className="flex-1">
+            <Text
+              className={`text-[13px] ${overdue ? 'text-expense' : 'text-ink'}`}
+              testID="drawer-backup-age">
+              {describeAge(lastBackupAt > 0 ? lastBackupAt : null, now)}
+              {overdue ? ' · overdue' : ''}
+            </Text>
+            <Text className="text-xs text-muted" numberOfLines={1}>
+              {driveAccount}
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
 
       <Text className="px-5 pb-3 text-xs text-muted opacity-60" testID="drawer-version">
         {formatVersion(buildInfo)}
