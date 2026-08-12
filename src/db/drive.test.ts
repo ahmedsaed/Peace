@@ -161,6 +161,33 @@ describe('pruning old backups', () => {
     expect((await runBackup()).pruned).toBe(0);
     expect(mocked.deleteBackup).not.toHaveBeenCalled();
   });
+
+  /**
+   * THE COMPOUNDING FAILURE, seen on a real device.
+   *
+   * Once the upload has landed the backup exists and is safe. If anything after
+   * it throws, the caller never records the success — so the app believes it
+   * has never backed up, considers one due at every launch, re-uploads every
+   * time, and never reaches this pruning step to clean up the copies it is
+   * making. One late failure, three symptoms.
+   */
+  it('still reports success when pruning fails after a good upload', async () => {
+    stageFile();
+    mocked.listBackups.mockRejectedValue(new Error('drive list failed'));
+
+    const outcome = await runBackup();
+
+    expect(outcome.at).toBeGreaterThan(0);
+    expect(outcome.pruned).toBe(0);
+  });
+
+  it('still reports success when a delete fails part-way through', async () => {
+    stageFile();
+    mocked.listBackups.mockResolvedValue(driveFiles(8));
+    mocked.deleteBackup.mockRejectedValue(new Error('permission denied'));
+
+    await expect(runBackup()).resolves.toMatchObject({ pruned: 0 });
+  });
 });
 
 describe('the staging copy', () => {

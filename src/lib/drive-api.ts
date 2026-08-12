@@ -27,8 +27,18 @@ export const APP_DATA_FOLDER = 'appDataFolder';
 export type DriveFile = {
   id: string;
   name: string;
-  /** Bytes. Drive sends this as a STRING; see `parseFile`. */
-  size: number;
+  /**
+   * Bytes, or NULL when Drive did not report it.
+   *
+   * The distinction is load-bearing and was learned the hard way: a resumable
+   * upload's final response carries only the fields it feels like unless
+   * `fields` is asked for, so `size` arrives undefined. Coercing that to 0
+   * turned "Drive did not say" into "Drive stored nothing", and a backup that
+   * had uploaded perfectly was reported to the user as incomplete.
+   *
+   * An absent measurement is not a measurement of zero.
+   */
+  size: number | null;
   /** RFC3339, as Drive sends it. */
   createdTime: string;
 };
@@ -88,17 +98,31 @@ const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
  * Drive sends int64 fields as STRINGS — `"size": "1234"`.
  *
  * Left as a string it compares and sorts as text, so 9 KB looks larger than
- * 10 KB and the "is this backup empty" check passes on the string "0".
+ * 10 KB. Absent stays ABSENT rather than becoming 0 — see `DriveFile.size`.
  */
 export function parseFile(raw: unknown): DriveFile {
   const r = (raw ?? {}) as Record<string, unknown>;
-  const size = Number(r.size ?? 0);
+  const size = r.size === undefined || r.size === null ? null : Number(r.size);
+
   return {
     id: String(r.id ?? ''),
     name: String(r.name ?? ''),
-    size: Number.isFinite(size) ? size : 0,
+    size: size !== null && Number.isFinite(size) ? size : null,
     createdTime: String(r.createdTime ?? ''),
   };
+}
+
+/** The fields worth asking for. Drive returns a bare minimum without this. */
+const FILE_FIELDS = 'id,name,size,createdTime';
+
+/** One file's metadata, with the fields explicitly requested. */
+export async function getFile(token: string, id: string, opts: Opts = {}): Promise<DriveFile> {
+  const response = await request(
+    `${FILES_URL}/${encodeURIComponent(id)}?fields=${FILE_FIELDS}`,
+    { headers: auth(token) },
+    opts
+  );
+  return parseFile(await response.json());
 }
 
 /**
@@ -111,7 +135,7 @@ export function parseFile(raw: unknown): DriveFile {
 export async function listBackups(token: string, opts: Opts = {}): Promise<DriveFile[]> {
   const query = new URLSearchParams({
     spaces: APP_DATA_FOLDER,
-    fields: 'files(id,name,size,createdTime)',
+    fields: `files(${FILE_FIELDS})`,
     orderBy: 'createdTime desc',
     pageSize: '100',
   });
@@ -133,7 +157,7 @@ export async function startUpload(
   opts: Opts = {}
 ): Promise<string> {
   const response = await request(
-    `${UPLOAD_URL}?uploadType=resumable`,
+    `${UPLOAD_URL}?uploadType=resumable&fields=${FILE_FIELDS}`,
     {
       method: 'POST',
       headers: { ...auth(token), 'Content-Type': 'application/json; charset=UTF-8' },
@@ -149,15 +173,7 @@ export async function startUpload(
   return session;
 }
 
-/**
- * Send the bytes, and check what Drive says it stored.
- *
- * THE SIZE CHECK IS THE POINT. This app has already shipped a backup that was a
- * perfectly named 0-byte file, because nothing downstream could tell the
- * difference between "wrote a file" and "wrote the contents". Drive reports the
- * size it actually persisted; comparing it against what was sent is the only
- * evidence that the upload was real.
- */
+/** Send the bytes. Verification is separate — see `uploadBackup`. */
 export async function finishUpload(
   session: string,
   bytes: Uint8Array,
@@ -172,17 +188,28 @@ export async function finishUpload(
     },
     opts
   );
-
-  const file = parseFile(await response.json());
-  if (file.size !== bytes.byteLength) {
-    throw new DriveError(
-      `Drive stored ${file.size} bytes of ${bytes.byteLength}. The backup is incomplete.`,
-      response.status
-    );
-  }
-  return file;
+  return parseFile(await response.json());
 }
 
+/**
+ * Upload, then ask Drive what it actually stored.
+ *
+ * THE SIZE CHECK IS THE POINT — this app has already shipped a backup that was
+ * a perfectly named 0-byte file, because nothing downstream could tell "wrote a
+ * file" from "wrote the contents".
+ *
+ * But the check has to ask a question Drive is guaranteed to answer. The first
+ * version read `size` straight off the upload response, which does NOT include
+ * it unless `fields` is requested, and Google's own documentation does not say
+ * whether `fields` on the initiation request survives to the final one. So it
+ * read as absent, absent was coerced to 0, and a backup that had uploaded
+ * perfectly told the user it was incomplete — while the failure ALSO meant the
+ * success was never recorded, so every launch re-uploaded and nothing was ever
+ * pruned. One misread field, three symptoms.
+ *
+ * A separate metadata GET with an explicit `fields` removes the guesswork: one
+ * small request, an unambiguous answer, and a size check that means something.
+ */
 export async function uploadBackup(
   token: string,
   name: string,
@@ -194,7 +221,25 @@ export async function uploadBackup(
     // succeed, pass the size check trivially, and replace a good backup.
     throw new DriveError('Refusing to upload an empty backup.', 0);
   }
-  return finishUpload(await startUpload(token, name, opts), bytes, opts);
+
+  const uploaded = await finishUpload(await startUpload(token, name, opts), bytes, opts);
+  if (!uploaded.id) {
+    throw new DriveError('Drive did not say what it stored the backup as.', 0);
+  }
+
+  const stored = await getFile(token, uploaded.id, opts);
+  if (stored.size !== null && stored.size !== bytes.byteLength) {
+    throw new DriveError(
+      `Drive stored ${stored.size} bytes of ${bytes.byteLength}. The backup is incomplete.`,
+      0
+    );
+  }
+  // A null size here would mean Drive ignored an explicit `fields` — worth a
+  // line in the log, but NOT worth failing an upload that plainly worked.
+  if (stored.size === null) {
+    console.warn('[drive] Drive did not report a size; upload not size-verified');
+  }
+  return stored;
 }
 
 export async function downloadBackup(
