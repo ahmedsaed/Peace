@@ -39,6 +39,14 @@ export const RESTORE_TABLES = [
   'budgets',
   'recurring_rules',
   'attachments',
+  // The portfolio keeps its own tables and never touches the ledger — but a
+  // backup that quietly dropped them would still be a backup that lost data.
+  // A table absent from this list is copied by nothing; unlike a new COLUMN,
+  // which `copyFromBackup` picks up on its own, a new TABLE has to be added
+  // here by hand. That asymmetry is the whole reason restore-fidelity.test.ts
+  // asserts figures rather than columns.
+  'asset_classes',
+  'holdings',
 ] as const;
 
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
