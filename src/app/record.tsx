@@ -11,7 +11,9 @@ import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { InvariantError, listCategoryTree } from '@/db/repo/categories';
-import { advanceRule } from '@/db/repo/recurring';
+import { describeRepeat, RepeatSheet, type Repeat } from '@/components/repeat-sheet';
+import { advanceRule, createRule } from '@/db/repo/recurring';
+import { toYmd } from '@/lib/recurrence';
 import {
   createRecord,
   createTransfer,
@@ -144,6 +146,16 @@ export default function RecordScreen() {
   // Dated TODAY for a refund or a copy: the money comes back, or goes out
   // again, on the day it happens — not on the day of the record it came from.
   const [occurredAt, setOccurredAt] = useState<Date>(existing?.occurredAt ?? new Date());
+  /**
+   * How this record repeats, if it does.
+   *
+   * Offered on NEW records only. Turning an existing row into a rule would beg
+   * the question of what the row already written was — the first occurrence, or
+   * something separate — and there is no answer that is not surprising half the
+   * time. Rules are managed on the Recurring screen once they exist.
+   */
+  const [repeat, setRepeat] = useState<Repeat | null>(null);
+  const [repeatOpen, setRepeatOpen] = useState(false);
   const [picking, setPicking] = useState<'date' | 'time' | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -525,6 +537,34 @@ export default function RecordScreen() {
       // occurrence if the save then threw.
       if (fromRule && dueOn) advanceRule(db, fromRule, dueOn);
 
+      /**
+       * Turn this record into a standing order.
+       *
+       * The rule starts on THIS record's date, and is then advanced straight
+       * past it — the record for today has just been written, and a rule that
+       * still owed it would offer the same payment again on the records list a
+       * second later. What it owes begins at the next occurrence.
+       */
+      if (repeat && !isEdit) {
+        const startsOn = toYmd(occurredAt);
+        const rule = createRule(db, {
+          name: note.trim() || category?.name || 'Recurring',
+          type: type === 'transfer' ? 'transfer' : (type as 'expense' | 'income'),
+          accountId,
+          counterAccountId: type === 'transfer' ? toAccountId : null,
+          categoryId: type === 'transfer' ? null : categoryId,
+          amountMinor,
+          currency,
+          note: note.trim() || null,
+          frequency: repeat.frequency,
+          interval: repeat.interval,
+          anchorDay: repeat.anchorDay,
+          startsOn,
+          endsOn: repeat.endsOn,
+        });
+        advanceRule(db, rule.id, startsOn);
+      }
+
       router.back();
     } catch (e) {
       // An InvariantError is the user's mistake and worth showing verbatim;
@@ -594,6 +634,13 @@ export default function RecordScreen() {
       className="flex-1 bg-ground"
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       testID="record-screen">
+      <RepeatSheet
+        visible={repeatOpen}
+        value={repeat}
+        startsOn={toYmd(occurredAt)}
+        onClose={() => setRepeatOpen(false)}
+        onChange={setRepeat}
+      />
       <View className={`flex-row items-center justify-between px-4 ${pad}`}>
         <Pressable
           onPress={() => router.back()}
@@ -603,12 +650,34 @@ export default function RecordScreen() {
           <Text className="text-sm font-medium text-muted">Cancel</Text>
         </Pressable>
 
-        <Text className="text-sm font-medium text-muted" testID="record-title">
-          {/* Names the ACTION you are in, not the row that will result.
-              Duplicating a refund still produces a refund, but "Refund" here
-              would leave you wondering which of the two things you tapped. */}
-          {isEdit ? 'Edit record' : refundOf ? 'Refund' : copyOf ? 'Duplicate' : 'New record'}
-        </Text>
+        <View className="items-center">
+          <Text className="text-sm font-medium text-muted" testID="record-title">
+            {/* Names the ACTION you are in, not the row that will result.
+                Duplicating a refund still produces a refund, but "Refund" here
+                would leave you wondering which of the two things you tapped. */}
+            {isEdit ? 'Edit record' : refundOf ? 'Refund' : copyOf ? 'Duplicate' : 'New record'}
+          </Text>
+
+          {/* Repeating is a property of the record you are entering, so it is
+              entered here rather than on a screen of its own — the amount,
+              account and category pickers already live on this screen and
+              should not be built a second time somewhere worse. */}
+          {!isEdit ? (
+            <Pressable
+              onPress={() => setRepeatOpen(true)}
+              testID="record-repeat"
+              accessibilityRole="button"
+              accessibilityLabel="Repeat"
+              className="mt-0.5 flex-row items-center gap-1 active:opacity-70">
+              <Icon name="refresh" size={12} color={repeat ? palette.accent : palette.muted} />
+              <Text
+                className={`text-xs ${repeat ? 'font-medium text-accent' : 'text-muted'}`}
+                numberOfLines={1}>
+                {describeRepeat(repeat, toYmd(occurredAt))}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
 
         <Pressable
           onPress={onSave}
