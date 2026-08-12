@@ -2,6 +2,7 @@ import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { DriveBackup } from '@/components/drive-backup';
 import { Icon } from '@/components/icon';
 import { StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
@@ -192,6 +193,11 @@ export default function ExportScreen() {
           kind="backup"
           onPress={run}
         />
+
+        {/* Below the local options deliberately. The Drive copy lives in a
+            hidden app folder no browser can reach, so it is the convenience,
+            and a file the user physically holds is still the safety net. */}
+        <DriveBackup />
 
         <View className="mb-4 rounded-xl border border-expense/30 bg-surface p-4">
           <View className="mb-2 flex-row items-center gap-2.5">
