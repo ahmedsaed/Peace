@@ -90,3 +90,34 @@ appId: com.ahmed.peace
 #
 # The whole round trip — record, back up, wipe with `pm clear`, restore, undo —
 # was verified by hand on a release build.
+
+# --- Google Drive: the part a flow can honestly assert ---
+#
+# NOT the sign-in. Driving a real Google consent screen needs a Google account
+# on the device, a live network and a real grant — non-hermetic and flaky, and
+# it would be asserting Google's UI rather than this app's. What IS testable is
+# that the section renders, offers the right thing, and explains itself; the
+# logic behind the button is covered by unit tests (google-auth, drive-api,
+# seal, drive) and by hand on a release build.
+- scrollUntilVisible:
+    element:
+      id: "drive-section"
+    direction: DOWN
+- assertVisible:
+    id: "drive-connect"
+# The promise the user is being asked to accept. If this copy ever stops
+# matching what the code does — a visible folder, or an unencrypted upload
+# described as private — that is a lie in the one place it matters most.
+- assertVisible: ".*private folder only Peace can see.*"
+- takeScreenshot: 04-drive-disconnected
+
+# Before connecting there is nothing to report, so none of the connected
+# controls may be on screen. A section that showed "Back up now" while
+# disconnected would fail on the first tap with an auth error the user could
+# not act on.
+- assertNotVisible:
+    id: "drive-backup-now"
+- assertNotVisible:
+    id: "drive-check"
+- assertNotVisible:
+    id: "drive-cadence-weekly"
