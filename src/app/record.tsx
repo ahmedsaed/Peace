@@ -34,6 +34,7 @@ import { byDensity, useDensity } from '@/lib/layout';
 import { convertMinor, formatMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
 import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
+import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
 import { CURRENCIES } from '@/lib/currencies';
 import { foreignPurchase } from '@/lib/fees';
@@ -198,6 +199,30 @@ export default function RecordScreen() {
   // component grew a second rate to fetch, the compiler could no longer prove
   // this useCallback's deps and gave up optimising the entire file.
   const onFetchRate = () => void fetchFor(currency);
+
+  /**
+   * Paying a card: fill in what it owes.
+   *
+   * Not a button anywhere — transferring into a card IS paying it, and the app
+   * already has that. All that was missing was the amount, which otherwise
+   * means leaving the screen to look it up and typing it back in.
+   *
+   * ONLY when nothing has been typed yet. A prefill that overwrites what
+   * someone has already entered is worse than no prefill: it is a silent edit
+   * to a number they chose, and a part payment is completely normal.
+   */
+  function onPickToAccount(pickedId: string) {
+    if (type !== 'transfer' || existing) return;
+    if (calc.entry !== '0' || calc.pendingOp !== null) return;
+
+    const target = accounts.find((a) => a.id === pickedId);
+    if (!target || !isLiability(target.type)) return;
+    // Only a card in DEBT has something to settle; one in credit does not.
+    const owed = -accountBalance(db, pickedId);
+    if (owed <= 0) return;
+
+    setCalc(calcFromMinor(owed, target.currency));
+  }
 
   /**
    * The rate INTO THE CARD'S currency, which is a different question from the
@@ -900,6 +925,7 @@ export default function RecordScreen() {
         selectedId={toAccountId}
         onSelect={(pickedId) => {
           setToAccountId(pickedId);
+          onPickToAccount(pickedId);
           setSheet(null);
         }}
         onClose={() => setSheet(null)}
