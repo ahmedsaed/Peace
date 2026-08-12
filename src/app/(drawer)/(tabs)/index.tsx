@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { SectionList, Text } from 'react-native';
 
+import { RecordActions } from '@/components/record-actions';
 import { RecordRow } from '@/components/record-row';
 import { Snackbar } from '@/components/snackbar';
 import { EmptyState, Fab, MonthHeader, Screen, SummaryTrio } from '@/components/screen';
@@ -14,7 +15,7 @@ import {
   type RecordRow as Row,
 } from '@/db/repo/records';
 import { broughtForward, type BroughtForward } from '@/db/repo/carry';
-import { restoreRecords } from '@/db/repo/transactions';
+import { deleteRecord, restoreRecords } from '@/db/repo/transactions';
 import { formatMinor } from '@/lib/money';
 import { currentPeriod } from '@/lib/period';
 import { useSetting } from '@/state/settings';
@@ -47,8 +48,13 @@ export default function RecordsScreen() {
   const [rows, setRows] = useState<Row[]>([]);
   const [summary, setSummary] = useState<PeriodSummary>(EMPTY_SUMMARY);
   const [carried, setCarried] = useState<BroughtForward>(NO_CARRY);
+  // Long-pressed row, if any. The menu is the only place Delete lives now: at
+  // the bottom of the edit form it meant opening a record to change it in order
+  // to remove it, with a destructive action next to Save.
+  const [acting, setActing] = useState<Row | null>(null);
   const pendingUndo = useUndoStore((state) => state.pending);
   const clearUndo = useUndoStore((state) => state.clear);
+  const offerUndo = useUndoStore((state) => state.offer);
 
   const refresh = useCallback(() => {
     setRows(listRecordsForPeriod(db, period));
@@ -142,6 +148,7 @@ export default function RecordsScreen() {
             <RecordRow
               row={item}
               onPress={() => router.push({ pathname: '/record', params: { id: item.id } })}
+              onLongPress={() => setActing(item)}
             />
           )}
           renderSectionHeader={({ section }) => (
@@ -156,6 +163,27 @@ export default function RecordsScreen() {
       )}
 
       <Fab onPress={() => router.push('/record')} raised={!!pendingUndo} />
+
+      <RecordActions
+        row={acting}
+        onClose={() => setActing(null)}
+        onRefund={() => {
+          // Starts from the record being reversed, so the refund inherits its
+          // account and category and cannot be filed against the wrong one.
+          router.push({ pathname: '/record', params: { refundOf: acting!.id } });
+          setActing(null);
+        }}
+        onDuplicate={() => {
+          router.push({ pathname: '/record', params: { copyOf: acting!.id } });
+          setActing(null);
+        }}
+        onDelete={() => {
+          const removed = deleteRecord(db, acting!.id);
+          offerUndo(removed, removed.length > 1 ? 'Transfer deleted' : 'Record deleted');
+          setActing(null);
+          refresh();
+        }}
+      />
 
       {pendingUndo ? (
         <Snackbar

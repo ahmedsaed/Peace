@@ -221,6 +221,7 @@ describe('groupByDay', () => {
     occurredAt: new Date(2026, 7, day, hour),
     isTransfer: false,
     isAdjustment: false,
+    isRefund: false,
     categoryName: null,
     categoryIcon: null,
     categoryColor: null,

@@ -12,6 +12,15 @@ type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
 export type RecordInput = {
   type: 'expense' | 'income';
+  /**
+   * Money coming back on the expense side — a return, or a friend settling
+   * their share. Stored as a POSITIVE amount on an expense-kind row so it nets
+   * against the category it reverses.
+   *
+   * Only meaningful with `type: 'expense'`. A refund of income is not a thing;
+   * that is just an expense.
+   */
+  isRefund?: boolean;
   accountId: string;
   categoryId?: string | null;
   /** ALWAYS unsigned. The sign is derived from `type` — see below. */
@@ -85,7 +94,11 @@ export function createRecord(db: Db, input: RecordInput): Transaction {
   assertAmount(input.amountMinor);
 
   const id = input.id ?? newId();
-  const signed = input.type === 'expense' ? -input.amountMinor : input.amountMinor;
+  // A refund is the one expense that is positive. Everything downstream decides
+  // sides through predicates.ts rather than by testing this sign, which is what
+  // makes that safe.
+  const refund = input.type === 'expense' && !!input.isRefund;
+  const signed = input.type === 'expense' && !refund ? -input.amountMinor : input.amountMinor;
   const currency = input.currency ?? 'EGP';
   const fxRate = input.fxRate ?? 1;
 
@@ -98,6 +111,7 @@ export function createRecord(db: Db, input: RecordInput): Transaction {
       currency,
       fxRate,
       ...homeAmount(signed, currency, input.homeCurrency, fxRate),
+      isRefund: refund,
       note: input.note ?? null,
       occurredAt: input.occurredAt ?? new Date(),
     })
@@ -173,6 +187,8 @@ export function getRecord(db: Db, id: string): Transaction | undefined {
 
 export type RecordPatch = {
   type?: 'expense' | 'income';
+  /** Carried over from the existing row when not given. */
+  isRefund?: boolean;
   accountId?: string;
   categoryId?: string | null;
   /** Unsigned, like createRecord. */
@@ -203,14 +219,18 @@ export function updateRecord(db: Db, id: string, patch: RecordPatch): Transactio
     throw new InvariantError('This is a transfer — edit it as a transfer, not as a record.');
   }
 
-  const type = patch.type ?? (existing.amountMinor < 0 ? 'expense' : 'income');
+  // NOT `existing.amountMinor < 0`. A refund is the one expense with a positive
+  // amount, so inferring the side from the sign would silently turn an edited
+  // refund into income — the very bug this feature exists to remove.
+  const refund = patch.isRefund ?? existing.isRefund;
+  const type = patch.type ?? (refund || existing.amountMinor < 0 ? 'expense' : 'income');
   const unsigned = patch.amountMinor ?? Math.abs(existing.amountMinor);
   assertAmount(unsigned);
 
   // Recomputed, never carried over: the stored home amount describes a specific
   // amount at a specific rate, so leaving it untouched while the amount changes
   // would leave every total quoting the old value.
-  const signedNew = type === 'expense' ? -unsigned : unsigned;
+  const signedNew = type === 'expense' && !refund ? -unsigned : unsigned;
   const currencyNew = patch.currency ?? existing.currency;
   const fxRateNew = patch.fxRate ?? existing.fxRate;
 
@@ -219,6 +239,7 @@ export function updateRecord(db: Db, id: string, patch: RecordPatch): Transactio
       accountId: patch.accountId ?? existing.accountId,
       categoryId: patch.categoryId === undefined ? existing.categoryId : patch.categoryId,
       amountMinor: signedNew,
+      isRefund: refund,
       currency: currencyNew,
       fxRate: fxRateNew,
       ...homeAmount(signedNew, currencyNew, patch.homeCurrency, fxRateNew),

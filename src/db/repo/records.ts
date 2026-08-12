@@ -3,7 +3,7 @@ import { alias, type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { formatDayHeading, periodBounds, type Period } from '../../lib/period';
 import * as schema from '../schema';
-import { movesPosition } from './predicates';
+import { movesPosition, onExpenseSide, onIncomeSide } from './predicates';
 import { accounts, categories, transactions } from '../schema';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
@@ -17,6 +17,8 @@ export type RecordRow = {
   isTransfer: boolean;
   /** A balance correction, not spending. Rendered as its own kind of row. */
   isAdjustment: boolean;
+  /** Money coming back on the expense side. */
+  isRefund: boolean;
   categoryName: string | null;
   categoryIcon: string | null;
   categoryColor: string | null;
@@ -44,6 +46,7 @@ export function listRecordsForPeriod(db: Db, period: Period): RecordRow[] {
       occurredAt: transactions.occurredAt,
       transferPairId: transactions.transferPairId,
       isAdjustment: transactions.isAdjustment,
+      isRefund: transactions.isRefund,
       categoryName: categories.name,
       categoryIcon: categories.icon,
       categoryColor: categories.color,
@@ -111,8 +114,8 @@ export function periodSummary(db: Db, period: Period, homeCurrency = 'EGP'): Per
 
   const row = db
     .select({
-      expense: sql<number>`coalesce(sum(case when ${transactions.isAdjustment} = 0 and ${transactions.amountMinor} < 0 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
-      income: sql<number>`coalesce(sum(case when ${transactions.isAdjustment} = 0 and ${transactions.amountMinor} > 0 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
+      expense: sql<number>`coalesce(sum(case when ${onExpenseSide()} then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
+      income: sql<number>`coalesce(sum(case when ${onIncomeSide()} then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
       adjustment: sql<number>`coalesce(sum(case when ${transactions.isAdjustment} = 1 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
       unvalued: sql<number>`coalesce(sum(case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then 0 else 1 end), 0)`,
     })

@@ -10,7 +10,7 @@ shipped after it.
 | 1 | Liability balances shown as **owed**, with available credit | ✅ shipped |
 | — | **Balance corrections** — an adjustment that moves the balance and never spending | ✅ shipped |
 | — | Per-card **fee profile** (limit, foreign %, cash %) rather than one bank's rules in the app | ✅ shipped |
-| 2 | **Refund** as a negative expense against the original category | not built |
+| 2 | **Refund** as a negative expense against the original category | ✅ shipped |
 | 3 | **"Pay this card"** — became a prefill on the transfer, not a button | ✅ shipped |
 | 4 | `statementDay` / `dueDay` and a derived statement view | **not planned** — see below |
 | 5 | Foreign purchases store the settled amount, fee computed from the card | ✅ shipped |
@@ -260,7 +260,7 @@ Settled on 2026-08-09.
 That removes interest from the slice and splits the refund work in two, leaving:
 
 1. ✅ Liability balances render as **owed** *(presentation)*
-2. **Refund flag** — a signed expense that nets against its category *(repo + record form)*
+2. ✅ **Refund** — reached by long-pressing the purchase it reverses, so it inherits that account and category rather than being filed by hand
 3. ✅ **Paying a card** — became a prefill on the transfer rather than a button. Transferring into a
    card already *was* paying it; only the amount was missing.
 4. ~~`statementDay` / `dueDay`~~ — not planned, see above
@@ -273,5 +273,8 @@ to move the balance without inventing a purchase — which turned out to need a 
 non-spending row alongside transfer legs, and a single home for that rule in
 `src/db/repo/predicates.ts`.
 
-**Item 2 is now the only thing left**, and it is the one that stops the numbers drifting: relaxing
-"expense rows are negative" is exactly the class of change the repository layer exists to police.
+**Everything on this list has now shipped.** Item 2 was the one that stops the numbers drifting, and
+relaxing "expense rows are negative" was exactly the class of change the repository layer exists to
+police: the SQL was fixed to decide sides by `isRefund` rather than by sign, and three JavaScript
+callers were then found still doing the old test — caught by an E2E flow that duplicated a refund
+and produced income.
