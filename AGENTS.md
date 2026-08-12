@@ -362,6 +362,21 @@ app ignoring input. `pkill -f GradleDaemon`.
   checked `rows.length === 0` and knew nothing about due rows, so a month with no records but a
   standing order owing money rendered "No records this month" and hid the very thing the feature
   exists for. Gate on the merged sections. Every unit test passed throughout.
+- **A background task reads settings from SQLITE, never from the zustand store.** It runs in a
+  headless JS context with no React tree, so the store was never loaded and hands back its built-in
+  defaults — `driveCadence: 'off'` — and the task would decide there was nothing to do, forever,
+  with nothing in any log to say why. A store is a UI cache; the database is the truth.
+- **WorkManager is an accelerator, never the mechanism.** It defers at the OS's discretion, and a
+  force-stop — by the user or by an OEM battery manager "helping" — cancels pending work until the
+  app is launched again. The on-open catch-up is what actually delivers a weekly backup, because
+  this is an expense tracker and it gets opened. Ask to be woken roughly twice a day and do nothing
+  unless a backup is owed: the OS gives no guarantee about *when*, so frequent cheap no-ops converge
+  far better than one weekly request that gets missed.
+- **A surviving mutant is a question, not a verdict.** `shouldBackUp` had an explicit
+  `cadence === 'off'` guard that no test could kill — because `backupDue` already owned that rule.
+  The line was dead, not the test weak. Deleting it put the rule back in one place, where mutating
+  it now fails tests in both files. When a mutant survives, ask whether the code is redundant before
+  assuming the assertion is.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
