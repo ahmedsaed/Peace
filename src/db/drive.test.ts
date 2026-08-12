@@ -29,13 +29,19 @@ jest.mock('../lib/google-auth', () => ({
   withDriveToken: jest.fn(async (call: (t: string) => unknown) => call('token')),
 }));
 jest.mock('../lib/secrets', () => ({ getPassphrase: jest.fn(async () => null) }));
+jest.mock('./restore', () => ({
+  restoreFrom: jest.fn(async () => ({ copied: { transactions: 43 }, safetyBytes: 1000 })),
+  currentCounts: jest.fn(() => ({ transactions: 0, accounts: 0 })),
+  refreshAfterRestore: jest.fn(),
+}));
 
 /* eslint-disable import/first */
 import { databaseBackup } from './backup';
-import { deleteBackup, listBackups, uploadBackup } from '../lib/drive-api';
+import { deleteBackup, downloadBackup, listBackups, uploadBackup } from '../lib/drive-api';
 import { getPassphrase } from '../lib/secrets';
-import { isSealed } from '../lib/seal';
-import { runBackup } from './drive';
+import { isSealed, seal } from '../lib/seal';
+import { restoreFrom } from './restore';
+import { restoreFromDrive, runBackup } from './drive';
 /* eslint-enable import/first */
 
 const mocked = {
@@ -43,7 +49,9 @@ const mocked = {
   uploadBackup: uploadBackup as jest.Mock,
   listBackups: listBackups as jest.Mock,
   deleteBackup: deleteBackup as jest.Mock,
+  downloadBackup: downloadBackup as jest.Mock,
   getPassphrase: getPassphrase as jest.Mock,
+  restoreFrom: restoreFrom as jest.Mock,
 };
 
 /** A SQLite-looking payload, since `seal` refuses anything else on the way back. */
@@ -74,6 +82,7 @@ beforeEach(() => {
   mocked.getPassphrase.mockResolvedValue(null);
   mocked.listBackups.mockResolvedValue([]);
   mocked.uploadBackup.mockResolvedValue({ id: 'new', name: 'n', size: 1, createdTime: 't' });
+  mocked.restoreFrom.mockResolvedValue({ copied: { transactions: 43 }, safetyBytes: 1000 });
 });
 
 describe('taking a backup', () => {
@@ -187,6 +196,77 @@ describe('pruning old backups', () => {
     mocked.deleteBackup.mockRejectedValue(new Error('permission denied'));
 
     await expect(runBackup()).resolves.toMatchObject({ pruned: 0 });
+  });
+});
+
+/**
+ * `appdata` is reachable by nothing but this app — no browser, no file manager.
+ * Without this path a backup in Drive could be read by no software on earth,
+ * which makes it not a backup.
+ */
+describe('restoring from Drive', () => {
+  const PASS = 'a good long passphrase';
+
+  it('hands the plain database to the ordinary restore path', async () => {
+    // Reusing `restoreFrom` is what makes a Drive restore validate before
+    // deleting, park a safety copy, and share the same Undo button.
+    mocked.downloadBackup.mockResolvedValue(LEDGER);
+
+    const result = await restoreFromDrive('file-1');
+
+    expect(mocked.restoreFrom).toHaveBeenCalledTimes(1);
+    expect(result.copied.transactions).toBe(43);
+  });
+
+  it('decrypts a sealed backup before restoring it', async () => {
+    mocked.downloadBackup.mockResolvedValue(await seal(LEDGER, PASS, { logN: 8, r: 8, p: 1 }));
+    mocked.getPassphrase.mockResolvedValue(PASS);
+
+    // Read DURING the call: the staged file is deleted as soon as the restore
+    // returns, which is the behaviour that keeps a decrypted copy of the whole
+    // ledger from lingering in the cache.
+    let handed: Uint8Array | null = null;
+    mocked.restoreFrom.mockImplementation(async (file: { bytes: () => Promise<Uint8Array> }) => {
+      handed = await file.bytes();
+      return { copied: { transactions: 43 }, safetyBytes: 1000 };
+    });
+
+    await restoreFromDrive('file-1');
+
+    // What reached the restore path is the LEDGER, not the ciphertext.
+    expect(handed).not.toBeNull();
+    expect(isSealed(handed!)).toBe(false);
+    expect(Array.from(handed!)).toEqual(Array.from(LEDGER));
+  });
+
+  it('says the passphrase is missing rather than blaming the backup', async () => {
+    mocked.downloadBackup.mockResolvedValue(await seal(LEDGER, PASS, { logN: 8, r: 8, p: 1 }));
+    mocked.getPassphrase.mockResolvedValue(null);
+
+    await expect(restoreFromDrive('file-1')).rejects.toThrow(/sealed.*passphrase/i);
+    expect(mocked.restoreFrom).not.toHaveBeenCalled();
+  });
+
+  it('refuses a wrong passphrase without touching the ledger', async () => {
+    mocked.downloadBackup.mockResolvedValue(await seal(LEDGER, PASS, { logN: 8, r: 8, p: 1 }));
+    mocked.getPassphrase.mockResolvedValue('not the passphrase at all');
+
+    await expect(restoreFromDrive('file-1')).rejects.toThrow();
+    expect(mocked.restoreFrom).not.toHaveBeenCalled();
+  });
+
+  it('refuses an empty download rather than wiping the ledger with nothing', async () => {
+    mocked.downloadBackup.mockResolvedValue(new Uint8Array(0));
+
+    await expect(restoreFromDrive('file-1')).rejects.toThrow(/empty/i);
+    expect(mocked.restoreFrom).not.toHaveBeenCalled();
+  });
+
+  it('refuses a file that is neither sealed nor a database', async () => {
+    mocked.downloadBackup.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
+
+    await expect(restoreFromDrive('file-1')).rejects.toThrow(/neither sealed nor/i);
+    expect(mocked.restoreFrom).not.toHaveBeenCalled();
   });
 });
 

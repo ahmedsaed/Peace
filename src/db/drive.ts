@@ -27,6 +27,7 @@ import { isSealed, looksLikeSqlite, seal, SealError, unseal } from '../lib/seal'
 import { getPassphrase } from '../lib/secrets';
 import { databaseBackup } from './backup';
 import { sqliteDb } from './client';
+import { restoreFrom, type RestoreResult } from './restore';
 import { countRows, validateBackup } from './restore-core';
 
 /** A 401 means the cached token aged out; anything else is a real failure. */
@@ -200,3 +201,54 @@ function inspect(plain: Uint8Array): { records: number; accounts: number; catego
 
 /** For the settings row: is this cadence one that runs by itself? */
 export const isAutomatic = (cadence: Cadence) => cadence !== 'off';
+
+/** What is in Drive, newest first, for the restore picker. */
+export async function listDriveBackups(): Promise<DriveFile[]> {
+  return withDriveToken((token) => listBackups(token), tokenExpired);
+}
+
+/**
+ * Restore from Drive.
+ *
+ * Without this the feature has a hole exactly where it matters: `appdata` is
+ * unreachable from any browser, so a backup in there can ONLY be read by this
+ * app — and until now this app could only restore from a file the user picked
+ * off the filesystem. Backups readable by nothing at all are not backups.
+ *
+ * Everything after the decryption is the existing restore path, deliberately:
+ * `restoreFrom` validates before deleting anything, parks the current database
+ * as a safety copy, and replaces the ledger inside one transaction. Reusing it
+ * means Drive restores are undoable by the same button as file restores, rather
+ * than being a second implementation that has to be kept in step.
+ */
+export async function restoreFromDrive(id: string): Promise<RestoreResult> {
+  const downloaded = await withDriveToken((token) => downloadBackup(token, id), tokenExpired);
+
+  if (downloaded.byteLength === 0) {
+    throw new DriveError('That backup is empty, so there is nothing to restore.', 0);
+  }
+
+  let plain = downloaded;
+  if (isSealed(downloaded)) {
+    const passphrase = await getPassphrase();
+    if (passphrase === null) {
+      throw new SealError('That backup is sealed. Set its passphrase before restoring.');
+    }
+    plain = await unseal(downloaded, passphrase);
+  } else if (!looksLikeSqlite(downloaded)) {
+    throw new SealError('That backup is neither sealed nor a Peace database.');
+  }
+
+  const staged = new File(Paths.cache, 'drive-restore.db');
+  if (staged.exists) staged.delete();
+  staged.create();
+  staged.write(plain);
+
+  try {
+    return await restoreFrom(staged);
+  } finally {
+    // A decrypted copy of the whole ledger, sitting in the cache. It has served
+    // its purpose the moment the restore returns either way.
+    if (staged.exists) staged.delete();
+  }
+}
