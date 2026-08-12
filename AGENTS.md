@@ -234,6 +234,15 @@ app ignoring input. `pkill -f GradleDaemon`.
   array that was capped gives a number that silently means "the first 300 of them" — worse than
   showing no total at all. Two queries: one for the rows, one aggregate for the figures. The test
   runs with `limit: 1` and asserts the full total.
+- **A second reason to exclude a row is a second place to forget it.** There are now two kinds of
+  row that are not ordinary spending — a transfer leg and a balance correction — and they have
+  DIFFERENT consequences: both stay out of income and expense, but a correction still moves the
+  running position. Written out at each of the six queries that need them, one gets missed, and the
+  miss reads as a category screen quietly disagreeing with a header. `src/db/repo/predicates.ts`
+  holds `countsAsSpending`, `movesPosition` and `movesAccountBalance`; never write the guard inline.
+- **Negating zero gives negative zero, and it is a different value.** `Object.is(-0, 0)` is false,
+  `toEqual` will not catch it, and it can reach the screen as "-E£0.00" on a card that is exactly
+  settled. Anywhere money is negated at a boundary — `liability.ts` does it twice — normalise it.
 - **A feature whose design keeps forcing awkward questions is usually the wrong feature.** Budget
   carry-over — an unspent limit growing next month's limit — had two questions with no good answer
   (does it compound into an unbounded balance? does an overspend carry as a debt?). Both existed

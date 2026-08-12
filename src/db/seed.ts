@@ -41,6 +41,12 @@ const EXPENSE: [slug: string, name: string, icon: string, color: string][] = [
   ['pets', 'Pets', 'paw', '#C99A2E'],
   ['baby', 'Baby', 'bottle', '#A8475C'],
   ['insurance', 'Insurance', 'shield', '#6B5B4A'],
+  // Where a card's foreign-transaction commission and cash-withdrawal fee land.
+  // A real, permanent cost — unlike a provisional Murabaha booking, which
+  // reverses on settlement and is not spending at all. Seeding is
+  // onConflictDoNothing on every launch, so this appears for existing ledgers
+  // too without a migration.
+  ['bank-fees', 'Bank fees', 'percent', '#8A6A3D'],
   ['other-expense', 'Other', 'dots', '#6B5B4A'],
 ];
 

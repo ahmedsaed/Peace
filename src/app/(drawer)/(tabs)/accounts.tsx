@@ -6,6 +6,7 @@ import { Icon } from '@/components/icon';
 import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
 import { balanceByCurrency, listAccountsWithBalance, type CurrencyTotal } from '@/db/repo/accounts';
+import { availableCredit, isLiability, owedDisplay } from '@/lib/liability';
 import { formatMinor } from '@/lib/money';
 import { useSetting } from '@/state/settings';
 
@@ -66,22 +67,73 @@ export default function AccountsScreen() {
 
             <View className="flex-1">
               <Text className="text-base text-ink">{account.name}</Text>
-              <Text className="text-xs capitalize text-muted">
-                {account.type} · {account.currency}
+              <Text className="text-xs capitalize text-muted" testID={`account-sub-${account.id}`}>
+                {accountSubtitle(account)}
               </Text>
             </View>
 
-            <Text
-              className={`text-base font-semibold ${
-                account.balanceMinor < 0 ? 'text-expense' : 'text-income'
-              }`}>
-              {formatMinor(account.balanceMinor, account.currency)}
-            </Text>
+            <AccountAmount account={account} />
           </Pressable>
         ))}
       </ScrollView>
 
       <Fab onPress={() => router.push('/account')} testID="fab-account" />
     </Screen>
+  );
+}
+
+type Row = ReturnType<typeof listAccountsWithBalance>[number];
+
+/**
+ * "card · EGP", or the headroom left when a limit is recorded.
+ *
+ * Available credit is the number people actually plan against — "can I put this
+ * on the card" is not answered by knowing what you owe.
+ */
+function accountSubtitle(account: Row): string {
+  const available = isLiability(account.type)
+    ? availableCredit(account.balanceMinor, account.creditLimit)
+    : null;
+
+  if (available === null) return `${account.type} · ${account.currency}`;
+  return `${formatMinor(available, account.currency)} of ${formatMinor(
+    account.creditLimit ?? 0,
+    account.currency
+  )} available`;
+}
+
+/**
+ * The balance, read the way the account actually works.
+ *
+ * A card at −5,000 is five thousand of DEBT, not an emptied wallet, and showing
+ * the two identically is what teaches someone to distrust the screen. The
+ * stored sign never changes — net worth is still a plain sum across every
+ * account — this is the render boundary and only the render boundary.
+ */
+function AccountAmount({ account }: { account: Row }) {
+  if (!isLiability(account.type)) {
+    return (
+      <Text
+        className={`text-base font-semibold ${
+          account.balanceMinor < 0 ? 'text-expense' : 'text-income'
+        }`}
+        testID={`account-amount-${account.id}`}>
+        {formatMinor(account.balanceMinor, account.currency)}
+      </Text>
+    );
+  }
+
+  const owed = owedDisplay(account.balanceMinor);
+  return (
+    <View className="items-end">
+      <Text
+        className={`text-base font-semibold ${owed.isDebt ? 'text-expense' : 'text-income'}`}
+        testID={`account-amount-${account.id}`}>
+        {formatMinor(owed.magnitudeMinor, account.currency)}
+      </Text>
+      <Text className="text-[11px] text-muted" testID={`account-owed-${account.id}`}>
+        {owed.label}
+      </Text>
+    </View>
   );
 }

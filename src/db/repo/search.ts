@@ -21,6 +21,7 @@ import {
 } from '../../lib/search-query';
 import * as schema from '../schema';
 import { accounts, categories, transactions } from '../schema';
+import { countsAsSpending } from './predicates';
 import type { RecordRow } from './records';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
@@ -171,6 +172,7 @@ export function searchRecords(
       note: transactions.note,
       occurredAt: transactions.occurredAt,
       transferPairId: transactions.transferPairId,
+      isAdjustment: transactions.isAdjustment,
       categoryName: categories.name,
       categoryIcon: categories.icon,
       categoryColor: categories.color,
@@ -193,9 +195,10 @@ export function searchRecords(
   // meant something it does not.
   const valued = sql`case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home}
       then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end`;
-  // TRANSFERS ARE NEITHER INCOME NOR EXPENSE. Counting them would inflate both
-  // sides by the same amount, exactly as periodSummary avoids.
-  const spendable = sql`${transactions.transferPairId} is null`;
+  // Neither transfers nor balance corrections are income or expense — one copy
+  // of that rule, in predicates.ts, because this is the sixth query that needs
+  // it and the sixth is where a hand-written guard gets forgotten.
+  const spendable = countsAsSpending();
 
   const totals = db
     .select({

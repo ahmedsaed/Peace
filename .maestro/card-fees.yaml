@@ -1,0 +1,131 @@
+appId: com.ahmed.peace
+---
+# A purchase abroad on a card: the rate into the CARD's currency, and the card's
+# commission as its own record.
+#
+# $25 at 49.873 is E£1,246.83. The card's 3% is E£37.40. The statement will show
+# E£1,284.23. Every assertion below is one of those three numbers, because a
+# screen that computed the fee from the wrong base — or applied it twice, or not
+# at all — would still show a plausible total.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- a card that charges 3% abroad ---
+- tapOn:
+    id: "tab-accounts"
+- tapOn:
+    id: "fab-account"
+- tapOn:
+    id: "account-name"
+- inputText: "Kenana"
+- hideKeyboard
+- tapOn:
+    id: "acct-type-card"
+- tapOn:
+    id: "account-foreign-fee"
+- inputText: "3"
+- hideKeyboard
+- tapOn:
+    id: "form-save"
+
+# --- a $25 dinner ---
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-account"
+- tapOn: "Kenana"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Restaurants"
+
+# The currency is a control only on a card — everywhere else an account's rows
+# are all in its own currency, so there would be nothing to choose.
+- tapOn:
+    id: "amount-currency"
+- assertVisible:
+    id: "sheet-abroad"
+- scrollUntilVisible:
+    element:
+      text: "US dollar"
+    direction: DOWN
+- tapOn: "US dollar"
+
+- tapOn:
+    id: "abroad-rate"
+- inputText: "49.873"
+- hideKeyboard
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-5"
+
+# The estimate, before saving. It says it is an estimate, because the bank
+# settles days later at its own rate — that is what "Update balance" is for.
+- assertVisible:
+    id: "abroad-preview"
+    text: "E£1,246.83 \\+ E£37.40 fee = E£1,284.23.*estimate.*"
+- takeScreenshot: 01-abroad-estimate
+
+- tapOn:
+    id: "record-save"
+
+# --- two rows, not one ---
+# Folded into the purchase the commission would be invisible for ever, and
+# Restaurants would carry a bank charge it never incurred.
+- assertVisible: "Bank fees"
+# Wildcards because the row renders it as `Kenana · "3% foreign commission"`
+# and Maestro matches the WHOLE text, not a substring.
+- assertVisible: ".*3% foreign commission.*"
+- assertVisible: "-E£37.40"
+- assertVisible: "-E£1,246.83"
+# ...and the card moved by the total of both.
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£1,284.23"
+- takeScreenshot: 02-two-rows
+
+# --- the card is charged in ITS currency, not in dollars ---
+# Store the dollars as the account movement and the balance could never agree
+# with the statement.
+- tapOn:
+    id: "tab-accounts"
+- assertVisible: "E£1,284.23"
+- assertVisible:
+    id: "account-owed-.*"
+    text: "owed"
+
+# --- the commission is separately answerable ---
+- tapOn:
+    id: "tab-analysis"
+- assertVisible:
+    id: "analysis-total"
+    text: "E£1,284.23"
+- assertVisible: "Bank fees"
+
+# --- deleting the purchase takes its commission with it ---
+- tapOn:
+    id: "tab-index"
+- tapOn: "Restaurants"
+- tapOn:
+    id: "record-delete"
+- assertVisible:
+    id: "summary-expense"
+    text: "E£0.00"
+- assertNotVisible: "Bank fees"
+
+# --- and undo puts BOTH back ---
+# A cascade the undo buffer does not know about would restore the purchase and
+# leave the commission gone for good.
+- tapOn: "Undo"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£1,284.23"
+- assertVisible: "Bank fees"
+- takeScreenshot: 03-undo-restores-both

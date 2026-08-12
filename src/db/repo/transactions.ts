@@ -5,6 +5,7 @@ import { newId } from '../../lib/id';
 import { convertMinor } from '../../lib/money';
 import * as schema from '../schema';
 import { transactions, type Transaction } from '../schema';
+import { withFeeRows } from './card';
 import { InvariantError } from './categories';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
@@ -327,8 +328,16 @@ export function deleteRecord(db: Db, id: string): Transaction[] {
   if (!row) return [];
 
   if (!row.transferPairId) {
-    db.delete(transactions).where(eq(transactions.id, id)).run();
-    return [row];
+    // A card fee belongs to the purchase that incurred it, so the two are
+    // deleted and restored as one. Returning only the purchase would put half
+    // of it back on Undo and leave the commission gone for good.
+    let removed: Transaction[] = [];
+    db.transaction((tx) => {
+      removed = withFeeRows(tx as Db, id);
+      tx.delete(transactions).where(eq(transactions.feeForId, id)).run();
+      tx.delete(transactions).where(eq(transactions.id, id)).run();
+    });
+    return removed;
   }
 
   const pairId = row.transferPairId;

@@ -1,0 +1,145 @@
+appId: com.ahmed.peace
+---
+# Credit cards: a balance read as debt, a limit instead of an opening balance,
+# and a correction that never counts as spending.
+#
+# The assertion that matters is the LAST one. Correcting a card has to move the
+# balance and the running position while leaving EXPENSE exactly where it was —
+# if a correction leaked into spending, reconciling would drop a category's
+# worth of phantom expenditure into whichever month you happened to do it in,
+# which is the drift this whole feature exists to remove.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- a card is set up with a LIMIT, not an opening balance ---
+- tapOn:
+    id: "tab-accounts"
+- tapOn:
+    id: "fab-account"
+- tapOn:
+    id: "account-name"
+- inputText: "Kenana"
+- hideKeyboard
+- tapOn:
+    id: "acct-type-card"
+# The opening-balance field is replaced, not merely hidden alongside: a card's
+# starting debt arrives as a dated correction instead.
+- assertNotVisible:
+    id: "account-opening"
+- assertVisible:
+    id: "account-limit"
+- tapOn:
+    id: "account-limit"
+- inputText: "50000"
+- hideKeyboard
+# Fees live on the card, not in the app. Another card left blank charges none.
+- tapOn:
+    id: "account-foreign-fee"
+- inputText: "3"
+- hideKeyboard
+- tapOn:
+    id: "form-save"
+
+# --- a new card owes nothing, and says so in words ---
+- assertVisible:
+    id: "account-owed-.*"
+    text: "clear"
+- takeScreenshot: 01-card-created
+
+# --- spend on it ---
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-account"
+- tapOn: "Kenana"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Coffee"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£500.00"
+
+# --- the card reads as DEBT, not as an emptied wallet ---
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "account-owed-.*"
+    text: "owed"
+# Unsigned: five hundred owed, not minus five hundred held. The stored sign is
+# untouched — this is the render boundary only.
+- assertVisible: "E£500.00"
+# Headroom is what you plan against: "can I put this on the card" is not
+# answered by knowing what you owe.
+- assertVisible: "E£49,500.00 of E£50,000.00 available"
+- takeScreenshot: 02-card-owed
+
+# --- the bank disagrees: correct it ---
+- tapOn: "Kenana"
+- tapOn:
+    id: "account-reconcile"
+- assertVisible:
+    id: "reconcile-sheet"
+# Both numbers are offered because banking apps disagree about which one they
+# show. "Available" appears only because a limit was set.
+- assertVisible:
+    id: "reconcile-mode-available"
+- tapOn:
+    id: "reconcile-mode-owed"
+- tapOn:
+    id: "reconcile-input"
+- inputText: "520"
+- hideKeyboard
+# Shown BEFORE anything is written, and worded as an instruction — "-E£20"
+# alone says nothing about which way the correction goes.
+- assertVisible:
+    id: "reconcile-difference"
+    text: "Adds a E£20.00 correction against this account"
+- takeScreenshot: 03-reconcile
+- tapOn:
+    id: "reconcile-save"
+- tapOn:
+    id: "form-cancel"
+
+- assertVisible: "E£520.00"
+- assertVisible: "E£49,480.00 of E£50,000.00 available"
+
+# --- THE ASSERTION THAT MATTERS ---
+# The balance moved by E£20 and expense did not move at all. A correction is not
+# a purchase.
+- tapOn:
+    id: "tab-index"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£500.00"
+# It IS money, so the position followed it down.
+- assertVisible:
+    id: "summary-running"
+    text: "-E£520.00"
+# And it is visible in the list rather than silently moving a number — greyed,
+# named, and explicitly not spending.
+- assertVisible: "Balance correction"
+- assertVisible: "Kenana · not counted as spending"
+- takeScreenshot: 04-correction-listed
+
+# --- it stays out of the charts and the budgets too ---
+- tapOn:
+    id: "tab-analysis"
+- assertVisible:
+    id: "analysis-total"
+    text: "E£500.00"
+- assertNotVisible: "Balance correction"
