@@ -11,7 +11,15 @@ import { formatMinor } from '@/lib/money';
  * are visually distinct twice over — the transfer colour AND the "→" in the
  * subtitle — because colour alone is not a signal anyone can rely on.
  */
-export function RecordRow({ row, onPress }: { row: Row; onPress?: () => void }) {
+export function RecordRow({
+  row,
+  onPress,
+  onLongPress,
+}: {
+  row: Row;
+  onPress?: () => void;
+  onLongPress?: () => void;
+}) {
   // A correction is its own kind of row. Rendered like an expense it would read
   // as a mystery purchase in a category you never chose — which is exactly the
   // confusion the feature exists to remove.
@@ -19,9 +27,14 @@ export function RecordRow({ row, onPress }: { row: Row; onPress?: () => void }) 
     ? 'text-muted'
     : row.isTransfer
       ? 'text-transfer'
-      : row.amountMinor < 0
-        ? 'text-expense'
-        : 'text-income';
+      : // A refund is money coming back, but it belongs to the expense side and
+        // must not wear the income colour — the tint is what a reader checks at
+        // a glance, and green would say "earned".
+        row.isRefund
+        ? 'text-muted'
+        : row.amountMinor < 0
+          ? 'text-expense'
+          : 'text-income';
 
   // A transfer's stored amount is the negative outgoing leg, but showing it as
   // "-E£10,753" would read as spending. The direction is already carried by the
@@ -39,7 +52,9 @@ export function RecordRow({ row, onPress }: { row: Row; onPress?: () => void }) 
 
   const subtitle = row.isTransfer
     ? `${row.accountName} → ${row.counterAccountName ?? '—'}`
-    : row.isAdjustment
+    : row.isRefund
+      ? `${row.accountName} · refunded${row.note ? ` · “${row.note}”` : ''}`
+      : row.isAdjustment
       ? `${row.accountName} · not counted as spending`
       : row.note
         ? `${row.accountName} · “${row.note}”`
@@ -48,6 +63,7 @@ export function RecordRow({ row, onPress }: { row: Row; onPress?: () => void }) 
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       testID={`record-${row.id}`}
       className="flex-row items-center gap-3 border-b border-line px-4 py-3 active:bg-surface">
       <View

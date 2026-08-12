@@ -14,7 +14,6 @@ import { InvariantError, listCategoryTree } from '@/db/repo/categories';
 import {
   createRecord,
   createTransfer,
-  deleteRecord,
   getRecord,
   updateRecord,
   updateTransfer,
@@ -34,12 +33,12 @@ import { byDensity, useDensity } from '@/lib/layout';
 import { convertMinor, formatMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
 import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
+import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
 import { CURRENCIES } from '@/lib/currencies';
 import { foreignPurchase } from '@/lib/fees';
 import { isLiability } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
-import { useUndoStore } from '@/state/undo';
 
 type RecordType = 'income' | 'expense' | 'transfer';
 
@@ -52,7 +51,13 @@ const TYPES: { value: RecordType; label: string }[] = [
 export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, refundOf, copyOf } = useLocalSearchParams<{
+    id?: string;
+    /** Reverse this record: same account and category, marked a refund. */
+    refundOf?: string;
+    /** Same again, dated today. */
+    copyOf?: string;
+  }>();
   const density = useDensity();
 
   const accounts = useMemo(() => listAccountsWithBalance(db), []);
@@ -60,13 +65,36 @@ export default function RecordScreen() {
   // Load once. `id` does not change while the screen is mounted, and re-reading
   // on every render would fight the edits being made.
   const existing = useMemo(() => (id ? getRecord(db, id) : undefined), [id]);
+
+  /**
+   * The record being reversed or copied. NOT `existing` — this is a NEW record
+   * that borrows its fields, so nothing here is ever written back to the
+   * original.
+   *
+   * A refund starts from the purchase precisely so it inherits the account and
+   * category: choosing them by hand is exactly how a return ends up reducing
+   * whichever category happened to be on screen.
+   */
+  const source = useMemo(
+    () => (refundOf ? getRecord(db, refundOf) : copyOf ? getRecord(db, copyOf) : undefined),
+    [refundOf, copyOf]
+  );
+  // Refunding a record, editing one that already is, or duplicating one:
+  // "refund" is a property of the row, not of how the screen was opened.
+  const isRefund = (!!refundOf && !!source) || !!source?.isRefund || !!existing?.isRefund;
+
   const isEdit = !!existing;
   const editingTransfer = !!existing?.transferPairId;
 
   const [type, setType] = useState<RecordType>(() => {
-    if (!existing) return 'expense';
-    if (existing.transferPairId) return 'transfer';
-    return existing.amountMinor < 0 ? 'expense' : 'income';
+    // NEVER `amountMinor < 0` on its own. A refund is the one expense with a
+    // positive amount, so the sign alone would present it as Income — and
+    // saving from there would write it back as income.
+    const from = source ?? existing;
+    if (!from) return 'expense';
+    if (from.transferPairId) return 'transfer';
+    if (from.isRefund) return 'expense';
+    return from.amountMinor < 0 ? 'expense' : 'income';
   });
 
   const defaultAccountId = useSetting('defaultAccountId');
@@ -74,6 +102,7 @@ export default function RecordScreen() {
   // A transfer can be opened from either leg; the form always presents it as
   // "from the account that lost money".
   const [accountId, setAccountId] = useState(() => {
+    if (source) return source.accountId;
     if (!existing) {
       // The setting is only a preference, never a guarantee: an account can be
       // deleted or archived after being chosen as the default, and a form that
@@ -88,13 +117,21 @@ export default function RecordScreen() {
     return existing.accountId;
   });
   const [toAccountId, setToAccountId] = useState<string | null>(() => {
-    if (!existing) return accounts[1]?.id ?? null;
-    if (existing.transferPairId && existing.amountMinor > 0) return existing.accountId;
-    return existing.counterAccountId ?? accounts[1]?.id ?? null;
+    // A duplicated transfer has to carry its DESTINATION. Falling through to
+    // "whichever account happens to be second" produced a form that looked
+    // filled in and pointed somewhere else entirely.
+    const from = existing ?? source;
+    if (!from) return accounts[1]?.id ?? null;
+    if (from.transferPairId && from.amountMinor > 0) return from.accountId;
+    return from.counterAccountId ?? accounts[1]?.id ?? null;
   });
 
-  const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null);
-  const [note, setNote] = useState(existing?.note ?? '');
+  const [categoryId, setCategoryId] = useState<string | null>(
+    existing?.categoryId ?? source?.categoryId ?? null
+  );
+  const [note, setNote] = useState(existing?.note ?? source?.note ?? '');
+  // Dated TODAY for a refund or a copy: the money comes back, or goes out
+  // again, on the day it happens — not on the day of the record it came from.
   const [occurredAt, setOccurredAt] = useState<Date>(existing?.occurredAt ?? new Date());
   const [picking, setPicking] = useState<'date' | 'time' | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
@@ -110,15 +147,15 @@ export default function RecordScreen() {
   const [offered, setOffered] = useState<Sheet[]>(() =>
     existing ? ['account', 'toAccount', 'category'] : []
   );
-  const offerUndo = useUndoStore((state) => state.offer);
 
   const account = accounts.find((a) => a.id === accountId);
   const currency = account?.currency ?? 'EGP';
   const homeCurrency = useSetting('homeCurrency');
 
-  const [calc, setCalc] = useState(() =>
-    existing ? calcFromMinor(existing.amountMinor, existing.currency) : initialCalc()
-  );
+  const [calc, setCalc] = useState(() => {
+    const from = existing ?? source;
+    return from ? calcFromMinor(from.amountMinor, from.currency) : initialCalc();
+  });
 
   /**
    * A record in an account that does not hold the home currency needs a rate,
@@ -198,6 +235,30 @@ export default function RecordScreen() {
   // component grew a second rate to fetch, the compiler could no longer prove
   // this useCallback's deps and gave up optimising the entire file.
   const onFetchRate = () => void fetchFor(currency);
+
+  /**
+   * Paying a card: fill in what it owes.
+   *
+   * Not a button anywhere — transferring into a card IS paying it, and the app
+   * already has that. All that was missing was the amount, which otherwise
+   * means leaving the screen to look it up and typing it back in.
+   *
+   * ONLY when nothing has been typed yet. A prefill that overwrites what
+   * someone has already entered is worse than no prefill: it is a silent edit
+   * to a number they chose, and a part payment is completely normal.
+   */
+  function onPickToAccount(pickedId: string) {
+    if (type !== 'transfer' || existing) return;
+    if (calc.entry !== '0' || calc.pendingOp !== null) return;
+
+    const target = accounts.find((a) => a.id === pickedId);
+    if (!target || !isLiability(target.type)) return;
+    // Only a card in DEBT has something to settle; one in credit does not.
+    const owed = -accountBalance(db, pickedId);
+    if (owed <= 0) return;
+
+    setCalc(calcFromMinor(owed, target.currency));
+  }
 
   /**
    * The rate INTO THE CARD'S currency, which is a different question from the
@@ -398,6 +459,7 @@ export default function RecordScreen() {
         } else {
           updateRecord(db, existing.id, {
             type: type as 'expense' | 'income',
+            isRefund,
             accountId,
             categoryId,
             amountMinor,
@@ -441,6 +503,7 @@ export default function RecordScreen() {
           currency,
           fxRate: foreign ? fxRate : 1,
           homeCurrency,
+          isRefund,
           note: note.trim() || null,
           occurredAt,
         });
@@ -452,19 +515,6 @@ export default function RecordScreen() {
       setError(
         e instanceof InvariantError ? e.message : 'Could not save this record. Please try again.'
       );
-    }
-  }
-
-  function onDelete() {
-    if (!existing) return;
-    try {
-      // The rows come back so they can be put straight back on undo — see
-      // src/state/undo.ts for why this is not a soft delete.
-      const removed = deleteRecord(db, existing.id);
-      offerUndo(removed, removed.length > 1 ? 'Transfer deleted' : 'Record deleted');
-      router.back();
-    } catch {
-      setError('Could not delete this record.');
     }
   }
 
@@ -537,7 +587,10 @@ export default function RecordScreen() {
         </Pressable>
 
         <Text className="text-sm font-medium text-muted" testID="record-title">
-          {isEdit ? 'Edit record' : 'New record'}
+          {/* Names the ACTION you are in, not the row that will result.
+              Duplicating a refund still produces a refund, but "Refund" here
+              would leave you wondering which of the two things you tapped. */}
+          {isEdit ? 'Edit record' : refundOf ? 'Refund' : copyOf ? 'Duplicate' : 'New record'}
         </Text>
 
         <Pressable
@@ -835,17 +888,10 @@ export default function RecordScreen() {
         </Text>
       ) : null}
 
-      {/* Delete sits at the bottom-left, far from Save, and is the only
-          destructive control on the screen — hence the expense colour. */}
-      {isEdit ? (
-        <Pressable
-          onPress={onDelete}
-          testID="record-delete"
-          accessibilityRole="button"
-          className="mx-4 mb-2 self-start rounded-lg border border-expense/40 px-4 py-2 active:opacity-70">
-          <Text className="text-sm font-medium text-expense">Delete</Text>
-        </Pressable>
-      ) : null}
+      {/* Delete used to sit here. It now lives behind a long press on the row
+          in the records list, alongside Refund and Duplicate — putting a
+          destructive action on the same screen as Save meant opening a record
+          to CHANGE it in order to REMOVE it, which is a strange way in. */}
 
       <View className="mx-3">
         <Keypad onKey={onKey} density={density} equalsLabel={flowKeyLabel(flow)} />
@@ -900,6 +946,7 @@ export default function RecordScreen() {
         selectedId={toAccountId}
         onSelect={(pickedId) => {
           setToAccountId(pickedId);
+          onPickToAccount(pickedId);
           setSheet(null);
         }}
         onClose={() => setSheet(null)}

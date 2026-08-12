@@ -234,6 +234,12 @@ app ignoring input. `pkill -f GradleDaemon`.
   array that was capped gives a number that silently means "the first 300 of them" — worse than
   showing no total at all. Two queries: one for the rows, one aggregate for the figures. The test
   runs with `limit: 1` and asserts the full total.
+- **Never infer which side of the ledger a row belongs to from the sign of its amount.** A refund is
+  an EXPENSE with a POSITIVE amount, so `amount_minor < 0 ? 'expense' : 'income'` reads it as
+  income — and saving from there flips the sign and makes it one. Use `onExpenseSide` /
+  `onIncomeSide` from `src/db/repo/predicates.ts`. This was fixed in the SQL first and then found
+  again, by an E2E flow, in three JavaScript callers: `updateRecord` and two initialisers in
+  `record.tsx`. Fixing the query layer is not fixing the rule.
 - **A second reason to exclude a row is a second place to forget it.** There are now two kinds of
   row that are not ordinary spending — a transfer leg and a balance correction — and they have
   DIFFERENT consequences: both stay out of income and expense, but a correction still moves the

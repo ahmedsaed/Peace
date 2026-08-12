@@ -1,4 +1,7 @@
 appId: com.ahmed.peace
+# `core` runs on `npm run e2e:fast` — the app launches and every tab renders.
+tags:
+  - core
 ---
 # Smoke test: the app launches, migrations and seeding complete, and every tab
 # renders. `clearState` forces the fresh-install path each run, so this also

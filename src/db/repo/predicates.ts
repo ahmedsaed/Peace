@@ -45,6 +45,29 @@ export function movesPosition(): SQL {
 }
 
 /**
+ * WHICH SIDE OF THE LEDGER a row belongs to.
+ *
+ * Until refunds existed, the sign of `amount_minor` answered this on its own:
+ * negative was spending, positive was earning. A refund breaks that — it is
+ * money coming back, but it belongs to the expense side so it can net against
+ * the category it reverses. Return E£800 of shoes and count it as income and
+ * the month reports E£800 more income than you earned AND E£800 more expense
+ * than you spent; the net is right, which is exactly why the bug survives.
+ *
+ * So the side is decided here, once, and NEVER by a bare `amount < 0` again.
+ */
+export function onExpenseSide(): SQL {
+  return sql`${transactions.isAdjustment} = 0
+    and (${transactions.amountMinor} < 0 or ${transactions.isRefund} = 1)`;
+}
+
+export function onIncomeSide(): SQL {
+  return sql`${transactions.isAdjustment} = 0
+    and ${transactions.amountMinor} > 0
+    and ${transactions.isRefund} = 0`;
+}
+
+/**
  * Counts towards ONE ACCOUNT's balance.
  *
  * Everything does, including both transfer legs and adjustments: every row on
