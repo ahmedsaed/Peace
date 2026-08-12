@@ -34,6 +34,10 @@ import { byDensity, useDensity } from '@/lib/layout';
 import { convertMinor, formatMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
 import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
+import { createCardPurchase } from '@/db/repo/card';
+import { CURRENCIES } from '@/lib/currencies';
+import { foreignPurchase } from '@/lib/fees';
+import { isLiability } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
 import { useUndoStore } from '@/state/undo';
 
@@ -122,6 +126,33 @@ export default function RecordScreen() {
    * Defaulting to 1 would be worse than asking: it looks like an answer.
    */
   const foreign = currency.toUpperCase() !== homeCurrency.toUpperCase();
+
+  /**
+   * SPENT ABROAD ON A CARD.
+   *
+   * A card denominated in EGP and used in Rome is charged in EGP at the bank's
+   * rate, plus whatever commission the card charges. The amount that moves the
+   * account is therefore the settled EGP — store the euros and the balance can
+   * never agree with the statement.
+   *
+   * Offered only when the card is held in the home currency: a EUR purchase on
+   * a USD card in an EGP ledger would need two rates at once, and two rate
+   * fields on one screen is a worse answer than not offering it. Not offered
+   * when editing either — rewriting a purchase and its fee together is a
+   * different job from editing one row.
+   */
+  const cardAccount = !!account && isLiability(account.type);
+  const canGoAbroad = cardAccount && !foreign && type === 'expense' && !existing;
+  const [abroad, setAbroad] = useState<string | null>(null);
+  // Deliberately NOT part of `Sheet`: that union is the one-handed flow's walk,
+  // and the flow key would then insist on this optional step.
+  const [abroadSheet, setAbroadSheet] = useState(false);
+  const [abroadRateText, setAbroadRateText] = useState('');
+  const abroadRate = Number(abroadRateText);
+  const abroadRateValid =
+    abroadRateText.trim() !== '' && Number.isFinite(abroadRate) && abroadRate > 0;
+  // The currency the KEYPAD is entering. Everything below follows this.
+  const entryCurrency = abroad ?? currency;
   const [rateText, setRateText] = useState(() =>
     existing && existing.fxRate !== 1 ? String(existing.fxRate) : ''
   );
@@ -163,7 +194,36 @@ export default function RecordScreen() {
     [homeCurrency]
   );
 
-  const onFetchRate = useCallback(() => void fetchFor(currency), [fetchFor, currency]);
+  // Plain function for the same reason as fetchAbroadRate below: once the
+  // component grew a second rate to fetch, the compiler could no longer prove
+  // this useCallback's deps and gave up optimising the entire file.
+  const onFetchRate = () => void fetchFor(currency);
+
+  /**
+   * The rate INTO THE CARD'S currency, which is a different question from the
+   * one `fetchFor` answers — that one converts to the home currency for
+   * reporting. Here the card is about to be charged in its own currency, and
+   * that is the number the statement will show.
+   *
+   * Every failure still ends with the field simply staying manual, and says so.
+   */
+  // A plain function, not a useCallback: the React Compiler memoizes this
+  // component, and a manual useCallback here is what made it give up on the
+  // whole file — "existing memoization could not be preserved" disables the
+  // optimisation for every hook in the component, not just this one.
+  async function fetchAbroadRate() {
+    if (!abroad) return;
+    setFetchingRate(true);
+    setRateError(null);
+    try {
+      const fetched = await fetchRate(abroad, currency);
+      setAbroadRateText(String(fetched.rate));
+    } catch (error) {
+      setRateError(error instanceof RateError ? error.message : 'Could not fetch the rate.');
+    } finally {
+      setFetchingRate(false);
+    }
+  }
 
   /**
    * Fetching is triggered by CHOOSING the account, not by opening the screen.
@@ -203,7 +263,20 @@ export default function RecordScreen() {
     [categoryTree, categoryId]
   );
 
-  const amountMinor = committedMinor(calc, currency);
+  const amountMinor = committedMinor(calc, entryCurrency);
+
+  /**
+   * What the card will actually be charged. An ESTIMATE — the bank settles days
+   * later at its own rate — which is what "Update balance" on the account is
+   * for. An estimate you can correct beats a blank you forget to fill in.
+   */
+  const abroadPreview =
+    abroad && abroadRateValid && amountMinor !== null && amountMinor > 0
+      ? foreignPurchase(
+          convertMinor(amountMinor, abroad, currency, abroadRate),
+          account?.foreignFeeBp
+        )
+      : null;
   const homePreview =
     foreign && rateValid && amountMinor !== null
       ? convertMinor(amountMinor, currency, homeCurrency, fxRate)
@@ -216,6 +289,9 @@ export default function RecordScreen() {
     // Without a rate the record cannot be valued, so saving it would put a
     // number into the month total that means nothing.
     (!foreign || rateValid) &&
+    // Same rule for a purchase abroad: without a rate there is no settled
+    // amount, so the card would move by a number nobody computed.
+    (!abroad || abroadRateValid) &&
     (type !== 'transfer' || (!!toAccountId && toAccountId !== accountId));
 
   /**
@@ -246,7 +322,7 @@ export default function RecordScreen() {
   function advance() {
     switch (flow.kind) {
       case 'evaluate':
-        setCalc((state) => equals(state, currency));
+        setCalc((state) => equals(state, entryCurrency));
         return;
       case 'open':
         openSheet(flow.sheet);
@@ -273,11 +349,11 @@ export default function RecordScreen() {
     setCalc((state) => {
       switch (press.kind) {
         case 'digit':
-          return inputDigit(state, press.value, currency);
+          return inputDigit(state, press.value, entryCurrency);
         case 'dot':
-          return inputDot(state, currency);
+          return inputDot(state, entryCurrency);
         case 'op':
-          return inputOp(state, press.value, currency);
+          return inputOp(state, press.value, entryCurrency);
       }
     });
   }
@@ -339,6 +415,19 @@ export default function RecordScreen() {
           amountMinor,
           currency,
           fxRate: foreign ? fxRate : 1,
+          homeCurrency,
+          note: note.trim() || null,
+          occurredAt,
+        });
+      } else if (abroad) {
+        // A purchase abroad on a card writes the settled charge AND the card's
+        // commission, in one transaction. See createCardPurchase.
+        createCardPurchase(db, {
+          accountId,
+          categoryId,
+          amountMinor,
+          originalCurrency: abroad,
+          fxRate: abroadRate,
           homeCurrency,
           note: note.trim() || null,
           occurredAt,
@@ -606,9 +695,23 @@ export default function RecordScreen() {
           currencies could not have a balance at all. */}
       <View className={`mx-4 rounded-lg bg-surface px-4 ${pad} ${gap}`}>
         <View className="flex-row items-center gap-3">
-          <Text className="text-sm font-medium text-muted" testID="amount-currency">
-            {currency}
-          </Text>
+          {/* The currency is INFORMATION, not a control — except on a card,
+              where "I paid in euros" is a real thing to say and the card is
+              still charged in its own currency. */}
+          {canGoAbroad ? (
+            <Pressable
+              onPress={() => setAbroadSheet(true)}
+              hitSlop={10}
+              testID="amount-currency"
+              accessibilityRole="button"
+              accessibilityLabel={`Paid in ${entryCurrency}. Change`}>
+              <Text className="text-sm font-medium text-accent">{entryCurrency} ▾</Text>
+            </Pressable>
+          ) : (
+            <Text className="text-sm font-medium text-muted" testID="amount-currency">
+              {entryCurrency}
+            </Text>
+          )}
           <Text
             className={`flex-1 text-right font-light text-ink ${amountText}`}
             numberOfLines={1}
@@ -627,6 +730,50 @@ export default function RecordScreen() {
             <Text className="text-2xl text-muted">&#9003;</Text>
           </Pressable>
         </View>
+
+        {/* Spent abroad: the rate into the CARD's currency, and what the card
+            will actually be charged once its commission is added. */}
+        {abroad ? (
+          <View className="mt-2 border-t border-line pt-2" testID="abroad-block">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-xs text-muted">1 {abroad} =</Text>
+              <TextInput
+                value={abroadRateText}
+                onChangeText={setAbroadRateText}
+                placeholder="rate"
+                placeholderTextColor={palette.muted}
+                keyboardType="decimal-pad"
+                testID="abroad-rate"
+                className="min-w-14 py-0.5 text-sm font-medium text-ink"
+              />
+              <Text className="flex-1 text-xs text-muted">{currency}</Text>
+              <Pressable
+                onPress={() => void fetchAbroadRate()}
+                disabled={fetchingRate}
+                hitSlop={10}
+                testID="abroad-rate-fetch"
+                accessibilityRole="button"
+                accessibilityLabel="Fetch today's rate">
+                <Text className={`text-xs ${fetchingRate ? 'text-line' : 'text-accent'}`}>
+                  {fetchingRate ? 'fetching…' : 'fetch'}
+                </Text>
+              </Pressable>
+            </View>
+
+            {abroadPreview ? (
+              <Text className="mt-1 text-xs text-muted" testID="abroad-preview">
+                {formatMinor(abroadPreview.settledMinor, currency)}
+                {abroadPreview.feeMinor > 0
+                  ? ` + ${formatMinor(abroadPreview.feeMinor, currency)} fee = ${formatMinor(
+                      abroadPreview.totalMinor,
+                      currency
+                    )}`
+                  : ''}{' '}
+                — estimate, correct it when the statement lands
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {foreign ? (
           <View className="mt-2 border-t border-line pt-2">
@@ -757,6 +904,36 @@ export default function RecordScreen() {
         }}
         onClose={() => setSheet(null)}
         testID="sheet-to-account"
+      />
+
+      <PickerSheet
+        visible={abroadSheet}
+        title="Paid in"
+        options={[
+          {
+            id: currency,
+            label: `${currency} — no conversion`,
+            icon: 'cash',
+            detail: 'Card currency',
+          },
+          ...CURRENCIES.filter((c) => c.code !== currency).map((c) => ({
+            id: c.code,
+            label: c.name,
+            icon: 'plane',
+            detail: c.code,
+          })),
+        ]}
+        selectedId={entryCurrency}
+        onSelect={(code) => {
+          // Back to the card's own currency means this was not a foreign
+          // purchase after all — drop the rate with it rather than leaving a
+          // stale number to be applied to the next thing typed.
+          setAbroad(code === currency ? null : code);
+          setAbroadRateText('');
+          setAbroadSheet(false);
+        }}
+        onClose={() => setAbroadSheet(false)}
+        testID="sheet-abroad"
       />
 
       <PickerSheet

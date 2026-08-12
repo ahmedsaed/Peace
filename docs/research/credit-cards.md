@@ -2,7 +2,32 @@
 
 Why the card account drifts in MyMoney, and what Peace should do instead.
 
-Status: **proposal, not built.** Written after nine days of real use, before Stage 2.
+Status: **partly built.** Written after nine days of real use, before Stage 2; the first slice
+shipped after it.
+
+| # | Change | State |
+|---|---|---|
+| 1 | Liability balances shown as **owed**, with available credit | ✅ shipped |
+| — | **Balance corrections** — an adjustment that moves the balance and never spending | ✅ shipped |
+| — | Per-card **fee profile** (limit, foreign %, cash %) rather than one bank's rules in the app | ✅ shipped |
+| 2 | **Refund** as a negative expense against the original category | not built |
+| 3 | **"Pay this card"** pre-filling a Bank → Card transfer | not built |
+| 4 | `statementDay` / `dueDay` and a derived statement view | columns only |
+| 5 | Foreign purchases store the settled amount, fee computed from the card | not built |
+
+Two things the shipped slice settled that this document had left open:
+
+- **Corrections are their own kind of row**, not an income or expense with a special category. They
+  move the balance and the running position and are excluded from income, expense, budgets and the
+  category charts. There are now two reasons a row is not ordinary spending — a transfer leg and an
+  adjustment — with *different* consequences, so the rules live once in `src/db/repo/predicates.ts`
+  rather than being written out at each of the six queries that need them.
+- **A card is set up with its credit limit, not an opening balance.** Whatever is already owed
+  arrives through "Update balance" as a dated correction: visible in the list, questionable later,
+  deletable. An undated number quietly sitting under the account name is a bad place to keep a debt.
+  The reconcile sheet accepts *either* the outstanding balance or the available credit, because
+  banking apps disagree about which they show and doing the subtraction yourself, at the moment you
+  are fixing an error, is how a correction becomes a second error.
 
 ---
 

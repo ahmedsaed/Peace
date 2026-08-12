@@ -26,6 +26,9 @@ import { InvariantError } from '@/db/repo/categories';
 import type { Account } from '@/db/schema';
 import { formatMinor, parseAmountToMinor } from '@/lib/money';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
+import { ReconcileSheet } from '@/components/reconcile-sheet';
+import { accountBalance, reconcileAccount } from '@/db/repo/adjust';
+import { bpToPercent, isLiability, percentToBp } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
 
 const TYPES: { value: Account['type']; label: string }[] = [
@@ -59,14 +62,35 @@ export default function AccountScreen() {
   const [opening, setOpening] = useState(
     existing ? String(existing.openingBalance / 100) : ''
   );
+  const [limit, setLimit] = useState(
+    existing?.creditLimit ? String(existing.creditLimit / 100) : ''
+  );
+  const [foreignFee, setForeignFee] = useState(bpToPercent(existing?.foreignFeeBp ?? null));
+  const [cashFee, setCashFee] = useState(bpToPercent(existing?.cashFeeBp ?? null));
   const [icon, setIcon] = useState(existing?.icon ?? 'wallet');
   const [color, setColor] = useState(existing?.color ?? '#6B5B4A');
   const [archived, setArchived] = useState(existing?.archived ?? false);
-  const [sheet, setSheet] = useState<'currency' | null>(null);
+  const [sheet, setSheet] = useState<'currency' | 'reconcile' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Re-read after a correction rather than kept in sync by hand: the balance is
+  // derived, and a copy of a derived number is a copy that can be wrong.
+  const [balanceNow, setBalanceNow] = useState(() =>
+    existing ? accountBalance(db, existing.id) : 0
+  );
+
+  // A card is set up with its LIMIT, not a balance. Whatever is already owed
+  // arrives through "Update balance" as a dated adjustment — visible in the
+  // list, questionable later, deletable. An undated number quietly sitting
+  // under the account name is a bad place to keep a debt.
+  const liability = isLiability(type);
 
   const openingMinor = opening.trim() === '' ? 0 : parseAmountToMinor(opening, currency);
-  const canSave = name.trim().length > 0 && currency.trim().length === 3 && openingMinor !== null;
+  const limitMinor = limit.trim() === '' ? null : parseAmountToMinor(limit, currency);
+  const canSave =
+    name.trim().length > 0 &&
+    currency.trim().length === 3 &&
+    (liability || openingMinor !== null) &&
+    (limit.trim() === '' || limitMinor !== null);
 
   function onSave() {
     if (!canSave) return;
@@ -75,7 +99,11 @@ export default function AccountScreen() {
         name,
         type,
         currency: currency.toUpperCase(),
-        openingBalance: openingMinor ?? 0,
+        // A liability keeps its opening balance at zero on purpose; see above.
+        openingBalance: liability ? (existing?.openingBalance ?? 0) : (openingMinor ?? 0),
+        creditLimit: liability ? (limitMinor === null ? null : Math.abs(limitMinor)) : null,
+        foreignFeeBp: liability ? percentToBp(foreignFee) : null,
+        cashFeeBp: liability ? percentToBp(cashFee) : null,
         icon,
         color,
       };
@@ -139,17 +167,59 @@ export default function AccountScreen() {
             </Field>
           </View>
           <View className="flex-1">
-            <Field label="Opening balance">
-              <TextField
-                value={opening}
-                onChangeText={setOpening}
-                placeholder="0"
-                keyboardType="numeric"
-                testID="account-opening"
-              />
-            </Field>
+            {liability ? (
+              <Field label="Credit limit">
+                <TextField
+                  value={limit}
+                  onChangeText={setLimit}
+                  placeholder="Optional"
+                  keyboardType="numeric"
+                  testID="account-limit"
+                />
+              </Field>
+            ) : (
+              <Field label="Opening balance">
+                <TextField
+                  value={opening}
+                  onChangeText={setOpening}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  testID="account-opening"
+                />
+              </Field>
+            )}
           </View>
         </View>
+
+        {/* Per-card, never global. A card with these left empty behaves exactly
+            like any other account — which is the point: one bank's rules baked
+            into the app is a rule every other card has to be excused from. */}
+        {liability ? (
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <Field label="Foreign fee %">
+                <TextField
+                  value={foreignFee}
+                  onChangeText={setForeignFee}
+                  placeholder="e.g. 3"
+                  keyboardType="numeric"
+                  testID="account-foreign-fee"
+                />
+              </Field>
+            </View>
+            <View className="flex-1">
+              <Field label="Cash fee %">
+                <TextField
+                  value={cashFee}
+                  onChangeText={setCashFee}
+                  placeholder="e.g. 5"
+                  keyboardType="numeric"
+                  testID="account-cash-fee"
+                />
+              </Field>
+            </View>
+          </View>
+        ) : null}
 
         <Field label="Colour">
           <ColorPicker value={color} onChange={setColor} />
@@ -188,17 +258,52 @@ export default function AccountScreen() {
           </Text>
         ) : null}
 
+        {/* The drift fix. A card's balance is derived, so there is nothing to
+            edit — instead you say what the bank shows and Peace writes a dated
+            correction for the difference. */}
+        {existing ? (
+          <Pressable
+            onPress={() => setSheet('reconcile')}
+            testID="account-reconcile"
+            className="mb-3 items-center rounded-lg bg-raised py-3 active:opacity-70">
+            <Text className="text-sm font-semibold text-ink">Update balance</Text>
+          </Pressable>
+        ) : null}
+
         {existing ? (
           <DangerButton label="Delete account" onPress={onDelete} testID="account-delete" />
         ) : null}
 
         {existing ? (
-          <Text className="mt-3 text-xs text-muted">
-            Current balance {formatMinor(existing.openingBalance, existing.currency)} opening, plus
-            every record on this account.
+          <Text className="mt-3 text-xs leading-5 text-muted">
+            {liability
+              ? `Currently ${formatMinor(Math.abs(balanceNow), existing.currency)} ${
+                  balanceNow <= 0 ? 'owed' : 'in credit'
+                }, from every record on this card. Use "Update balance" when the bank disagrees.`
+              : `Current balance ${formatMinor(
+                  existing.openingBalance,
+                  existing.currency
+                )} opening, plus every record on this account.`}
           </Text>
         ) : null}
       </ScrollView>
+
+      {existing ? (
+        <ReconcileSheet
+          visible={sheet === 'reconcile'}
+          accountName={existing.name}
+          accountType={existing.type}
+          currency={existing.currency}
+          currentMinor={balanceNow}
+          creditLimitMinor={existing.creditLimit}
+          onClose={() => setSheet(null)}
+          onConfirm={(targetMinor) => {
+            reconcileAccount(db, existing.id, targetMinor);
+            setBalanceNow(accountBalance(db, existing.id));
+            setSheet(null);
+          }}
+        />
+      ) : null}
 
       <PickerSheet
         visible={sheet === 'currency'}

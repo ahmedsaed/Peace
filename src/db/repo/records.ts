@@ -3,6 +3,7 @@ import { alias, type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { formatDayHeading, periodBounds, type Period } from '../../lib/period';
 import * as schema from '../schema';
+import { movesPosition } from './predicates';
 import { accounts, categories, transactions } from '../schema';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
@@ -14,6 +15,8 @@ export type RecordRow = {
   note: string | null;
   occurredAt: Date;
   isTransfer: boolean;
+  /** A balance correction, not spending. Rendered as its own kind of row. */
+  isAdjustment: boolean;
   categoryName: string | null;
   categoryIcon: string | null;
   categoryColor: string | null;
@@ -40,6 +43,7 @@ export function listRecordsForPeriod(db: Db, period: Period): RecordRow[] {
       note: transactions.note,
       occurredAt: transactions.occurredAt,
       transferPairId: transactions.transferPairId,
+      isAdjustment: transactions.isAdjustment,
       categoryName: categories.name,
       categoryIcon: categories.icon,
       categoryColor: categories.color,
@@ -72,6 +76,16 @@ export type PeriodSummary = {
   unvaluedCount: number;
   expenseMinor: number;
   incomeMinor: number;
+  /**
+   * Balance corrections made this month. Signed.
+   *
+   * Kept out of income and expense — a correction is not a purchase — but part
+   * of `balanceMinor`, because it moved real money. Without it the identity the
+   * Records header depends on, `brought forward + balance = the Accounts
+   * total`, silently stops holding the first time anyone reconciles a card.
+   */
+  adjustmentMinor: number;
+  /** income + expense + adjustments: what the month did to your position. */
   balanceMinor: number;
 };
 
@@ -97,8 +111,9 @@ export function periodSummary(db: Db, period: Period, homeCurrency = 'EGP'): Per
 
   const row = db
     .select({
-      expense: sql<number>`coalesce(sum(case when ${transactions.amountMinor} < 0 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
-      income: sql<number>`coalesce(sum(case when ${transactions.amountMinor} > 0 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
+      expense: sql<number>`coalesce(sum(case when ${transactions.isAdjustment} = 0 and ${transactions.amountMinor} < 0 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
+      income: sql<number>`coalesce(sum(case when ${transactions.isAdjustment} = 0 and ${transactions.amountMinor} > 0 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
+      adjustment: sql<number>`coalesce(sum(case when ${transactions.isAdjustment} = 1 then (case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end) else 0 end), 0)`,
       unvalued: sql<number>`coalesce(sum(case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home} then 0 else 1 end), 0)`,
     })
     .from(transactions)
@@ -106,17 +121,21 @@ export function periodSummary(db: Db, period: Period, homeCurrency = 'EGP'): Per
       and(
         gte(transactions.occurredAt, start),
         lt(transactions.occurredAt, end),
-        isNull(transactions.transferPairId)
+        // The POSITION, so adjustments are inside this query and are then split
+        // out below. Income and expense each carry their own guard.
+        movesPosition()
       )
     )
     .get();
 
   const expenseMinor = Number(row?.expense ?? 0);
   const incomeMinor = Number(row?.income ?? 0);
+  const adjustmentMinor = Number(row?.adjustment ?? 0);
   return {
     expenseMinor,
     incomeMinor,
-    balanceMinor: incomeMinor + expenseMinor,
+    adjustmentMinor,
+    balanceMinor: incomeMinor + expenseMinor + adjustmentMinor,
     // Records whose value in TODAY's home currency is unknown — almost always
     // because the home currency was changed after they were entered. Excluded
     // from the totals and counted, rather than summed in as if their numbers

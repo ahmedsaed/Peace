@@ -37,10 +37,37 @@ export const accounts = sqliteTable(
       .default('cash'),
     /** ISO 4217, e.g. "EGP", "USD" */
     currency: text('currency').notNull().default('EGP'),
-    /** Opening balance in minor units. Current balance is derived from transactions. */
+    /**
+     * Opening balance in minor units. Current balance is derived from
+     * transactions.
+     *
+     * Asset accounts only, in practice. A CARD is set up with its credit limit
+     * instead, and whatever is already owed arrives as a dated adjustment — an
+     * undated number you cannot see in the list is a bad place to keep a debt,
+     * and it would be the one figure on the card that no record explains.
+     */
     openingBalance: integer('opening_balance').notNull().default(0),
     /** Annual rate as a decimal (0.185 = 18.5%). Only meaningful for `loan` accounts. */
     interestRate: real('interest_rate'),
+
+    // --- card profile -------------------------------------------------------
+    // All nullable, all per-account. There is deliberately no "Kenana mode":
+    // one bank's rules hardcoded into the app is a rule every other card would
+    // then have to be excused from. A card with none of these set behaves
+    // exactly like any other account.
+
+    /** Ceiling on what may be owed, in minor units. A limit, never a balance. */
+    creditLimit: integer('credit_limit'),
+    /**
+     * Fees as BASIS POINTS — 3% is 300 — because a percentage stored as a float
+     * and multiplied by money reintroduces exactly the drift `amount_minor`
+     * exists to prevent. 3% of E£1,246.83 must be one exact integer, every time.
+     */
+    foreignFeeBp: integer('foreign_fee_bp'),
+    cashFeeBp: integer('cash_fee_bp'),
+    /** Day of month the statement closes, and the day payment is due. 1–28. */
+    statementDay: integer('statement_day'),
+    dueDay: integer('due_day'),
     icon: text('icon'),
     color: text('color'),
     sortOrder: integer('sort_order').notNull().default(0),
@@ -148,6 +175,41 @@ export const transactions = sqliteTable(
      * their own currency still matches today's home currency.
      */
     homeCurrency: text('home_currency'),
+    /**
+     * WHAT YOU ACTUALLY HANDED OVER ABROAD. Metadata, never summed.
+     *
+     * A card denominated in EGP and used in Rome is charged in EGP at the
+     * bank's rate, so `amount_minor` — the number that moves the account — must
+     * be the settled EGP. Store the euros there instead and the card balance
+     * can never agree with the statement, which is a permanent, guaranteed
+     * drift.
+     *
+     * That leaves nowhere to answer "what did this cost in euros", hence these.
+     * They exist to be read back, never to be added up.
+     *
+     * Three pairs of currency fields now hang off a row, so to be explicit:
+     *   currency + amountMinor          what moved the ACCOUNT
+     *   homeCurrency + homeAmountMinor  what it is worth for REPORTING
+     *   originalCurrency + originalAmountMinor   what was HANDED OVER
+     */
+    originalAmountMinor: integer('original_amount_minor'),
+    originalCurrency: text('original_currency'),
+
+    /**
+     * Set on a card fee, pointing at the purchase that incurred it.
+     *
+     * A foreign-transaction commission is a real, permanent cost and gets its
+     * own row so "what did FX cost me this year" stays answerable — folded into
+     * the purchase it would be invisible for ever and would overstate whatever
+     * category the purchase was filed under.
+     *
+     * Cascade so a deleted purchase cannot leave its fee behind. `deleteRecord`
+     * also collects the fee explicitly, because the undo buffer has to be able
+     * to put BOTH back — a cascade the undo does not know about is silent data
+     * loss the moment someone taps Undo.
+     */
+    feeForId: text('fee_for_id'),
+
     note: text('note'),
 
     /**
@@ -165,6 +227,25 @@ export const transactions = sqliteTable(
      *      A transfer is neither, and summing it inflates both sides.
      */
     transferPairId: text('transfer_pair_id'),
+
+    /**
+     * A BALANCE CORRECTION, not spending.
+     *
+     * Cards drift: the bank's rate differs from the one estimated, a fee posts
+     * that was not anticipated, a record gets forgotten. An adjustment moves the
+     * account to the figure the bank actually shows.
+     *
+     * It moves the BALANCE and the running position — it is real money, and
+     * pretending otherwise would put the Accounts screen and the Records header
+     * permanently at odds. It must never touch income or expense: a correction
+     * is not a purchase, and counting it would put a category's worth of
+     * phantom spending into whichever month you happened to reconcile in.
+     *
+     * That makes two different "not ordinary spending" conditions in one table,
+     * which is precisely the shape that gets forgotten in one query out of six.
+     * Neither is ever written by hand — see `src/db/repo/predicates.ts`.
+     */
+    isAdjustment: integer('is_adjustment', { mode: 'boolean' }).notNull().default(false),
     /**
      * The other account in a transfer, denormalised onto BOTH legs.
      * Redundant with the sibling row, but it lets the records list render
