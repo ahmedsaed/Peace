@@ -72,12 +72,28 @@ export async function runBackup(now = new Date()): Promise<BackupOutcome> {
     const name = backupName(now, sealed);
     await withDriveToken((token) => uploadBackup(token, name, payload), tokenExpired);
 
-    const pruned = await withDriveToken(async (token) => {
-      const existing = await listBackups(token);
-      const doomed = prunable(existing);
-      for (const file of doomed) await deleteBackup(token, file.id);
-      return doomed.length;
-    }, tokenExpired);
+    /**
+     * Housekeeping, and NOT allowed to fail the backup.
+     *
+     * Once the upload has landed, the backup exists — that is the whole point
+     * of the operation, and it is already safe. Letting a failed delete throw
+     * from here would report a successful backup as a failure, and the caller
+     * would then never record it: the app would believe it had never backed up,
+     * consider one due at every launch, re-upload every time, and never reach
+     * this pruning step to clean any of it up. Exactly that happened on a real
+     * device, from a misread `size` field.
+     */
+    let pruned = 0;
+    try {
+      pruned = await withDriveToken(async (token) => {
+        const existing = await listBackups(token);
+        const doomed = prunable(existing);
+        for (const file of doomed) await deleteBackup(token, file.id);
+        return doomed.length;
+      }, tokenExpired);
+    } catch (error) {
+      console.warn('[drive] backup uploaded but pruning failed', error);
+    }
 
     return { name, bytes: payload.byteLength, sealed, pruned, at: now.getTime() };
   } finally {
@@ -90,8 +106,8 @@ export async function runBackup(now = new Date()): Promise<BackupOutcome> {
 export type BackupCheck = {
   name: string;
   createdTime: string;
-  /** Size in Drive. */
-  bytes: number;
+  /** Size in Drive, or null when Drive did not report one. */
+  bytes: number | null;
   sealed: boolean;
   /** Rows in the restored-as-read-only copy. */
   records: number;

@@ -39,11 +39,27 @@ describe('reading a file record', () => {
     expect(typeof file.size).toBe('number');
   });
 
-  it('reads a missing size as zero rather than NaN', () => {
-    // NaN would silently fail every comparison it touched, including the size
-    // check that is supposed to catch a broken upload.
-    expect(parseFile({ id: 'a', name: 'b' }).size).toBe(0);
-    expect(parseFile({ id: 'a', size: 'not-a-number' }).size).toBe(0);
+  /**
+   * THE BUG A REAL DEVICE FOUND. Coercing an absent `size` to 0 turned "Drive
+   * did not say" into "Drive stored nothing", so a backup that had uploaded
+   * perfectly reported itself incomplete — and because that threw, the success
+   * was never recorded, every launch re-uploaded, and nothing was ever pruned.
+   *
+   * An absent measurement is not a measurement of zero.
+   */
+  it('reads an absent size as unknown, NOT as zero', () => {
+    expect(parseFile({ id: 'a', name: 'b' }).size).toBeNull();
+    expect(parseFile({ id: 'a', name: 'b', size: null }).size).toBeNull();
+  });
+
+  it('reads an unparseable size as unknown rather than NaN', () => {
+    // NaN would silently fail every comparison it touched.
+    expect(parseFile({ id: 'a', size: 'not-a-number' }).size).toBeNull();
+  });
+
+  it('still reads a real zero as zero', () => {
+    // A genuinely empty file must stay distinguishable from an unreported one.
+    expect(parseFile({ id: 'a', size: '0' }).size).toBe(0);
   });
 });
 
@@ -75,9 +91,10 @@ describe('listing what is in the hidden folder', () => {
 describe('uploading', () => {
   const bytes = new Uint8Array([1, 2, 3, 4]);
 
-  it('posts metadata, then puts the bytes at the session URL', async () => {
+  it('posts metadata, puts the bytes, then asks what was stored', async () => {
     const { fetchImpl, calls } = transport([
       ok({}, { Location: 'https://upload.example/session-1' }),
+      ok({ id: 'new' }),
       ok({ id: 'new', name: 'peace.db', size: '4', createdTime: 't' }),
     ]);
 
@@ -92,7 +109,11 @@ describe('uploading', () => {
     // files endpoint — the response body of step one is empty.
     expect(calls[1].url).toBe('https://upload.example/session-1');
     expect(calls[1].init.method).toBe('PUT');
-    expect(file.id).toBe('new');
+    // Step three asks for the size EXPLICITLY, because the upload response is
+    // not guaranteed to carry it.
+    expect(calls[2].url).toContain('fields=');
+    expect(calls[2].url).toContain('size');
+    expect(file.size).toBe(4);
   });
 
   /**
@@ -103,12 +124,45 @@ describe('uploading', () => {
   it('rejects an upload Drive stored short', async () => {
     const { fetchImpl } = transport([
       ok({}, { Location: 'https://upload.example/s' }),
+      ok({ id: 'new' }),
       ok({ id: 'new', name: 'peace.db', size: '0', createdTime: 't' }),
     ]);
 
     await expect(uploadBackup('tok', 'peace.db', bytes, { fetchImpl })).rejects.toThrow(
       /stored 0 bytes of 4/
     );
+  });
+
+  /**
+   * THE REGRESSION. The upload response legitimately omits `size`; that must
+   * never be read as a failed upload. A real device reported "Drive stored 0
+   * bytes of 135224" for a backup that was demonstrably intact.
+   */
+  it('does not fail an upload merely because the PUT response omitted the size', async () => {
+    const { fetchImpl } = transport([
+      ok({}, { Location: 'https://upload.example/s' }),
+      // Exactly what Drive sent on device: no size at all.
+      ok({ id: 'new', name: 'peace.db' }),
+      ok({ id: 'new', name: 'peace.db', size: '4', createdTime: 't' }),
+    ]);
+
+    await expect(uploadBackup('tok', 'peace.db', bytes, { fetchImpl })).resolves.toMatchObject({
+      id: 'new',
+      size: 4,
+    });
+  });
+
+  it('accepts, with a warning, when Drive reports no size even when asked', async () => {
+    // Refusing here would fail a backup that plainly worked.
+    const { fetchImpl } = transport([
+      ok({}, { Location: 'https://upload.example/s' }),
+      ok({ id: 'new' }),
+      ok({ id: 'new', name: 'peace.db' }),
+    ]);
+
+    await expect(uploadBackup('tok', 'peace.db', bytes, { fetchImpl })).resolves.toMatchObject({
+      size: null,
+    });
   });
 
   it('refuses to send an empty backup at all', async () => {
