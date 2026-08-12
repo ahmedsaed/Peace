@@ -439,6 +439,64 @@ export const settings = sqliteTable('settings', {
 });
 
 // ---------------------------------------------------------------------------
+// Portfolio
+// ---------------------------------------------------------------------------
+
+/**
+ * The investment side, and DELIBERATELY SEPARATE FROM THE LEDGER.
+ *
+ * A holding is not an account and buying units is not a transaction: nothing
+ * here moves an account balance, appears in income or expense, or reaches the
+ * Accounts total. It is a rebalancing tool that happens to live in this app,
+ * with its own tables and its own arithmetic.
+ *
+ * Stated here because the temptation to wire the two together will come back —
+ * portfolio value looks a lot like net worth — and the moment it does, every
+ * total on every other screen starts moving with the market.
+ */
+export const assetClasses = sqliteTable(
+  'asset_classes',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    /**
+     * BASIS POINTS, so "the targets must add up to 100%" is an exact integer
+     * comparison against 10000 rather than a float tolerance. Same reasoning as
+     * `foreign_fee_bp` on an account.
+     */
+    targetBp: integer('target_bp').notNull().default(0),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().default(now),
+  },
+  (table) => [index('idx_asset_classes_sort').on(table.sortOrder)]
+);
+
+export const holdings = sqliteTable(
+  'holdings',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    assetClassId: text('asset_class_id')
+      .notNull()
+      // Deleting a class takes its holdings with it. The alternative — orphans
+      // belonging to no class — would silently drop out of every total while
+      // still being listed as owned.
+      .references(() => assetClasses.id, { onDelete: 'cascade' }),
+    /**
+     * Units scaled by 1e6. You can hold 12.347 of a fund, and a float would be
+     * the same mistake as a float amount of money — see `src/lib/portfolio.ts`.
+     */
+    unitsMicro: integer('units_micro').notNull().default(0),
+    /** Minor units of the home currency, per ONE whole unit. */
+    priceMinor: integer('price_minor').notNull().default(0),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().default(now),
+  },
+  (table) => [index('idx_holdings_class').on(table.assetClassId)]
+);
+
+// ---------------------------------------------------------------------------
 
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
@@ -453,3 +511,7 @@ export type NewRecurringRule = typeof recurringRules.$inferInsert;
 export type Attachment = typeof attachments.$inferSelect;
 export type NewAttachment = typeof attachments.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
+export type AssetClassRow = typeof assetClasses.$inferSelect;
+export type NewAssetClassRow = typeof assetClasses.$inferInsert;
+export type HoldingRow = typeof holdings.$inferSelect;
+export type NewHoldingRow = typeof holdings.$inferInsert;

@@ -72,6 +72,7 @@ export default function RootLayout() {
             <Stack.Screen name="search" />
             <Stack.Screen name="settings" />
             <Stack.Screen name="export" />
+            <Stack.Screen name="portfolio" />
             <Stack.Screen name="about" />
           </Stack>
         </DatabaseProvider>
