@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { formatBytes } from '@/db/backup';
-import { checkLatestBackup, runBackup } from '@/db/drive';
+import { checkLatestBackup, listDriveBackups, restoreFromDrive, runBackup } from '@/db/drive';
+import { currentCounts, refreshAfterRestore } from '@/db/restore';
+import type { DriveFile } from '@/lib/drive-api';
 import { CADENCES, describeAge, describeCadence, backupDue } from '@/lib/drive-backup';
 import { connect, disconnect, reconnectSilently } from '@/lib/google-auth';
 import { assertUsablePassphrase, MIN_PASSPHRASE } from '@/lib/seal';
 import { getPassphrase, setPassphrase } from '@/lib/secrets';
 import { useSetting, useSettingsStore } from '@/state/settings';
 
-type Busy = 'connect' | 'backup' | 'check' | 'passphrase' | null;
+type Busy = 'connect' | 'backup' | 'check' | 'passphrase' | 'list' | 'restore' | null;
 
 /**
  * Google Drive backup.
@@ -48,6 +50,8 @@ export function DriveBackup() {
   const [sealed, setSealed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  /** Null while the restore sheet is closed; an array once Drive has answered. */
+  const [choices, setChoices] = useState<DriveFile[] | null>(null);
 
   useEffect(() => {
     getPassphrase().then((value) => setSealed(value !== null));
@@ -143,6 +147,50 @@ export function DriveBackup() {
         const result = await checkLatestBackup();
         return `${result.name} opens: ${result.records} records, ${result.accounts} accounts, ${result.categories} categories.`;
       }),
+    [guard]
+  );
+
+  const onBrowse = useCallback(
+    () =>
+      guard('list', async () => {
+        const files = await listDriveBackups();
+        setChoices(files);
+        return files.length === 1 ? '1 backup in Drive.' : `${files.length} backups in Drive.`;
+      }),
+    [guard]
+  );
+
+  /**
+   * Restore, behind a confirmation that says what is about to be lost.
+   *
+   * The count of what is here NOW is the number that matters — "replaces
+   * everything" is abstract, "the 43 records now in the app" is not.
+   */
+  const onRestore = useCallback(
+    async (file: DriveFile) => {
+      const before = currentCounts();
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Restore this backup?',
+          `The ${before.transactions} records now in the app will be replaced by the contents of ${file.name}. Your current data is saved first, so this can be undone.`,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Restore', style: 'destructive', onPress: () => resolve(true) },
+          ],
+          { cancelable: true, onDismiss: () => resolve(false) }
+        );
+      });
+      if (!confirmed) return;
+
+      setChoices(null);
+      await guard('restore', async () => {
+        const result = await restoreFromDrive(file.id);
+        // Repaint every screen from the new database, and re-read settings —
+        // without this the app keeps rendering the ledger it just replaced.
+        refreshAfterRestore();
+        return `Restored ${result.copied.transactions} records from ${file.name}.`;
+      });
+    },
     [guard]
   );
 
@@ -297,6 +345,20 @@ export function DriveBackup() {
             )}
           </View>
 
+          {/* Restoring is the reason the rest of this exists, and `appdata` is
+              reachable by nothing but this app — so without a picker here, a
+              backup in Drive could be read by no software on earth. */}
+          <View className="mb-4 border-t border-line pt-4">
+            <Button
+              label="Restore from Drive"
+              working={busy === 'list'}
+              disabled={busy !== null}
+              onPress={onBrowse}
+              testID="drive-restore-open"
+              danger
+            />
+          </View>
+
           <Button
             label="Disconnect"
             working={false}
@@ -305,6 +367,54 @@ export function DriveBackup() {
             testID="drive-disconnect"
             danger
           />
+
+          <Modal
+            visible={choices !== null}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setChoices(null)}>
+            <Pressable
+              className="flex-1"
+              onPress={() => setChoices(null)}
+              accessibilityLabel="Dismiss"
+            />
+            <View
+              className="max-h-[70%] rounded-t-2xl border-t border-line bg-ground pb-8"
+              style={{ elevation: 16 }}
+              testID="drive-restore-sheet">
+              <View className="border-b border-line px-5 py-4">
+                <Text className="text-base font-semibold text-ink">Restore from Drive</Text>
+                <Text className="text-xs text-muted">
+                  Replaces everything in the app. Your current data is saved first, so this is
+                  undoable.
+                </Text>
+              </View>
+              <ScrollView>
+                {choices?.length === 0 ? (
+                  <Text className="px-5 py-4 text-sm text-muted" testID="drive-restore-empty">
+                    There are no backups in Drive yet.
+                  </Text>
+                ) : (
+                  choices?.map((file) => (
+                    <Pressable
+                      key={file.id}
+                      onPress={() => onRestore(file)}
+                      testID={`drive-restore-${file.id}`}
+                      accessibilityRole="button"
+                      className="border-b border-line px-5 py-3.5 active:bg-surface">
+                      <Text className="text-[15px] text-ink" numberOfLines={1}>
+                        {file.name}
+                      </Text>
+                      <Text className="text-xs text-muted">
+                        {file.size === null ? 'size unknown' : formatBytes(file.size)}
+                        {file.name.endsWith('.enc') ? ' · sealed' : ''}
+                      </Text>
+                    </Pressable>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          </Modal>
         </>
       )}
 
