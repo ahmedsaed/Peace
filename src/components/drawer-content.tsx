@@ -26,6 +26,13 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
     testID: 'drawer-settings',
   },
   {
+    icon: 'refresh',
+    label: 'Recurring',
+    hint: 'Standing orders and instalments',
+    href: '/recurring',
+    testID: 'drawer-recurring',
+  },
+  {
     icon: 'analysis',
     label: 'Portfolio',
     hint: 'Target allocation and rebalancing',

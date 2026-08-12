@@ -1,0 +1,111 @@
+appId: com.ahmed.peace
+---
+# Standing orders.
+#
+# The assertion that matters is that a rule DOES NOT WRITE TO THE LEDGER by
+# itself. A flow that only checked a grey row appeared would pass just as
+# happily against one that had already posted the record — and the whole design
+# exists so a rule with a typo cannot corrupt months of history before anyone
+# notices.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# The month starts empty, and that is the baseline every assertion below leans on.
+- assertVisible:
+    id: "summary-expense"
+    text: "E£0.00"
+
+# --- a rule that waits to be asked ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-recurring"
+- assertVisible:
+    id: "recurring-screen"
+- assertVisible:
+    id: "rule-empty"
+
+- tapOn:
+    id: "rule-name"
+- inputText: "Rent"
+- tapOn:
+    id: "rule-amount"
+- inputText: "5000"
+- hideKeyboard
+- tapOn:
+    id: "rule-create"
+
+# Described in words, so the schedule is checkable without doing date maths.
+- assertVisible: ".*Every month on the.*"
+- takeScreenshot: 01-rules
+
+# --- it appears as a grey row, and has NOT been written ---
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "home-screen"
+- assertVisible: "Rent"
+
+# THE ASSERTION THAT MATTERS. The row is on screen but the month's expense is
+# still zero: nothing has been added to the ledger, and the total proves it.
+- assertVisible:
+    id: "summary-expense"
+    text: "E£0.00"
+- takeScreenshot: 02-due
+
+# --- holding it offers add or skip ---
+- longPressOn: "Rent"
+- assertVisible:
+    id: "due-actions"
+- assertVisible:
+    id: "due-add"
+- assertVisible:
+    id: "due-dismiss"
+- takeScreenshot: 03-due-actions
+
+# --- adding it writes the record ---
+- tapOn:
+    id: "due-add"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£5,000.00"
+
+# And it is gone from the due list: added once, owed no longer. A rule that
+# kept offering the same occurrence would be entered twice by anyone tapping
+# through a backlog.
+- assertNotVisible:
+    id: "due-actions"
+- takeScreenshot: 04-added
+
+# --- a second rule, skipped rather than added ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-recurring"
+- tapOn:
+    id: "rule-name"
+- inputText: "Gym"
+- tapOn:
+    id: "rule-amount"
+- inputText: "300"
+- hideKeyboard
+- tapOn:
+    id: "rule-create"
+- tapOn:
+    id: "nav-back"
+
+- longPressOn: "Gym"
+- tapOn:
+    id: "due-dismiss"
+
+# Skipping writes NOTHING — the total is unchanged from the rent alone — and
+# the row is gone, because that occurrence has been dealt with.
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£5,000.00"
+- takeScreenshot: 05-skipped

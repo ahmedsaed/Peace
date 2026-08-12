@@ -11,6 +11,7 @@ import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { InvariantError, listCategoryTree } from '@/db/repo/categories';
+import { advanceRule } from '@/db/repo/recurring';
 import {
   createRecord,
   createTransfer,
@@ -51,12 +52,22 @@ const TYPES: { value: RecordType; label: string }[] = [
 export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, refundOf, copyOf } = useLocalSearchParams<{
+  const { id, refundOf, copyOf, fromRule, dueOn } = useLocalSearchParams<{
     id?: string;
     /** Reverse this record: same account and category, marked a refund. */
     refundOf?: string;
     /** Same again, dated today. */
     copyOf?: string;
+    /**
+     * A recurring rule this record is settling, and the date it was due.
+     *
+     * The record is written through the ordinary path below — editing the
+     * amount before saving is the whole point, because "the rent went up" is
+     * the common case. The RULE still has to be told, or the same occurrence
+     * comes back due tomorrow and gets entered a second time.
+     */
+    fromRule?: string;
+    dueOn?: string;
   }>();
   const density = useDensity();
 
@@ -506,8 +517,14 @@ export default function RecordScreen() {
           isRefund,
           note: note.trim() || null,
           occurredAt,
+          recurringRuleId: fromRule ?? null,
         });
       }
+
+      // Only after the write succeeded. Advancing first would lose the
+      // occurrence if the save then threw.
+      if (fromRule && dueOn) advanceRule(db, fromRule, dueOn);
+
       router.back();
     } catch (e) {
       // An InvariantError is the user's mistake and worth showing verbatim;
