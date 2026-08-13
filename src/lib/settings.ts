@@ -6,6 +6,15 @@
  *
  * SECRETS DO NOT BELONG IN SETTINGS. The settings table is included in backups
  * and exports; the Gemini API key goes in expo-secure-store instead.
+ *
+ * NOTHING IS DECLARED HERE AHEAD OF THE CODE THAT READS IT. `viewMode` was —
+ * a daily/weekly/monthly/yearly range for the Records and Analysis screens —
+ * and it sat unread for the whole life of the app because the app turned out to
+ * be month-shaped in a way that setting fought: budgets are keyed by month,
+ * carry-forward is month to month, and recurring windows are months. It was
+ * deleted rather than wired, because a preference the design has outgrown is
+ * worse than no preference at all. Ranges can come back as a feature, with the
+ * setting that goes with them.
  */
 
 export const SETTING_DEFAULTS = {
@@ -31,9 +40,13 @@ export const SETTING_DEFAULTS = {
    * reports a running cash position and leaves every budget alone.
    */
   carryOver: true as boolean,
-  /** Default range for the Records and Analysis screens. */
-  viewMode: 'monthly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
-  /** Show the running total in list headers. */
+  /**
+   * Put each day's net beside its date in the records list.
+   *
+   * Transfers are left out — moving money between your own accounts is not a
+   * day's spending, and counting it would make the day you shuffled savings
+   * across read exactly like the day you spent them.
+   */
   showTotal: true as boolean,
   /** Which Gemini model the AI features call. Not a secret. */
   geminiModel: 'gemini-flash-latest' as string,

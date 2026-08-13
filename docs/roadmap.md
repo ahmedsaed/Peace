@@ -115,7 +115,7 @@ work depends on Stage 2's per-record currency.
 
 ---
 
-## Stage 2 — Money features
+## Stage 2 — Money features ✅ done
 
 - ✅ **Settings screen** — home currency and default account, both wired through to the screens
   that use them. **Only settings that do something are shown**: `carryOver`, `viewMode` and
@@ -283,7 +283,7 @@ work depends on Stage 2's per-record currency.
 
 ---
 
-## Stage 3 — Recurring payments
+## Stage 3 — Recurring payments ✅ done
 
 Your "Installments" category was 92.9% of August spending and is currently re-typed by hand every
 month. This is likely the highest-value feature for you specifically.
@@ -295,9 +295,30 @@ month. This is likely the highest-value feature for you specifically.
 - Optional reminders via `expo-notifications`
 - Due dates on budget items
 
+**What shipped differently.** Three things, each because the plan above fought the domain.
+
+*No separate screen.* Rules were first given a page of their own with its own name, amount and
+chip lists — a worse copy of the record screen, and a second place to fix everything twice.
+Repeating is now a property you set *while entering the record*, on the screen that already owns
+those inputs. The rules screen kept only what a list can do that a form cannot: pause, delete, and
+see what is scheduled.
+
+*No `next_run_on` cursor.* Storing progress as a pointer can express "handled up to here" and
+nothing finer, so it invented rules the domain does not have — occurrences had to be dealt with in
+order, and acting out of order had to be forbidden. Occurrences are independent: **approved is read
+from the ledger** (a transaction carries its rule and its date, so its existence *is* the approval)
+and dismissed from `recurring_skips`. A proposal is anything in range that appears in neither.
+
+*Occurrence dates are derived from the rule's start by index*, never from the one that fired last.
+A monthly rule anchored to the 31st must fire on 28 February and then on **31 March**; deriving
+each date from the previous one lets February poison every month after it.
+
+Reminders and budget due dates were dropped — a due row in the list is the reminder, and it is
+already the first thing on the screen.
+
 ---
 
-## Stage 4 — Attachments
+## Stage 4 — Attachments ✅ done
 
 Prerequisite for Stage 5's OCR — build the storage layer before the intelligence.
 
@@ -307,9 +328,21 @@ Prerequisite for Stage 5's OCR — build the storage layer before the intelligen
 - Thumbnail on the record row, full-screen viewer
 - Include attachments in backup/export
 
+**What shipped differently.** "Include attachments in backup" turned out to be the whole stage.
+The moment a row can point at a file, a backup that copies `peace.db` alone restores a ledger whose
+every receipt is a broken thumbnail — on the one day a backup is being used at all. A Peace backup
+is now a **zip container**: `peace.db` beside an `attachments/` folder, which keeps the property
+that made it a bare `.db` in the first place. Old `.db` backups still restore, decided by reading
+the bytes rather than the filename.
+
+`expo-camera` was not needed — `expo-image-picker` covers both the camera and the library.
+Files are content-addressed (`<sha256>.<ext>`), and the pre-restore safety copy is a container too,
+because a restore sweeps files the incoming ledger does not mention and "undo" would otherwise hand
+back rows whose photos had just been deleted.
+
 ---
 
-## Stage 5 — AI-assisted entry (Gemini Flash)
+## Stage 5 — AI-assisted entry (Gemini) ✅ done
 
 Decision: **cloud processing via Gemini Flash**, for images and audio alike.
 
@@ -351,6 +384,44 @@ Requirements this creates:
   failure or a crash
 - Surface the model name as a setting too, so switching between Flash and Flash-Lite is a
   preference rather than a code change
+
+**What shipped differently.**
+
+*Voice was dropped, not deferred.* Photographing a receipt answers the same question better, and a
+second capture path would have been a second set of parsing rules to keep honest for a shortcut
+nobody reached for.
+
+*No Zod.* `responseSchema` is a plain object and the runtime validation is hand-written in
+`lib/receipt.ts`, because the interesting cases are not "is this a number" but "is this number a
+plausible receipt total" — a range check, a real-calendar-date check, and a cap on string length.
+A schema library would have validated the shape and passed all of them.
+
+*The model list is fetched, not typed.* A free-text model name is a 404 waiting to happen, so
+Settings offers what the key can actually call, filtered on `generateContent`.
+
+*The key is validated by using it, not by a test call.* An invalid key comes back as
+**400 INVALID_ARGUMENT**, not 401 — Google puts the real reason in `error.details[].reason`, and
+reading it is what lets the app blame the key rather than the model name.
+
+---
+
+## Unplanned, and shipped anyway ✅ done
+
+Two features that were never on this roadmap and earned their place mid-flight.
+
+**Google Drive backup.** Contradicts local-first on its face, which is why it is optional and why
+the file is sealed on the device before it leaves: a passphrase, scrypt, AES-GCM, and everything
+needed to open it travelling *inside* the file. The first version generated a random key instead —
+cryptographically stronger and useless, because that key lives in the device's secure store and the
+one scenario backups exist for is the one where the device is gone. Uploads go to `appdata`, a
+folder invisible in Drive and reachable by nothing but this app, which is also why restoring *from*
+Drive had to exist: otherwise the backups would be readable by no software on earth.
+
+**Portfolio rebalancing.** A separate ledger with its own tables that never touches money — asset
+classes with targets in basis points, holdings in micro-units, and a plan that says what to buy.
+Kept deliberately apart from the expense ledger rather than integrated: they answer different
+questions, and joining them would have made every total on every screen ask "which of the two do
+you mean".
 
 ---
 

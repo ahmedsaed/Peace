@@ -3,7 +3,7 @@ import { alias, type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { formatDayHeading, periodBounds, type Period } from '../../lib/period';
 import * as schema from '../schema';
-import { movesPosition, onExpenseSide, onIncomeSide } from './predicates';
+import { ledgerSide, movesPosition, onExpenseSide, onIncomeSide } from './predicates';
 import { accounts, attachments, categories, transactions } from '../schema';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
@@ -33,6 +33,17 @@ export type RecordRow = {
    * the same reason the icon map is split three ways rather than filtered.
    */
   attachmentCount: number;
+  /**
+   * What this row is worth in the HOME currency, or null when that is unknown.
+   *
+   * Null is the whole point of the field. A record in a currency this ledger
+   * cannot value — no stored conversion, and the only rates here belong to
+   * other records — must be EXCLUDED from a total rather than folded in at
+   * face value: adding 100 dollars to 100 pounds gives 200 of nothing.
+   * `dayTotals` counts those separately so the screen can say the total is
+   * incomplete instead of quietly lying by a few hundred.
+   */
+  homeValueMinor: number | null;
 };
 
 /**
@@ -47,6 +58,23 @@ const attachmentCount = sql<number>`(
   select count(*) from ${attachments} where ${attachments.transactionId} = ${transactions.id}
 )`.mapWith(Number);
 
+/**
+ * A row's value in the home currency, or NULL when it cannot be valued.
+ *
+ * The exact expression `periodSummary` sums, extracted so the per-row column
+ * and the month total cannot disagree about what a record is worth. Two
+ * hand-kept copies of this is how a day's subtotals stop adding up to the
+ * figure in the header directly above them.
+ */
+export function homeValue(homeCurrency: string) {
+  const home = sql`${homeCurrency.toUpperCase()}`;
+  return sql<number | null>`case
+    when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home}
+    then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor})
+    else null
+  end`;
+}
+
 export { attachmentCount };
 
 /**
@@ -56,7 +84,11 @@ export { attachmentCount };
  * leg is the one listed — without that filter every transfer shows up twice,
  * once as money leaving and once as money arriving.
  */
-export function listRecordsForPeriod(db: Db, period: Period): RecordRow[] {
+export function listRecordsForPeriod(
+  db: Db,
+  period: Period,
+  homeCurrency = 'EGP'
+): RecordRow[] {
   const { start, end } = periodBounds(period);
   const counter = alias(accounts, 'counter_account');
 
@@ -76,6 +108,7 @@ export function listRecordsForPeriod(db: Db, period: Period): RecordRow[] {
       accountName: accounts.name,
       counterAccountName: counter.name,
       attachmentCount,
+      homeValueMinor: homeValue(homeCurrency),
     })
     .from(transactions)
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
@@ -171,7 +204,22 @@ export function periodSummary(db: Db, period: Period, homeCurrency = 'EGP'): Per
   };
 }
 
-export type DayGroup = { key: string; heading: string; rows: RecordRow[] };
+export type DayGroup = {
+  key: string;
+  heading: string;
+  rows: RecordRow[];
+  /**
+   * What this day did to your position, in the home currency.
+   *
+   * Only the rows that MOVE it: a transfer between your own accounts is not a
+   * day's spending, and counting it would make a day you shuffled money look
+   * like a day you spent it. A correction does count — it moved real money —
+   * which is the same split `periodSummary` makes for the month above.
+   */
+  totalMinor: number;
+  /** Rows left out because this ledger cannot value them. */
+  unvaluedCount: number;
+};
 
 /**
  * Pure: split rows into day sections, preserving the order they arrive in.
@@ -189,10 +237,25 @@ export function groupByDay(rows: RecordRow[]): DayGroup[] {
     const d = row.occurredAt;
     const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     if (!current || current.key !== key) {
-      current = { key, heading: formatDayHeading(d), rows: [] };
+      current = { key, heading: formatDayHeading(d), rows: [], totalMinor: 0, unvaluedCount: 0 };
       groups.push(current);
     }
     current.rows.push(row);
+
+    // A transfer moves money between your own accounts and is neither spending
+    // nor income; including it would make the day you moved savings across look
+    // like the day you spent them. `ledgerSide` owns that question everywhere
+    // else, and it owns it here.
+    if (ledgerSide(row) === 'transfer') continue;
+
+    if (row.homeValueMinor === null) {
+      // Counted, never guessed at. A record in a currency this ledger cannot
+      // value is excluded from the figure and reported beside it, so the total
+      // is either right or visibly incomplete.
+      current.unvaluedCount += 1;
+      continue;
+    }
+    current.totalMinor += row.homeValueMinor;
   }
 
   return groups;
