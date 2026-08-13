@@ -411,6 +411,45 @@ app ignoring input. `pkill -f GradleDaemon`.
   `keyboardDidShow`, never `keyboardWillShow`: Android only fires the `Did` events, so a `Will`
   listener reports zero on the one platform that needs it. The flow has to TYPE into the field and
   then assert the button below it is still visible; asserting the field exists proves nothing.
+- **The moment a row can point at a FILE, the backup stops being the database.** Attachments live
+  on disk with only their names in `attachments`, so copying `peace.db` alone restores a ledger
+  whose every receipt is a broken thumbnail — on the one day a backup is being used at all. A
+  backup is now a zip: `peace.db` beside an `attachments/` folder, which keeps the property that
+  made it a bare `.db` in the first place (unzip it anywhere and the data is there without this
+  app). Old `.db` backups still restore: `openBackupPayload` decides container-or-database by
+  reading the bytes, in ONE place, so the file restore, the Drive restore and the backup check
+  cannot drift apart. Ask what else refers to a file before adding the next thing that does.
+- **A truncated zip still unzips.** The entries that survived read back perfectly, so nothing
+  downstream notices that half the receipts are gone — and restoring it would delete the originals
+  and report success. The manifest records how many attachments were packed and `readContainer`
+  CHECKS it, which is what makes the loss visible before anything is deleted. Any container format
+  needs a count that is verified rather than trusted.
+- **Attachments are content-addressed (`<sha256>.<ext>`), and that is three rules in one.** The
+  same receipt attached twice is one file; a name a file manager supplied never reaches the disk or
+  the archive (`../../evil.jpg` is the classic zip escape); and a file cannot change under its own
+  name. Never store a picked filename as a path — keep it in `original_name` for display only.
+- **A row and its file are not one thing.** Two records can share one receipt — a purchase and its
+  refund, an invoice split across two categories — so deleting a row must NOT delete the file, or
+  removing a receipt from one record silently blanks it on the other. `orphanedFiles` in
+  `repo/attachments.ts` is the only thing allowed to decide a file can go, and it answers by asking
+  the ledger what it still refers to rather than by bookkeeping.
+- **The safety copy has to hold everything the restore replaces, files included.** Restore sweeps
+  the files the incoming ledger does not mention, which is correct and would otherwise destroy the
+  OUTGOING ledger's photos — so "undo" would hand back rows whose files had just been deleted while
+  the screen still called the restore undoable. The pre-restore copy is a container for exactly
+  that reason. Same family as the fixed-name rule above it: a recovery path that quietly loses part
+  of what it promised is worse than none.
+- **The record does not exist when the photo is taken.** You open the record screen, photograph the
+  receipt, and only then type the amount — so there is no transaction id for most of the time the
+  screen is open. Bytes are written immediately (the camera leaves its output in a cache Android may
+  reclaim, and losing a photo somebody just took is unforgivable); ROWS wait for the save, so
+  backing out leaves the ledger untouched like every other field. The file left behind is collected
+  by the orphan sweep on launch — a cost paid in bytes, not in receipts.
+- **Downscale a photo before it is stored, never at render time.** A 4MB camera JPEG that reaches
+  the disk is 4MB in every backup made from then on. 1600px at quality 0.7 still reads a total and
+  a date, and is the difference between a year of receipts weighing 20MB and 400MB — which is the
+  difference between a weekly Drive backup that works and one the user switches off. Failing to
+  shrink must not fail the attach: store the original and let the size guard catch it.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

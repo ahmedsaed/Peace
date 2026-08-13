@@ -35,7 +35,7 @@ import {
   isImageMime,
 } from '../lib/attachment';
 import { db } from './client';
-import { addAttachment, orphanedFiles, referencedFiles } from './repo/attachments';
+import { orphanedFiles, referencedFiles } from './repo/attachments';
 import type { Attachment } from './schema';
 
 const DIRECTORY = 'attachments';
@@ -87,17 +87,53 @@ type Incoming = {
 };
 
 /**
- * Copy a picked file into the attachments directory and record it.
+ * A file that is on disk but does not belong to a record yet.
+ *
+ * THE RECORD DOES NOT EXIST WHEN THE PHOTO IS TAKEN. You open the record
+ * screen, photograph the receipt, and then type the amount — so there is no
+ * transaction id to attach to for most of the time the screen is open. The
+ * bytes are written immediately anyway, and the ROW waits for the save.
+ *
+ * Writing the bytes straight away rather than holding the picked uri is the
+ * safer half of the trade: the camera leaves its output in the cache, which
+ * Android may reclaim at any moment, and losing the photo somebody just took
+ * because they spent two minutes picking a category would be unforgivable.
+ * Backing out of the screen instead leaves a file nothing points at, which the
+ * orphan sweep clears on the next launch — a cost paid in bytes, not in
+ * receipts.
+ */
+export type StagedAttachment = {
+  fileName: string;
+  originalName: string | null;
+  mimeType: string;
+  byteSize: number;
+  sha256: string;
+  width: number | null;
+  height: number | null;
+};
+
+/** What an existing record's rows look like to the screen holding them. */
+export function stagedFromRows(rows: Attachment[]): StagedAttachment[] {
+  return rows.map((row) => ({
+    fileName: row.fileName,
+    originalName: row.originalName,
+    mimeType: row.mimeType,
+    byteSize: row.byteSize,
+    sha256: row.sha256 ?? '',
+    width: row.width,
+    height: row.height,
+  }));
+}
+
+/**
+ * Copy a picked file into the attachments directory.
  *
  * The order is deliberate: read, hash, size-check, THEN write. Writing first
  * and validating afterwards leaves a rejected file sitting in the directory
  * with nothing pointing at it — which the orphan sweep would eventually clear,
- * but only after it has already been packed into a backup.
+ * but only after it had already been packed into a backup.
  */
-export async function storeAttachment(
-  transactionId: string,
-  incoming: Incoming
-): Promise<Attachment> {
+export async function stageAttachment(incoming: Incoming): Promise<StagedAttachment> {
   const mimeType = incoming.mimeType.toLowerCase();
   // Throws by name for anything not on the accepted list, before any work.
   extensionFor(mimeType);
@@ -130,8 +166,7 @@ export async function storeAttachment(
     }
   }
 
-  return addAttachment(db, {
-    transactionId,
+  return {
     fileName,
     originalName: incoming.originalName ?? null,
     mimeType,
@@ -139,7 +174,7 @@ export async function storeAttachment(
     sha256,
     width: incoming.width ?? null,
     height: incoming.height ?? null,
-  });
+  };
 }
 
 /**
@@ -174,7 +209,7 @@ async function downscale(uri: string): Promise<{ uri: string; width: number; hei
   }
 }
 
-export type PickOutcome = { cancelled: true } | { cancelled: false; attachment: Attachment };
+export type PickOutcome = { cancelled: true } | { cancelled: false; attachment: StagedAttachment };
 
 /**
  * Take a photo.
@@ -183,7 +218,7 @@ export type PickOutcome = { cancelled: true } | { cancelled: false; attachment: 
  * at launch: a permission prompt with no context attached is the one people
  * deny, and denying it here is recoverable — the file picker still works.
  */
-export async function attachFromCamera(transactionId: string): Promise<PickOutcome> {
+export async function attachFromCamera(): Promise<PickOutcome> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     throw new AttachmentError(
@@ -206,7 +241,7 @@ export async function attachFromCamera(transactionId: string): Promise<PickOutco
   const shrunk = await downscale(asset.uri);
   return {
     cancelled: false,
-    attachment: await storeAttachment(transactionId, {
+    attachment: await stageAttachment({
       uri: shrunk.uri,
       mimeType: 'image/jpeg',
       width: shrunk.width || asset.width,
@@ -222,7 +257,7 @@ export async function attachFromCamera(transactionId: string): Promise<PickOutco
  * Framework is a permission grant rather than a path, and it can expire between
  * being handed over and being read — the copy is what makes reading it reliable.
  */
-export async function attachFromFiles(transactionId: string): Promise<PickOutcome> {
+export async function attachFromFiles(): Promise<PickOutcome> {
   const result = await DocumentPicker.getDocumentAsync({
     type: ACCEPTED_MIME,
     multiple: false,
@@ -240,7 +275,7 @@ export async function attachFromFiles(transactionId: string): Promise<PickOutcom
     const shrunk = await downscale(asset.uri);
     return {
       cancelled: false,
-      attachment: await storeAttachment(transactionId, {
+      attachment: await stageAttachment({
         uri: shrunk.uri,
         mimeType: 'image/jpeg',
         originalName: asset.name,
@@ -252,7 +287,7 @@ export async function attachFromFiles(transactionId: string): Promise<PickOutcom
 
   return {
     cancelled: false,
-    attachment: await storeAttachment(transactionId, {
+    attachment: await stageAttachment({
       uri: asset.uri,
       mimeType,
       originalName: asset.name,

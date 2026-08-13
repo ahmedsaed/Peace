@@ -84,6 +84,49 @@ export function removeAttachment(db: Db, id: string): void {
   db.delete(attachments).where(eq(attachments.id, id)).run();
 }
 
+/**
+ * Make a record's attachments match exactly this list.
+ *
+ * WHAT THE SAVE BUTTON CALLS. The record screen holds attachments in component
+ * state — added ones are already on disk, removed ones are merely gone from the
+ * array — and nothing is written to the database until the record is saved.
+ * That is what makes backing out of the screen leave the ledger untouched, the
+ * same property every other field on it has.
+ *
+ * Matched by FILENAME, which is the content hash: two entries describing the
+ * same bytes are the same attachment however they arrived, so re-picking a file
+ * that is already there is a no-op rather than a duplicate.
+ *
+ * Returns what changed, so the caller can sweep orphans only when something
+ * actually went.
+ */
+export function syncAttachments(
+  db: Db,
+  transactionId: string,
+  wanted: Omit<NewAttachmentInput, 'transactionId'>[]
+): { added: number; removed: number } {
+  const existing = listAttachments(db, transactionId);
+  const keep = new Set(wanted.map((a) => a.fileName));
+
+  let removed = 0;
+  for (const row of existing) {
+    if (!keep.has(row.fileName)) {
+      removeAttachment(db, row.id);
+      removed += 1;
+    }
+  }
+
+  const have = new Set(existing.map((row) => row.fileName));
+  let added = 0;
+  for (const entry of wanted) {
+    if (have.has(entry.fileName)) continue;
+    addAttachment(db, { ...entry, transactionId });
+    added += 1;
+  }
+
+  return { added, removed };
+}
+
 /** How many receipts each of these records carries, for the list's indicator. */
 export function attachmentCounts(db: Db, transactionIds: string[]): Map<string, number> {
   const counts = new Map<string, number>();

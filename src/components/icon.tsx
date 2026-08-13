@@ -59,6 +59,23 @@ const CHROME_PATHS = {
   // Off-device backup. Chrome, not a category: "Cloud" is not somewhere money
   // goes, and offering it in the picker would invite exactly that mistake.
   cloud: 'M6.5 19a4.5 4.5 0 0 1-.6-8.96 6 6 0 0 1 11.64-1.02A4.75 4.75 0 0 1 17.75 19H6.5zm0-2h11.25a2.75 2.75 0 0 0 .1-5.5l-.85-.03-.2-.83a4 4 0 0 0-7.8.2l-.16.87-.88.06A2.5 2.5 0 0 0 6.5 17z',
+
+  // --- attachments ---
+  // The lens is a ring, so the inner circle is wound the OPPOSITE way to the
+  // outer one — same trick as `search` above. Matching winding under a non-zero
+  // fill gives a solid disc, which reads as a sticker rather than a lens.
+  camera:
+    'M9.2 3h5.6l1.2 2H20a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l1.2-2zM12 8a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 1 1 0-5.6z',
+  // A folder rather than a paperclip: a clip is mostly negative space and turns
+  // to mush at 18px, which is the size this is actually drawn at.
+  folder: 'M2 4h7.2l2 3H22v13H2V4z',
+  // The tile a PDF gets, since it has no thumbnail. The folded corner is what
+  // stops it reading as `records`, whose silhouette is otherwise close.
+  document: 'M6 2h8l6 6v14H6V2zm8 1.6V9h5.4L14 3.6zM9 12h8v2H9v-2zm0 4h8v2H9v-2z',
+  // Removes one attachment. A filled X, not two strokes — this Path has no
+  // stroke, so line segments would render as nothing at all.
+  close:
+    'M5.6 4.2L12 10.6l6.4-6.4 1.4 1.4L13.4 12l6.4 6.4-1.4 1.4L12 13.4l-6.4 6.4-1.4-1.4L10.6 12 4.2 5.6z',
 } as const;
 
 /**

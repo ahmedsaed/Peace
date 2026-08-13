@@ -1,8 +1,9 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { openBackupPayload, type BackupPayload } from '../lib/backup-payload';
+import { packContainer } from '../lib/container';
 import { useSettingsStore } from '../state/settings';
-import { filesOnDisk, sweepOrphans, writeRestoredFiles } from './attachments';
+import { filesOnDisk, readReferencedFiles, sweepOrphans, writeRestoredFiles } from './attachments';
 import { db, sqliteDb, DATABASE_NAME } from './client';
 import { missingFiles } from './repo/attachments';
 import {
@@ -44,8 +45,15 @@ const ALIAS = 'peace_backup';
  * same day deleted the safety copy — the staging code clears a file of the same
  * name before writing. The screen said a restore was undoable while the only
  * thing that made it undoable was one tap from being destroyed.
+ *
+ * A CONTAINER, not a bare database, since records started carrying receipts.
+ * A restore sweeps the files the incoming ledger does not mention, which is the
+ * right thing to do and would otherwise destroy the outgoing ledger's photos —
+ * so "undo" would hand back rows whose files had just been deleted, and the
+ * screen would still be calling it undoable. The safety copy has to hold
+ * everything the restore is about to replace, files included.
  */
-const SAFETY_NAME = 'peace-before-restore.db';
+const SAFETY_NAME = 'peace-before-restore.zip';
 
 export const safetyCopy = () => new File(Paths.cache, SAFETY_NAME);
 
@@ -135,12 +143,23 @@ export async function restoreFrom(picked: File): Promise<RestoreResult> {
     // Throws before anything is deleted.
     validateBackup(sqliteDb, ALIAS);
 
-    // Park the CURRENT state before replacing it. Safe to overwrite here: the
-    // chosen file was already staged to its own name above, so the source of
-    // this restore is never the file being written.
+    /**
+     * Park the CURRENT state before replacing it — the whole ledger AND the
+     * receipts it refers to, because the sweep below is about to delete every
+     * file the incoming ledger does not mention.
+     *
+     * Safe to overwrite here: the chosen file was already read into memory
+     * above, so the source of this restore can never be the file being written.
+     */
     const safety = safetyCopy();
     if (safety.exists) safety.delete();
-    databaseFile().copySync(safety);
+    safety.create({ overwrite: true });
+    safety.write(
+      packContainer({
+        database: await databaseFile().bytes(),
+        files: await readReferencedFiles(),
+      })
+    );
     if (!safety.exists || safety.size <= 0) {
       throw new RestoreError('Could not save a copy of your current data, so nothing was changed.');
     }
