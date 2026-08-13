@@ -76,6 +76,17 @@ const CHROME_PATHS = {
   // stroke, so line segments would render as nothing at all.
   close:
     'M5.6 4.2L12 10.6l6.4-6.4 1.4 1.4L13.4 12l6.4 6.4-1.4 1.4L12 13.4l-6.4 6.4-1.4-1.4L10.6 12 4.2 5.6z',
+  /**
+   * "This record has a receipt", in a list row at 12px.
+   *
+   * A paperclip is MOSTLY NEGATIVE SPACE, which is why the attach button uses a
+   * folder instead — a clip drawn as a silhouette turns into a blob. Drawn as a
+   * RING it survives: the outer sweep and the inner sweep are wound opposite
+   * ways (0 against 1) so the non-zero fill punches the hole, exactly as
+   * `search` and `camera` do. Verified on a device at the size it is used.
+   */
+  paperclip:
+    'M16.5 6.5a3.5 3.5 0 0 0-6 2.5v7a5.5 5.5 0 0 0 11 0V7h-2v9a3.5 3.5 0 0 1-7 0V9a1.5 1.5 0 0 1 3 0v7h2V9a3.5 3.5 0 0 0-1-2.5z',
 } as const;
 
 /**

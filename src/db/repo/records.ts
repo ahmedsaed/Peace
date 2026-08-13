@@ -4,7 +4,7 @@ import { alias, type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { formatDayHeading, periodBounds, type Period } from '../../lib/period';
 import * as schema from '../schema';
 import { movesPosition, onExpenseSide, onIncomeSide } from './predicates';
-import { accounts, categories, transactions } from '../schema';
+import { accounts, attachments, categories, transactions } from '../schema';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -24,7 +24,30 @@ export type RecordRow = {
   categoryColor: string | null;
   accountName: string;
   counterAccountName: string | null;
+  /**
+   * How many receipts this record carries, for the list's indicator.
+   *
+   * On the SHARED row type rather than fetched by whichever screen wants it,
+   * which is what makes the search results carry it too without anyone
+   * remembering to ask. A field added here forces every producer to answer —
+   * the same reason the icon map is split three ways rather than filtered.
+   */
+  attachmentCount: number;
 };
+
+/**
+ * "How many receipts?", as a correlated subquery.
+ *
+ * ONE query, not a second pass keyed by id. A month is a few hundred rows and
+ * the join is on an indexed column, so this costs nothing — while fetching the
+ * counts separately would be a second round trip that can disagree with the
+ * first, and would have to be repeated by every screen showing a record.
+ */
+const attachmentCount = sql<number>`(
+  select count(*) from ${attachments} where ${attachments.transactionId} = ${transactions.id}
+)`.mapWith(Number);
+
+export { attachmentCount };
 
 /**
  * One month of records, newest first.
@@ -52,6 +75,7 @@ export function listRecordsForPeriod(db: Db, period: Period): RecordRow[] {
       categoryColor: categories.color,
       accountName: accounts.name,
       counterAccountName: counter.name,
+      attachmentCount,
     })
     .from(transactions)
     .leftJoin(categories, eq(categories.id, transactions.categoryId))

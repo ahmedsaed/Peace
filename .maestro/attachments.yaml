@@ -79,6 +79,12 @@ appId: com.ahmed.peace
     id: "summary-expense"
     text: "-E£120.00"
 
+# No receipt, so no clip. The indicator is driven by a count in the row query,
+# and a marker that shows on EVERY row is exactly as useless as one that shows
+# on none — this is the half a flow can prove without driving the system picker.
+- assertNotVisible:
+    id: "attachment-indicator"
+
 # --- and re-opening it shows no receipts, not a broken tile ---
 # The note is the row's SUBTITLE, rendered as `Cash · “Lunch receipt”` — and
 # Maestro matches a selector against the WHOLE text, so the bare note does not
