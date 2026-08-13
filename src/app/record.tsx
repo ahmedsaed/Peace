@@ -11,7 +11,9 @@ import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { InvariantError, listCategoryTree } from '@/db/repo/categories';
-import { advanceRule } from '@/db/repo/recurring';
+import { describeRepeat, RepeatSheet, type Repeat } from '@/components/repeat-sheet';
+import { createRule, getRule, markHandled } from '@/db/repo/recurring';
+import { toYmd } from '@/lib/recurrence';
 import {
   createRecord,
   createTransfer,
@@ -90,6 +92,16 @@ export default function RecordScreen() {
     () => (refundOf ? getRecord(db, refundOf) : copyOf ? getRecord(db, copyOf) : undefined),
     [refundOf, copyOf]
   );
+
+  /**
+   * The rule a due row came from.
+   *
+   * Tapping one of those rows has to arrive at a FILLED form — the amount, the
+   * account and the category are the whole reason the rule was written down,
+   * and re-typing them is what this feature exists to stop. Editing before
+   * saving is the point ("the rent went up"), not re-entering from scratch.
+   */
+  const rule = useMemo(() => (fromRule ? getRule(db, fromRule) : undefined), [fromRule]);
   // Refunding a record, editing one that already is, or duplicating one:
   // "refund" is a property of the row, not of how the screen was opened.
   const isRefund = (!!refundOf && !!source) || !!source?.isRefund || !!existing?.isRefund;
@@ -101,6 +113,7 @@ export default function RecordScreen() {
     // NEVER `amountMinor < 0` on its own. A refund is the one expense with a
     // positive amount, so the sign alone would present it as Income — and
     // saving from there would write it back as income.
+    if (rule) return rule.type;
     const from = source ?? existing;
     if (!from) return 'expense';
     if (from.transferPairId) return 'transfer';
@@ -113,6 +126,7 @@ export default function RecordScreen() {
   // A transfer can be opened from either leg; the form always presents it as
   // "from the account that lost money".
   const [accountId, setAccountId] = useState(() => {
+    if (rule) return rule.accountId;
     if (source) return source.accountId;
     if (!existing) {
       // The setting is only a preference, never a guarantee: an account can be
@@ -131,6 +145,7 @@ export default function RecordScreen() {
     // A duplicated transfer has to carry its DESTINATION. Falling through to
     // "whichever account happens to be second" produced a form that looked
     // filled in and pointed somewhere else entirely.
+    if (rule) return rule.counterAccountId ?? accounts[1]?.id ?? null;
     const from = existing ?? source;
     if (!from) return accounts[1]?.id ?? null;
     if (from.transferPairId && from.amountMinor > 0) return from.accountId;
@@ -138,12 +153,27 @@ export default function RecordScreen() {
   });
 
   const [categoryId, setCategoryId] = useState<string | null>(
-    existing?.categoryId ?? source?.categoryId ?? null
+    rule?.categoryId ?? existing?.categoryId ?? source?.categoryId ?? null
   );
-  const [note, setNote] = useState(existing?.note ?? source?.note ?? '');
+  const [note, setNote] = useState(rule?.note ?? existing?.note ?? source?.note ?? '');
   // Dated TODAY for a refund or a copy: the money comes back, or goes out
   // again, on the day it happens — not on the day of the record it came from.
-  const [occurredAt, setOccurredAt] = useState<Date>(existing?.occurredAt ?? new Date());
+  const [occurredAt, setOccurredAt] = useState<Date>(() => {
+    // Dated the day it was DUE. A rent payment settled a week late still
+    // belongs to the week it was owed, and every period total groups by day.
+    if (dueOn) return new Date(`${dueOn}T12:00:00`);
+    return existing?.occurredAt ?? new Date();
+  });
+  /**
+   * How this record repeats, if it does.
+   *
+   * Offered on NEW records only. Turning an existing row into a rule would beg
+   * the question of what the row already written was — the first occurrence, or
+   * something separate — and there is no answer that is not surprising half the
+   * time. Rules are managed on the Recurring screen once they exist.
+   */
+  const [repeat, setRepeat] = useState<Repeat | null>(null);
+  const [repeatOpen, setRepeatOpen] = useState(false);
   const [picking, setPicking] = useState<'date' | 'time' | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +194,7 @@ export default function RecordScreen() {
   const homeCurrency = useSetting('homeCurrency');
 
   const [calc, setCalc] = useState(() => {
+    if (rule) return calcFromMinor(rule.amountMinor, rule.currency);
     const from = existing ?? source;
     return from ? calcFromMinor(from.amountMinor, from.currency) : initialCalc();
   });
@@ -523,7 +554,39 @@ export default function RecordScreen() {
 
       // Only after the write succeeded. Advancing first would lose the
       // occurrence if the save then threw.
-      if (fromRule && dueOn) advanceRule(db, fromRule, dueOn);
+      if (fromRule && dueOn) markHandled(db, fromRule, dueOn);
+
+      /**
+       * Turn this record into a standing order.
+       *
+       * The rule starts on THIS record's date, and is then advanced straight
+       * past it — the record for today has just been written, and a rule that
+       * still owed it would offer the same payment again on the records list a
+       * second later. What it owes begins at the next occurrence.
+       */
+      if (repeat && !isEdit) {
+        const startsOn = toYmd(occurredAt);
+        const rule = createRule(db, {
+          name: note.trim() || category?.name || 'Recurring',
+          type: type === 'transfer' ? 'transfer' : (type as 'expense' | 'income'),
+          accountId,
+          counterAccountId: type === 'transfer' ? toAccountId : null,
+          categoryId: type === 'transfer' ? null : categoryId,
+          amountMinor,
+          currency,
+          note: note.trim() || null,
+          frequency: repeat.frequency,
+          interval: repeat.interval,
+          anchorDay: repeat.anchorDay,
+          startsOn,
+          endsOn: repeat.endsOn,
+        });
+        // The record for today has just been written, but it was written
+        // before this rule existed, so it does not carry the link that would
+        // mark the occurrence handled. Close it out explicitly, or the rule
+        // proposes the very payment that created it.
+        markHandled(db, rule.id, startsOn);
+      }
 
       router.back();
     } catch (e) {
@@ -594,34 +657,78 @@ export default function RecordScreen() {
       className="flex-1 bg-ground"
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       testID="record-screen">
-      <View className={`flex-row items-center justify-between px-4 ${pad}`}>
+      <RepeatSheet
+        visible={repeatOpen}
+        value={repeat}
+        startsOn={toYmd(occurredAt)}
+        onClose={() => setRepeatOpen(false)}
+        onChange={setRepeat}
+      />
+      <View className={`relative flex-row items-center justify-between px-4 ${pad}`}>
         <Pressable
           onPress={() => router.back()}
           testID="record-cancel"
           accessibilityRole="button"
-          className="rounded-lg border border-line px-5 py-2.5 active:opacity-70">
+          className="h-10 justify-center rounded-lg border border-line px-5 active:opacity-70">
           <Text className="text-sm font-medium text-muted">Cancel</Text>
         </Pressable>
 
-        <Text className="text-sm font-medium text-muted" testID="record-title">
-          {/* Names the ACTION you are in, not the row that will result.
-              Duplicating a refund still produces a refund, but "Refund" here
-              would leave you wondering which of the two things you tapped. */}
-          {isEdit ? 'Edit record' : refundOf ? 'Refund' : copyOf ? 'Duplicate' : 'New record'}
-        </Text>
+        {/* Centred on the SCREEN, not on the space left over.
+            Laid out in the flow between Cancel and the two buttons on the
+            right, `justify-between` puts it wherever the leftover gap happens
+            to be — so it drifted left the moment the repeat button widened that
+            side. Taken out of the flow it stays put whatever the buttons do.
 
-        <Pressable
-          onPress={onSave}
-          disabled={!canSave}
-          testID="record-save"
-          accessibilityRole="button"
-          className={`rounded-lg px-7 py-2.5 active:opacity-80 ${
-            canSave ? 'bg-accent' : 'bg-surface'
-          }`}>
-          <Text className={`text-sm font-semibold ${canSave ? 'text-accent-ink' : 'text-line'}`}>
-            Save
+            `pointerEvents="none"` because it now overlays the whole row and
+            would otherwise swallow taps aimed at the buttons underneath. */}
+        <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+          <Text className="text-sm font-medium text-muted" testID="record-title">
+            {/* Names the ACTION you are in, not the row that will result.
+                Duplicating a refund still produces a refund, but "Refund" here
+                would leave you wondering which of the two things you tapped. */}
+            {isEdit ? 'Edit record' : refundOf ? 'Refund' : copyOf ? 'Duplicate' : 'New record'}
           </Text>
-        </Pressable>
+        </View>
+
+        <View className="flex-row items-center gap-2">
+          {/* Repeating is a property of the record you are entering, so it is
+              set here rather than on a screen of its own — the amount, account
+              and category pickers already live on this screen and should not be
+              built a second time somewhere worse.
+
+              An icon alone, so the WHOLE state is carried by how it looks: tinted
+              and outlined in the accent when this record repeats, plain when it
+              does not. The schedule in words lives in the sheet, where there is
+              room for it and where it is being chosen. */}
+          {!isEdit ? (
+            <Pressable
+              onPress={() => setRepeatOpen(true)}
+              testID="record-repeat"
+              accessibilityRole="button"
+              accessibilityState={{ selected: !!repeat }}
+              // Without a label this button is unreadable to a screen reader,
+              // and the schedule is exactly what someone would want read out.
+              accessibilityLabel={`Repeat: ${describeRepeat(repeat, toYmd(occurredAt))}`}
+              className={`h-10 w-10 items-center justify-center rounded-lg border active:opacity-70 ${
+                repeat ? 'border-accent bg-accent/15' : 'border-line'
+              }`}>
+              <Icon name="refresh" size={18} color={repeat ? palette.accent : palette.muted} />
+            </Pressable>
+          ) : null}
+
+          <Pressable
+            onPress={onSave}
+            disabled={!canSave}
+            testID="record-save"
+            accessibilityRole="button"
+            className={`h-10 justify-center rounded-lg px-7 active:opacity-80 ${
+              canSave ? 'bg-accent' : 'bg-surface'
+            }`}>
+            <Text className={`text-sm font-semibold ${canSave ? 'text-accent-ink' : 'text-line'}`}>
+              Save
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* `flexGrow: 1` lets the note expand into spare room on a full-height
