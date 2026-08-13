@@ -354,6 +354,26 @@ export async function readReferencedFiles(): Promise<{ name: string; bytes: Uint
   return files;
 }
 
+/**
+ * Read a stored attachment back as base64, for sending to a model.
+ *
+ * THE STORED COPY, NOT THE CAMERA ORIGINAL. It has already been downscaled to
+ * 1600px, which is smaller to upload and — the part that matters — is the copy
+ * the user will still have in two years. If the model cannot read the archived
+ * receipt then neither can a person, and finding that out now is worth more
+ * than a slightly better reading from a file that is about to be thrown away.
+ *
+ * `base64()` is native; encoding a 300KB image in JavaScript on Hermes would be
+ * both slow and a dependency.
+ */
+export async function attachmentAsBase64(fileName: string): Promise<string> {
+  const file = new File(attachmentsDirectory(), fileName);
+  if (!file.exists) {
+    throw new AttachmentError('That receipt is not on this phone any more.');
+  }
+  return file.base64();
+}
+
 /** Write the attachments out of a restored container, replacing what is there. */
 export function writeRestoredFiles(files: { name: string; bytes: Uint8Array }[]): number {
   const directory = attachmentsDirectory();
