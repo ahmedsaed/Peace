@@ -13,7 +13,7 @@
  * nothing", and it is the only thing allowed to decide a file can go.
  */
 
-import { and, count, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { newId } from '../../lib/id';
@@ -125,22 +125,6 @@ export function syncAttachments(
   }
 
   return { added, removed };
-}
-
-/** How many receipts each of these records carries, for the list's indicator. */
-export function attachmentCounts(db: Db, transactionIds: string[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  if (transactionIds.length === 0) return counts;
-
-  const rows = db
-    .select({ transactionId: attachments.transactionId, n: count() })
-    .from(attachments)
-    .where(sql`${attachments.transactionId} IN ${transactionIds}`)
-    .groupBy(attachments.transactionId)
-    .all();
-
-  for (const row of rows) counts.set(row.transactionId, row.n);
-  return counts;
 }
 
 /** Every file the database still expects to find on disk. */
