@@ -15,14 +15,12 @@ import { useSettingsStore } from '@/state/settings';
 /**
  * Settings.
  *
- * ONLY SETTINGS THAT DO SOMETHING APPEAR HERE. `viewMode` and `showTotal` are
- * defined and stored, but nothing reads them yet — so showing them would be two
- * switches that silently do nothing, which is worse than an empty screen and
- * exactly the kind of thing that teaches you to stop trusting an app. They land
- * with the features that consume them.
- *
- * `carryOver` appeared the moment the Records and Analysis screens started
- * reading it, which is the same rule from the other direction.
+ * ONLY SETTINGS THAT DO SOMETHING APPEAR HERE. A control for a preference
+ * nothing reads is a switch that silently does nothing, which is worse than an
+ * empty screen and exactly how an app teaches you to stop trusting it. Each row
+ * lands in the same change as the code that honours it — `carryOver` appeared
+ * the moment two screens started reading it, and `showTotal` the moment the
+ * records list learned to total a day.
  */
 export default function SettingsScreen() {
   const settings = useSettingsStore((state) => state.settings);
@@ -83,6 +81,13 @@ export default function SettingsScreen() {
             value={settings.carryOver}
             onChange={(next) => update('carryOver', next)}
             testID="setting-carry-over"
+          />
+          <Toggle
+            label="Daily totals"
+            hint="Put each day's net beside its date in the records list. Transfers between your own accounts are left out."
+            value={settings.showTotal}
+            onChange={(next) => update('showTotal', next)}
+            testID="setting-show-total"
             last
           />
         </Section>

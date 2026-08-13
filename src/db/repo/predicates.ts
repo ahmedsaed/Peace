@@ -103,11 +103,22 @@ export type LedgerSide = 'expense' | 'income' | 'transfer' | 'correction';
  */
 export function ledgerSide(row: {
   transferPairId?: string | null;
+  /**
+   * The SAME question as `transferPairId`, asked by a row that has already
+   * answered it.
+   *
+   * `RecordRow` carries `isTransfer` and drops the pair id, so a caller handing
+   * one of those over matched no branch at all and every transfer came back as
+   * expense or income by its sign — typechecking perfectly, because these
+   * fields are optional. Accepting both is what stops this rule acquiring a
+   * fifth hand-written copy for the row shape that does not happen to fit.
+   */
+  isTransfer?: boolean | null;
   isAdjustment?: boolean | null;
   isRefund?: boolean | null;
   amountMinor: number;
 }): LedgerSide {
-  if (row.transferPairId) return 'transfer';
+  if (row.transferPairId || row.isTransfer) return 'transfer';
   if (row.isAdjustment) return 'correction';
   if (row.isRefund) return 'expense';
   return row.amountMinor < 0 ? 'expense' : 'income';

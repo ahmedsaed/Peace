@@ -282,6 +282,104 @@ describe('how many receipts a row carries', () => {
   });
 });
 
+/**
+ * The per-day subtotal in each section heading, behind the `showTotal` setting.
+ *
+ * It has to agree with the month header directly above it, which is why the
+ * home-currency expression is shared with `periodSummary` rather than written
+ * out a second time here.
+ */
+describe('what a day did to your position', () => {
+  const row = (over: Partial<RecordRow>): RecordRow => ({
+    id: `r${Math.random()}`,
+    amountMinor: -100,
+    currency: 'EGP',
+    note: null,
+    occurredAt: new Date(2026, 7, 5, 12),
+    isTransfer: false,
+    isAdjustment: false,
+    isRefund: false,
+    categoryName: null,
+    categoryIcon: null,
+    categoryColor: null,
+    accountName: 'Cash',
+    counterAccountName: null,
+    attachmentCount: 0,
+    homeValueMinor: -100,
+    ...over,
+  });
+
+  it('nets a day of spending and income', () => {
+    const [day] = groupByDay([
+      row({ amountMinor: -3_000, homeValueMinor: -3_000 }),
+      row({ amountMinor: 10_000, homeValueMinor: 10_000 }),
+    ]);
+    expect(day.totalMinor).toBe(7_000);
+    expect(day.unvaluedCount).toBe(0);
+  });
+
+  /**
+   * A transfer between your own accounts is neither spending nor income. Left
+   * in, the day you moved savings across would read exactly like the day you
+   * spent them.
+   */
+  it('leaves transfers out', () => {
+    const [day] = groupByDay([
+      row({ amountMinor: -3_000, homeValueMinor: -3_000 }),
+      row({ isTransfer: true, amountMinor: -50_000, homeValueMinor: -50_000 }),
+    ]);
+    expect(day.totalMinor).toBe(-3_000);
+  });
+
+  /** A correction moved real money, so it belongs in the position. */
+  it('counts a balance correction', () => {
+    const [day] = groupByDay([row({ isAdjustment: true, amountMinor: -1_500, homeValueMinor: -1_500 })]);
+    expect(day.totalMinor).toBe(-1_500);
+  });
+
+  /**
+   * A refund is an expense with a POSITIVE amount. Its sign is what makes the
+   * day's net right, and reading the side from the sign is the bug that rule
+   * exists to prevent.
+   */
+  it('nets a refund against the day it came back on', () => {
+    const [day] = groupByDay([
+      row({ amountMinor: -80_000, homeValueMinor: -80_000 }),
+      row({ isRefund: true, amountMinor: 30_000, homeValueMinor: 30_000 }),
+    ]);
+    expect(day.totalMinor).toBe(-50_000);
+  });
+
+  /**
+   * 100 dollars plus 100 pounds is 200 of nothing. An unvaluable record is
+   * excluded and COUNTED, so the screen can say the figure is incomplete
+   * rather than being quietly wrong by a few hundred.
+   */
+  it('excludes what it cannot value, and says how many', () => {
+    const [day] = groupByDay([
+      row({ amountMinor: -3_000, homeValueMinor: -3_000 }),
+      row({ currency: 'USD', amountMinor: -5_000, homeValueMinor: null }),
+    ]);
+    expect(day.totalMinor).toBe(-3_000);
+    expect(day.unvaluedCount).toBe(1);
+  });
+
+  it('totals each day separately', () => {
+    const groups = groupByDay([
+      row({ occurredAt: new Date(2026, 7, 6, 9), amountMinor: -1_000, homeValueMinor: -1_000 }),
+      row({ occurredAt: new Date(2026, 7, 5, 9), amountMinor: -2_000, homeValueMinor: -2_000 }),
+    ]);
+    expect(groups.map((g) => g.totalMinor)).toEqual([-1_000, -2_000]);
+  });
+
+  it('is zero for a day of nothing but transfers', () => {
+    // Zero rather than absent: the day HAS rows, and its position simply did
+    // not move. Hiding the figure would read as a missing total.
+    const [day] = groupByDay([row({ isTransfer: true, homeValueMinor: -100 })]);
+    expect(day.totalMinor).toBe(0);
+  });
+});
+
 describe('groupByDay', () => {
   const row = (day: number, hour = 12): RecordRow => ({
     id: `r${day}-${hour}`,
@@ -298,6 +396,7 @@ describe('groupByDay', () => {
     accountName: 'Cash',
     counterAccountName: null,
     attachmentCount: 0,
+    homeValueMinor: -100,
   });
 
   it('returns nothing for no rows', () => {

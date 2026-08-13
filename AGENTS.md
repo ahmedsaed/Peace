@@ -114,10 +114,12 @@ one line rather than a rule about all of them. **The tell is `***` where the val
 log.** Never build a cross-job output out of anything that might match a secret; glob for the file
 instead.
 
-**The release path cannot be tested from a pull request** — it only runs on push to `main`. Anything
-in the `publish` job is therefore unverified until it runs for real. Keep that job small, and make
-it fail loudly rather than publish something broken: a release with no APK attached looks
-installable and is not.
+**The release path cannot be tested from a pull request** — it only runs on push to `main`, so a
+change to the `publish` job is unverified until it is merged. It has since run on every merge and
+published a release each time, and installing from the Releases page is the normal way a build
+reaches a phone — but that history is not a test, and the next edit to that job is as unproven as
+the first was. Keep it small, and make it fail loudly rather than publish something broken: a
+release with no APK attached looks installable and is not.
 
 Three things that are true only because CI caught them, and will bite again:
 
