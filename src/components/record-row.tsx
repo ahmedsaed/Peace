@@ -99,7 +99,9 @@ export function RecordRow({
             <View
               testID="attachment-indicator"
               accessibilityLabel={`${row.attachmentCount} receipt${row.attachmentCount === 1 ? '' : 's'}`}>
-              <Icon name="paperclip" size={11} color={palette.muted} />
+              {/* 14, not 12 to match the text beside it: a paperclip is carried
+                  by its hole, and the hole closes below ~13px. See icon.tsx. */}
+              <Icon name="paperclip" size={14} color={palette.muted} />
             </View>
           ) : null}
           {row.attachmentCount > 1 ? (
