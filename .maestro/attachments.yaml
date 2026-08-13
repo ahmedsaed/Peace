@@ -1,0 +1,113 @@
+appId: com.ahmed.peace
+---
+# Receipts on the record screen.
+#
+# WHAT THIS CAN AND CANNOT ASSERT. The camera and the file picker are system
+# UI — a different app on every device, with a different layout on every Android
+# version — so a flow that drove them would be asserting Android's screens
+# rather than Peace's. Attaching a real file is verified by hand on a device,
+# the same way Google sign-in is.
+#
+# What IS covered here is everything on this side of the picker, and it is the
+# half that breaks silently: that the buttons exist and are reachable, that the
+# notes field still behaves like a notes field now that it shares its surface
+# with them, and that a record with no receipts is completely unchanged — which
+# is the state every existing record is in, and therefore the regression that
+# would affect every user of the app.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "record-screen"
+
+# --- the two buttons live in the foot of the notes field ---
+- assertVisible:
+    id: "attach-camera"
+- assertVisible:
+    id: "attach-file"
+
+# Nothing attached yet, so there is no preview strip at all. An empty strip
+# would eat 56dp of a screen that fights for every pixel in split-screen.
+- assertNotVisible:
+    id: "attachment-previews"
+- takeScreenshot: 01-record-attach-buttons
+
+# --- the notes field still works ---
+# It is no longer the rounded surface itself but a child of one, which is
+# exactly the sort of change that silently breaks focus or swallows taps. The
+# assertion is that the typed text comes back, not that the field exists.
+- tapOn:
+    id: "record-note"
+- inputText: "Lunch receipt"
+- assertVisible:
+    id: "record-note"
+    text: "Lunch receipt"
+
+# THE BUTTONS MUST STILL BE REACHABLE WITH THE KEYBOARD UP. They sit at the
+# foot of the notes field, which is the lowest thing in the scrolling half of
+# the screen — precisely where the repeat sheet's fields were hiding. Asserting
+# they exist while the keyboard is down would prove nothing.
+- assertVisible:
+    id: "attach-camera"
+- assertVisible:
+    id: "attach-file"
+- takeScreenshot: 02-attach-with-keyboard
+- hideKeyboard
+
+# --- a record with no receipts saves exactly as it always did ---
+# The regression that would hit every existing record. `syncAttachments` runs
+# on every save now, and a save that threw on the empty case would break the
+# entire app rather than only this feature.
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£120.00"
+
+# No receipt, so no clip. The indicator is driven by a count in the row query,
+# and a marker that shows on EVERY row is exactly as useless as one that shows
+# on none — this is the half a flow can prove without driving the system picker.
+- assertNotVisible:
+    id: "attachment-indicator"
+
+# --- and re-opening it shows no receipts, not a broken tile ---
+# The note is the row's SUBTITLE, rendered as `Cash · “Lunch receipt”` — and
+# Maestro matches a selector against the WHOLE text, so the bare note does not
+# match. The curly quotes around it are real and are why this is not anchored.
+- tapOn: ".*Lunch receipt.*"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "attach-camera"
+- assertNotVisible:
+    id: "attachment-previews"
+- tapOn:
+    id: "record-cancel"
+
+# --- the backup says nothing about receipts when there are none ---
+# "0 receipts" on a ledger that has never had one is noise about a feature the
+# user may not have found. The row appears only once there is something in it.
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-export"
+- assertVisible:
+    id: "export-screen"
+- assertNotVisible:
+    id: "export-attachments"
+- takeScreenshot: 03-export-no-receipts

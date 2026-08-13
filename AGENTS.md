@@ -292,6 +292,13 @@ app ignoring input. `pkill -f GradleDaemon`.
   `CHROME`, which would have offered a funnel as a category icon. `icon.tsx` now holds three
   separate maps and `ICON_NAMES` *is* the category one, so a glyph's group is where it is written.
   Look for the same shape wherever a comment says "remember to also add it to…".
+- **A glyph's legibility is set by its GAP, not its ink — rasterise it before shipping it.** A
+  paperclip is mostly negative space: at 11px its hole closes and it becomes a blob, and widening
+  the strokes to compensate makes it worse. `convert` on a one-line SVG at the exact `size` prop
+  answers this in seconds and costs nothing, where finding out needs a 4-minute APK build and an
+  emulator. Check the CENTRING the same way — the first paperclip was four units right of centre,
+  invisible on its own and obvious beside text. Solid shapes (`document`) survive small sizes;
+  rings (`search`, `camera`, `paperclip`) need ~14px, which is why the attach button is a folder.
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
 - **testIDs must be regex-safe** — letters, digits, hyphens between words. Maestro matches ids as
   **regular expressions**, so `key-op-+` reads as "`key-op` then one or more hyphens" and silently
@@ -411,6 +418,51 @@ app ignoring input. `pkill -f GradleDaemon`.
   `keyboardDidShow`, never `keyboardWillShow`: Android only fires the `Did` events, so a `Will`
   listener reports zero on the one platform that needs it. The flow has to TYPE into the field and
   then assert the button below it is still visible; asserting the field exists proves nothing.
+- **The moment a row can point at a FILE, the backup stops being the database.** Attachments live
+  on disk with only their names in `attachments`, so copying `peace.db` alone restores a ledger
+  whose every receipt is a broken thumbnail — on the one day a backup is being used at all. A
+  backup is now a zip: `peace.db` beside an `attachments/` folder, which keeps the property that
+  made it a bare `.db` in the first place (unzip it anywhere and the data is there without this
+  app). Old `.db` backups still restore: `openBackupPayload` decides container-or-database by
+  reading the bytes, in ONE place, so the file restore, the Drive restore and the backup check
+  cannot drift apart. Ask what else refers to a file before adding the next thing that does.
+- **A truncated zip still unzips.** The entries that survived read back perfectly, so nothing
+  downstream notices that half the receipts are gone — and restoring it would delete the originals
+  and report success. The manifest records how many attachments were packed and `readContainer`
+  CHECKS it, which is what makes the loss visible before anything is deleted. Any container format
+  needs a count that is verified rather than trusted.
+- **Attachments are content-addressed (`<sha256>.<ext>`), and that is three rules in one.** The
+  same receipt attached twice is one file; a name a file manager supplied never reaches the disk or
+  the archive (`../../evil.jpg` is the classic zip escape); and a file cannot change under its own
+  name. Never store a picked filename as a path — keep it in `original_name` for display only.
+- **A row and its file are not one thing.** Two records can share one receipt — a purchase and its
+  refund, an invoice split across two categories — so deleting a row must NOT delete the file, or
+  removing a receipt from one record silently blanks it on the other. `orphanedFiles` in
+  `repo/attachments.ts` is the only thing allowed to decide a file can go, and it answers by asking
+  the ledger what it still refers to rather than by bookkeeping.
+- **The safety copy has to hold everything the restore replaces, files included.** Restore sweeps
+  the files the incoming ledger does not mention, which is correct and would otherwise destroy the
+  OUTGOING ledger's photos — so "undo" would hand back rows whose files had just been deleted while
+  the screen still called the restore undoable. The pre-restore copy is a container for exactly
+  that reason. Same family as the fixed-name rule above it: a recovery path that quietly loses part
+  of what it promised is worse than none.
+- **The record does not exist when the photo is taken.** You open the record screen, photograph the
+  receipt, and only then type the amount — so there is no transaction id for most of the time the
+  screen is open. Bytes are written immediately (the camera leaves its output in a cache Android may
+  reclaim, and losing a photo somebody just took is unforgivable); ROWS wait for the save, so
+  backing out leaves the ledger untouched like every other field. The file left behind is collected
+  by the orphan sweep on launch — a cost paid in bytes, not in receipts.
+- **Downscale a photo before it is stored, never at render time.** A 4MB camera JPEG that reaches
+  the disk is 4MB in every backup made from then on. 1600px at quality 0.7 still reads a total and
+  a date, and is the difference between a year of receipts weighing 20MB and 400MB — which is the
+  difference between a weekly Drive backup that works and one the user switches off. Failing to
+  shrink must not fail the attach: store the original and let the size guard catch it.
+- **`resize({ width })` constrains the WIDTH, and a receipt photo is portrait.** Pinning the width
+  to 1600 turns a 1200x1800 photo into 1600x2400 — an UPSCALE, produced by the function whose only
+  job is to make the file smaller, and completely invisible on screen because a bigger file looks
+  exactly like a smaller one. Measure first, cap the LONG edge, and never resize something already
+  under the cap. `resizeTarget` in `lib/attachment.ts` is pure and tested for exactly this reason;
+  the same trap waits in any "max dimension" API that takes one named axis.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

@@ -5,6 +5,7 @@ import { createTestDb, type TestDb } from '../../test/db';
 import { accountId, catId, seedDefaults } from '../seed';
 import { groupByDay, listRecordsForPeriod, periodSummary, type RecordRow } from './records';
 import { createRecord, createTransfer } from './transactions';
+import { addAttachment } from './attachments';
 
 const CASH = accountId('cash');
 const BANK = accountId('bank');
@@ -212,6 +213,75 @@ describe('periodSummary', () => {
   });
 });
 
+/**
+ * The list's receipt indicator.
+ *
+ * Counted in the SAME query as the row, so the mark can never describe a
+ * different moment from the row it sits on.
+ */
+describe('how many receipts a row carries', () => {
+  let db: TestDb;
+  beforeEach(() => {
+    db = createTestDb().db;
+    seedDefaults(db);
+  });
+
+  const hash = (seed: string) => seed.padEnd(64, '0');
+  const attach = (transactionId: string, seedText: string) =>
+    addAttachment(db, {
+      transactionId,
+      fileName: `${hash(seedText)}.jpg`,
+      mimeType: 'image/jpeg',
+      byteSize: 1000,
+      sha256: hash(seedText),
+    });
+
+  const spend = (id: string) =>
+    createRecord(db, {
+      id,
+      type: 'expense',
+      accountId: CASH,
+      amountMinor: 100,
+      occurredAt: new Date(2026, 7, 5, 12),
+    });
+
+  it('reports zero for a record with none', () => {
+    spend('r1');
+    expect(listRecordsForPeriod(db, '2026-08')[0].attachmentCount).toBe(0);
+  });
+
+  it('counts what is attached', () => {
+    spend('r1');
+    attach('r1', 'a');
+    attach('r1', 'b');
+    expect(listRecordsForPeriod(db, '2026-08')[0].attachmentCount).toBe(2);
+  });
+
+  /**
+   * A correlated subquery is used precisely to avoid this: a JOIN onto
+   * `attachments` would return one ROW PER RECEIPT, so a record with two
+   * receipts would appear in the list twice — and the month's totals are
+   * computed elsewhere, so nothing else would contradict it.
+   */
+  it('does not duplicate the record itself', () => {
+    spend('r1');
+    attach('r1', 'a');
+    attach('r1', 'b');
+    attach('r1', 'c');
+    expect(listRecordsForPeriod(db, '2026-08')).toHaveLength(1);
+  });
+
+  it('counts per record rather than across the month', () => {
+    spend('r1');
+    spend('r2');
+    attach('r1', 'a');
+
+    const byId = new Map(listRecordsForPeriod(db, '2026-08').map((r) => [r.id, r.attachmentCount]));
+    expect(byId.get('r1')).toBe(1);
+    expect(byId.get('r2')).toBe(0);
+  });
+});
+
 describe('groupByDay', () => {
   const row = (day: number, hour = 12): RecordRow => ({
     id: `r${day}-${hour}`,
@@ -227,6 +297,7 @@ describe('groupByDay', () => {
     categoryColor: null,
     accountName: 'Cash',
     counterAccountName: null,
+    attachmentCount: 0,
   });
 
   it('returns nothing for no rows', () => {

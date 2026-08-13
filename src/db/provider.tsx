@@ -5,6 +5,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import migrations from '../../drizzle/migrations';
 import palette from '../constants/palette';
 import { useSettingsStore } from '../state/settings';
+import { sweepOrphans } from './attachments';
 import { db } from './client';
 import { seedDefaults } from './seed';
 import { getSetting } from './settings';
@@ -34,6 +35,26 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       // Loaded here, behind the same gate, so no screen ever renders with the
       // built-in defaults and then flicks to the stored values a frame later.
       useSettingsStore.getState().load();
+
+      /**
+       * Collect attachment files nothing points at any more.
+       *
+       * Backing out of the record screen after photographing a receipt leaves
+       * one behind — the bytes are written when the camera returns, because the
+       * cache they land in is not somewhere a photo can be left. Deleting a
+       * record leaves its files too, since a file may be shared with another
+       * record and only the database knows.
+       *
+       * Here rather than at either of those moments because it is cheap, exact
+       * and needs no bookkeeping: it asks the ledger what it still refers to.
+       * Deliberately not allowed to fail the launch — a file that will not
+       * delete is worth a line in the log and nothing more.
+       */
+      try {
+        sweepOrphans();
+      } catch (e) {
+        console.warn('[attachments] orphan sweep failed', e);
+      }
       return null;
     } catch (e) {
       return e instanceof Error ? e : new Error(String(e));

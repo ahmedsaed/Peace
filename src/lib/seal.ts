@@ -34,6 +34,8 @@ import {
 } from 'expo-crypto';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
 
+import { looksLikeZip } from './container';
+
 /**
  * Marks a file as sealed, in the file itself.
  *
@@ -228,11 +230,18 @@ export async function unseal(sealedBytes: Uint8Array, passphrase: string): Promi
     throw new SealError('That passphrase does not open this backup.');
   }
 
-  // Belt and braces: the tag already proves authenticity, but this turns a
-  // decrypted-yet-wrong file into a clear message rather than a confusing
-  // SQLite error three screens later.
-  if (!looksLikeSqlite(plain)) {
-    throw new SealError('That backup did not decrypt to a Peace database.');
+  /**
+   * Belt and braces: the tag already proves authenticity, but this turns a
+   * decrypted-yet-wrong file into a clear message rather than a confusing
+   * SQLite error three screens later.
+   *
+   * EITHER SHAPE IS VALID. A backup made since attachments existed is a zip
+   * container holding the database; one made before is the bare database. This
+   * check only asks "did this decrypt to something we recognise" — which of the
+   * two it is gets decided once, in `backup-payload.ts`.
+   */
+  if (!looksLikeSqlite(plain) && !looksLikeZip(plain)) {
+    throw new SealError('That backup did not decrypt to a Peace backup.');
   }
   return plain;
 }
