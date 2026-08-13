@@ -22,7 +22,7 @@
 
 import { Image } from 'expo-image';
 import { memo } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
@@ -37,6 +37,15 @@ type Props = {
   onFiles: () => void;
   onRemove: (fileName: string) => void;
   onOpen: (attachment: StagedAttachment) => void;
+  /**
+   * Read this receipt and fill in the form.
+   *
+   * Offered per attachment rather than once for the record, because a record
+   * can carry several and only one of them is the receipt worth reading.
+   */
+  onRead: (attachment: StagedAttachment) => void;
+  /** Which attachment is being read, so only its own badge spins. */
+  reading: string | null;
   /** True in split-screen: previews go, the buttons merge, the count stays. */
   compact: boolean;
   busy?: boolean;
@@ -55,10 +64,14 @@ const Preview = memo(function Preview({
   attachment,
   onOpen,
   onRemove,
+  onRead,
+  reading,
 }: {
   attachment: StagedAttachment;
   onOpen: () => void;
   onRemove: () => void;
+  onRead: () => void;
+  reading: boolean;
 }) {
   const missing = !attachmentExists(attachment.fileName);
   const image = isImageMime(attachment.mimeType) && !missing;
@@ -109,6 +122,31 @@ const Preview = memo(function Preview({
         className="absolute -right-1.5 -top-1.5 h-5 w-5 items-center justify-center rounded-full border border-line bg-ground active:opacity-70">
         <Icon name="close" size={10} color={palette.muted} />
       </Pressable>
+
+      {/**
+       * "Read this one."
+       *
+       * Only on an IMAGE that is actually there — a PDF cannot be photographed
+       * into a total by this path, and a missing file has nothing to read. An
+       * affordance that is present but cannot work is the thing that teaches
+       * you to stop trusting the app.
+       */}
+      {image ? (
+        <Pressable
+          onPress={onRead}
+          disabled={reading}
+          hitSlop={8}
+          testID={`attachment-read-${attachment.fileName.slice(0, 8)}`}
+          accessibilityRole="button"
+          accessibilityLabel={reading ? `Reading ${label}` : `Read ${label} and fill in the record`}
+          className="absolute -bottom-1.5 -right-1.5 h-5 w-5 items-center justify-center rounded-full border border-accent bg-ground active:opacity-70">
+          {reading ? (
+            <ActivityIndicator size="small" color={palette.accent} />
+          ) : (
+            <Icon name="sparkle" size={11} color={palette.accent} />
+          )}
+        </Pressable>
+      ) : null}
     </View>
   );
 });
@@ -154,6 +192,8 @@ export function AttachmentBar({
   onFiles,
   onRemove,
   onOpen,
+  onRead,
+  reading,
   compact,
   busy,
 }: Props) {
@@ -194,6 +234,8 @@ export function AttachmentBar({
               attachment={attachment}
               onOpen={() => onOpen(attachment)}
               onRemove={() => onRemove(attachment.fileName)}
+              onRead={() => onRead(attachment)}
+              reading={reading === attachment.fileName}
             />
           ))}
         </ScrollView>

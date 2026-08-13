@@ -258,7 +258,17 @@ export default function RecordsScreen() {
         />
       )}
 
-      <Fab onPress={() => router.push('/record')} raised={!!pendingUndo} />
+      {/* Hold to photograph a receipt.
+          It pushes the ORDINARY record screen with a flag rather than opening a
+          camera here — the capture, the attach and the read all belong to the
+          screen that owns those fields, and doing any of it on this screen
+          would be a second implementation of all three. */}
+      <Fab
+        onPress={() => router.push('/record')}
+        onLongPress={() => router.push({ pathname: '/record', params: { capture: '1' } })}
+        longPressLabel="photograph a receipt"
+        raised={!!pendingUndo}
+      />
 
       <ProposalActions
         proposal={actingDue}

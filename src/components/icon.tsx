@@ -90,7 +90,16 @@ const CHROME_PATHS = {
    * which is invisible in isolation and obvious next to text.
    */
   paperclip:
-    'M13 5.5a3.5 3.5 0 0 0-6 2.5v7a5.5 5.5 0 0 0 11 0V6h-2v9a3.5 3.5 0 0 1-7 0V8a1.5 1.5 0 0 1 3 0v7h2V8a3.5 3.5 0 0 0-1-2.5z',
+    'M13 5.5a3.5 3.5 0 0 0-6 2.5v7a5.5 5.5 0 0 0 11 0V6h-2v9a3.5 3.5 0 0 1-7 0V8a1.5 1.5 0 0 1 3 0v7h2V8a3.5 3.5 0 0 0-1-2.5z'
+  /**
+   * "Let the model read this."
+   *
+   * Two SOLID four-point stars, which is why this one survives at 11px where
+   * the paperclip beside it needs 14: there is no hole to close up. Checked at
+   * the size it is drawn, per the rule in AGENTS.md.
+   */,
+  sparkle:
+    'M13 2l1.9 5.6L20.5 9.5l-5.6 1.9L13 17l-1.9-5.6L5.5 9.5l5.6-1.9L13 2zM5.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6L2 17.5l2.6-.9L5.5 14z',
 } as const;
 
 /**
