@@ -4,6 +4,8 @@ import {
   describeFailure,
   endpoint,
   extractJson,
+  listModels,
+  parseModelList,
   readReceipt,
   reasonOf,
 } from './gemini';
@@ -124,6 +126,89 @@ describe('digging the reading out of the envelope', () => {
 
   it('refuses a body that is not an object', () => {
     expect(() => extractJson('nope')).toThrow(GeminiError);
+  });
+});
+
+/**
+ * The model list, so the setting is a dropdown rather than a typed name — a
+ * typed model name is a 404 waiting to happen and there is no way to discover
+ * the right spelling from inside the app.
+ */
+describe('listing the models a key can call', () => {
+  const model = (name: string, methods: string[], extra: Record<string, unknown> = {}) => ({
+    name,
+    displayName: `Display ${name}`,
+    description: 'A model.',
+    supportedGenerationMethods: methods,
+    ...extra,
+  });
+
+  it('keeps only what can actually generate content', () => {
+    // The filter is the API's OWN declaration of what a model does, so it stays
+    // right as Google adds and retires them — where a hand-kept list of names
+    // to exclude goes stale the first week nobody updates it.
+    const parsed = parseModelList({
+      models: [
+        model('models/gemini-flash-latest', ['generateContent', 'countTokens']),
+        model('models/text-embedding-004', ['embedContent']),
+        model('models/aqa', ['generateAnswer']),
+      ],
+    });
+
+    expect(parsed.map((m) => m.id)).toEqual(['gemini-flash-latest']);
+  });
+
+  it('strips the models/ prefix, because that is what the endpoint wants', () => {
+    const [first] = parseModelList({
+      models: [model('models/gemini-2.5-pro', ['generateContent'])],
+    });
+    expect(first.id).toBe('gemini-2.5-pro');
+    expect(endpoint(first.id)).toContain('models/gemini-2.5-pro:generateContent');
+  });
+
+  it('falls back to the id when there is no display name', () => {
+    const [first] = parseModelList({
+      models: [{ name: 'models/x', supportedGenerationMethods: ['generateContent'] }],
+    });
+    expect(first.label).toBe('x');
+  });
+
+  it('returns nothing rather than throwing on a shape it does not know', () => {
+    expect(parseModelList(null)).toEqual([]);
+    expect(parseModelList({})).toEqual([]);
+    expect(parseModelList({ models: 'lots' })).toEqual([]);
+    expect(parseModelList({ models: [null, 42, {}] })).toEqual([]);
+  });
+
+  it('fetches with the key in a header and asks for a big page', async () => {
+    const fetchImpl = ok({ models: [model('models/gemini-flash-latest', ['generateContent'])] });
+    const models = await listModels('super-secret', { fetchImpl });
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).not.toContain('super-secret');
+    expect(url).toContain('pageSize=');
+    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('super-secret');
+    expect(models).toHaveLength(1);
+  });
+
+  it('refuses to call at all with no key', async () => {
+    const fetchImpl = ok({ models: [] });
+    await expect(listModels('  ', { fetchImpl })).rejects.toThrow(/No Gemini API key/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('blames the key when the key is what is wrong', async () => {
+    const body = googleError(400, 'API key not valid.', 'API_KEY_INVALID');
+    await expect(listModels('bad', { fetchImpl: status(400, body) })).rejects.toThrow(
+      /key was refused/i
+    );
+  });
+
+  it('says so when a key works but offers nothing usable', async () => {
+    // Distinct from a network failure: the key is fine and there is simply
+    // nothing to choose, which is a different thing to tell someone.
+    const fetchImpl = ok({ models: [model('models/text-embedding-004', ['embedContent'])] });
+    await expect(listModels('key', { fetchImpl })).rejects.toThrow(/no usable models/i);
   });
 });
 
