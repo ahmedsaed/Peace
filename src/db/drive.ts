@@ -27,9 +27,8 @@ import { withDriveToken } from '../lib/google-auth';
 import { isSealed, seal, SealError, unseal } from '../lib/seal';
 import { getPassphrase } from '../lib/secrets';
 import { databaseBackup } from './backup';
-import { sqliteDb } from './client';
+import { inspectBackup } from './inspect';
 import { restoreFrom, type RestoreResult } from './restore';
-import { countRows, validateBackup } from './restore-core';
 
 /** A 401 means the cached token aged out; anything else is a real failure. */
 const tokenExpired = (error: unknown) => error instanceof DriveError && error.unauthorized;
@@ -174,49 +173,13 @@ export async function checkLatestBackup(): Promise<BackupCheck> {
   const payload = openBackupPayload(plain);
 
   return {
-    ...inspect(payload.database),
+    ...inspectBackup(payload.database),
     name: newest.name,
     createdTime: newest.createdTime,
     bytes: newest.size,
     sealed: encrypted,
     attachments: payload.files.length,
   };
-}
-
-const ALIAS = 'drivecheck';
-
-/**
- * Open a candidate database read-only and count what is in it.
- *
- * ATTACH takes a filesystem PATH, not a URI — a `file://` prefix makes SQLite
- * treat it as a relative name and fail in a way that reads like a corrupt file.
- * The same trap is documented in `restore.ts`.
- */
-function inspect(plain: Uint8Array): { records: number; accounts: number; categories: number } {
-  const staged = new File(Paths.cache, 'drive-check.db');
-  if (staged.exists) staged.delete();
-  staged.create();
-  staged.write(plain);
-
-  try {
-    sqliteDb.execSync(`ATTACH DATABASE '${staged.uri.replace(/^file:\/\//, '')}' AS ${ALIAS}`);
-    // The same check a real restore runs, so a backup that passes here is one
-    // that would actually go in.
-    validateBackup(sqliteDb, ALIAS);
-
-    return {
-      records: countRows(sqliteDb, ALIAS, 'transactions'),
-      accounts: countRows(sqliteDb, ALIAS, 'accounts'),
-      categories: countRows(sqliteDb, ALIAS, 'categories'),
-    };
-  } finally {
-    try {
-      sqliteDb.execSync(`DETACH DATABASE ${ALIAS}`);
-    } catch {
-      // Already detached, or never attached because ATTACH itself threw.
-    }
-    if (staged.exists) staged.delete();
-  }
 }
 
 /** For the settings row: is this cadence one that runs by itself? */
