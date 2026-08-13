@@ -267,13 +267,18 @@ export default function RecordsScreen() {
             )
           }
           renderSectionHeader={({ section }) => (
-            <View className="flex-row items-baseline justify-between bg-ground px-4 pb-1.5 pt-4">
-              <Text className="text-xs font-semibold text-muted">{section.title}</Text>
+            <View className="flex-row items-baseline justify-between gap-3 bg-ground px-4 pb-1.5 pt-4">
+              {/* `flex-1` and one line: without it the heading was shrunk by the
+                  total beside it and "Aug 13, Thursday" rendered as "Aug 13,"
+                  — clipped mid-string with no ellipsis to say so. */}
+              <Text className="flex-1 text-xs font-semibold text-muted" numberOfLines={1}>
+                {section.title}
+              </Text>
               {/* The due-rows section has no total — it is a list of things that
                   have not happened yet, and giving it one would invite reading
                   it as money already spent. */}
               {showTotal && section.total !== null ? (
-                <Text className="text-xs text-muted" testID={`day-total-${section.key}`}>
+                <Text className="shrink-0 text-xs text-muted" testID={`day-total-${section.key}`}>
                   {formatMinor(section.total, homeCurrency, { showSign: true })}
                   {section.unvalued ? ' +' : ''}
                 </Text>
