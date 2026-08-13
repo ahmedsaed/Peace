@@ -44,8 +44,8 @@ a second set of parsing rules to keep honest.
 <td width="33%"><img src="docs/screenshots/budgets.png" alt="The budgets screen showing four categories with progress bars, one of them over budget in red"></td>
 </tr>
 <tr>
-<td><b>Records</b><br>The month is the organising unit. Transfers appear once, not twice, so the totals mean what they say.</td>
-<td><b>One-handed entry</b><br>Pickers at the top, keypad at the bottom, and the bottom-right key walks the whole form — account, category, save.</td>
+<td><b>Records</b><br>The month is the organising unit. Transfers appear once, not twice, so the totals mean what they say — and each day's heading nets that day, which reconciles with <i>Now</i> above it.</td>
+<td><b>One-handed entry</b><br>Pickers at the top, keypad at the bottom, and the bottom-right key walks the whole form — account, category, save. The camera and folder in the note's corner attach a receipt.</td>
 <td><b>Budgets</b><br>A limit per category, suggested from what you actually spend. Spending under <i>Coffee</i> counts against <i>Food</i>.</td>
 </tr>
 <tr>
