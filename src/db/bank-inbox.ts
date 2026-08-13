@@ -89,8 +89,7 @@ export type ReadOutcome = { read: number; failed: number };
  */
 export async function readPending(
   fallbackCurrency: string,
-  model: string,
-  now = new Date()
+  model: string
 ): Promise<ReadOutcome> {
   const waiting = pendingCaptures(db);
   if (waiting.length === 0) return { read: 0, failed: 0 };
@@ -103,7 +102,6 @@ export async function readPending(
     return { read: 0, failed: 0 };
   }
 
-  const today = toYmd(now);
   let read = 0;
   let failed = 0;
 
@@ -112,7 +110,7 @@ export async function readPending(
       const raw = await readBankMessage(
         key,
         model,
-        buildBankPrompt(capture.body, today),
+        buildBankPrompt(capture.body),
         BANK_RESPONSE_SCHEMA
       );
       markParsed(db, capture.id, parseBankReading(raw, fallbackCurrency));
@@ -129,10 +127,4 @@ export async function readPending(
   }
 
   return { read, failed };
-}
-
-/** Local calendar day, so a message is dated the day the user lived. */
-function toYmd(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

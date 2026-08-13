@@ -6,6 +6,7 @@ import migrations from '../../drizzle/migrations';
 import palette from '../constants/palette';
 import { useSettingsStore } from '../state/settings';
 import { sweepOrphans } from './attachments';
+import { forgetHandled } from './repo/bank-captures';
 import { db } from './client';
 import { seedDefaults } from './seed';
 import { getSetting } from './settings';
@@ -54,6 +55,20 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         sweepOrphans();
       } catch (e) {
         console.warn('[attachments] orphan sweep failed', e);
+      }
+
+      /**
+       * Forget bank messages that have been dealt with.
+       *
+       * Their bodies are the most sensitive text this app ever holds, and
+       * keeping them once they have become records — or been dismissed — serves
+       * nobody. Anything still awaiting a decision is never touched, however
+       * old: that is precisely the one the user has not dealt with.
+       */
+      try {
+        forgetHandled(db, new Date());
+      } catch (e) {
+        console.warn('[bank] forgetting handled messages failed', e);
       }
       return null;
     } catch (e) {

@@ -498,9 +498,15 @@ app ignoring input. `pkill -f GradleDaemon`.
   which messaging apps do. Reading only `EXTRA_TEXT` silently loses the half of the message with
   the amount in it — and it looks like the model misreading rather than the app under-reading.
 - **A queue gated on something optional must say it is gated.** Bank captures sit `pending` until
-  there is an API key to read them with, and the review screen said "Nothing waiting" while messages
-  piled up behind that — the app silently doing nothing, which is the failure it is least allowed to
-  have. Count what is waiting and name what is blocking it.
+  there is an API key to read them with, and nothing anywhere said so while messages piled up behind
+  that — the app silently doing nothing, which is the failure it is least allowed to have. Count
+  what is waiting and name what is blocking it.
+- **A notification is stamped with the moment it arrived; never ask a model for the date.** A bank
+  alert lands when the money moves, and Android records that to the second — so the exact answer is
+  already in hand. Reading "13/08/2026" out of the text instead invites the one mistake nobody can
+  spot afterwards, because that string is a valid date under two conventions and both look right.
+  Do not even ask for it: a field the model returns and the app ignores is a field somebody will
+  eventually wire up.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

@@ -209,11 +209,14 @@ export default function RecordScreen() {
     // Dated the day it was DUE. A rent payment settled a week late still
     // belongs to the week it was owed, and every period total groups by day.
     if (dueOn) return new Date(`${dueOn}T12:00:00`);
-    // The date the MESSAGE stated, when it stated one. Midday, like every other
-    // date this screen builds — midnight lands on the previous day west of UTC.
-    if (bankMessage?.occurredOn) return new Date(`${bankMessage.occurredOn}T12:00:00`);
-    // Otherwise the moment the bank posted it, which is far closer than "now"
-    // for a message read days after it arrived.
+    /**
+     * WHEN THE NOTIFICATION ARRIVED, to the second.
+     *
+     * Never a date read out of the message. Android stamps the moment it landed
+     * and a bank alert lands when the money moves, so the exact answer is
+     * already in hand — where "13/08/2026" is a valid date under two
+     * conventions and picking the wrong one is unspottable afterwards.
+     */
     if (bankMessage) return bankMessage.postedAt;
     return existing?.occurredAt ?? new Date();
   });
