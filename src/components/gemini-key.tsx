@@ -11,17 +11,20 @@
  * Shaped after the passphrase editor in `drive-backup.tsx` on purpose: the same
  * job (a secret, entered inline, masked once saved) should not have two
  * different shapes in one app.
+ *
+ * The MODEL is chosen from a list Google returns rather than typed. A typed
+ * model name is a 404 waiting to happen, and there is no way to discover the
+ * right spelling from inside the app.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import palette from '@/constants/palette';
+import { GeminiError, listModels, type GeminiModel } from '@/lib/gemini';
 import { getGeminiKey, maskKey, setGeminiKey } from '@/lib/secrets';
 import { useSettingsStore } from '@/state/settings';
-
-/** Offered as a starting point; the field stays free text. */
-const SUGGESTED_MODEL = 'gemini-flash-latest';
 
 export function GeminiKeyCard() {
   const settings = useSettingsStore((state) => state.settings);
@@ -34,8 +37,64 @@ export function GeminiKeyCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [editingModel, setEditingModel] = useState(false);
-  const [modelDraft, setModelDraft] = useState(settings.geminiModel);
+  const [models, setModels] = useState<GeminiModel[] | null>(null);
+  const [listing, setListing] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
+
+  /**
+   * Ask Google which models this key can call, then let the user pick one.
+   *
+   * A dropdown rather than a free-text field, because a typed model name is a
+   * 404 waiting to happen and there is no way to discover the right spelling
+   * from inside the app. Fetched on demand rather than at launch: it costs a
+   * request, it is only needed on the rare occasion somebody changes it, and a
+   * Settings screen that makes a network call just by opening is a Settings
+   * screen that fails to open on a plane.
+   */
+  const onPickModel = useCallback(async () => {
+    setListing(true);
+    setModelError(null);
+    try {
+      const key = await getGeminiKey();
+      if (key === null) {
+        setModelError('Add a key first.');
+        return;
+      }
+      setModels(await listModels(key));
+    } catch (e) {
+      // Listing failing must not strand anyone on a broken model — whatever is
+      // already set keeps working, and the message says what went wrong.
+      setModelError(e instanceof GeminiError ? e.message : 'Could not list the models.');
+    } finally {
+      setListing(false);
+    }
+  }, []);
+
+  /**
+   * What the sheet offers.
+   *
+   * The model currently in use is ALWAYS present, even when the fetched list
+   * does not contain it — otherwise opening the picker on a retired model would
+   * show no selection at all and leave the user unsure what they are running.
+   */
+  const modelOptions: PickerOption[] = useMemo(() => {
+    const fetched = models ?? [];
+    const rows = fetched.map((m) => ({
+      id: m.id,
+      label: m.label,
+      icon: 'sparkle',
+      detail: m.id,
+    }));
+    if (!rows.some((r) => r.id === settings.geminiModel)) {
+      rows.unshift({
+        id: settings.geminiModel,
+        label: settings.geminiModel,
+        icon: 'sparkle',
+        detail: 'In use',
+      });
+    }
+    return rows;
+  }, [models, settings.geminiModel]);
 
   // Read once. The keystore is async and the row must not flash "Not set"
   // before the answer arrives, which would read as the key having been lost.
@@ -147,52 +206,35 @@ export function GeminiKeyCard() {
             </Text>
           </View>
 
-          {editingModel ? (
-            <>
-              <TextInput
-                value={modelDraft}
-                onChangeText={setModelDraft}
-                placeholder={SUGGESTED_MODEL}
-                placeholderTextColor={palette.muted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                className="mb-2 rounded-lg border border-line px-3 py-2.5 text-ink"
-                testID="gemini-model-input"
-              />
-              <View className="flex-row gap-2">
-                <SmallButton
-                  label="Save"
-                  primary
-                  testID="gemini-model-save"
-                  onPress={() => {
-                    // Blank means "back to the default" rather than a model
-                    // called empty string, which would 404 on every read.
-                    update('geminiModel', modelDraft.trim() || SUGGESTED_MODEL);
-                    setEditingModel(false);
-                  }}
-                />
-                <SmallButton
-                  label="Cancel"
-                  testID="gemini-model-cancel"
-                  onPress={() => {
-                    setModelDraft(settings.geminiModel);
-                    setEditingModel(false);
-                  }}
-                />
-              </View>
-            </>
-          ) : (
-            <SmallButton
-              label="Change model"
-              testID="gemini-model-edit"
-              onPress={() => {
-                setModelDraft(settings.geminiModel);
-                setEditingModel(true);
-              }}
-            />
-          )}
+          <SmallButton
+            label={listing ? 'Loading models…' : 'Change model'}
+            disabled={listing}
+            testID="gemini-model-edit"
+            onPress={onPickModel}
+          />
+          {modelError ? (
+            <Text className="mt-2 text-xs text-expense" testID="gemini-model-error">
+              {modelError}
+            </Text>
+          ) : null}
         </View>
       ) : null}
+
+      {/* Selecting writes straight through to the settings store, which is a
+          write-through cache over SQLite — so the record screen picks up the
+          new model without this component telling it anything. */}
+      <PickerSheet
+        visible={models !== null}
+        title="Gemini model"
+        options={modelOptions}
+        selectedId={settings.geminiModel}
+        onSelect={(id) => {
+          update('geminiModel', id);
+          setModels(null);
+        }}
+        onClose={() => setModels(null)}
+        testID="sheet-gemini-model"
+      />
     </View>
   );
 }

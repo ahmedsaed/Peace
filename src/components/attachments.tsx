@@ -30,6 +30,16 @@ import { attachmentExists, attachmentUri, type StagedAttachment } from '@/db/att
 import { isImageMime, shortName } from '@/lib/attachment';
 
 export const PREVIEW_SIZE = 56;
+/**
+ * How far the corner badges overhang a tile.
+ *
+ * Both the remove and the read badge sit ON the corners, so the scroll view
+ * needs this much padding at top and bottom or it slices them off — which is
+ * exactly what happened to the read badge along the bottom edge.
+ */
+const BADGE_ROOM = 8;
+/** Two 40dp buttons and the 8dp gap between them. */
+const BUTTONS_WIDTH = 40 * 2 + 8;
 
 type Props = {
   attachments: StagedAttachment[];
@@ -218,15 +228,44 @@ export function AttachmentBar({
     );
   }
 
+  /**
+   * The strip and the buttons share one band; the buttons FLOAT over its right.
+   *
+   * They had a row of their own, which cost 40dp of a screen that fights for
+   * every pixel and pushed the receipts a whole row further from the field they
+   * belong to. Floating them puts the previews beside the buttons rather than
+   * above them, and the band is no taller than one thumbnail.
+   */
   return (
-    <View className="gap-2" testID="attachment-bar">
+    <View
+      className="relative"
+      // Only as tall as it needs to be: one thumbnail plus its badges when
+      // there are receipts, one button when there are none. A band sized for
+      // previews that do not exist is 32dp of a short screen given to nothing.
+      style={{ minHeight: attachments.length > 0 ? PREVIEW_SIZE + BADGE_ROOM * 2 : 40 }}
+      testID="attachment-bar">
       {attachments.length > 0 ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          // Room for the delete badge, which overhangs the top-right corner and
-          // would otherwise be clipped by the scroll view's bounds.
-          contentContainerStyle={{ gap: 10, paddingTop: 6, paddingRight: 6 }}
+          contentContainerStyle={{
+            gap: 10,
+            // Room for the badges, which overhang the corners of every tile and
+            // would otherwise be sliced off by the scroll view's own bounds —
+            // the read badge was visibly clipped along the bottom edge.
+            paddingTop: BADGE_ROOM,
+            paddingBottom: BADGE_ROOM,
+            /**
+             * SCROLL PAST THE LAST ONE.
+             *
+             * Without this the final thumbnail comes to rest UNDER the floating
+             * buttons and cannot be moved out from beneath them — the one
+             * receipt you just added is the one you cannot see. The trailing
+             * space is the buttons' own width, so the last tile can be scrolled
+             * fully clear into the middle of the strip.
+             */
+            paddingRight: BUTTONS_WIDTH + 12,
+          }}
           testID="attachment-previews">
           {attachments.map((attachment) => (
             <Preview
@@ -241,7 +280,13 @@ export function AttachmentBar({
         </ScrollView>
       ) : null}
 
-      <View className="flex-row justify-end gap-2">
+      {/* Over the strip, not in the flow. `pointerEvents="box-none"` on the
+          wrapper so the scroll gesture still reaches the strip everywhere the
+          buttons themselves are not. */}
+      <View
+        className="absolute bottom-0 right-0 flex-row gap-2"
+        pointerEvents="box-none"
+        style={{ width: BUTTONS_WIDTH }}>
         <SquareButton
           icon="camera"
           label="Photograph a receipt"
