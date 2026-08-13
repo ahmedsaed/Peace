@@ -485,6 +485,22 @@ app ignoring input. `pkill -f GradleDaemon`.
   the wrong figure off one you did not. Keep a partial reading: a receipt whose date is unreadable
   but whose total is clear still saves the typing, and refusing the whole thing over one junk field
   throws that away. `temperature: 0`, because the same photo read twice must not give two totals.
+- **A NotificationListenerService writes to DISK, never to JavaScript.** A bank message arrives at
+  two in the afternoon while the app is closed, and there is no React context to hand it to — an
+  event emitter drops it silently, which is the one outcome that makes the feature useless. Captures
+  go to a small bounded native store the app drains on launch, exactly as the Drive backup catches
+  up. Three more things that only a device shows: `android:exported="true"` is REQUIRED for the
+  system to bind it (guarded by `BIND_NOTIFICATION_LISTENER_SERVICE`, which no ordinary app holds),
+  the module's own `AndroidManifest.xml` merges into the app's so no config plugin is needed, and
+  `adb shell cmd notification allow_listener <pkg>/<cls>` grants access without touching the UI.
+- **Read `EXTRA_BIG_TEXT` before `EXTRA_TEXT`.** `EXTRA_TEXT` is the collapsed one-line form and is
+  truncated; the big-text extra carries the whole message whenever the poster used `BigTextStyle`,
+  which messaging apps do. Reading only `EXTRA_TEXT` silently loses the half of the message with
+  the amount in it — and it looks like the model misreading rather than the app under-reading.
+- **A queue gated on something optional must say it is gated.** Bank captures sit `pending` until
+  there is an API key to read them with, and the review screen said "Nothing waiting" while messages
+  piled up behind that — the app silently doing nothing, which is the failure it is least allowed to
+  have. Count what is waiting and name what is blocking it.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

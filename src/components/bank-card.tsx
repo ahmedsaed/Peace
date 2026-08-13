@@ -147,6 +147,9 @@ export function BankMessagesCard() {
           disabled={!permitted}
           testID="bank-capture-toggle"
           accessibilityRole="switch"
+          // Without a label this is an unnamed switch to a screen reader —
+          // uiautomator reported it as NAF (not accessibility friendly).
+          accessibilityLabel="Capture messages"
           accessibilityState={{ checked: capturing }}
           className={`h-8 w-14 justify-center rounded-full px-1 ${
             capturing ? 'bg-accent' : 'bg-line'

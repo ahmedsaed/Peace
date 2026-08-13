@@ -21,7 +21,7 @@ import { Icon } from '@/components/icon';
 import { EmptyState, StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
-import { dismissCapture, reviewableCaptures } from '@/db/repo/bank-captures';
+import { dismissCapture, pendingCaptures, reviewableCaptures } from '@/db/repo/bank-captures';
 import type { BankCapture } from '@/db/schema';
 import { formatMinor } from '@/lib/money';
 import { useSetting } from '@/state/settings';
@@ -30,8 +30,20 @@ export default function BankMessagesScreen() {
   const router = useRouter();
   const homeCurrency = useSetting('homeCurrency');
   const [rows, setRows] = useState<BankCapture[]>([]);
+  /**
+   * Captured but not yet read.
+   *
+   * Without this the screen says "Nothing waiting" while messages pile up
+   * unread behind a missing API key — the app silently doing nothing, which is
+   * the failure it is least allowed to have. Found on a device: the queue was
+   * empty and the message was sitting in the database the whole time.
+   */
+  const [waiting, setWaiting] = useState(0);
 
-  const refresh = useCallback(() => setRows(reviewableCaptures(db)), []);
+  const refresh = useCallback(() => {
+    setRows(reviewableCaptures(db));
+    setWaiting(pendingCaptures(db, 500).length);
+  }, []);
   // On focus, not on mount: returning from the record screen must drop the
   // message that was just saved.
   useFocusEffect(refresh);
@@ -40,7 +52,16 @@ export default function BankMessagesScreen() {
     <View className="flex-1 bg-ground" testID="bank-messages-screen">
       <StackHeader title="Bank messages" />
 
-      {rows.length === 0 ? (
+      {waiting > 0 ? (
+        <View className="mx-4 mt-2 rounded-lg bg-raised p-3" testID="bank-waiting">
+          <Text className="text-xs leading-5 text-muted">
+            {waiting === 1 ? '1 message is' : `${waiting} messages are`} waiting to be read. Add a
+            Gemini API key in Settings, or check the last error below.
+          </Text>
+        </View>
+      ) : null}
+
+      {rows.length === 0 && waiting === 0 ? (
         <EmptyState
           icon="records"
           title="Nothing waiting"
