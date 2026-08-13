@@ -7,7 +7,18 @@ import { NativeModule, requireNativeModule } from 'expo';
  * what they mean is decided in `src/lib/bank-sms.ts`, where it is testable
  * without a phone.
  */
-declare class NotificationListenerModule extends NativeModule {
+/**
+ * Fired when the service captures a notification while the app is running.
+ *
+ * The app otherwise only looks on launch and on foreground, so a message
+ * arriving while someone is looking at the records list would show up nowhere
+ * until they navigated — which reads as the feature being broken.
+ */
+export type NotificationListenerEvents = {
+  onCapture: () => void;
+};
+
+declare class NotificationListenerModule extends NativeModule<NotificationListenerEvents> {
   /** Has the user granted notification access on the system settings screen? */
   isPermitted(): boolean;
   /** Open that screen. There is no dialog for this permission. */

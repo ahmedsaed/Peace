@@ -92,7 +92,7 @@ class CaptureStore(context: Context) {
       JSONArray()
     }
 
-  private companion object {
+  companion object {
     const val PREFS = "peace.notifications"
     const val KEY_ENTRIES = "entries"
     const val KEY_ENABLED = "enabled"

@@ -2,6 +2,7 @@ package com.ahmed.peace.notifications
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import expo.modules.kotlin.exception.Exceptions
@@ -24,8 +25,53 @@ class NotificationListenerModule : Module() {
   private val store: CaptureStore
     get() = CaptureStore(context)
 
+  /**
+   * Held as a FIELD, not a lambda passed inline.
+   *
+   * `SharedPreferences` keeps only a weak reference to its listeners, so one
+   * created at registration time is collected at the next GC and the events
+   * simply stop — silently, and long after any testing would notice.
+   */
+  private var captureListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+
   override fun definition() = ModuleDefinition {
     Name("NotificationListener")
+
+    /**
+     * Fired when the service captures something while the app is running.
+     *
+     * WITHOUT THIS THE APP ONLY LOOKS ON LAUNCH AND ON FOREGROUND. A message
+     * arriving while someone is staring at the records list produced nothing at
+     * all until they switched month or reopened the app — which reads exactly
+     * like the feature being broken.
+     *
+     * The signal is the capture store itself. The service and this module run in
+     * the same process, so a `SharedPreferences` change listener sees the write
+     * directly: no static holder, no reference from the service back into the
+     * React context, and nothing to keep in step.
+     */
+    Events("onCapture")
+
+    OnStartObserving {
+      val prefs = context.getSharedPreferences(CaptureStore.PREFS, Context.MODE_PRIVATE)
+      val listener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+          // Only the entries. The enabled flag changes when the user flips the
+          // switch, and waking the reader for that would be pointless work.
+          if (key == CaptureStore.KEY_ENTRIES) sendEvent("onCapture", mapOf<String, Any>())
+        }
+      captureListener = listener
+      prefs.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    OnStopObserving {
+      captureListener?.let {
+        context
+          .getSharedPreferences(CaptureStore.PREFS, Context.MODE_PRIVATE)
+          .unregisterOnSharedPreferenceChangeListener(it)
+      }
+      captureListener = null
+    }
 
     /**
      * Has the user granted notification access?

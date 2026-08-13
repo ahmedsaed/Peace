@@ -24,6 +24,7 @@ import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import palette from '@/constants/palette';
 import { GeminiError, listModels, type GeminiModel } from '@/lib/gemini';
 import { getGeminiKey, maskKey, setGeminiKey } from '@/lib/secrets';
+import { runBankCatchUp } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
 
 export function GeminiKeyCard() {
@@ -118,6 +119,19 @@ export function GeminiKeyCard() {
       setSaved(await getGeminiKey());
       setEditing(false);
       setDraft('');
+
+      /**
+       * Read whatever was waiting for exactly this.
+       *
+       * Bank messages captured before there was a key sit `pending` for want of
+       * one. Leaving them until the next foreground means adding a key appears
+       * to do nothing, which is the same complaint the capture event fixed.
+       */
+      void runBankCatchUp({
+        senders: settings.bankSenders,
+        homeCurrency: settings.homeCurrency,
+        geminiModel: settings.geminiModel,
+      });
     } catch (e) {
       // The keystore can refuse on a device with a broken keychain. Friendly
       // sentence here, real error in the log.
@@ -126,7 +140,7 @@ export function GeminiKeyCard() {
     } finally {
       setBusy(false);
     }
-  }, [draft]);
+  }, [draft, settings.bankSenders, settings.homeCurrency, settings.geminiModel]);
 
   return (
     <View className="rounded-xl bg-surface p-4" testID="gemini-card">
