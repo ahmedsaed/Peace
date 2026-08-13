@@ -299,6 +299,13 @@ app ignoring input. `pkill -f GradleDaemon`.
   emulator. Check the CENTRING the same way — the first paperclip was four units right of centre,
   invisible on its own and obvious beside text. Solid shapes (`document`) survive small sizes;
   rings (`search`, `camera`, `paperclip`) need ~14px, which is why the attach button is a folder.
+- **A control floating over a scrollable strip needs trailing padding, or the last item is
+  unreachable.** The attach buttons overlay the receipt previews to save a row of height; without
+  `paddingRight` equal to the buttons' width, the final thumbnail comes to rest UNDERNEATH them and
+  no amount of scrolling frees it — and the last one added is exactly the one you want to look at.
+  Same family: badges that overhang a tile's corners are sliced off by the scroll view's bounds
+  unless the content has padding on those edges too. Both are invisible until there are enough
+  items to overflow, so test with more than fit.
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
 - **testIDs must be regex-safe** — letters, digits, hyphens between words. Maestro matches ids as
   **regular expressions**, so `key-op-+` reads as "`key-op` then one or more hyphens" and silently

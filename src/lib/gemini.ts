@@ -184,6 +184,95 @@ export function describeFailure(status: number, body: unknown): string {
   return `Gemini refused the request (${status}).`;
 }
 
+export type GeminiModel = {
+  /** The bare id, with the `models/` prefix stripped — what `endpoint` wants. */
+  id: string;
+  label: string;
+  description: string;
+};
+
+/**
+ * Which models a key may actually call.
+ *
+ * Filtered on `generateContent` and nothing else. That is the API's OWN
+ * declaration of what a model can do, so it stays right as Google adds and
+ * retires them — where a hand-kept list of names to exclude is a parallel rule
+ * that goes stale the first week nobody updates it. An embedding model does not
+ * advertise `generateContent` and so never appears; a model that advertises it
+ * and then cannot read a photo answers with Google's own error, which this
+ * module now passes through verbatim.
+ */
+export function parseModelList(body: unknown): GeminiModel[] {
+  const models = (body as { models?: unknown } | null)?.models;
+  if (!Array.isArray(models)) return [];
+
+  const out: GeminiModel[] = [];
+  for (const raw of models) {
+    const model = (raw ?? {}) as Record<string, unknown>;
+    const name = typeof model.name === 'string' ? model.name : '';
+    const methods = model.supportedGenerationMethods;
+
+    if (name === '') continue;
+    if (!Array.isArray(methods) || !methods.includes('generateContent')) continue;
+
+    const id = name.replace(/^models\//, '');
+    if (id === '') continue;
+
+    out.push({
+      id,
+      // The display name is nicer to read but the ID is what actually gets
+      // called, so a row that shows only the pretty name would leave you
+      // unable to tell which of two similar entries you had chosen.
+      label: typeof model.displayName === 'string' && model.displayName ? model.displayName : id,
+      description: typeof model.description === 'string' ? model.description : '',
+    });
+  }
+  return out;
+}
+
+/**
+ * Ask Google what this key can call.
+ *
+ * Same failure discipline as a read: a friendly sentence out, the real error to
+ * the log, and a short timeout so a captive portal cannot leave the sheet
+ * spinning. The caller keeps whatever model is already set if this fails.
+ */
+export async function listModels(
+  apiKey: string,
+  { timeoutMs = 15_000, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
+): Promise<GeminiModel[]> {
+  if (apiKey.trim() === '') {
+    throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(`${BASE_URL}?pageSize=200`, {
+      headers: { 'x-goog-api-key': apiKey.trim() },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new GeminiError(describeFailure(response.status, body));
+    }
+
+    const models = parseModelList(await response.json());
+    if (models.length === 0) {
+      throw new GeminiError('That key can reach Gemini but has no usable models.');
+    }
+    return models;
+  } catch (error) {
+    if (error instanceof GeminiError) throw error;
+    console.warn('[gemini] listing models failed', error);
+    throw new GeminiError('Could not reach Gemini to list its models.');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export type ReadOptions = {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
