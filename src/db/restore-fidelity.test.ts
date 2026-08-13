@@ -25,8 +25,11 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 
+import { openBackupPayload } from '../lib/backup-payload';
+import { packContainer } from '../lib/container';
 import * as schema from './schema';
 import { copyFromBackup, validateBackup } from './restore-core';
+import { addAttachment, listAttachments, missingFiles } from './repo/attachments';
 import { accountId, catId, seedDefaults } from './seed';
 import { createAccount, getAccount, listAccountsWithBalance } from './repo/accounts';
 import { accountBalance, reconcileAccount } from './repo/adjust';
@@ -166,7 +169,21 @@ function buildLedger(db: Db) {
     unitsMicro: 12_347_000,
     priceMinor: 4_183,
   });
+
+  // A receipt on the jacket. The ROW is ordinary data; what makes attachments
+  // different is that it names a file which has to travel separately.
+  addAttachment(db, {
+    transactionId: 'txn-jacket',
+    fileName: `${RECEIPT_HASH}.jpg`,
+    originalName: 'jacket-receipt.jpg',
+    mimeType: 'image/jpeg',
+    byteSize: RECEIPT_BYTES.byteLength,
+    sha256: RECEIPT_HASH,
+  });
 }
+
+const RECEIPT_HASH = 'c0ffee'.padEnd(64, '0');
+const RECEIPT_BYTES = new Uint8Array([...'a receipt photo'].map((c) => c.charCodeAt(0)));
 
 /**
  * Every number a screen would show, in one object.
@@ -200,6 +217,9 @@ function snapshot(db: Db) {
       .map((r) => r.id)
       .sort(),
     portfolio: portfolioSnapshot(db),
+    // Attachment rows travel in the database like any others; the FILES they
+    // name travel in the container, which the round-trip test below proves.
+    attachments: listAttachments(db, 'txn-jacket').map((a) => a.fileName),
   };
 }
 
@@ -349,6 +369,85 @@ describe('a restored ledger still means the same thing', () => {
       // 12.347 units at 41.83 = 516.48
       expect(portfolio.totalValueMinor).toBe(51_648);
       expect(portfolio.holdings[0].unitsMicro).toBe(12_347_000);
+    });
+  });
+
+  /**
+   * THE CONTAINER, AGAINST A REAL DATABASE FILE.
+   *
+   * Every other test of the zip format uses bytes that stand in for a database.
+   * This one packs the actual SQLite file this fixture wrote — pages, indexes,
+   * B-trees and all — puts it through fflate, opens it the way a restore does,
+   * and demands every screen figure back.
+   *
+   * A binary that survives a synthetic round trip and not a real one is exactly
+   * the failure that reaches a user: their backup is the real one.
+   */
+  describe('through the backup container', () => {
+    const roundTrip = (files: { name: string; bytes: Uint8Array }[]) => {
+      // The file on disk, as `databaseBackup` would read it.
+      const database = new Uint8Array(fs.readFileSync(backup.file));
+      const packed = packContainer({ database, files });
+
+      const payload = openBackupPayload(packed);
+
+      // Restore stages the unwrapped database and attaches THAT — so this is
+      // the same path, not a shortcut around it.
+      const staged = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'peace-container-')), 'r.db');
+      fs.writeFileSync(staged, payload.database);
+
+      live.sqlite.exec(`ATTACH DATABASE '${staged}' AS backup`);
+      validateBackup(live.sqlite, 'backup');
+      copyFromBackup(live.sqlite, 'backup');
+      live.sqlite.exec('DETACH DATABASE backup');
+      return payload;
+    };
+
+    it('gives back every figure after a real database has been zipped', () => {
+      buildLedger(backup.db);
+      const before = snapshot(backup.db);
+
+      roundTrip([{ name: `${RECEIPT_HASH}.jpg`, bytes: RECEIPT_BYTES }]);
+
+      expect(snapshot(live.db)).toEqual(before);
+    });
+
+    it('carries the receipt file itself, byte for byte', () => {
+      buildLedger(backup.db);
+
+      const payload = roundTrip([{ name: `${RECEIPT_HASH}.jpg`, bytes: RECEIPT_BYTES }]);
+
+      // The row names a file; the container has to actually contain it, or the
+      // restored ledger shows a receipt that is not there.
+      const named = listAttachments(live.db, 'txn-jacket')[0].fileName;
+      const carried = payload.files.find((f) => f.name === named);
+      expect(carried).toBeDefined();
+      expect(Array.from(carried!.bytes)).toEqual(Array.from(RECEIPT_BYTES));
+      expect(payload.legacy).toBe(false);
+    });
+
+    /**
+     * The backup every user already has. Refusing it would mean shipping a
+     * version of the app that cannot restore its own history.
+     */
+    it('still restores a bare .db from before attachments existed', () => {
+      buildLedger(backup.db);
+      const before = snapshot(backup.db);
+
+      const database = new Uint8Array(fs.readFileSync(backup.file));
+      const payload = openBackupPayload(database);
+      expect(payload.legacy).toBe(true);
+      expect(payload.files).toEqual([]);
+
+      live.sqlite.exec(`ATTACH DATABASE '${backup.file}' AS backup`);
+      validateBackup(live.sqlite, 'backup');
+      copyFromBackup(live.sqlite, 'backup');
+
+      // The ledger comes back whole — including the attachment ROW. Its file is
+      // simply not there, which is what `missingFiles` reports and what the
+      // restore summary tells the user rather than leaving them to guess.
+      expect(snapshot(live.db)).toEqual(before);
+      expect(missingFiles(live.db, []).map((a) => a.fileName)).toEqual([`${RECEIPT_HASH}.jpg`]);
     });
   });
 });

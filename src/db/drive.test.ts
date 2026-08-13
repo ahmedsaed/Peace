@@ -92,7 +92,7 @@ describe('taking a backup', () => {
 
     expect(mocked.uploadBackup).toHaveBeenCalledTimes(1);
     const [, name, payload] = mocked.uploadBackup.mock.calls[0];
-    expect(name).toBe('peace-2026-08-12-0905.db');
+    expect(name).toBe('peace-2026-08-12-0905.zip');
     expect(Array.from(payload as Uint8Array)).toEqual(Array.from(LEDGER));
     expect(outcome.sealed).toBe(false);
     expect(outcome.bytes).toBe(LEDGER.byteLength);
@@ -105,7 +105,7 @@ describe('taking a backup', () => {
     const outcome = await runBackup(new Date(2026, 7, 12, 9, 5));
 
     const [, name, payload] = mocked.uploadBackup.mock.calls[0];
-    expect(name).toBe('peace-2026-08-12-0905.db.enc');
+    expect(name).toBe('peace-2026-08-12-0905.zip.enc');
     expect(outcome.sealed).toBe(true);
     // What leaves the device is NOT the ledger.
     expect(isSealed(payload as Uint8Array)).toBe(true);
