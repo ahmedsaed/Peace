@@ -49,6 +49,20 @@ appId: com.ahmed.peace
     id: "repeat-sheet"
 - tapOn:
     id: "repeat-monthly"
+
+# The day field and the buttons below it must stay reachable WITH THE KEYBOARD
+# UP. A Modal is its own window and does not resize the way the app's window
+# does, so without lifting the sheet by hand they sit underneath it.
+- tapOn:
+    id: "repeat-day"
+- inputText: "1"
+- assertVisible:
+    id: "repeat-save"
+- assertVisible:
+    id: "repeat-preview"
+    text: "Every month on the 1st"
+- takeScreenshot: 08-repeat-keyboard
+- hideKeyboard
 # The preview says the schedule in words, so it is checkable without doing date
 # maths in your head.
 - assertVisible:
