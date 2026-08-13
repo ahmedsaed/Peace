@@ -107,7 +107,8 @@ Not claims about what MyMoney lacks — these are decisions about how this app s
 | **The backup carries the receipts** | The moment a row can point at a file, the backup stops being the database. A Peace backup is a zip holding `peace.db` beside an `attachments/` folder — so it still opens without this app, which is why it was a bare `.db` to begin with. The manifest records how many receipts were packed and the restore *checks* it: a truncated archive still unzips, and restoring one would delete the originals and report success. |
 | **Receipts are content-addressed** | A file is stored as `<sha256>.<ext>`, which buys three things at once: the same receipt attached twice is one file, a name a file manager supplied never reaches the disk or the archive, and a file cannot change under its own name. Two records can share one receipt, so deleting a row never deletes a file — only the ledger decides that. |
 | **The model is a typist, not an accountant** | Gemini reads a receipt into *structured output*, never prose, and everything it returns is range-checked and dropped if it fails. A receipt whose date is unreadable but whose total is clear still fills in the total. Your API key lives in the device keystore, never in the settings table — that table travels inside every backup. |
-| **The build identifies itself** | Settings → About shows `1.0.0 (build 32)` and the commit, marked `-dirty` if it was built from uncommitted code. |
+| **The build identifies itself** | Settings → About shows `1.1.0 (build 107)` and the commit, marked `-dirty` if it was built from uncommitted code. |
+| **Daily totals net the day** | Each day's heading carries what that day did to your position. Transfers are left out — the day you moved savings across should not read like the day you spent them — and corrections are left in, because they moved real money. It uses the same home-currency expression as the month total above it, so the two cannot drift. |
 
 Where Peace is still **behind**: nothing it set out to close. Bank-notification ingestion (Stage 6)
 is the last planned feature, and MyMoney does not have it either.
@@ -168,7 +169,7 @@ with no laptop attached. CI also attaches an APK to every PR, for testing a chan
 | commit sha | git | every commit |
 
 [`app.config.js`](app.config.js) layers the last two onto `app.json`. **Settings → About** shows
-`1.0.0 (build 25)` and the commit, so "which build am I actually running" is answerable from the
+`1.1.0 (build 107)` and the commit, so "which build am I actually running" is answerable from the
 phone. A build made from a tree with uncommitted changes is marked `-dirty`, since it cannot be
 reproduced from its sha.
 
