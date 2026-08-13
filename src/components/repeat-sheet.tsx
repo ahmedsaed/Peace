@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import palette from '@/constants/palette';
+import { useKeyboardHeight } from '@/lib/layout';
 import { describeRecurrence, type Frequency, type Recurrence } from '@/lib/recurrence';
 
 /**
@@ -56,6 +57,7 @@ export function RepeatSheet({
   const [draft, setDraft] = useState<Repeat>(
     value ?? { frequency: 'monthly', interval: 1, anchorDay: null, endsOn: null }
   );
+  const keyboardHeight = useKeyboardHeight();
   const [everyText, setEveryText] = useState(String(value?.interval ?? 1));
   const [dayText, setDayText] = useState(value?.anchorDay ? String(value.anchorDay) : '');
 
@@ -73,9 +75,13 @@ export function RepeatSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
 
+      {/* LIFTED ABOVE THE KEYBOARD BY HAND. A Modal is its own window and does
+          not resize with the keyboard the way the app's window does, so the day
+          field and the buttons below it sit underneath it — scrolling cannot
+          help, because the sheet still believes it has the whole screen. */}
       <View
         className="max-h-[80%] rounded-t-2xl border-t border-line bg-ground pb-8"
-        style={{ elevation: 16 }}
+        style={{ elevation: 16, marginBottom: keyboardHeight }}
         testID="repeat-sheet">
         <View className="border-b border-line px-5 py-4">
           <Text className="text-base font-semibold text-ink">Repeat</Text>
