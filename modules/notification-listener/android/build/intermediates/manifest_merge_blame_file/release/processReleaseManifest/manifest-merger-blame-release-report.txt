@@ -1,0 +1,38 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.ahmed.peace.notifications" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6
+7    <!--
+8    The listener service.
+9
+10    `exported="true"` is required for the SYSTEM to bind it, and is safe only
+11    because `BIND_NOTIFICATION_LISTENER_SERVICE` is a permission no ordinary app
+12    can hold — the export is to Android, not to other apps. Omitting exported
+13    entirely is a build error on API 31+ once there is an intent-filter, and
+14    setting it false means the service is declared, never bound, and captures
+15    nothing with no error anywhere to say so.
+16    -->
+17    <application>
+17-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:13:3-23:17
+18        <service
+18-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:14:5-22:15
+19            android:name="com.ahmed.peace.notifications.NotificationCaptureService"
+19-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:15:7-49
+20            android:exported="true"
+20-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:17:7-30
+21            android:label="Peace"
+21-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:16:7-28
+22            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+22-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:18:7-81
+23            <intent-filter>
+23-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:19:7-21:23
+24                <action android:name="android.service.notification.NotificationListenerService" />
+24-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:20:9-91
+24-->/home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:20:17-88
+25            </intent-filter>
+26        </service>
+27    </application>
+28
+29</manifest>

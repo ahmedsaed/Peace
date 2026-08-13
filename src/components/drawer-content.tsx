@@ -37,6 +37,13 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
     testID: 'drawer-recurring',
   },
   {
+    icon: 'bank',
+    label: 'Bank messages',
+    hint: 'Alerts waiting to be checked',
+    href: '/bank-messages',
+    testID: 'drawer-bank-messages',
+  },
+  {
     icon: 'analysis',
     label: 'Portfolio',
     hint: 'Target allocation and rebalancing',

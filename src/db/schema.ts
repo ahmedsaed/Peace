@@ -541,6 +541,72 @@ export const holdings = sqliteTable(
 );
 
 // ---------------------------------------------------------------------------
+// Bank messages
+// ---------------------------------------------------------------------------
+
+/**
+ * A bank SMS that was captured, and what it turned out to say.
+ *
+ * STORED RATHER THAN DERIVED, unlike a recurring proposal. A recurring rule can
+ * always recompute what it owes; a notification exists once and is gone — the
+ * native store is drained and cleared in one step, so if this row were not
+ * written the message would be lost the moment the app read it. That also makes
+ * the offline case work: a capture waits here until there is a network to read
+ * it with.
+ *
+ * NOTHING HERE IS IN THE LEDGER. A row in this table is a message, not a record.
+ * It becomes a record only when a person opens it and saves, at which point
+ * `transactionId` links the two so the same message cannot be entered twice.
+ */
+export const bankCaptures = sqliteTable(
+  'bank_captures',
+  {
+    id: text('id').primaryKey(),
+    /**
+     * Sender plus body, hashed. UNIQUE, because a messaging app re-posts a whole
+     * conversation when the next message lands — so the same text arrives again
+     * after a drain has already cleared the native store, and without this it
+     * would be offered a second time.
+     */
+    captureKey: text('capture_key').notNull().unique(),
+    sender: text('sender').notNull(),
+    body: text('body').notNull(),
+    /** When Android posted it, not when Peace read it. */
+    postedAt: integer('posted_at', { mode: 'timestamp_ms' }).notNull(),
+
+    /**
+     * `pending` until it has been read, then `parsed` or `unreadable`.
+     * `dismissed` is the user saying no. `saved` carries a transaction.
+     */
+    status: text('status', { enum: ['pending', 'parsed', 'unreadable', 'dismissed', 'saved'] })
+      .notNull()
+      .default('pending'),
+    /** Why it could not be read, for a screen that should not just say "failed". */
+    error: text('error'),
+
+    // What the model made of it. All nullable: a message with an amount and a
+    // direction is usable even when it names no shop and no date.
+    amountMinor: integer('amount_minor'),
+    currency: text('currency'),
+    /** 'out' or 'in', read from the message's words — never from a sign. */
+    direction: text('direction', { enum: ['out', 'in'] }),
+    merchant: text('merchant'),
+    /** yyyy-mm-dd, only when the message stated one. */
+    occurredOn: text('occurred_on'),
+    /** Last digits of the card, as TEXT — "0042" is not 42. */
+    accountTail: text('account_tail'),
+
+    /** Set once a record has been saved from this message. */
+    transactionId: text('transaction_id').references(() => transactions.id, {
+      onDelete: 'set null',
+    }),
+
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+  },
+  (table) => [index('idx_bank_captures_status').on(table.status, table.postedAt)]
+);
+
+// ---------------------------------------------------------------------------
 
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
@@ -560,3 +626,5 @@ export type AssetClassRow = typeof assetClasses.$inferSelect;
 export type NewAssetClassRow = typeof assetClasses.$inferInsert;
 export type HoldingRow = typeof holdings.$inferSelect;
 export type NewHoldingRow = typeof holdings.$inferInsert;
+export type BankCapture = typeof bankCaptures.$inferSelect;
+export type NewBankCapture = typeof bankCaptures.$inferInsert;

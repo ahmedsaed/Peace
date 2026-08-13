@@ -17,6 +17,7 @@ import {
   type StagedAttachment,
 } from '@/db/attachments';
 import { listAttachments, syncAttachments } from '@/db/repo/attachments';
+import { getCapture, markSaved } from '@/db/repo/bank-captures';
 import { AttachmentError } from '@/lib/attachment';
 import { GeminiError, readReceipt } from '@/lib/gemini';
 import { isEmptyReading, matchCategory } from '@/lib/receipt';
@@ -69,7 +70,7 @@ const TYPES: { value: RecordType; label: string }[] = [
 export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, refundOf, copyOf, fromRule, dueOn, capture } = useLocalSearchParams<{
+  const { id, refundOf, copyOf, fromRule, dueOn, capture, fromCapture } = useLocalSearchParams<{
     id?: string;
     /**
      * Opened by holding the + button: photograph a receipt, then read it.
@@ -93,6 +94,14 @@ export default function RecordScreen() {
      */
     fromRule?: string;
     dueOn?: string;
+    /**
+     * A captured bank message this record is settling.
+     *
+     * Same shape as `fromRule`: the record is written through the ordinary path
+     * below — checking the amount before saving is the entire point — and the
+     * MESSAGE is told afterwards, so backing out leaves it in the queue.
+     */
+    fromCapture?: string;
   }>();
   const density = useDensity();
 
@@ -125,6 +134,15 @@ export default function RecordScreen() {
    * saving is the point ("the rent went up"), not re-entering from scratch.
    */
   const rule = useMemo(() => (fromRule ? getRule(db, fromRule) : undefined), [fromRule]);
+
+  /**
+   * The bank message being turned into a record, if this screen was opened from
+   * one. NOT `capture` — that name is already the camera shortcut's flag.
+   */
+  const bankMessage = useMemo(
+    () => (fromCapture ? getCapture(db, fromCapture) : undefined),
+    [fromCapture]
+  );
   // Refunding a record, editing one that already is, or duplicating one:
   // "refund" is a property of the row, not of how the screen was opened.
   const isRefund = (!!refundOf && !!source) || !!source?.isRefund || !!existing?.isRefund;
@@ -137,6 +155,9 @@ export default function RecordScreen() {
     // positive amount, so the sign alone would present it as Income — and
     // saving from there would write it back as income.
     if (rule) return rule.type;
+    // The message SAYS which way the money went. Reading it from a sign is the
+    // mistake `ledgerSide` exists to prevent.
+    if (bankMessage?.direction) return bankMessage.direction === 'in' ? 'income' : 'expense';
     const from = source ?? existing;
     if (!from) return 'expense';
     if (from.transferPairId) return 'transfer';
@@ -179,13 +200,21 @@ export default function RecordScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(
     rule?.categoryId ?? existing?.categoryId ?? source?.categoryId ?? null
   );
-  const [note, setNote] = useState(rule?.note ?? existing?.note ?? source?.note ?? '');
+  const [note, setNote] = useState(
+    rule?.note ?? existing?.note ?? source?.note ?? bankMessage?.merchant ?? ''
+  );
   // Dated TODAY for a refund or a copy: the money comes back, or goes out
   // again, on the day it happens — not on the day of the record it came from.
   const [occurredAt, setOccurredAt] = useState<Date>(() => {
     // Dated the day it was DUE. A rent payment settled a week late still
     // belongs to the week it was owed, and every period total groups by day.
     if (dueOn) return new Date(`${dueOn}T12:00:00`);
+    // The date the MESSAGE stated, when it stated one. Midday, like every other
+    // date this screen builds — midnight lands on the previous day west of UTC.
+    if (bankMessage?.occurredOn) return new Date(`${bankMessage.occurredOn}T12:00:00`);
+    // Otherwise the moment the bank posted it, which is far closer than "now"
+    // for a message read days after it arrived.
+    if (bankMessage) return bankMessage.postedAt;
     return existing?.occurredAt ?? new Date();
   });
   /**
@@ -237,6 +266,9 @@ export default function RecordScreen() {
 
   const [calc, setCalc] = useState(() => {
     if (rule) return calcFromMinor(rule.amountMinor, rule.currency);
+    if (bankMessage?.amountMinor !== null && bankMessage?.amountMinor !== undefined) {
+      return calcFromMinor(bankMessage.amountMinor, bankMessage.currency ?? 'EGP');
+    }
     const from = existing ?? source;
     return from ? calcFromMinor(from.amountMinor, from.currency) : initialCalc();
   });
@@ -771,6 +803,10 @@ export default function RecordScreen() {
       // Only after the write succeeded. Advancing first would lose the
       // occurrence if the save then threw.
       if (fromRule && dueOn) markHandled(db, fromRule, dueOn);
+
+      // Same rule for a bank message: told after the record exists, so backing
+      // out or failing to save leaves it in the queue rather than losing it.
+      if (bankMessage) markSaved(db, bankMessage.id, savedId);
 
       /**
        * Turn this record into a standing order.

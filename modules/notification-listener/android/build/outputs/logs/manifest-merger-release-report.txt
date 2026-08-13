@@ -1,0 +1,34 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:1:1-25:12
+INJECTED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:1:1-25:12
+	package
+		INJECTED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:1:11-69
+application
+ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:13:3-23:17
+service#com.ahmed.peace.notifications.NotificationCaptureService
+ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:14:5-22:15
+	android:label
+		ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:16:7-28
+	android:exported
+		ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:17:7-30
+	android:permission
+		ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:18:7-81
+	android:name
+		ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:15:7-49
+intent-filter#action:name:android.service.notification.NotificationListenerService
+ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:19:7-21:23
+action#android.service.notification.NotificationListenerService
+ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:20:9-91
+	android:name
+		ADDED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml:20:17-88
+uses-sdk
+INJECTED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml
+INJECTED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/ahmed/Documents/Projects/peace/modules/notification-listener/android/src/main/AndroidManifest.xml
