@@ -126,15 +126,61 @@ export function extractJson(body: unknown): unknown {
   }
 }
 
-/** HTTP failures, in words a person can act on. */
-function describeStatus(status: number): string {
-  if (status === 400) return 'Gemini rejected the request. Check the model name in Settings.';
+/**
+ * Pull the machine-readable reason out of an error body.
+ *
+ * THE STATUS CODE IS NOT ENOUGH, and finding that out cost a device run: an
+ * invalid API key comes back as **400 INVALID_ARGUMENT**, not the 401 or 403
+ * every instinct expects. Mapping on the status alone sent someone whose key
+ * was wrong off to check their model name — the single most useless thing this
+ * could tell them, because the model name is fine.
+ *
+ * Google puts the truth in `error.details[].reason`, so that is what gets read.
+ */
+export function reasonOf(body: unknown): string | null {
+  const error = (body as { error?: { details?: unknown } } | null)?.error;
+  if (!error || !Array.isArray(error.details)) return null;
+
+  for (const detail of error.details) {
+    const reason = (detail as { reason?: unknown })?.reason;
+    if (typeof reason === 'string' && reason !== '') return reason;
+  }
+  return null;
+}
+
+/** HTTP failures, in words that name the thing the user can actually change. */
+export function describeFailure(status: number, body: unknown): string {
+  switch (reasonOf(body)) {
+    case 'API_KEY_INVALID':
+    case 'API_KEY_SERVICE_BLOCKED':
+    case 'ACCESS_TOKEN_EXPIRED':
+      return 'That Gemini API key was refused. Check it in Settings.';
+    case 'SERVICE_DISABLED':
+      return 'The Gemini API is not enabled for that key. Check it in Settings.';
+    case 'RATE_LIMIT_EXCEEDED':
+    case 'RESOURCE_EXHAUSTED':
+      return 'Gemini is rate-limiting this key. Try again in a minute.';
+    default:
+      break;
+  }
+
   if (status === 401 || status === 403) {
     return 'That Gemini API key was refused. Check it in Settings.';
   }
   if (status === 404) return 'That Gemini model does not exist. Check the name in Settings.';
   if (status === 429) return 'Gemini is rate-limiting this key. Try again in a minute.';
   if (status >= 500) return 'Gemini is unavailable right now. Enter the record by hand.';
+
+  /**
+   * A 400 with no reason we recognise. Google's own sentence is far more useful
+   * than anything that could be invented here — "Unable to submit request
+   * because it has an empty model name" names the fix exactly — so it is passed
+   * through rather than flattened into a generic apology.
+   */
+  const message = (body as { error?: { message?: unknown } } | null)?.error?.message;
+  if (typeof message === 'string' && message.trim() !== '') {
+    return `Gemini refused the request: ${message.trim()}`;
+  }
   return `Gemini refused the request (${status}).`;
 }
 
@@ -184,7 +230,13 @@ export async function readReceipt(
       signal: controller.signal,
     });
 
-    if (!response.ok) throw new GeminiError(describeStatus(response.status));
+    if (!response.ok) {
+      // The body carries the reason the status cannot. Its own parsing must not
+      // throw over the top of the real failure, so a body that will not read
+      // simply leaves the status to speak for itself.
+      const body = await response.json().catch(() => null);
+      throw new GeminiError(describeFailure(response.status, body));
+    }
 
     return parseReading(extractJson(await response.json()), fallbackCurrency);
   } catch (error) {
