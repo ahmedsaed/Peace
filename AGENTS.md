@@ -292,6 +292,13 @@ app ignoring input. `pkill -f GradleDaemon`.
   `CHROME`, which would have offered a funnel as a category icon. `icon.tsx` now holds three
   separate maps and `ICON_NAMES` *is* the category one, so a glyph's group is where it is written.
   Look for the same shape wherever a comment says "remember to also add it to…".
+- **A glyph's legibility is set by its GAP, not its ink — rasterise it before shipping it.** A
+  paperclip is mostly negative space: at 11px its hole closes and it becomes a blob, and widening
+  the strokes to compensate makes it worse. `convert` on a one-line SVG at the exact `size` prop
+  answers this in seconds and costs nothing, where finding out needs a 4-minute APK build and an
+  emulator. Check the CENTRING the same way — the first paperclip was four units right of centre,
+  invisible on its own and obvious beside text. Solid shapes (`document`) survive small sizes;
+  rings (`search`, `camera`, `paperclip`) need ~14px, which is why the attach button is a folder.
 - **Add a `testID` to anything a flow needs to find.** Maestro matches on it; text labels change.
 - **testIDs must be regex-safe** — letters, digits, hyphens between words. Maestro matches ids as
   **regular expressions**, so `key-op-+` reads as "`key-op` then one or more hyphens" and silently
