@@ -222,19 +222,35 @@ export function SummaryTrio({
  */
 export function Fab({
   onPress,
+  onLongPress,
+  longPressLabel,
   testID = 'fab',
   raised = false,
 }: {
   onPress: () => void;
+  /**
+   * The shortcut, when the screen has one.
+   *
+   * Optional so the category and account FABs are unaffected — a long press
+   * that does something on one screen and nothing on another is fine; one that
+   * does something DIFFERENT on each is not.
+   */
+  onLongPress?: () => void;
+  /** Named in the accessible label, because a long press is invisible. */
+  longPressLabel?: string;
+  onPressIn?: () => void;
   testID?: string;
   raised?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel="Add record"
+      accessibilityLabel={
+        longPressLabel ? `Add record. Hold to ${longPressLabel}` : 'Add record'
+      }
       className={`absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-accent active:opacity-80 ${
         raised ? 'bottom-24' : 'bottom-5'
       }`}
