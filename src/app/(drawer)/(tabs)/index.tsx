@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, SectionList, Text, View } from 'react-native';
 
+import { BankActions, BankRow } from '@/components/bank-row';
 import { ProposalActions, ProposalRow } from '@/components/proposal-row';
 import {
   catchUp,
@@ -15,6 +16,7 @@ import { RecordRow } from '@/components/record-row';
 import { Snackbar } from '@/components/snackbar';
 import { EmptyState, Fab, MonthHeader, Screen, SummaryTrio } from '@/components/screen';
 import { db } from '@/db/client';
+import { listAccountsWithBalance } from '@/db/repo/accounts';
 import {
   groupByDay,
   listRecordsForPeriod,
@@ -23,10 +25,13 @@ import {
   type RecordRow as Row,
 } from '@/db/repo/records';
 import { broughtForward, type BroughtForward } from '@/db/repo/carry';
-import { deleteRecord, restoreRecords } from '@/db/repo/transactions';
+import { dismissCapture, markSaved } from '@/db/repo/bank-captures';
+import type { BankCapture } from '@/db/schema';
+import { createRecord, deleteRecord, restoreRecords } from '@/db/repo/transactions';
 import { formatMinor } from '@/lib/money';
 import { currentPeriod } from '@/lib/period';
 import { useSetting } from '@/state/settings';
+import { useBankInbox } from '@/state/bank';
 import { useUndoStore } from '@/state/undo';
 
 const EMPTY_SUMMARY: PeriodSummary = {
@@ -49,8 +54,12 @@ const NO_CARRY: BroughtForward = {
  * opened.
  */
 /** Due rows carry a rule and a date; records carry an id. */
-const isProposal = (row: Row | Proposal): row is Proposal =>
+const isProposal = (row: Row | Proposal | BankCapture): row is Proposal =>
   (row as Proposal).ruleId !== undefined;
+
+/** A captured bank message. Only these carry the message body. */
+const isCapture = (row: Row | Proposal | BankCapture): row is BankCapture =>
+  (row as BankCapture).captureKey !== undefined;
 
 export default function RecordsScreen() {
   const router = useRouter();
@@ -75,6 +84,18 @@ export default function RecordsScreen() {
   /** Already spoken for, in the month being viewed. Display only. */
   const [upcoming, setUpcoming] = useState<Proposal[]>([]);
   const [actingDue, setActingDue] = useState<Proposal | null>(null);
+  /**
+   * Bank messages that have been read and not yet acted on.
+   *
+   * Merged into this list rather than given a screen, because a captured
+   * message is the same kind of thing as a due occurrence: something the app
+   * believes happened, waiting to be agreed to. A second inbox is a second
+   * place to remember to visit.
+   */
+  const captures = useBankInbox((state) => state.captures);
+  const reloadInbox = useBankInbox((state) => state.reload);
+  const [actingCapture, setActingCapture] = useState<BankCapture | null>(null);
+  const defaultAccountId = useSetting('defaultAccountId');
   const pendingUndo = useUndoStore((state) => state.pending);
   const clearUndo = useUndoStore((state) => state.clear);
   const offerUndo = useUndoStore((state) => state.offer);
@@ -92,10 +113,15 @@ export default function RecordsScreen() {
     // Belongs to the month being LOOKED AT, unlike the due list, which is
     // everything outstanding whenever it fell.
     setUpcoming(upcomingProposals(db, period));
+    // Everything outstanding whatever month it fell in, like the due list — a
+    // message from last week must not hide in a month nobody scrolls back to.
+    // Into the STORE, not into local state: the catch-up finishes a network
+    // round trip after this runs, and only a store can tell the screen so.
+    reloadInbox();
     // homeCurrency belongs here: changing it changes what the totals MEAN, and
     // without it the screen would keep showing figures computed against the
     // previous one until something else happened to trigger a refresh.
-  }, [period, homeCurrency, carryOver]);
+  }, [period, homeCurrency, carryOver, reloadInbox]);
 
   // Re-read on focus rather than on mount: returning from the add-record screen
   // has to show the record that was just saved.
@@ -146,6 +172,18 @@ export default function RecordsScreen() {
    * waiting. The try/catch is for a genuine write failure — a deleted account,
    * say — not for a rule about ordering.
    */
+  /**
+   * Which account a message goes to.
+   *
+   * The default if one is set and still exists, otherwise the first — the same
+   * fallback the record screen uses, because a deleted default must not leave
+   * this unable to write anything.
+   */
+  function accountFor(): string | null {
+    const accounts = listAccountsWithBalance(db);
+    return accounts.find((a) => a.id === defaultAccountId)?.id ?? accounts[0]?.id ?? null;
+  }
+
   function handleDue(work: () => void) {
     try {
       work();
@@ -167,6 +205,17 @@ export default function RecordsScreen() {
             total: null as number | null,
             unvalued: 0,
             data: due as (Row | Proposal)[],
+          },
+        ]
+      : []),
+    ...(captures.length > 0
+      ? [
+          {
+            key: 'bank',
+            title: captures.length === 1 ? 'From your bank' : `From your bank · ${captures.length}`,
+            total: null as number | null,
+            unvalued: 0,
+            data: captures as (Row | Proposal | BankCapture)[],
           },
         ]
       : []),
@@ -236,7 +285,18 @@ export default function RecordsScreen() {
             isProposal(row) ? `due-${row.ruleId}-${row.occurredOn}` : row.id
           }
           renderItem={({ item }) =>
-            isProposal(item) ? (
+            isCapture(item) ? (
+              <BankRow
+                capture={item}
+                currency={homeCurrency}
+                // A tap opens the ordinary record screen with whatever could be
+                // read already filled in — the same gesture a due row uses.
+                onPress={() =>
+                  router.push({ pathname: '/record', params: { fromCapture: item.id } })
+                }
+                onLongPress={() => setActingCapture(item)}
+              />
+            ) : isProposal(item) ? (
               <ProposalRow
                 proposal={item}
                 currency={homeCurrency}
@@ -301,6 +361,51 @@ export default function RecordsScreen() {
         onLongPress={() => router.push({ pathname: '/record', params: { capture: '1' } })}
         longPressLabel="photograph a receipt"
         raised={!!pendingUndo}
+      />
+
+      <BankActions
+        capture={actingCapture}
+        currency={homeCurrency}
+        onClose={() => setActingCapture(null)}
+        onAdd={(capture) => {
+          /**
+           * Written straight out when there is enough to write.
+           *
+           * The account is the default one and there is no category: a bank
+           * message names neither, and inventing them would be worse than a
+           * record the user can re-file in two taps. Anything less than a full
+           * amount and direction goes to the record screen instead, because a
+           * zero record is worse than typing one.
+           */
+          if (capture.amountMinor === null || capture.direction === null) {
+            setActingCapture(null);
+            router.push({ pathname: '/record', params: { fromCapture: capture.id } });
+            return;
+          }
+          handleDue(() => {
+            const account = accountFor();
+            if (!account) throw new Error('No account to record this against.');
+            const record = createRecord(db, {
+              type: capture.direction === 'in' ? 'income' : 'expense',
+              accountId: account,
+              amountMinor: capture.amountMinor!,
+              currency: capture.currency ?? homeCurrency,
+              note: capture.merchant ?? capture.sender,
+              // DATED BY THE NOTIFICATION, to the second. The bank posts when
+              // the money moves, so this is the exact answer — and it is the
+              // one thing the model is never asked for.
+              occurredAt: capture.postedAt,
+            });
+            // After the write, never before: the same rule a recurring rule
+            // follows. Marking first and then failing loses the message.
+            markSaved(db, capture.id, record.id);
+          });
+          setActingCapture(null);
+        }}
+        onDismiss={(capture) => {
+          handleDue(() => dismissCapture(db, capture.id));
+          setActingCapture(null);
+        }}
       />
 
       <ProposalActions

@@ -9,6 +9,11 @@ Ordering principle: **nothing intelligent matters until manual entry is excellen
 a shortcut around typing — if typing is bad, the shortcut just hides it. Stages 4–6 also depend
 on 0–3 structurally (you cannot OCR into a record type that does not exist yet).
 
+**All six stages have shipped**, plus two features that were never on this list — Google Drive
+backup and portfolio rebalancing. Each stage below keeps its original plan, with a
+*"what shipped differently"* note where the work disagreed with it; those notes are the useful part
+of this document now.
+
 ---
 
 ## Stage 0 — Foundations ✅ done
@@ -425,7 +430,7 @@ you mean".
 
 ---
 
-## Stage 6 — Bank notification ingestion
+## Stage 6 — Bank notification ingestion ✅ done
 
 Approach: **Android `NotificationListenerService`**, not `READ_SMS`.
 
@@ -454,6 +459,37 @@ Trade-offs to accept:
   so this must stay a convenience layered on manual entry, never the system of record.
 - Keeps the Play Store door open if distribution ever changes, since no restricted permission is
   involved. `READ_SMS` would have closed it permanently.
+
+**What shipped differently.**
+
+*No per-bank regex templates.* They work on the four messages you tested with, and the fifth is a
+template the bank rolled out on a Tuesday — so there is one parsing path and it is the model.
+Everything it returns is range-checked and dropped if it does not survive, and the DIRECTION is read
+from the message's words rather than inferred, because inferring it is how a refund becomes income.
+
+*SMS only, not bank apps.* The plan argued for catching bank-app pushes too. In practice the filter
+asks Android which app owns SMS and captures only that: one source, one shape of text, and no
+guessing about which of a bank app's notifications are transactions.
+
+*No review queue screen.* Captured messages are grey rows in the records list, exactly like a
+recurring occurrence — same thing, waiting for the same decision. The raw message lives in the
+long-press sheet, which is where the question "did it read this right" is actually asked. A separate
+screen was a second inbox to remember to visit.
+
+*The date is never parsed.* Android stamps the notification to the second and a bank alert arrives
+when the money moves, so the model is not asked for a date at all.
+
+*A local Expo module, not the third-party one.* `expo-android-notification-listener-service` was
+last published well before SDK 57. The surface needed is four functions and a service.
+
+*Three triggers, not one.* Launch and foreground both leave the case that gets noticed — a message
+arriving while you are looking at the screen it belongs on. The native side signals the capture, via
+a `SharedPreferences` listener on the store the service writes to.
+
+**The cost, which the plan did not anticipate:** Play Protect **hard-blocks** the sideloaded APK
+because the app declares notification access. There is no manifest change that avoids it while the
+feature exists. `adb install` or pausing Play Protect gets past it; the Play Store door the plan kept
+open is the only real escape, and it is still open.
 
 ---
 

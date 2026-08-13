@@ -48,6 +48,7 @@ export const RESTORE_TABLES = [
   'recurring_skips',
   'asset_classes',
   'holdings',
+  'bank_captures',
 ] as const;
 
 export type RestoreTable = (typeof RESTORE_TABLES)[number];

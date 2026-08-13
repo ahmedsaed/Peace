@@ -289,18 +289,22 @@ export type ReadOptions = {
  * A key in a URL is the one that ends up in a proxy log, a crash report or a
  * console line — and this app writes the URL to the console on failure.
  */
-export async function readReceipt(
+/**
+ * One request, whatever is being read.
+ *
+ * The transport, the timeout, the header the key travels in and the mapping of
+ * every failure into a sentence are identical for a photographed receipt and a
+ * bank message — only the parts and the schema differ. Two copies of this would
+ * be two places for the error handling to drift, and the error handling is the
+ * part that took a device run against the real API to get right.
+ */
+async function generateJson(
   apiKey: string,
   model: string,
-  base64Image: string,
-  mimeType: string,
-  {
-    timeoutMs = READ_TIMEOUT_MS,
-    fetchImpl = fetch,
-    categoryNames = [],
-    fallbackCurrency = 'USD',
-  }: ReadOptions = {}
-): Promise<ReadReceipt> {
+  parts: unknown[],
+  responseSchema: unknown,
+  { timeoutMs, fetchImpl, label }: { timeoutMs: number; fetchImpl: typeof fetch; label: string }
+): Promise<unknown> {
   if (apiKey.trim() === '') {
     throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
   }
@@ -315,7 +319,16 @@ export async function readReceipt(
         'content-type': 'application/json',
         'x-goog-api-key': apiKey.trim(),
       },
-      body: JSON.stringify(buildRequest(base64Image, mimeType, categoryNames)),
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema,
+          // One right answer. The same input read twice must not give two
+          // different amounts.
+          temperature: 0,
+        },
+      }),
       signal: controller.signal,
     });
 
@@ -327,10 +340,9 @@ export async function readReceipt(
       throw new GeminiError(describeFailure(response.status, body));
     }
 
-    return parseReading(extractJson(await response.json()), fallbackCurrency);
+    return extractJson(await response.json());
   } catch (error) {
     if (error instanceof GeminiError) throw error;
-    if (error instanceof ReceiptError) throw new GeminiError(error.message);
 
     /**
      * Offline, DNS failure, timeout, malformed JSON — all the same to the USER,
@@ -342,9 +354,62 @@ export async function readReceipt(
      *
      * The URL is logged; the key is not, because it is in a header.
      */
-    console.warn('[gemini] receipt read failed', endpoint(model), error);
+    console.warn(`[gemini] ${label} failed`, endpoint(model), error);
     throw new GeminiError('Could not reach Gemini. Enter the record by hand.');
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function readReceipt(
+  apiKey: string,
+  model: string,
+  base64Image: string,
+  mimeType: string,
+  {
+    timeoutMs = READ_TIMEOUT_MS,
+    fetchImpl = fetch,
+    categoryNames = [],
+    fallbackCurrency = 'USD',
+  }: ReadOptions = {}
+): Promise<ReadReceipt> {
+  const raw = await generateJson(
+    apiKey,
+    model,
+    [
+      { text: buildPrompt(categoryNames) },
+      { inline_data: { mime_type: mimeType, data: base64Image } },
+    ],
+    RESPONSE_SCHEMA,
+    { timeoutMs, fetchImpl, label: 'receipt read' }
+  );
+
+  try {
+    return parseReading(raw, fallbackCurrency);
+  } catch (error) {
+    if (error instanceof ReceiptError) throw new GeminiError(error.message);
+    throw error;
+  }
+}
+
+/**
+ * Read a bank message into the fields of a record.
+ *
+ * Text, not an image, and otherwise the same discipline: structured output, a
+ * temperature of zero, and everything that comes back treated as text somebody
+ * typed badly. `lib/bank-sms.ts` owns the prompt, the schema and the checking,
+ * so this file stays the transport.
+ */
+export async function readBankMessage(
+  apiKey: string,
+  model: string,
+  prompt: string,
+  responseSchema: unknown,
+  { timeoutMs = READ_TIMEOUT_MS, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
+): Promise<unknown> {
+  return generateJson(apiKey, model, [{ text: prompt }], responseSchema, {
+    timeoutMs,
+    fetchImpl,
+    label: 'bank message read',
+  });
 }
