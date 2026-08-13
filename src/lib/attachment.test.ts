@@ -1,7 +1,9 @@
 import {
   ACCEPTED_MIME,
   AttachmentError,
+  IMAGE_MAX_EDGE,
   MAX_ATTACHMENT_BYTES,
+  resizeTarget,
   assertWithinLimit,
   attachmentFileName,
   extensionFor,
@@ -79,6 +81,56 @@ describe('the size limit', () => {
     // An off-by-one here is the kind of thing nobody notices until a file is
     // refused for being precisely the size the message says is allowed.
     expect(() => assertWithinLimit(MAX_ATTACHMENT_BYTES, 'scan.pdf')).not.toThrow();
+  });
+});
+
+/**
+ * THE FAILURE THAT LOOKS LIKE SUCCESS.
+ *
+ * A slightly larger file looks exactly like a slightly smaller one on screen,
+ * so nothing about the app would reveal that "downscaling" was making every
+ * receipt bigger. It shows up months later as a backup nobody wants to wait for.
+ */
+describe('deciding how to shrink a photo', () => {
+  it('caps the LONG edge of a portrait receipt, not the width', () => {
+    // The bug this exists for: constraining the width takes a 1200x1800 photo
+    // to 1600x2400 — an upscale, from the function meant to shrink it.
+    expect(resizeTarget(1200, 1800)).toEqual({ height: IMAGE_MAX_EDGE });
+  });
+
+  it('caps the width when the photo is landscape', () => {
+    expect(resizeTarget(4000, 3000)).toEqual({ width: IMAGE_MAX_EDGE });
+  });
+
+  it('caps either edge of a square', () => {
+    expect(resizeTarget(3000, 3000)).toEqual({ width: IMAGE_MAX_EDGE });
+  });
+
+  it('leaves a photo that is already small enough alone', () => {
+    // Resizing cannot add detail, and it puts a JPEG through a second JPEG.
+    expect(resizeTarget(800, 600)).toBeNull();
+    expect(resizeTarget(600, 800)).toBeNull();
+  });
+
+  it('leaves one exactly at the cap alone', () => {
+    expect(resizeTarget(IMAGE_MAX_EDGE, 900)).toBeNull();
+    expect(resizeTarget(900, IMAGE_MAX_EDGE)).toBeNull();
+    // One pixel over is the first size that gets touched.
+    expect(resizeTarget(900, IMAGE_MAX_EDGE + 1)).toEqual({ height: IMAGE_MAX_EDGE });
+  });
+
+  it('does nothing when the dimensions could not be measured', () => {
+    // A target computed from a zero or a NaN is garbage; leaving the photo
+    // alone is always safe, and the size guard still catches a huge one.
+    for (const [w, h] of [
+      [0, 0],
+      [0, 1800],
+      [-1, 100],
+      [NaN, 100],
+      [Infinity, 100],
+    ]) {
+      expect(resizeTarget(w, h)).toBeNull();
+    }
   });
 });
 

@@ -68,6 +68,37 @@ export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const IMAGE_MAX_EDGE = 1600;
 export const IMAGE_QUALITY = 0.7;
 
+/**
+ * Which edge to constrain when shrinking a photo, or null to leave it alone.
+ *
+ * TWO WAYS TO GET THIS WRONG, AND BOTH MAKE THE FILE BIGGER.
+ *
+ * Constraining the WIDTH unconditionally is the first. A receipt photo is
+ * portrait, so pinning its width to 1600 turns 1200x1800 into 1600x2400 — an
+ * upscale, in the function whose whole job is to make the file smaller. The
+ * LONG edge is the one that has to be capped, and which edge is long is not
+ * knowable without measuring.
+ *
+ * Resizing a photo that is already small enough is the second. It cannot add
+ * detail and it re-encodes a JPEG that has already been through a JPEG.
+ *
+ * Pure, because this is arithmetic and the failure is invisible on screen —
+ * a slightly larger file looks exactly like a slightly smaller one.
+ */
+export function resizeTarget(
+  width: number,
+  height: number,
+  maxEdge = IMAGE_MAX_EDGE
+): { width: number } | { height: number } | null {
+  // A dimension the manipulator could not report. Resizing against a zero or a
+  // NaN would produce a garbage target; leaving it alone is always safe.
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+  if (Math.max(width, height) <= maxEdge) return null;
+  return width >= height ? { width: maxEdge } : { height: maxEdge };
+}
+
 export class AttachmentError extends Error {}
 
 export function isImageMime(mime: string): boolean {

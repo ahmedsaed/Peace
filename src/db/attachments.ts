@@ -27,12 +27,12 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   ACCEPTED_MIME,
   AttachmentError,
-  IMAGE_MAX_EDGE,
   IMAGE_QUALITY,
   assertWithinLimit,
   attachmentFileName,
   extensionFor,
   isImageMime,
+  resizeTarget,
 } from '../lib/attachment';
 import { db } from './client';
 import { orphanedFiles, referencedFiles } from './repo/attachments';
@@ -192,10 +192,25 @@ export async function stageAttachment(incoming: Incoming): Promise<StagedAttachm
  */
 async function downscale(uri: string): Promise<{ uri: string; width: number; height: number }> {
   try {
+    /**
+     * MEASURE FIRST, THEN DECIDE WHICH EDGE TO CONSTRAIN.
+     *
+     * `resize({ width })` constrains the WIDTH, and a receipt photo is always
+     * portrait — so pinning the width to 1600 takes a 1200x1800 photo and makes
+     * it 1600x2400. That is an upscale: more pixels, a bigger file, no more
+     * detail, in a function whose entire purpose is to make the file smaller.
+     * The long edge is the one that has to be capped, and which edge is long is
+     * not knowable without looking.
+     */
+    const measured = await ImageManipulator.manipulate(uri).renderAsync();
+    const target = resizeTarget(measured.width, measured.height);
+
     const context = ImageManipulator.manipulate(uri);
-    // One edge, null on the other: the aspect ratio is preserved, and a
-    // portrait receipt is not squashed into a landscape box.
-    context.resize({ width: IMAGE_MAX_EDGE });
+    // Null when it is already small enough — then this only recompresses. One
+    // edge is given and the other is left out, so the aspect ratio is preserved
+    // and a portrait receipt is not squashed into a landscape box.
+    if (target) context.resize(target);
+
     const rendered = await context.renderAsync();
     const result = await rendered.saveAsync({
       format: SaveFormat.JPEG,
@@ -204,6 +219,8 @@ async function downscale(uri: string): Promise<{ uri: string; width: number; hei
     return { uri: result.uri, width: result.width, height: result.height };
   } catch (error) {
     // Friendly nothing for the user, the real error for whoever has to fix it.
+    // Losing a receipt because it could not be OPTIMISED would be the wrong
+    // trade — the size guard still catches anything genuinely too big.
     console.warn('[attachments] could not downscale, storing the original', error);
     return { uri, width: 0, height: 0 };
   }

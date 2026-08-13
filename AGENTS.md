@@ -450,6 +450,12 @@ app ignoring input. `pkill -f GradleDaemon`.
   a date, and is the difference between a year of receipts weighing 20MB and 400MB — which is the
   difference between a weekly Drive backup that works and one the user switches off. Failing to
   shrink must not fail the attach: store the original and let the size guard catch it.
+- **`resize({ width })` constrains the WIDTH, and a receipt photo is portrait.** Pinning the width
+  to 1600 turns a 1200x1800 photo into 1600x2400 — an UPSCALE, produced by the function whose only
+  job is to make the file smaller, and completely invisible on screen because a bigger file looks
+  exactly like a smaller one. Measure first, cap the LONG edge, and never resize something already
+  under the cap. `resizeTarget` in `lib/attachment.ts` is pure and tested for exactly this reason;
+  the same trap waits in any "max dimension" API that takes one named axis.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
