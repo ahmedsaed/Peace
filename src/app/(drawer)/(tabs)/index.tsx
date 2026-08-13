@@ -25,12 +25,13 @@ import {
   type RecordRow as Row,
 } from '@/db/repo/records';
 import { broughtForward, type BroughtForward } from '@/db/repo/carry';
-import { dismissCapture, markSaved, reviewableCaptures } from '@/db/repo/bank-captures';
+import { dismissCapture, markSaved } from '@/db/repo/bank-captures';
 import type { BankCapture } from '@/db/schema';
 import { createRecord, deleteRecord, restoreRecords } from '@/db/repo/transactions';
 import { formatMinor } from '@/lib/money';
 import { currentPeriod } from '@/lib/period';
 import { useSetting } from '@/state/settings';
+import { useBankInbox } from '@/state/bank';
 import { useUndoStore } from '@/state/undo';
 
 const EMPTY_SUMMARY: PeriodSummary = {
@@ -91,7 +92,8 @@ export default function RecordsScreen() {
    * believes happened, waiting to be agreed to. A second inbox is a second
    * place to remember to visit.
    */
-  const [captures, setCaptures] = useState<BankCapture[]>([]);
+  const captures = useBankInbox((state) => state.captures);
+  const reloadInbox = useBankInbox((state) => state.reload);
   const [actingCapture, setActingCapture] = useState<BankCapture | null>(null);
   const defaultAccountId = useSetting('defaultAccountId');
   const pendingUndo = useUndoStore((state) => state.pending);
@@ -113,11 +115,13 @@ export default function RecordsScreen() {
     setUpcoming(upcomingProposals(db, period));
     // Everything outstanding whatever month it fell in, like the due list — a
     // message from last week must not hide in a month nobody scrolls back to.
-    setCaptures(reviewableCaptures(db));
+    // Into the STORE, not into local state: the catch-up finishes a network
+    // round trip after this runs, and only a store can tell the screen so.
+    reloadInbox();
     // homeCurrency belongs here: changing it changes what the totals MEAN, and
     // without it the screen would keep showing figures computed against the
     // previous one until something else happened to trigger a refresh.
-  }, [period, homeCurrency, carryOver]);
+  }, [period, homeCurrency, carryOver, reloadInbox]);
 
   // Re-read on focus rather than on mount: returning from the add-record screen
   // has to show the record that was just saved.

@@ -501,6 +501,20 @@ app ignoring input. `pkill -f GradleDaemon`.
   there is an API key to read them with, and nothing anywhere said so while messages piled up behind
   that — the app silently doing nothing, which is the failure it is least allowed to have. Count
   what is waiting and name what is blocking it.
+- **A native service that captures in the background needs THREE triggers, not one.** Launch and
+  foreground are the obvious two, and they leave the case that actually gets noticed: a message
+  arriving while somebody is looking at the screen it belongs on, producing nothing until they
+  navigated. The third is the native side SIGNALLING the capture — and the capture store itself is
+  the channel, since the service and the module share a process, so a `SharedPreferences` change
+  listener sees the write with no static holder and no reference back into the React context. Hold
+  that listener in a FIELD: `SharedPreferences` keeps only a weak reference, so an inline lambda is
+  collected at the next GC and the events stop silently.
+- **Anything a screen reads once cannot learn about an answer that arrives later.** Reading a
+  message is a network round trip, so it lands seconds after every screen has drawn. A per-screen
+  query left the row invisible until something else forced a re-render; the inbox is a store, like
+  settings — SQLite is the truth and the store is what repaints every screen. The same applies to
+  whatever UNBLOCKS the work: saving the API key has to kick the catch-up, or adding a key appears
+  to do nothing.
 - **A notification is stamped with the moment it arrived; never ask a model for the date.** A bank
   alert lands when the money moves, and Android records that to the second — so the exact answer is
   already in hand. Reading "13/08/2026" out of the text instead invites the one mistake nobody can

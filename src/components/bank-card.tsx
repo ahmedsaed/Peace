@@ -18,8 +18,7 @@ import { AppState, Pressable, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { isCapturing, isPermitted, openListenerSettings, setCapturing } from '@/db/bank-inbox';
-import { db } from '@/db/client';
-import { pendingCaptures } from '@/db/repo/bank-captures';
+import { useBankInbox } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
 
 /**
@@ -63,8 +62,12 @@ export function BankMessagesCard() {
    * list has no row for them either, because a message is only offered once it
    * has been read. Found on a device, when the list was empty and the message
    * was in the database the whole time.
+   *
+   * From the STORE so it drops the moment the catch-up reads them, even while
+   * this screen is the one being looked at.
    */
-  const [waiting, setWaiting] = useState(() => pendingCaptures(db, 500).length);
+  const waiting = useBankInbox((state) => state.waiting);
+  const reloadInbox = useBankInbox((state) => state.reload);
 
   /**
    * Re-checked on every return to the foreground.
@@ -77,8 +80,8 @@ export function BankMessagesCard() {
   const refresh = useCallback(() => {
     setPermitted(safeIsPermitted());
     setCapturingState(safeIsCapturing());
-    setWaiting(pendingCaptures(db, 500).length);
-  }, []);
+    reloadInbox();
+  }, [reloadInbox]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
@@ -206,8 +209,8 @@ export function BankMessagesCard() {
 
         {waiting > 0 ? (
           <Text className="mb-2 text-xs leading-4 text-expense" testID="bank-waiting">
-            {waiting === 1 ? '1 message is' : `${waiting} messages are`} waiting to be read. They
-            need a Gemini API key above.
+            {waiting === 1 ? '1 message is' : `${waiting} messages are`} waiting to be read — they
+            need the Gemini key above.
           </Text>
         ) : null}
 
