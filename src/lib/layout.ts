@@ -1,4 +1,5 @@
-import { useWindowDimensions } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Keyboard, useWindowDimensions } from 'react-native';
 
 /**
  * How much vertical room a screen has to work with.
@@ -39,4 +40,35 @@ export function useDensity(): Density {
 /** Picks the value for the current density from a full table. */
 export function byDensity<T>(density: Density, table: Record<Density, T>): T {
   return table[density];
+}
+
+/**
+ * How much of the screen the keyboard is currently covering.
+ *
+ * NEEDED BECAUSE A `Modal` DOES NOT RESIZE WITH THE KEYBOARD. Android's
+ * `adjustResize` shrinks the app's own window, which is why an ordinary screen
+ * can simply scroll — but a Modal is a SEPARATE window and keeps its full
+ * height, so anything near the bottom of a bottom-sheet stays underneath the
+ * keyboard however hard the content tries to scroll. The sheet has to be lifted
+ * by hand.
+ *
+ * Reported in dp, and 0 when the keyboard is down.
+ */
+export function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    // `Did` rather than `Will`: Android only ever fires the `Did` events, and
+    // using `Will` would leave this at 0 on the one platform that needs it.
+    const shown = Keyboard.addListener('keyboardDidShow', (event) =>
+      setHeight(event.endCoordinates.height)
+    );
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setHeight(0));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+
+  return height;
 }

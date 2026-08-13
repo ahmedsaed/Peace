@@ -404,6 +404,13 @@ app ignoring input. `pkill -f GradleDaemon`.
   its rule and its date, so its existence IS the approval) and dismissed from `recurring_skips`. A
   proposal is anything in range that appears in neither. When a model keeps forcing awkward rules,
   suspect the model.
+- **A `Modal` is its own window and does NOT resize with the keyboard.** Android's `adjustResize`
+  shrinks the app's window, which is why an ordinary screen can just scroll clear — a bottom sheet
+  keeps its full height and everything near its foot stays underneath the keyboard, however hard the
+  content scrolls. Lift it by hand with `useKeyboardHeight` from `layout.ts`, and listen to
+  `keyboardDidShow`, never `keyboardWillShow`: Android only fires the `Did` events, so a `Will`
+  listener reports zero on the one platform that needs it. The flow has to TYPE into the field and
+  then assert the button below it is still visible; asserting the field exists proves nothing.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
