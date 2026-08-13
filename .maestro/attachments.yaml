@@ -80,7 +80,10 @@ appId: com.ahmed.peace
     text: "-E£120.00"
 
 # --- and re-opening it shows no receipts, not a broken tile ---
-- tapOn: "Lunch receipt"
+# The note is the row's SUBTITLE, rendered as `Cash · “Lunch receipt”` — and
+# Maestro matches a selector against the WHOLE text, so the bare note does not
+# match. The curly quotes around it are real and are why this is not anchored.
+- tapOn: ".*Lunch receipt.*"
 - assertVisible:
     id: "record-screen"
 - assertVisible:

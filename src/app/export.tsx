@@ -249,7 +249,11 @@ export default function ExportScreen() {
           <ExportRow
             icon="shield"
             title="Backup file"
-            body="Complete and restorable. Any SQLite tool can open it."
+            // The claim has to track the format. It said "any SQLite tool can
+            // open it" while it was a bare `.db`, and that was the POINT of it
+            // being one — so the sentence had to change with the file rather
+            // than be left describing the version before last.
+            body="Complete and restorable. A zip holding the database and your receipts."
             kind="backup"
             busy={busy}
             onPress={run}
