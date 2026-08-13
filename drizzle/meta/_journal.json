@@ -64,6 +64,13 @@
       "when": 1786610209125,
       "tag": "0008_medical_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786645184001,
+      "tag": "0009_jittery_namora",
+      "breakpoints": true
     }
   ]
 }

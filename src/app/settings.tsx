@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
+import { BankMessagesCard } from '@/components/bank-card';
 import { GeminiKeyCard } from '@/components/gemini-key';
 import { StackHeader } from '@/components/screen';
 import { db } from '@/db/client';
@@ -97,6 +98,13 @@ export default function SettingsScreen() {
             Receipts
           </Text>
           <GeminiKeyCard />
+        </View>
+
+        <View className="pt-6">
+          <Text className="mb-2 px-1 text-[10px] uppercase tracking-widest text-muted">
+            Bank messages
+          </Text>
+          <BankMessagesCard />
         </View>
 
         <Text className="px-1 pt-6 text-xs leading-5 text-muted opacity-70">

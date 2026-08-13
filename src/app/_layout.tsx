@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import palette from '@/constants/palette';
 import { DatabaseProvider } from '@/db/provider';
+import { BankCatchUp } from '@/state/bank';
 import { DriveCatchUp } from '@/state/drive';
 
 import '@/global.css';
@@ -51,6 +52,10 @@ export default function RootLayout() {
               and swallows every failure — see the file for why the app being
               opened IS the scheduler rather than a fallback behind one. */}
           <DriveCatchUp />
+          {/* Drains whatever the notification listener captured while the app
+              was closed, and reads it. Renders nothing, blocks nothing, and
+              swallows every failure — a message left unread is read next time. */}
+          <BankCatchUp />
           <Stack
             screenOptions={{
               headerShown: false,
