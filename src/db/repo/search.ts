@@ -22,7 +22,7 @@ import {
 import * as schema from '../schema';
 import { accounts, categories, transactions } from '../schema';
 import { countsAsSpending, onExpenseSide, onIncomeSide } from './predicates';
-import type { RecordRow } from './records';
+import { attachmentCount, type RecordRow } from './records';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -179,6 +179,10 @@ export function searchRecords(
       categoryColor: categories.color,
       accountName: accounts.name,
       counterAccountName: counter.name,
+      // Shared with the records list so a result looks the same in both places.
+      // Search found this by refusing to typecheck when the field was added to
+      // `RecordRow`, which is the point of it living on the shared type.
+      attachmentCount,
     })
     .from(transactions)
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
