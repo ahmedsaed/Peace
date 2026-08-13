@@ -463,6 +463,19 @@ app ignoring input. `pkill -f GradleDaemon`.
   exactly like a smaller one. Measure first, cap the LONG edge, and never resize something already
   under the cap. `resizeTarget` in `lib/attachment.ts` is pure and tested for exactly this reason;
   the same trap waits in any "max dimension" API that takes one named axis.
+- **An HTTP status is not a diagnosis — read the error body.** Gemini answers an INVALID API KEY
+  with **400 INVALID_ARGUMENT**, not the 401 or 403 every instinct expects, so mapping on the
+  status alone told someone whose key was wrong to go and check their model name. Google puts the
+  truth in `error.details[].reason` (`API_KEY_INVALID`, `SERVICE_DISABLED`, …) and its own
+  `error.message` is usually better than anything you would invent — pass it through. Only a run
+  against the real API finds this; a mocked 401 passes happily forever.
+- **The model is a typist, not an accountant.** Everything an LLM returns is text somebody typed
+  badly: range-check it, drop what does not survive, and never let it reach the ledger directly.
+  Ask for STRUCTURED OUTPUT (`responseSchema` + `responseMimeType`) so the reply is fields rather
+  than prose — parsing prose with a regex works on the receipts you test with and eventually reads
+  the wrong figure off one you did not. Keep a partial reading: a receipt whose date is unreadable
+  but whose total is clear still saves the typing, and refusing the whole thing over one junk field
+  throws that away. `temperature: 0`, because the same photo read twice must not give two totals.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

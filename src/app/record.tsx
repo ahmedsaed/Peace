@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,12 +11,16 @@ import { Keypad, type KeyPress } from '@/components/keypad';
 import {
   attachFromCamera,
   attachFromFiles,
+  attachmentAsBase64,
   stagedFromRows,
   sweepOrphans,
   type StagedAttachment,
 } from '@/db/attachments';
 import { listAttachments, syncAttachments } from '@/db/repo/attachments';
 import { AttachmentError } from '@/lib/attachment';
+import { GeminiError, readReceipt } from '@/lib/gemini';
+import { isEmptyReading, matchCategory } from '@/lib/receipt';
+import { getGeminiKey } from '@/lib/secrets';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
@@ -65,8 +69,16 @@ const TYPES: { value: RecordType; label: string }[] = [
 export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, refundOf, copyOf, fromRule, dueOn } = useLocalSearchParams<{
+  const { id, refundOf, copyOf, fromRule, dueOn, capture } = useLocalSearchParams<{
     id?: string;
+    /**
+     * Opened by holding the + button: photograph a receipt, then read it.
+     *
+     * A flag rather than a separate screen. The capture, the attach and the
+     * read all belong to the screen that owns these fields, so the shortcut
+     * arrives HERE and asks for the same two actions the buttons already run.
+     */
+    capture?: string;
     /** Reverse this record: same account and category, marked a refund. */
     refundOf?: string;
     /** Same again, dated today. */
@@ -133,6 +145,7 @@ export default function RecordScreen() {
   });
 
   const defaultAccountId = useSetting('defaultAccountId');
+  const geminiModel = useSetting('geminiModel');
 
   // A transfer can be opened from either leg; the form always presents it as
   // "from the account that lost money".
@@ -201,6 +214,8 @@ export default function RecordScreen() {
   );
   const [viewing, setViewing] = useState<StagedAttachment | null>(null);
   const [attaching, setAttaching] = useState(false);
+  /** The receipt currently being read, so only its own badge spins. */
+  const [readingFile, setReadingFile] = useState<string | null>(null);
   const [picking, setPicking] = useState<'date' | 'time' | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -388,9 +403,21 @@ export default function RecordScreen() {
     () => (type === 'transfer' ? [] : listCategoryTree(db, type)),
     [type]
   );
+  /**
+   * Parents and children in one list.
+   *
+   * What a receipt reader needs: the model is offered every name it could
+   * legitimately return, and a returned name is matched back against the same
+   * set. Restricting it to top-level categories would mean "Restaurants" — the
+   * one a receipt actually names — could never be matched.
+   */
+  const flatCategories = useMemo(
+    () => categoryTree.flatMap((n) => [n, ...n.children]),
+    [categoryTree]
+  );
   const category = useMemo(
-    () => categoryTree.flatMap((n) => [n, ...n.children]).find((c) => c.id === categoryId),
-    [categoryTree, categoryId]
+    () => flatCategories.find((c) => c.id === categoryId),
+    [flatCategories, categoryId]
   );
 
   const amountMinor = committedMinor(calc, entryCurrency);
@@ -517,13 +544,13 @@ export default function RecordScreen() {
    * and re-enter the screen, and a second tap while the first is still
    * resolving would run two pickers over one piece of state.
    */
-  async function pick(source: 'camera' | 'files') {
-    if (attaching) return;
+  async function pick(source: 'camera' | 'files'): Promise<StagedAttachment | null> {
+    if (attaching) return null;
     setAttaching(true);
     setError(null);
     try {
       const outcome = source === 'camera' ? await attachFromCamera() : await attachFromFiles();
-      if (outcome.cancelled) return;
+      if (outcome.cancelled) return null;
 
       setAttached((current) =>
         // Named by content hash, so the same receipt picked twice is the same
@@ -532,6 +559,9 @@ export default function RecordScreen() {
           ? current
           : [...current, outcome.attachment]
       );
+      // Returned so the capture shortcut can read the very photo it just took
+      // without waiting for state to settle.
+      return outcome.attachment;
     } catch (e) {
       // An AttachmentError says something the user can act on — the file is too
       // big, the type is not supported, the camera permission is off. Anything
@@ -542,10 +572,99 @@ export default function RecordScreen() {
         console.warn('[attachments] could not attach', e);
         setError('Could not attach that file.');
       }
+      return null;
     } finally {
       setAttaching(false);
     }
   }
+
+  /**
+   * Read a receipt and fill in the form.
+   *
+   * IT OVERWRITES. Every field the model could read replaces what is there,
+   * rather than filling only the blanks or marking its guesses — because the
+   * point is to glance at a filled-in form and save it, and a half-filled form
+   * you then have to audit field by field is slower than typing it. Nothing is
+   * written to the ledger here: Cancel is the undo.
+   *
+   * Every failure ends with the form exactly as it was and a sentence saying
+   * why. A dead network, a wrong key, or a model that cannot read a crumpled
+   * receipt must never stop a record being saved — the same rule the rate fetch
+   * has lived under since the beginning.
+   */
+  async function onRead(attachment: StagedAttachment) {
+    if (readingFile) return;
+    setReadingFile(attachment.fileName);
+    setError(null);
+    try {
+      const key = await getGeminiKey();
+      if (key === null) {
+        // Not an error — the feature is optional and simply not set up. The
+        // sentence names the screen that fixes it.
+        setError('Add a Gemini API key in Settings to read receipts.');
+        return;
+      }
+
+      const reading = await readReceipt(
+        key,
+        geminiModel,
+        await attachmentAsBase64(attachment.fileName),
+        attachment.mimeType,
+        {
+          // The model picks from the user's OWN categories or returns nothing;
+          // a category this ledger does not have is worse than none.
+          categoryNames: flatCategories.map((c) => c.name),
+          fallbackCurrency: currency,
+        }
+      );
+
+      if (isEmptyReading(reading)) {
+        setError('Nothing could be read from that photo. Enter it by hand.');
+        return;
+      }
+
+      if (reading.amountMinor !== null) setCalc(calcFromMinor(reading.amountMinor, currency));
+      if (reading.merchant !== null) setNote(reading.merchant);
+      if (reading.occurredOn !== null) {
+        // Midday, like every other date this screen sets: a date built at
+        // midnight lands on the previous day in any timezone behind UTC.
+        setOccurredAt(new Date(`${reading.occurredOn}T12:00:00`));
+      }
+      const matched = matchCategory(reading.category, flatCategories);
+      if (matched) setCategoryId(matched.id);
+    } catch (e) {
+      if (e instanceof GeminiError || e instanceof AttachmentError) {
+        setError(e.message);
+      } else {
+        console.warn('[record] reading a receipt failed', e);
+        setError('Could not read that receipt.');
+      }
+    } finally {
+      setReadingFile(null);
+    }
+  }
+
+  /**
+   * The hold-the-plus-button shortcut: camera, then read, then stop.
+   *
+   * Runs exactly ONCE per mount, guarded by a ref rather than by state — a
+   * state guard would re-render, and this must not depend on or disturb the
+   * render cycle. It also deliberately does nothing when the camera is
+   * cancelled: backing out of the camera leaves the ordinary empty record
+   * screen, which is a reasonable thing to have asked for by accident.
+   */
+  const captureStarted = useRef(false);
+  useEffect(() => {
+    if (capture !== '1' || captureStarted.current) return;
+    captureStarted.current = true;
+    void (async () => {
+      const taken = await pick('camera');
+      if (taken) await onRead(taken);
+    })();
+    // Mount only. `pick` and `onRead` are redefined every render and listing
+    // them would re-run the camera on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capture]);
 
   function onSave() {
     if (!canSave || amountMinor === null) return;
@@ -924,6 +1043,8 @@ export default function RecordScreen() {
                 setAttached((current) => current.filter((a) => a.fileName !== fileName))
               }
               onOpen={setViewing}
+              onRead={onRead}
+              reading={readingFile}
               compact
               busy={attaching}
             />
@@ -987,6 +1108,8 @@ export default function RecordScreen() {
                   setAttached((current) => current.filter((a) => a.fileName !== fileName))
                 }
                 onOpen={setViewing}
+                onRead={onRead}
+                reading={readingFile}
                 compact={false}
                 busy={attaching}
               />
