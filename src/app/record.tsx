@@ -4,8 +4,19 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AttachmentBar } from '@/components/attachments';
+import { AttachmentViewer } from '@/components/attachment-viewer';
 import { Icon } from '@/components/icon';
 import { Keypad, type KeyPress } from '@/components/keypad';
+import {
+  attachFromCamera,
+  attachFromFiles,
+  stagedFromRows,
+  sweepOrphans,
+  type StagedAttachment,
+} from '@/db/attachments';
+import { listAttachments, syncAttachments } from '@/db/repo/attachments';
+import { AttachmentError } from '@/lib/attachment';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
@@ -174,6 +185,22 @@ export default function RecordScreen() {
    */
   const [repeat, setRepeat] = useState<Repeat | null>(null);
   const [repeatOpen, setRepeatOpen] = useState(false);
+
+  /**
+   * Receipts, held in state until the record is saved.
+   *
+   * The BYTES are already on disk — `stageAttachment` writes them the moment
+   * the picker returns, because the camera leaves its output in a cache Android
+   * may reclaim. The ROWS are written by `syncAttachments` in `onSave`, so
+   * backing out of this screen leaves the ledger untouched exactly like every
+   * other field here. A file left behind that way is collected by the orphan
+   * sweep on the next launch.
+   */
+  const [attached, setAttached] = useState<StagedAttachment[]>(() =>
+    id ? stagedFromRows(listAttachments(db, id)) : []
+  );
+  const [viewing, setViewing] = useState<StagedAttachment | null>(null);
+  const [attaching, setAttaching] = useState(false);
   const [picking, setPicking] = useState<'date' | 'time' | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -483,10 +510,59 @@ export default function RecordScreen() {
     });
   }
 
+  /**
+   * Both attach buttons, sharing one guard and one error surface.
+   *
+   * `attaching` is not decoration: the camera and the file picker both leave
+   * and re-enter the screen, and a second tap while the first is still
+   * resolving would run two pickers over one piece of state.
+   */
+  async function pick(source: 'camera' | 'files') {
+    if (attaching) return;
+    setAttaching(true);
+    setError(null);
+    try {
+      const outcome = source === 'camera' ? await attachFromCamera() : await attachFromFiles();
+      if (outcome.cancelled) return;
+
+      setAttached((current) =>
+        // Named by content hash, so the same receipt picked twice is the same
+        // entry. Appending it again would show two identical thumbnails.
+        current.some((a) => a.fileName === outcome.attachment.fileName)
+          ? current
+          : [...current, outcome.attachment]
+      );
+    } catch (e) {
+      // An AttachmentError says something the user can act on — the file is too
+      // big, the type is not supported, the camera permission is off. Anything
+      // else is a real fault and gets a generic line plus a warning in the log.
+      if (e instanceof AttachmentError) {
+        setError(e.message);
+      } else {
+        console.warn('[attachments] could not attach', e);
+        setError('Could not attach that file.');
+      }
+    } finally {
+      setAttaching(false);
+    }
+  }
+
   function onSave() {
     if (!canSave || amountMinor === null) return;
     try {
+      /**
+       * Which row the receipts belong to.
+       *
+       * Every branch below has to set it, because there is no sensible default:
+       * guessing wrong would file a receipt against the wrong record, and a
+       * transfer writes TWO rows so even "the one that was created" is
+       * ambiguous. The commission row on a foreign card purchase is the same
+       * question — the receipt is for the purchase, never for the bank's fee.
+       */
+      let savedId: string;
+
       if (existing) {
+        savedId = existing.id;
         if (editingTransfer) {
           updateTransfer(db, existing.id, {
             fromAccountId: accountId,
@@ -513,7 +589,7 @@ export default function RecordScreen() {
           });
         }
       } else if (type === 'transfer') {
-        createTransfer(db, {
+        const { out } = createTransfer(db, {
           fromAccountId: accountId,
           toAccountId: toAccountId!,
           amountMinor,
@@ -523,10 +599,13 @@ export default function RecordScreen() {
           note: note.trim() || null,
           occurredAt,
         });
+        // The leg money LEAVES on. A transfer's receipt describes the payment,
+        // and the paying side is the one a user would look for it on.
+        savedId = out.id;
       } else if (abroad) {
         // A purchase abroad on a card writes the settled charge AND the card's
         // commission, in one transaction. See createCardPurchase.
-        createCardPurchase(db, {
+        const { purchase } = createCardPurchase(db, {
           accountId,
           categoryId,
           amountMinor,
@@ -536,8 +615,11 @@ export default function RecordScreen() {
           note: note.trim() || null,
           occurredAt,
         });
+        // The purchase, never the commission row — the receipt is for what was
+        // bought, and the fee is the bank's own line.
+        savedId = purchase.id;
       } else {
-        createRecord(db, {
+        savedId = createRecord(db, {
           type,
           accountId,
           categoryId,
@@ -549,8 +631,23 @@ export default function RecordScreen() {
           note: note.trim() || null,
           occurredAt,
           recurringRuleId: fromRule ?? null,
-        });
+        }).id;
       }
+
+      /**
+       * The receipts, once there is something to attach them to.
+       *
+       * After the record is written, for the same reason `markHandled` is:
+       * attaching first and then failing the save would leave rows pointing at
+       * a transaction that does not exist.
+       *
+       * The sweep runs only when something was actually removed. A receipt
+       * taken off a record is usually the last thing pointing at that file, and
+       * leaving it on disk would keep it in every backup from then on — for a
+       * photo no screen shows.
+       */
+      const changed = syncAttachments(db, savedId, attached);
+      if (changed.removed > 0) sweepOrphans();
 
       // Only after the write succeeded. Advancing first would lose the
       // occurrence if the save then threw.
@@ -664,6 +761,7 @@ export default function RecordScreen() {
         onClose={() => setRepeatOpen(false)}
         onChange={setRepeat}
       />
+      <AttachmentViewer attachment={viewing} onClose={() => setViewing(null)} />
       <View className={`relative flex-row items-center justify-between px-4 ${pad}`}>
         <Pressable
           onPress={() => router.back()}
@@ -814,6 +912,21 @@ export default function RecordScreen() {
               testID="record-note"
               className="h-11 flex-1 rounded-lg bg-surface px-3 text-sm text-ink"
             />
+            {/* One button here, not two, and no previews — see the comment in
+                attachments.tsx. This row already carries two picker squares and
+                the note; a preview strip would cost more height than the note
+                has in a 340dp window. */}
+            <AttachmentBar
+              attachments={attached}
+              onCamera={() => pick('camera')}
+              onFiles={() => pick('files')}
+              onRemove={(fileName) =>
+                setAttached((current) => current.filter((a) => a.fileName !== fileName))
+              }
+              onOpen={setViewing}
+              compact
+              busy={attaching}
+            />
           </View>
         ) : (
           <>
@@ -849,18 +962,35 @@ export default function RecordScreen() {
 
             {/* Notes claims every pixel left between the pickers and the amount,
                 the way a web textarea fills its container — down to a floor,
-                below which it stops shrinking and the block scrolls instead. */}
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              placeholder="Add notes"
-              placeholderTextColor={palette.muted}
-              multiline
-              textAlignVertical="top"
-              testID="record-note"
-              style={{ minHeight: noteMinHeight }}
-              className={`mx-4 flex-1 rounded-lg bg-surface px-4 py-3 text-base text-ink ${gap}`}
-            />
+                below which it stops shrinking and the block scrolls instead.
+
+                The receipts live INSIDE the same surface, at its foot, so the
+                text field and its attachments read as one control rather than
+                as a toolbar that happens to sit underneath a text box. */}
+            <View className={`mx-4 flex-1 rounded-lg bg-surface px-4 py-3 ${gap}`}>
+              <TextInput
+                value={note}
+                onChangeText={setNote}
+                placeholder="Add notes"
+                placeholderTextColor={palette.muted}
+                multiline
+                textAlignVertical="top"
+                testID="record-note"
+                style={{ minHeight: noteMinHeight }}
+                className="flex-1 p-0 text-base text-ink"
+              />
+              <AttachmentBar
+                attachments={attached}
+                onCamera={() => pick('camera')}
+                onFiles={() => pick('files')}
+                onRemove={(fileName) =>
+                  setAttached((current) => current.filter((a) => a.fileName !== fileName))
+                }
+                onOpen={setViewing}
+                compact={false}
+                busy={attaching}
+              />
+            </View>
           </>
         )}
       </ScrollView>

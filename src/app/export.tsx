@@ -9,6 +9,7 @@ import { backupDue, describeAge } from '@/lib/drive-backup';
 import { useSetting } from '@/state/settings';
 import palette from '@/constants/palette';
 import {
+  backupContents,
   csvExport,
   databaseBackup,
   formatBytes,
@@ -47,6 +48,7 @@ export default function ExportScreen() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const count = recordCount();
+  const receipts = backupContents();
   const driveAccount = useSetting('driveAccount');
   const lastBackupAt = useSetting('driveLastBackupAt');
   // Captured once rather than read during render — `Date.now()` in a render
@@ -84,9 +86,12 @@ export default function ExportScreen() {
           throw new Error('Sharing is not available on this device.');
         }
         await Sharing.shareAsync(exported.file.uri, {
-          mimeType: kind === 'csv' ? 'text/csv' : 'application/octet-stream',
+          // A backup is a zip now — the database beside its receipts. Naming it
+          // as one is what lets a file manager or a desktop open it, which is
+          // the property that makes the backup readable without this app.
+          mimeType: kind === 'csv' ? 'text/csv' : 'application/zip',
           dialogTitle: kind === 'csv' ? 'Export records' : 'Back up Peace',
-          UTI: kind === 'csv' ? 'public.comma-separated-values-text' : 'public.database',
+          UTI: kind === 'csv' ? 'public.comma-separated-values-text' : 'public.zip-archive',
         });
         setDone(`${exported.file.name} · ${formatBytes(exported.bytes)} sent`);
       } catch (e) {
@@ -111,10 +116,28 @@ export default function ExportScreen() {
       const result = await restoreFrom(file);
       refreshAfterRestore();
       setCanUndo(hasSafetyCopy());
+
+      /**
+       * Say what happened to the RECEIPTS as well as the records.
+       *
+       * `filesMissing` is the number that matters and the reason this is not
+       * one sentence: restoring a backup made before Peace kept receipts brings
+       * back rows describing files that were never in it. Left unsaid, those
+       * show up later as blank tiles on old records and read as the app having
+       * lost them.
+       */
+      const receipts =
+        result.filesRestored > 0 ? ` ${result.filesRestored} receipts came back.` : '';
+      const missing =
+        result.filesMissing > 0
+          ? ` ${result.filesMissing} receipt${result.filesMissing === 1 ? ' is' : 's are'} not in ` +
+            `this backup — it was made before Peace kept them.`
+          : '';
+
       setDone(
         `${mode === 'undo' ? 'Undone' : 'Restored'} — ${result.copied.transactions} records and ` +
-          `${result.copied.accounts} accounts are now in the app. The previous state was kept, ` +
-          `so this can be reversed again.`
+          `${result.copied.accounts} accounts are now in the app.${receipts}${missing} ` +
+          `The previous state was kept, so this can be reversed again.`
       );
     } catch (e) {
       setCanUndo(hasSafetyCopy());
@@ -190,6 +213,16 @@ export default function ExportScreen() {
           <Text className="text-2xl font-semibold text-ink" testID="export-count">
             {count === 1 ? '1 record' : `${count} records`} in the ledger.
           </Text>
+          {/* Only when there are any. A line reading "0 receipts" on a ledger
+              that has never had one is noise about a feature the user may not
+              have found yet — and this screen's job is to answer "am I
+              covered?", not to inventory everything the app can hold. */}
+          {receipts.files > 0 ? (
+            <Text className="mt-1 text-sm text-muted" testID="export-attachments">
+              {receipts.files === 1 ? '1 receipt' : `${receipts.files} receipts`} ·{' '}
+              {formatBytes(receipts.bytes)} — included in a backup, not in the CSV.
+            </Text>
+          ) : null}
           {/* Red means OVERDUE, never merely unconfigured. Alarming someone
               about a feature they have not opted into is how an app teaches its
               user to ignore its warnings. */}

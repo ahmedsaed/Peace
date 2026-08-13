@@ -66,6 +66,11 @@ appId: com.ahmed.peace
 # --- full backup ---
 # The WAL checkpoint runs here. If it ever throws, this is what catches it —
 # the screen would show export-error instead of a filename.
+#
+# `.zip` since a backup became a CONTAINER of the database plus the receipt
+# files it refers to. The size assertion carries more weight than it looks:
+# zipping is where a backup could newly come out empty, and `[0-9]+ KB` fails
+# on the 0-byte case that once shipped.
 - tapOn:
     id: "export-backup-share"
 - waitForAnimationToEnd:
@@ -74,7 +79,7 @@ appId: com.ahmed.peace
 - extendedWaitUntil:
     visible:
       id: "export-done"
-      text: "peace-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.db · [0-9]+ (B|KB|MB) sent"
+      text: "peace-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.zip · [0-9]+ (B|KB|MB) sent"
     timeout: 15000
 - assertNotVisible:
     id: "export-error"

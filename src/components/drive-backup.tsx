@@ -133,7 +133,12 @@ export function DriveBackup() {
     () =>
       guard('check', async () => {
         const result = await checkLatestBackup();
-        return `${result.name} opens: ${result.records} records, ${result.accounts} accounts, ${result.categories} categories.`;
+        // The receipt count is only mentioned when there are some. "0 receipts"
+        // on a ledger that has never had one is noise, but a backup that checks
+        // out on rows while holding none of the photos is exactly the silent
+        // failure this button exists to catch.
+        const receipts = result.attachments > 0 ? `, ${result.attachments} receipts` : '';
+        return `${result.name} opens: ${result.records} records, ${result.accounts} accounts, ${result.categories} categories${receipts}.`;
       }),
     [guard]
   );

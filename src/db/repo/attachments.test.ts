@@ -14,6 +14,7 @@ import {
   orphanedFiles,
   referencedFiles,
   removeAttachment,
+  syncAttachments,
 } from './attachments';
 
 const on = (day: number) => new Date(2026, 7, day, 12, 0);
@@ -109,6 +110,73 @@ describe('attaching a file to a record', () => {
     deleteRecord(db, 'r1');
 
     expect(listAttachments(db, 'r1')).toEqual([]);
+  });
+});
+
+/**
+ * What the save button calls.
+ *
+ * The record screen holds attachments in component state and writes nothing
+ * until the record is saved — which is what makes backing out of the screen
+ * leave the ledger untouched, exactly like every other field on it.
+ */
+describe('making a record match what the screen is holding', () => {
+  const wanted = (seedText: string) => ({
+    fileName: `${hash(seedText)}.jpg`,
+    mimeType: 'image/jpeg',
+    byteSize: 1000,
+    sha256: hash(seedText),
+  });
+
+  it('adds what is new', () => {
+    const db = seed();
+    buy(db, 'r1');
+
+    expect(syncAttachments(db, 'r1', [wanted('a'), wanted('b')])).toEqual({ added: 2, removed: 0 });
+    expect(listAttachments(db, 'r1')).toHaveLength(2);
+  });
+
+  it('removes what the user took off', () => {
+    const db = seed();
+    buy(db, 'r1');
+    syncAttachments(db, 'r1', [wanted('a'), wanted('b')]);
+
+    expect(syncAttachments(db, 'r1', [wanted('a')])).toEqual({ added: 0, removed: 1 });
+    expect(listAttachments(db, 'r1').map((r) => r.fileName)).toEqual([`${hash('a')}.jpg`]);
+  });
+
+  it('changes nothing when nothing changed', () => {
+    // Opening a record and saving it without touching the receipts must not
+    // churn rows — a new id every save would break nothing visibly and would
+    // make every diff of the table meaningless.
+    const db = seed();
+    buy(db, 'r1');
+    syncAttachments(db, 'r1', [wanted('a')]);
+    const before = listAttachments(db, 'r1')[0].id;
+
+    expect(syncAttachments(db, 'r1', [wanted('a')])).toEqual({ added: 0, removed: 0 });
+    expect(listAttachments(db, 'r1')[0].id).toBe(before);
+  });
+
+  it('clears them all when the last one is taken off', () => {
+    const db = seed();
+    buy(db, 'r1');
+    syncAttachments(db, 'r1', [wanted('a')]);
+
+    expect(syncAttachments(db, 'r1', [])).toEqual({ added: 0, removed: 1 });
+    expect(listAttachments(db, 'r1')).toEqual([]);
+  });
+
+  it('leaves the other record alone', () => {
+    const db = seed();
+    buy(db, 'r1');
+    buy(db, 'r2', 2);
+    syncAttachments(db, 'r1', [wanted('a')]);
+    syncAttachments(db, 'r2', [wanted('b')]);
+
+    syncAttachments(db, 'r1', []);
+
+    expect(listAttachments(db, 'r2').map((r) => r.fileName)).toEqual([`${hash('b')}.jpg`]);
   });
 });
 
