@@ -39,6 +39,7 @@ jest.mock('./restore', () => ({
 import { databaseBackup } from './backup';
 import { deleteBackup, downloadBackup, listBackups, uploadBackup } from '../lib/drive-api';
 import { getPassphrase } from '../lib/secrets';
+import { packContainer, readContainer } from '../lib/container';
 import { isSealed, seal } from '../lib/seal';
 import { restoreFrom } from './restore';
 import { restoreFromDrive, runBackup } from './drive';
@@ -92,7 +93,7 @@ describe('taking a backup', () => {
 
     expect(mocked.uploadBackup).toHaveBeenCalledTimes(1);
     const [, name, payload] = mocked.uploadBackup.mock.calls[0];
-    expect(name).toBe('peace-2026-08-12-0905.db');
+    expect(name).toBe('peace-2026-08-12-0905.zip');
     expect(Array.from(payload as Uint8Array)).toEqual(Array.from(LEDGER));
     expect(outcome.sealed).toBe(false);
     expect(outcome.bytes).toBe(LEDGER.byteLength);
@@ -105,7 +106,7 @@ describe('taking a backup', () => {
     const outcome = await runBackup(new Date(2026, 7, 12, 9, 5));
 
     const [, name, payload] = mocked.uploadBackup.mock.calls[0];
-    expect(name).toBe('peace-2026-08-12-0905.db.enc');
+    expect(name).toBe('peace-2026-08-12-0905.zip.enc');
     expect(outcome.sealed).toBe(true);
     // What leaves the device is NOT the ledger.
     expect(isSealed(payload as Uint8Array)).toBe(true);
@@ -267,6 +268,73 @@ describe('restoring from Drive', () => {
 
     await expect(restoreFromDrive('file-1')).rejects.toThrow(/neither sealed nor/i);
     expect(mocked.restoreFrom).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A backup is a CONTAINER now — the database beside the receipt files. Drive's
+ * job is to move bytes and decrypt them; deciding what those bytes are belongs
+ * to `restoreFrom`, which is the one place that opens a backup.
+ */
+describe('restoring a container from Drive', () => {
+  const PASS = 'a good long passphrase';
+  const RECEIPT = new Uint8Array([...'a receipt photo'].map((c) => c.charCodeAt(0)));
+  const container = () => packContainer({ database: LEDGER, files: [{ name: 'r.jpg', bytes: RECEIPT }] });
+
+  const captureHandover = () => {
+    const seen: { bytes: Uint8Array | null } = { bytes: null };
+    mocked.restoreFrom.mockImplementation(async (file: { bytes: () => Promise<Uint8Array> }) => {
+      // Read DURING the call: the staged file is deleted the moment the restore
+      // returns, so a decrypted ledger never lingers in the cache.
+      seen.bytes = await file.bytes();
+      return { copied: { transactions: 43 }, safetyBytes: 1000, filesRestored: 1, filesRemoved: 0, filesMissing: 0 };
+    });
+    return seen;
+  };
+
+  /**
+   * STILL WRAPPED when it is handed over, deliberately. Unwrapping here would
+   * make this the second implementation of "what is this file", and the two
+   * would drift — which is exactly how the ledger-side rules ended up written
+   * out in four places.
+   */
+  it('hands the container over intact rather than opening it here', async () => {
+    mocked.downloadBackup.mockResolvedValue(container());
+    const seen = captureHandover();
+
+    await restoreFromDrive('file-1');
+
+    expect(seen.bytes).not.toBeNull();
+    const reopened = readContainer(seen.bytes!);
+    expect(Array.from(reopened.database)).toEqual(Array.from(LEDGER));
+    expect(reopened.files.map((f) => f.name)).toEqual(['r.jpg']);
+  });
+
+  it('decrypts a sealed container, receipts and all', async () => {
+    mocked.downloadBackup.mockResolvedValue(await seal(container(), PASS, { logN: 8, r: 8, p: 1 }));
+    mocked.getPassphrase.mockResolvedValue(PASS);
+    const seen = captureHandover();
+
+    await restoreFromDrive('file-1');
+
+    expect(isSealed(seen.bytes!)).toBe(false);
+    // The photo survived the seal, which is the whole point of putting it in
+    // the container rather than leaving it on disk.
+    const receipt = readContainer(seen.bytes!).files[0];
+    expect(Array.from(receipt.bytes)).toEqual(Array.from(RECEIPT));
+  });
+
+  /**
+   * Every backup made before attachments existed is a bare `.db`, including the
+   * ones in the user's Drive folder right now.
+   */
+  it('still restores a bare database from before attachments existed', async () => {
+    mocked.downloadBackup.mockResolvedValue(LEDGER);
+    const seen = captureHandover();
+
+    await restoreFromDrive('file-1');
+
+    expect(Array.from(seen.bytes!)).toEqual(Array.from(LEDGER));
   });
 });
 

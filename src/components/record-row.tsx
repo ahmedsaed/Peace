@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import palette from '@/constants/palette';
 import type { RecordRow as Row } from '@/db/repo/records';
 import { formatMinor } from '@/lib/money';
 
@@ -86,9 +87,30 @@ export function RecordRow({
         <Text className="text-base text-ink" numberOfLines={1}>
           {title}
         </Text>
-        <Text className="text-xs text-muted" numberOfLines={1}>
-          {subtitle}
-        </Text>
+        {/* The clip sits BESIDE the subtitle rather than inside it, so a long
+            note truncates and the indicator does not truncate with it — the
+            whole job of this mark is to be visible without reading the row.
+
+            The count only appears past one. "1" next to a single clip is the
+            icon repeating itself, and a column of 1s is noise in a list whose
+            other numbers are money. */}
+        <View className="flex-row items-center gap-1">
+          {row.attachmentCount > 0 ? (
+            <View
+              testID="attachment-indicator"
+              accessibilityLabel={`${row.attachmentCount} receipt${row.attachmentCount === 1 ? '' : 's'}`}>
+              {/* 14, not 12 to match the text beside it: a paperclip is carried
+                  by its hole, and the hole closes below ~13px. See icon.tsx. */}
+              <Icon name="paperclip" size={14} color={palette.muted} />
+            </View>
+          ) : null}
+          {row.attachmentCount > 1 ? (
+            <Text className="text-[10px] text-muted">{row.attachmentCount}</Text>
+          ) : null}
+          <Text className="flex-1 text-xs text-muted" numberOfLines={1}>
+            {subtitle}
+          </Text>
+        </View>
       </View>
 
       <Text className={`text-base font-semibold ${tone}`}>{amount}</Text>

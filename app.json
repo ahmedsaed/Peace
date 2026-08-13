@@ -35,6 +35,14 @@
       "expo-sharing",
       "expo-secure-store",
       "expo-background-task",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Peace uses the camera to photograph a receipt and keep it with the record.",
+          "photosPermission": "Peace can attach a photo you have already taken to a record."
+        }
+      ],
+      "expo-document-picker",
       "@react-native-community/datetimepicker",
       "./plugins/with-dark-theme",
       "./plugins/with-release-signing"

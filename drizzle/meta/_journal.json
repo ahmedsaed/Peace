@@ -57,6 +57,13 @@
       "when": 1786569298180,
       "tag": "0007_free_hawkeye",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786610209125,
+      "tag": "0008_medical_wonder_man",
+      "breakpoints": true
     }
   ]
 }

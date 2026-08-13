@@ -405,11 +405,24 @@ export const attachments = sqliteTable(
       .notNull()
       .references(() => transactions.id, { onDelete: 'cascade' }),
     /**
-     * File name RELATIVE to the app's document directory — never an absolute
+     * File name RELATIVE to the app's attachments directory — never an absolute
      * path. The sandbox path changes between installs and OS updates, so a
      * stored absolute path turns every old receipt into a broken image.
+     *
+     * It is `<sha256>.<ext>`, built by `attachmentFileName` in lib/attachment.ts
+     * — content-addressed, so the same receipt attached twice is one file and
+     * nothing a file manager called a document ever reaches the disk.
      */
     fileName: text('file_name').notNull(),
+    /**
+     * What it was called when it was picked, for a PDF that has no thumbnail.
+     *
+     * Separate from `fileName` precisely BECAUSE that one is a hash: the name
+     * is the only thing distinguishing two invoices on screen, and it is the
+     * part a hash throws away. Null for a photo taken in the app, which never
+     * had a name worth showing.
+     */
+    originalName: text('original_name'),
     mimeType: text('mime_type').notNull(),
     byteSize: integer('byte_size').notNull(),
     /** Content hash, so re-attaching the same receipt does not store it twice. */
