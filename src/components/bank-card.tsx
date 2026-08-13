@@ -18,6 +18,8 @@ import { AppState, Pressable, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { isCapturing, isPermitted, openListenerSettings, setCapturing } from '@/db/bank-inbox';
+import { db } from '@/db/client';
+import { pendingCaptures } from '@/db/repo/bank-captures';
 import { useSettingsStore } from '@/state/settings';
 
 /**
@@ -53,6 +55,16 @@ export function BankMessagesCard() {
   const [permitted, setPermitted] = useState(safeIsPermitted);
   const [capturing, setCapturingState] = useState(safeIsCapturing);
   const [draft, setDraft] = useState('');
+  /**
+   * Captured but not yet read.
+   *
+   * Shown because the alternative is the app silently doing nothing: with no
+   * API key, messages pile up unread and NOTHING anywhere says so — the records
+   * list has no row for them either, because a message is only offered once it
+   * has been read. Found on a device, when the list was empty and the message
+   * was in the database the whole time.
+   */
+  const [waiting, setWaiting] = useState(() => pendingCaptures(db, 500).length);
 
   /**
    * Re-checked on every return to the foreground.
@@ -65,6 +77,7 @@ export function BankMessagesCard() {
   const refresh = useCallback(() => {
     setPermitted(safeIsPermitted());
     setCapturingState(safeIsCapturing());
+    setWaiting(pendingCaptures(db, 500).length);
   }, []);
 
   useEffect(() => {
@@ -190,6 +203,13 @@ export function BankMessagesCard() {
             ))}
           </View>
         )}
+
+        {waiting > 0 ? (
+          <Text className="mb-2 text-xs leading-4 text-expense" testID="bank-waiting">
+            {waiting === 1 ? '1 message is' : `${waiting} messages are`} waiting to be read. They
+            need a Gemini API key above.
+          </Text>
+        ) : null}
 
         <View className="flex-row gap-2">
           <TextInput

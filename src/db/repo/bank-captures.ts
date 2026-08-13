@@ -77,7 +77,6 @@ export type ParsedFields = {
   currency: string | null;
   direction: 'out' | 'in' | null;
   merchant: string | null;
-  occurredOn: string | null;
   accountTail: string | null;
 };
 
@@ -138,17 +137,6 @@ export function reviewableCaptures(db: Db, limit = 100): schema.BankCapture[] {
     .orderBy(desc(bankCaptures.postedAt))
     .limit(limit)
     .all();
-}
-
-/** For the badge: how many are waiting on a decision. */
-export function reviewableCount(db: Db): number {
-  return (
-    db
-      .select({ n: sql<number>`count(*)` })
-      .from(bankCaptures)
-      .where(and(inArray(bankCaptures.status, ['parsed', 'unreadable']), isNull(bankCaptures.transactionId)))
-      .get()?.n ?? 0
-  );
 }
 
 export function getCapture(db: Db, id: string): schema.BankCapture | undefined {

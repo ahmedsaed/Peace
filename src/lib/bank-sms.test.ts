@@ -127,7 +127,6 @@ describe('reading what came back', () => {
     currency: 'EGP',
     direction: 'out',
     merchant: 'CARREFOUR',
-    date: '2026-08-13',
     accountTail: '0042',
   };
 
@@ -137,7 +136,6 @@ describe('reading what came back', () => {
       currency: 'EGP',
       direction: 'out',
       merchant: 'CARREFOUR',
-      occurredOn: '2026-08-13',
       accountTail: '0042',
     });
   });
@@ -178,12 +176,6 @@ describe('reading what came back', () => {
     expect(parseBankReading({ ...good, accountTail: '0042' }).accountTail).toBe('0042');
     expect(parseBankReading({ ...good, accountTail: '****0042' }).accountTail).toBe('0042');
     expect(parseBankReading({ ...good, accountTail: 'n/a' }).accountTail).toBeNull();
-  });
-
-  it('refuses a date that is well-shaped but not a real day', () => {
-    expect(parseBankReading({ ...good, date: '2026-02-31' }).occurredOn).toBeNull();
-    expect(parseBankReading({ ...good, date: '13/08/2026' }).occurredOn).toBeNull();
-    expect(parseBankReading({ ...good, date: '2028-02-29' }).occurredOn).toBe('2028-02-29');
   });
 
   it('only accepts a currency that looks like a code', () => {
@@ -231,28 +223,17 @@ describe('deciding whether to offer it at all', () => {
 
 describe('the prompt', () => {
   it('quotes the message rather than describing it', () => {
-    const prompt = buildBankPrompt('Purchase of EGP 450 at CARREFOUR', '2026-08-13');
+    const prompt = buildBankPrompt('Purchase of EGP 450 at CARREFOUR');
     expect(prompt).toContain('Purchase of EGP 450 at CARREFOUR');
   });
 
-  /**
-   * A model told to fill in a date will happily use today's. The message's own
-   * date is the only one worth having — anything else dates the record to when
-   * it was read rather than when the money moved.
-   */
-  it('tells the model today, and tells it not to use it', () => {
-    const prompt = buildBankPrompt('x', '2026-08-13');
-    expect(prompt).toContain('Today is 2026-08-13');
-    expect(prompt).toMatch(/Do NOT return today's date/);
-  });
-
   it('says to read the direction from the words', () => {
-    expect(buildBankPrompt('x', '2026-08-13')).toMatch(/Read the WORDS/);
+    expect(buildBankPrompt('x')).toMatch(/Read the WORDS/);
   });
 
   it('says to ignore the things that are not transactions', () => {
     // Balance alerts and OTPs vastly outnumber transactions in a bank's SMS
     // traffic, and each one read as a purchase is a junk record.
-    expect(buildBankPrompt('x', '2026-08-13')).toMatch(/OTPs/);
+    expect(buildBankPrompt('x')).toMatch(/OTPs/);
   });
 });

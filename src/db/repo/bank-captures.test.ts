@@ -14,7 +14,6 @@ import {
   pendingCaptures,
   recordCaptures,
   reviewableCaptures,
-  reviewableCount,
 } from './bank-captures';
 
 const at = (day: number) => new Date(2026, 7, day, 12, 0);
@@ -144,7 +143,6 @@ describe('the review queue', () => {
 
     // The third is still pending — not read yet, so not offered yet.
     expect(reviewableCaptures(db).map((c) => c.captureKey).sort()).toEqual(['a', 'b']);
-    expect(reviewableCount(db)).toBe(2);
   });
 
   it('drops one the user dismissed', () => {
