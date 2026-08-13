@@ -2,11 +2,13 @@ appId: com.ahmed.peace
 ---
 # Standing orders.
 #
-# The assertion that matters is that a rule DOES NOT WRITE TO THE LEDGER by
-# itself. A flow that only checked a grey row appeared would pass just as
-# happily against one that had already posted the record — and the whole design
-# exists so a rule with a typo cannot corrupt months of history before anyone
-# notices.
+# A rule is created from the RECORD SCREEN, not from a form of its own — the
+# amount, account and category pickers already live there. This flow enters a
+# payment the ordinary way, taps Repeat, and then checks the two things that
+# matter:
+#
+#   the record it was created from exists exactly ONCE, and
+#   the rule does not write anything else to the ledger by itself.
 - launchApp:
     clearState: true
 
@@ -15,97 +17,131 @@ appId: com.ahmed.peace
       id: "home-screen"
     timeout: 90000
 
-# The month starts empty, and that is the baseline every assertion below leans on.
 - assertVisible:
     id: "summary-expense"
     text: "E£0.00"
 
-# --- a rule that waits to be asked ---
+# --- enter rent, and make it repeat ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Bills"
+    direction: DOWN
+- tapOn: "Bills"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+
+# The button is an icon with no text, so its state is not assertable by label —
+# what IS assertable is that opening it offers no repeat yet, and that a rule
+# exists afterwards. Both are checked below.
+- tapOn:
+    id: "record-repeat"
+- assertVisible:
+    id: "repeat-sheet"
+- tapOn:
+    id: "repeat-monthly"
+# The preview says the schedule in words, so it is checkable without doing date
+# maths in your head.
+- assertVisible:
+    id: "repeat-preview"
+    text: "Every month on the .*"
+- takeScreenshot: 01-repeat-sheet
+- tapOn:
+    id: "repeat-save"
+
+- takeScreenshot: 02-record-with-repeat
+- tapOn:
+    id: "record-save"
+
+# --- the record is written ONCE ---
+# THE ASSERTION THAT MATTERS. The rule starts on this record's date, so a naive
+# implementation would immediately owe the very occurrence just entered and
+# offer it again as a due row — E£1,000 of rent from one payment.
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£5,000.00"
+- assertNotVisible:
+    id: "due-actions"
+- takeScreenshot: 03-saved-once
+
+# --- and it is visible in NEXT month, before it is owed ---
+# Most of why anyone writes a rule down: next month's rent should be in next
+# month's list. It is greyed and in no total, because it has not happened.
+- tapOn:
+    id: "month-next"
+- assertVisible: "Upcoming"
+- assertVisible: "Bills"
+- assertVisible:
+    id: "summary-expense"
+    text: "E£0.00"
+- takeScreenshot: 05-upcoming
+
+# Every grey row is actionable, owed or not — paying next month early is a real
+# thing, and a row you can see and tap but not act on explains nothing.
+- longPressOn: "Bills"
+- assertVisible:
+    id: "due-actions"
+- assertVisible:
+    id: "due-add"
+- assertVisible:
+    id: "due-dismiss"
+- back
+
+# Tapping it opens a FILLED form: the amount, account and category are the whole
+# reason the rule was written down, and re-typing them is what it exists to stop.
+- tapOn: "Bills"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "amount-display"
+    text: "5,000"
+- assertVisible: "Bills"
+- takeScreenshot: 07-due-prefilled
+- tapOn:
+    id: "record-cancel"
+- tapOn:
+    id: "month-prev"
+
+# --- the rule exists, and says what it will do ---
 - tapOn:
     id: "nav-menu"
 - tapOn:
     id: "drawer-recurring"
 - assertVisible:
     id: "recurring-screen"
+- assertVisible: "Every month on the .*"
+# The next run reads as a DATE a person can parse — the redesign replaced a raw
+# "next 2026-09-12" with "12 Sep". That it is in the future is what matters:
+# the occurrence just written is settled, not still owed.
+# `[a-z]+`, not `[a-z]{2}`: Android renders September as "Sept", not "Sep" —
+# Hermes ships different ICU data from Node, and `assertVisible` matches WHOLE
+# text, so a four-letter month simply does not match a three-letter pattern.
+- assertVisible: "[0-9]{1,2} [A-Z][a-z]+"
+- takeScreenshot: 04-rules
+
+# --- pausing stops it without deleting anything ---
+# Behind a long press, the same gesture a record uses — a destructive action
+# does not earn a permanent button on every row.
+- longPressOn: "Bills"
 - assertVisible:
-    id: "rule-empty"
-
+    id: "rule-actions"
+- assertVisible:
+    id: "rule-delete"
+- takeScreenshot: 06-rule-actions
 - tapOn:
-    id: "rule-name"
-- inputText: "Rent"
-- tapOn:
-    id: "rule-amount"
-- inputText: "5000"
-- hideKeyboard
-- tapOn:
-    id: "rule-create"
-
-# Described in words, so the schedule is checkable without doing date maths.
-- assertVisible: ".*Every month on the.*"
-- takeScreenshot: 01-rules
-
-# --- it appears as a grey row, and has NOT been written ---
+    id: "rule-toggle"
+- assertVisible: "Paused"
 - tapOn:
     id: "nav-back"
 - assertVisible:
-    id: "home-screen"
-- assertVisible: "Rent"
-
-# THE ASSERTION THAT MATTERS. The row is on screen but the month's expense is
-# still zero: nothing has been added to the ledger, and the total proves it.
-- assertVisible:
-    id: "summary-expense"
-    text: "E£0.00"
-- takeScreenshot: 02-due
-
-# --- holding it offers add or skip ---
-- longPressOn: "Rent"
-- assertVisible:
-    id: "due-actions"
-- assertVisible:
-    id: "due-add"
-- assertVisible:
-    id: "due-dismiss"
-- takeScreenshot: 03-due-actions
-
-# --- adding it writes the record ---
-- tapOn:
-    id: "due-add"
-- assertVisible:
     id: "summary-expense"
     text: "-E£5,000.00"
-
-# And it is gone from the due list: added once, owed no longer. A rule that
-# kept offering the same occurrence would be entered twice by anyone tapping
-# through a backlog.
-- assertNotVisible:
-    id: "due-actions"
-- takeScreenshot: 04-added
-
-# --- a second rule, skipped rather than added ---
-- tapOn:
-    id: "nav-menu"
-- tapOn:
-    id: "drawer-recurring"
-- tapOn:
-    id: "rule-name"
-- inputText: "Gym"
-- tapOn:
-    id: "rule-amount"
-- inputText: "300"
-- hideKeyboard
-- tapOn:
-    id: "rule-create"
-- tapOn:
-    id: "nav-back"
-
-- longPressOn: "Gym"
-- tapOn:
-    id: "due-dismiss"
-
-# Skipping writes NOTHING — the total is unchanged from the rent alone — and
-# the row is gone, because that occurrence has been dealt with.
-- assertVisible:
-    id: "summary-expense"
-    text: "-E£5,000.00"
-- takeScreenshot: 05-skipped

@@ -1,12 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { SectionList, Text } from 'react-native';
+import { Alert, SectionList, Text } from 'react-native';
 
 import { ProposalActions, ProposalRow } from '@/components/proposal-row';
 import {
   catchUp,
   postProposals,
   skipProposals,
+  upcomingProposals,
   type Proposal,
 } from '@/db/repo/recurring';
 import { RecordActions } from '@/components/record-actions';
@@ -70,6 +71,8 @@ export default function RecordsScreen() {
    * pending row in `transactions` would be the expensive answer.
    */
   const [due, setDue] = useState<Proposal[]>([]);
+  /** Already spoken for, in the month being viewed. Display only. */
+  const [upcoming, setUpcoming] = useState<Proposal[]>([]);
   const [actingDue, setActingDue] = useState<Proposal | null>(null);
   const pendingUndo = useUndoStore((state) => state.pending);
   const clearUndo = useUndoStore((state) => state.clear);
@@ -85,6 +88,9 @@ export default function RecordsScreen() {
     // Everything outstanding, whatever month it fell in. An occurrence missed
     // in August must not hide in a month nobody scrolls back to.
     setDue(catchUp(db).proposals);
+    // Belongs to the month being LOOKED AT, unlike the due list, which is
+    // everything outstanding whenever it fell.
+    setUpcoming(upcomingProposals(db, period));
     // homeCurrency belongs here: changing it changes what the totals MEAN, and
     // without it the screen would keep showing figures computed against the
     // previous one until something else happened to trigger a refresh.
@@ -125,10 +131,41 @@ export default function RecordsScreen() {
 
   // Due rows sit at the TOP, above today, because they are the only thing on
   // this screen that is waiting on a decision.
-  const sections =
-    due.length > 0
-      ? [{ key: 'due', title: due.length === 1 ? 'Due' : `Due · ${due.length}`, data: due as (Row | Proposal)[] }, ...dayGroups]
-      : dayGroups;
+  /**
+   * Run a due-row action.
+   *
+   * There is nothing to refuse any more: every occurrence is independent, so
+   * approving September while August is still waiting simply leaves August
+   * waiting. The try/catch is for a genuine write failure — a deleted account,
+   * say — not for a rule about ordering.
+   */
+  function handleDue(work: () => void) {
+    try {
+      work();
+    } catch (error) {
+      Alert.alert('Could not do that', error instanceof Error ? error.message : 'Something went wrong.');
+    }
+    setActingDue(null);
+    refresh();
+  }
+
+  const sections = [
+    ...(due.length > 0
+      ? [
+          {
+            key: 'due',
+            title: due.length === 1 ? 'Due' : `Due · ${due.length}`,
+            data: due as (Row | Proposal)[],
+          },
+        ]
+      : []),
+    ...dayGroups,
+    // LAST, and after the real records: these have not happened. Above them
+    // they would read as the newest thing in the month.
+    ...(upcoming.length > 0
+      ? [{ key: 'upcoming', title: 'Upcoming', data: upcoming as (Row | Proposal)[] }]
+      : []),
+  ];
 
   return (
     <Screen testID="home-screen">
@@ -195,7 +232,12 @@ export default function RecordsScreen() {
                     },
                   })
                 }
+                // Every proposed row is actionable, whenever it falls. Paying
+                // next month's rent early is a real thing, and occurrences are
+                // independent — approving one leaves the others exactly as they
+                // were.
                 onLongPress={() => setActingDue(item)}
+                upcoming={upcoming.includes(item)}
               />
             ) : (
               <RecordRow
@@ -222,18 +264,12 @@ export default function RecordsScreen() {
         proposal={actingDue}
         currency={homeCurrency}
         onClose={() => setActingDue(null)}
-        onAdd={() => {
-          postProposals(db, [actingDue!]);
-          setActingDue(null);
-          refresh();
-        }}
-        onDismiss={() => {
+        onAdd={(proposal) => handleDue(() => postProposals(db, [proposal]))}
+        onDismiss={(proposal) =>
           // Skips this occurrence only. The rule carries on, because a month
           // you did not pay is an ordinary thing, not a reason to stop.
-          skipProposals(db, [actingDue!]);
-          setActingDue(null);
-          refresh();
-        }}
+          handleDue(() => skipProposals(db, [proposal]))
+        }
       />
 
       <RecordActions

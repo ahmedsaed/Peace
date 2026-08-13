@@ -377,6 +377,33 @@ app ignoring input. `pkill -f GradleDaemon`.
   The line was dead, not the test weak. Deleting it put the rule back in one place, where mutating
   it now fails tests in both files. When a mutant survives, ask whether the code is redundant before
   assuming the assertion is.
+- **A new capability belongs on the screen that already has its inputs, not on a screen of its
+  own.** Recurring rules first got a whole page: name, amount, and chip lists standing in for the
+  account and category pickers — a worse copy of the record screen, and a second place to fix every
+  time either changed. Repeating is now a property you set while entering the record, and the rules
+  screen kept only what a list can do that a form cannot: pause, delete, and see what is scheduled.
+  Ask what the new screen would duplicate before building it.
+- **A rule created from a record must be advanced past that record's own date.** The rule starts on
+  the day the record is dated, so the occurrence just written is immediately owed — and the screen
+  offers it back as a due row, showing one payment twice. Write the record, create the rule, then
+  settle the first occurrence.
+- **`!` is the one construct that turns a compile-time guarantee into a runtime promise.** The
+  rules screen passed its sheet handlers as closures over state — `acting!.active` — and `acting` is
+  null whenever the sheet is closed, which is almost always. Typecheck clean, lint clean, 748 unit
+  tests green, and the screen was a hard crash on first open. Hand the value down from where it is
+  known non-null instead of asserting it where it is not.
+- **Android's `Intl` shortens September to "Sept", not "Sep".** Hermes ships different ICU data from
+  Node, so a `[A-Z][a-z]{2}` month pattern that passes everywhere else fails on device — and
+  `assertVisible` matches WHOLE text, so four letters simply do not match three. Same family as the
+  currency-symbol rule above: anything formatted through `Intl` has to be seen on a device.
+- **Storing progress as a POINTER invents rules the domain does not have.** Recurring occurrences
+  were tracked with a single `next_run_on` cursor, which can express "handled up to here" and
+  nothing finer — so occurrences had to be dealt with in order, acting out of order had to be
+  forbidden, and future rows had to be made inert. Every one of those rules protected the storage,
+  not the user. Occurrences are independent: approved is read from the LEDGER (a transaction carries
+  its rule and its date, so its existence IS the approval) and dismissed from `recurring_skips`. A
+  proposal is anything in range that appears in neither. When a model keeps forcing awkward rules,
+  suspect the model.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
