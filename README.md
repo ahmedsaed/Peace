@@ -23,7 +23,7 @@ account, and no network dependency anywhere in the core product.
 | 3 | Recurring payments | ✅ done |
 | 4 | Receipt attachments | ✅ done |
 | 5 | Receipt OCR (Gemini) | ✅ done |
-| 6 | Bank notification ingestion | planned |
+| 6 | Bank notification ingestion | ✅ done |
 
 Full plan and the reasoning behind the ordering: [docs/roadmap.md](docs/roadmap.md).
 
@@ -31,7 +31,7 @@ Stage 1's finish line was never a feature list — it is *logging a real week of
 reaching for MyMoney*. **That test has been passed**: nine days of real records, and the only
 things it turned up were a broken split-screen layout and a handful of papercuts, all since fixed.
 
-Everything but Stage 6 has shipped. Voice entry was dropped from Stage 5 rather than deferred —
+**Every planned stage has shipped.** Voice entry was dropped from Stage 5 rather than deferred —
 photographing a receipt answers the same question better, and a second capture path would have been
 a second set of parsing rules to keep honest.
 
@@ -79,6 +79,7 @@ competitor.
 | **No recurring transactions** — "Installments" is a *category*, re-typed by hand each month | Rules set while entering the record; occurrences proposed in the list and approved, edited or dismissed | ✅ shipped |
 | **No receipt attachments** | Photograph or attach one per record, content-addressed and carried inside the backup | ✅ shipped |
 | **No assisted entry** | Read a photographed receipt with Gemini and fill in the form | ✅ shipped |
+| **No bank-message ingestion** — every record typed by hand | Bank SMS notifications are read and offered as records to approve | ✅ shipped |
 | **No interest rate** on loan accounts | `interestRate` column exists on the schema | column only, no UI |
 | **No multi-device sync** | Also none, deliberately — the ledger stays on the phone | by design |
 
@@ -107,11 +108,12 @@ Not claims about what MyMoney lacks — these are decisions about how this app s
 | **The backup carries the receipts** | The moment a row can point at a file, the backup stops being the database. A Peace backup is a zip holding `peace.db` beside an `attachments/` folder — so it still opens without this app, which is why it was a bare `.db` to begin with. The manifest records how many receipts were packed and the restore *checks* it: a truncated archive still unzips, and restoring one would delete the originals and report success. |
 | **Receipts are content-addressed** | A file is stored as `<sha256>.<ext>`, which buys three things at once: the same receipt attached twice is one file, a name a file manager supplied never reaches the disk or the archive, and a file cannot change under its own name. Two records can share one receipt, so deleting a row never deletes a file — only the ledger decides that. |
 | **The model is a typist, not an accountant** | Gemini reads a receipt into *structured output*, never prose, and everything it returns is range-checked and dropped if it fails. A receipt whose date is unreadable but whose total is clear still fills in the total. Your API key lives in the device keystore, never in the settings table — that table travels inside every backup. |
-| **The build identifies itself** | Settings → About shows `1.1.0 (build 107)` and the commit, marked `-dirty` if it was built from uncommitted code. |
+| **The build identifies itself** | Settings → About shows `1.2.0 (build 116)` and the commit, marked `-dirty` if it was built from uncommitted code. |
+| **Bank alerts are read, not your inbox** | Android hands over the notification the messaging app already showed — the same text you read off a lock screen. No `READ_SMS`, no conversation history, and nothing captured from any app but the one that owns SMS. The sender list **starts empty and reads nothing**, so granting the permission does not send every text you receive to Google. A captured message lands in the records list as a grey row like a recurring one, in no total, until you approve it. |
+| **A notification's own timestamp beats a parsed date** | The model is never asked when a transaction happened. Android stamps the arrival to the second and a bank alert arrives when the money moves, so the exact answer is already in hand — where `13/08/2026` is a valid date under two conventions and picking the wrong one cannot be spotted afterwards. |
 | **Daily totals net the day** | Each day's heading carries what that day did to your position. Transfers are left out — the day you moved savings across should not read like the day you spent them — and corrections are left in, because they moved real money. It uses the same home-currency expression as the month total above it, so the two cannot drift. |
 
-Where Peace is still **behind**: nothing it set out to close. Bank-notification ingestion (Stage 6)
-is the last planned feature, and MyMoney does not have it either.
+Where Peace is still **behind**: nothing it set out to close.
 
 ## Stack
 
@@ -119,6 +121,10 @@ Expo SDK 57 · React Native 0.86 · React 19.2 · TypeScript · expo-router · N
 Drizzle ORM + expo-sqlite · react-native-svg · fflate · Jest · Maestro
 
 No chart library and no UI kit. Every icon and the category ring are hand-drawn SVG paths.
+
+The one piece of native code is a **local Expo module** in [`modules/notification-listener/`](modules/notification-listener) —
+a `NotificationListenerService` and about four functions. The third-party package for this was last
+published well before SDK 57, and vendoring a fork would have been more code than writing it.
 
 > **Expo has changed.** SDK 57 and RN 0.86 are newer than most training data and most tutorials.
 > Read [the versioned docs](https://docs.expo.dev/versions/v57.0.0/) rather than writing APIs
@@ -152,9 +158,26 @@ npm start             # Metro dev server
 
 Distribution is **sideload only** — no Play Store, so no restricted-permission review.
 
-**The easiest way is the [Releases page](../../releases).** Every merge to `main` publishes a signed
-arm64 APK there. It upgrades an existing install in place — no uninstall, no data loss — because
+**The APK is on the [Releases page](../../releases).** Every merge to `main` publishes a signed
+arm64 build there. It upgrades an existing install in place — no uninstall, no data loss — because
 every build is signed with the same key and carries an increasing `versionCode`.
+
+> **Play Protect blocks this APK, and will keep blocking it.** Since Stage 6 the app declares a
+> `NotificationListenerService`, and Google classes notification access — alongside `READ_SMS` and
+> accessibility — as a sensitive permission that is **automatically blocked for sideloaded apps**.
+> The dialog has no "Install anyway": it is a hard block, on every update rather than only the
+> first.
+>
+> Two ways through, both on the phone's side rather than the app's:
+>
+> - `adb install -r peace-<version>-build<n>.apk` — a different install path, not subject to it.
+> - Pause Play Protect (Play Store → profile → Play Protect → settings), install, switch it back on.
+>
+> **No manifest change avoids this while the feature exists** — the declaration *is* the capability.
+> The only real escape is distributing through Play itself, and an internal testing track would do
+> it: notification access is governed by the ordinary "necessary for core functionality" policy, not
+> the near-total ban that applies to `READ_SMS`. Keeping that door open is exactly why this reads
+> notifications rather than the inbox.
 
 `npm run apk` builds the same thing locally at
 `android/app/build/outputs/apk/release/app-release.apk`, with the JS bundle embedded so it runs
@@ -169,7 +192,7 @@ with no laptop attached. CI also attaches an APK to every PR, for testing a chan
 | commit sha | git | every commit |
 
 [`app.config.js`](app.config.js) layers the last two onto `app.json`. **Settings → About** shows
-`1.1.0 (build 107)` and the commit, so "which build am I actually running" is answerable from the
+`1.2.0 (build 116)` and the commit, so "which build am I actually running" is answerable from the
 phone. A build made from a tree with uncommitted changes is marked `-dirty`, since it cannot be
 reproduced from its sha.
 
@@ -229,10 +252,11 @@ src/constants/         palette.js — the single source of colour truth
 src/db/                schema, client, migrations provider, seed
 src/db/repo/           the ONLY place that writes to the database
 src/lib/               pure logic — money, periods, calculator, receipt parsing. Tests live here.
-src/state/             cross-screen state (settings cache, undo, Drive catch-up)
+src/state/             cross-screen state (settings cache, undo, Drive and bank catch-up)
 src/test/              test helpers (in-memory database from real migrations)
 assets/logo/           source SVGs for the app icon (PNGs are generated)
 scripts/               emulator, screenshots, icon generation
+modules/               local native modules (the notification listener)
 drizzle/               generated migrations (committed)
 docs/                  research, roadmap, design system
 .maestro/              E2E flows

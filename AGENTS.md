@@ -146,6 +146,12 @@ Three things that are true only because CI caught them, and will bite again:
 **Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
 merging anything that touches a screen.
 
+**Play Protect HARD-BLOCKS the sideloaded APK, on every update.** Declaring a
+`NotificationListenerService` puts the app in the same class as `READ_SMS` and accessibility
+services, and the block has no "Install anyway". No manifest change avoids it while the feature
+exists — the declaration IS the capability. `adb install -r` uses a different path and works;
+so does pausing Play Protect. Do not go looking for a signing or manifest fix, there isn't one.
+
 ### Run E2E against a release APK, not the dev build
 
 ```
@@ -485,6 +491,42 @@ app ignoring input. `pkill -f GradleDaemon`.
   the wrong figure off one you did not. Keep a partial reading: a receipt whose date is unreadable
   but whose total is clear still saves the typing, and refusing the whole thing over one junk field
   throws that away. `temperature: 0`, because the same photo read twice must not give two totals.
+- **A NotificationListenerService writes to DISK, never to JavaScript.** A bank message arrives at
+  two in the afternoon while the app is closed, and there is no React context to hand it to — an
+  event emitter drops it silently, which is the one outcome that makes the feature useless. Captures
+  go to a small bounded native store the app drains on launch, exactly as the Drive backup catches
+  up. Three more things that only a device shows: `android:exported="true"` is REQUIRED for the
+  system to bind it (guarded by `BIND_NOTIFICATION_LISTENER_SERVICE`, which no ordinary app holds),
+  the module's own `AndroidManifest.xml` merges into the app's so no config plugin is needed, and
+  `adb shell cmd notification allow_listener <pkg>/<cls>` grants access without touching the UI.
+- **Read `EXTRA_BIG_TEXT` before `EXTRA_TEXT`.** `EXTRA_TEXT` is the collapsed one-line form and is
+  truncated; the big-text extra carries the whole message whenever the poster used `BigTextStyle`,
+  which messaging apps do. Reading only `EXTRA_TEXT` silently loses the half of the message with
+  the amount in it — and it looks like the model misreading rather than the app under-reading.
+- **A queue gated on something optional must say it is gated.** Bank captures sit `pending` until
+  there is an API key to read them with, and nothing anywhere said so while messages piled up behind
+  that — the app silently doing nothing, which is the failure it is least allowed to have. Count
+  what is waiting and name what is blocking it.
+- **A native service that captures in the background needs THREE triggers, not one.** Launch and
+  foreground are the obvious two, and they leave the case that actually gets noticed: a message
+  arriving while somebody is looking at the screen it belongs on, producing nothing until they
+  navigated. The third is the native side SIGNALLING the capture — and the capture store itself is
+  the channel, since the service and the module share a process, so a `SharedPreferences` change
+  listener sees the write with no static holder and no reference back into the React context. Hold
+  that listener in a FIELD: `SharedPreferences` keeps only a weak reference, so an inline lambda is
+  collected at the next GC and the events stop silently.
+- **Anything a screen reads once cannot learn about an answer that arrives later.** Reading a
+  message is a network round trip, so it lands seconds after every screen has drawn. A per-screen
+  query left the row invisible until something else forced a re-render; the inbox is a store, like
+  settings — SQLite is the truth and the store is what repaints every screen. The same applies to
+  whatever UNBLOCKS the work: saving the API key has to kick the catch-up, or adding a key appears
+  to do nothing.
+- **A notification is stamped with the moment it arrived; never ask a model for the date.** A bank
+  alert lands when the money moves, and Android records that to the second — so the exact answer is
+  already in hand. Reading "13/08/2026" out of the text instead invites the one mistake nobody can
+  spot afterwards, because that string is a valid date under two conventions and both look right.
+  Do not even ask for it: a field the model returns and the app ignores is a field somebody will
+  eventually wire up.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

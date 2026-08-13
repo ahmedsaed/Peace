@@ -50,6 +50,19 @@ export const SETTING_DEFAULTS = {
   showTotal: true as boolean,
   /** Which Gemini model the AI features call. Not a secret. */
   geminiModel: 'gemini-flash-latest' as string,
+  /**
+   * Whose SMS messages are worth reading — "CIB", "QNB", a short code.
+   *
+   * In settings rather than secure storage because it is not a credential and
+   * it SHOULD travel in a backup: a restored ledger that still knows which
+   * banks to watch is right. Matched case-insensitively as a substring, so one
+   * entry covers "CIB", "CIB Bank" and "CIB-Alerts".
+   *
+   * EMPTY MEANS NOTHING IS READ, never everything. The list starting empty is
+   * what stops granting the permission from sending every text message the user
+   * receives to Google.
+   */
+  bankSenders: [] as string[],
 
   /**
    * How often to copy the database to Google Drive. `off` until connected.

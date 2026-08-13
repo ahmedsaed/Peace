@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.ahmed.peace.notifications" >
+
+    <uses-sdk android:minSdkVersion="24" />
+
+    <!--
+    The listener service.
+
+    `exported="true"` is required for the SYSTEM to bind it, and is safe only
+    because `BIND_NOTIFICATION_LISTENER_SERVICE` is a permission no ordinary app
+    can hold — the export is to Android, not to other apps. Omitting exported
+    entirely is a build error on API 31+ once there is an intent-filter, and
+    setting it false means the service is declared, never bound, and captures
+    nothing with no error anywhere to say so.
+    -->
+    <application>
+        <service
+            android:name="com.ahmed.peace.notifications.NotificationCaptureService"
+            android:exported="true"
+            android:label="Peace"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>
