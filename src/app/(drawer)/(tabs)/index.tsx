@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, SectionList, Text } from 'react-native';
+import { Alert, SectionList, Text, View } from 'react-native';
 
 import { ProposalActions, ProposalRow } from '@/components/proposal-row';
 import {
@@ -57,6 +57,7 @@ export default function RecordsScreen() {
   const [period, setPeriod] = useState(currentPeriod());
   const homeCurrency = useSetting('homeCurrency');
   const carryOver = useSetting('carryOver');
+  const showTotal = useSetting('showTotal');
   const [rows, setRows] = useState<Row[]>([]);
   const [summary, setSummary] = useState<PeriodSummary>(EMPTY_SUMMARY);
   const [carried, setCarried] = useState<BroughtForward>(NO_CARRY);
@@ -79,7 +80,7 @@ export default function RecordsScreen() {
   const offerUndo = useUndoStore((state) => state.offer);
 
   const refresh = useCallback(() => {
-    setRows(listRecordsForPeriod(db, period));
+    setRows(listRecordsForPeriod(db, period, homeCurrency));
     setSummary(periodSummary(db, period, homeCurrency));
     // Only asked for when it is going to be shown. It is a scan of every record
     // before this month, which is the one query here that grows with the age of
@@ -126,6 +127,12 @@ export default function RecordsScreen() {
   const dayGroups = groupByDay(rows).map((group) => ({
     key: group.key,
     title: group.heading,
+    // What the day did to your position, shown beside its heading when the
+    // setting is on. Computed for every group either way — it is a sum over
+    // rows already in memory, and branching on a preference to avoid it would
+    // save nothing while giving the two paths room to disagree.
+    total: group.totalMinor as number | null,
+    unvalued: group.unvaluedCount,
     data: group.rows as (Row | Proposal)[],
   }));
 
@@ -155,6 +162,10 @@ export default function RecordsScreen() {
           {
             key: 'due',
             title: due.length === 1 ? 'Due' : `Due · ${due.length}`,
+            // No total. These have not happened; a figure here would read as
+            // money already spent.
+            total: null as number | null,
+            unvalued: 0,
             data: due as (Row | Proposal)[],
           },
         ]
@@ -163,7 +174,15 @@ export default function RecordsScreen() {
     // LAST, and after the real records: these have not happened. Above them
     // they would read as the newest thing in the month.
     ...(upcoming.length > 0
-      ? [{ key: 'upcoming', title: 'Upcoming', data: upcoming as (Row | Proposal)[] }]
+      ? [
+          {
+            key: 'upcoming',
+            title: 'Upcoming',
+            total: null as number | null,
+            unvalued: 0,
+            data: upcoming as (Row | Proposal)[],
+          },
+        ]
       : []),
   ];
 
@@ -248,9 +267,18 @@ export default function RecordsScreen() {
             )
           }
           renderSectionHeader={({ section }) => (
-            <Text className="bg-ground px-4 pb-1.5 pt-4 text-xs font-semibold text-muted">
-              {section.title}
-            </Text>
+            <View className="flex-row items-baseline justify-between bg-ground px-4 pb-1.5 pt-4">
+              <Text className="text-xs font-semibold text-muted">{section.title}</Text>
+              {/* The due-rows section has no total — it is a list of things that
+                  have not happened yet, and giving it one would invite reading
+                  it as money already spent. */}
+              {showTotal && section.total !== null ? (
+                <Text className="text-xs text-muted" testID={`day-total-${section.key}`}>
+                  {formatMinor(section.total, homeCurrency, { showSign: true })}
+                  {section.unvalued ? ' +' : ''}
+                </Text>
+              ) : null}
+            </View>
           )}
           stickySectionHeadersEnabled={false}
           contentContainerClassName="pb-24"

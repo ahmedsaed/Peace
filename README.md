@@ -18,9 +18,11 @@ account, and no network dependency anywhere in the core product.
 | 1 | Daily driver — records, calculator keypad, edit/delete, accounts & categories | ✅ done |
 | — | App icon, side menu, search entry point (chrome, pulled ahead of Stage 2) | ✅ done |
 | 2 | Budgets, analysis, search | ✅ done |
-| 3 | Recurring payments | planned |
-| 4 | Receipt attachments | planned |
-| 5 | OCR + voice entry (Gemini Flash) | planned |
+| — | Google Drive backup, sealed with a passphrase | ✅ done |
+| — | Portfolio rebalancing | ✅ done |
+| 3 | Recurring payments | ✅ done |
+| 4 | Receipt attachments | ✅ done |
+| 5 | Receipt OCR (Gemini) | ✅ done |
 | 6 | Bank notification ingestion | planned |
 
 Full plan and the reasoning behind the ordering: [docs/roadmap.md](docs/roadmap.md).
@@ -28,6 +30,10 @@ Full plan and the reasoning behind the ordering: [docs/roadmap.md](docs/roadmap.
 Stage 1's finish line was never a feature list — it is *logging a real week of spending without
 reaching for MyMoney*. **That test has been passed**: nine days of real records, and the only
 things it turned up were a broken split-screen layout and a handful of papercuts, all since fixed.
+
+Everything but Stage 6 has shipped. Voice entry was dropped from Stage 5 rather than deferred —
+photographing a receipt answers the same question better, and a second capture path would have been
+a second set of parsing rules to keep honest.
 
 ## Screens
 
@@ -70,8 +76,9 @@ competitor.
 | Gap in MyMoney | Peace | State |
 |---|---|---|
 | **No sub-categories** — one flat level, its most-requested feature | Two-tier categories, enforced at the repository layer so a sub-category can never sprout children of its own | ✅ shipped |
-| **No recurring transactions** — "Installments" is a *category*, re-typed by hand each month | `recurring_rules` table, lazy catch-up on app open | Stage 3 |
-| **No due dates or bill reminders** on budgets | Due dates on budget items | Stage 3 |
+| **No recurring transactions** — "Installments" is a *category*, re-typed by hand each month | Rules set while entering the record; occurrences proposed in the list and approved, edited or dismissed | ✅ shipped |
+| **No receipt attachments** | Photograph or attach one per record, content-addressed and carried inside the backup | ✅ shipped |
+| **No assisted entry** | Read a photographed receipt with Gemini and fill in the form | ✅ shipped |
 | **No interest rate** on loan accounts | `interestRate` column exists on the schema | column only, no UI |
 | **No multi-device sync** | Also none, deliberately — the ledger stays on the phone | by design |
 
@@ -96,15 +103,19 @@ Not claims about what MyMoney lacks — these are decisions about how this app s
 | **Balance corrections that are not spending** | Cards drift: the bank's rate differs, a fee posts, a record is missed. You type what the bank shows — outstanding *or* available, since banking apps disagree about which they display — and Peace writes a dated correction for the difference. It moves your balance and running total and never touches income, expense, budgets or the charts. Counting a correction as spending is what drops phantom expenditure into whichever month you happened to reconcile in. |
 | **Card fees live on the card** | Credit limit, foreign-transaction fee and cash-withdrawal fee are per-account and optional, stored as basis points so a percentage never becomes a float multiplied by money. There is no "Kenana mode": one bank's rules baked into the app is a rule every other card then has to be excused from. |
 | **Budgets have no carry-over** | An unspent limit rolling into next month is the feature MyMoney offers and Peace deliberately does not. A limit that gets easier every time you fail to use it is not a limit — and every question it forces (does it compound? does an overspend carry as a debt?) has no good answer, because the idea fights itself. What carries between months is *money*: the Records header's third cell reads **Now** — what you are actually holding — instead of this month's net, and that figure reconciles exactly with the Accounts total. |
-| **Settings that do nothing are not shown** | `viewMode` and `showTotal` are stored but nothing reads them yet. Two switches that silently do nothing is how an app teaches you to stop trusting it. `carryOver` appeared the moment two screens started reading it. |
+| **Settings that do nothing are not shown** | A control for a preference nothing reads is a switch that silently does nothing, which is how an app teaches you to stop trusting it. Each row lands in the same change as the code that honours it. `viewMode` — a daily/weekly/yearly range — was declared early and **deleted rather than wired**: the app turned out to be month-shaped in a way it fought, since budgets are keyed by month and carry-forward runs month to month. A preference the design has outgrown is worse than none. |
+| **The backup carries the receipts** | The moment a row can point at a file, the backup stops being the database. A Peace backup is a zip holding `peace.db` beside an `attachments/` folder — so it still opens without this app, which is why it was a bare `.db` to begin with. The manifest records how many receipts were packed and the restore *checks* it: a truncated archive still unzips, and restoring one would delete the originals and report success. |
+| **Receipts are content-addressed** | A file is stored as `<sha256>.<ext>`, which buys three things at once: the same receipt attached twice is one file, a name a file manager supplied never reaches the disk or the archive, and a file cannot change under its own name. Two records can share one receipt, so deleting a row never deletes a file — only the ledger decides that. |
+| **The model is a typist, not an accountant** | Gemini reads a receipt into *structured output*, never prose, and everything it returns is range-checked and dropped if it fails. A receipt whose date is unreadable but whose total is clear still fills in the total. Your API key lives in the device keystore, never in the settings table — that table travels inside every backup. |
 | **The build identifies itself** | Settings → About shows `1.0.0 (build 32)` and the commit, marked `-dirty` if it was built from uncommitted code. |
 
-Where Peace is still **behind**: no recurring payments. That is Stage 3.
+Where Peace is still **behind**: nothing it set out to close. Bank-notification ingestion (Stage 6)
+is the last planned feature, and MyMoney does not have it either.
 
 ## Stack
 
 Expo SDK 57 · React Native 0.86 · React 19.2 · TypeScript · expo-router · NativeWind ·
-Drizzle ORM + expo-sqlite · react-native-svg · Jest · Maestro
+Drizzle ORM + expo-sqlite · react-native-svg · fflate · Jest · Maestro
 
 No chart library and no UI kit. Every icon and the category ring are hand-drawn SVG paths.
 
@@ -192,7 +203,9 @@ Every PR to `main` runs [`.github/workflows/pr.yml`](.github/workflows/pr.yml):
 | `apk` | `expo prebuild` + Gradle release build, uploaded as a downloadable artifact |
 
 Merging to `main` runs [`release.yml`](.github/workflows/release.yml), which repeats those checks
-and publishes a GitHub Release tagged `v<version>+build.<n>` with the APK attached.
+and publishes a GitHub Release tagged `v<version>+build.<n>` with the APK attached. Every merge so
+far has produced one, and installing from the Releases page is the normal way to get a build onto a
+phone.
 
 Both workflows call the **same** reusable build
 ([`build-apk.yml`](.github/workflows/build-apk.yml)) rather than keeping two copies of the steps —
@@ -214,8 +227,8 @@ src/components/        shared UI (screen chrome, icon set, drawer content)
 src/constants/         palette.js — the single source of colour truth
 src/db/                schema, client, migrations provider, seed
 src/db/repo/           the ONLY place that writes to the database
-src/lib/               pure logic — money, periods, calculator, ids. Tests live here.
-src/state/             cross-screen state (settings cache, undo)
+src/lib/               pure logic — money, periods, calculator, receipt parsing. Tests live here.
+src/state/             cross-screen state (settings cache, undo, Drive catch-up)
 src/test/              test helpers (in-memory database from real migrations)
 assets/logo/           source SVGs for the app icon (PNGs are generated)
 scripts/               emulator, screenshots, icon generation
