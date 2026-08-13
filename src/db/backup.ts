@@ -2,8 +2,11 @@ import { count } from 'drizzle-orm';
 import { Directory, File, Paths } from 'expo-file-system';
 import { defaultDatabaseDirectory } from 'expo-sqlite';
 
+import { packContainer } from '../lib/container';
 import { toCsvFile } from '../lib/csv';
+import { readReferencedFiles } from './attachments';
 import { DATABASE_NAME, db, sqliteDb } from './client';
+import { attachmentTotalBytes } from './repo/attachments';
 import { CSV_HEADER, exportFilename, exportRows } from './repo/export';
 import { transactions } from './schema';
 
@@ -14,8 +17,15 @@ import { transactions } from './schema';
  *
  *   CSV     readable anywhere, for a spreadsheet. LOSSY — no settings, and it
  *           cannot be imported back.
- *   Backup  a byte copy of the SQLite file. Complete, restorable, and openable
- *           with any SQLite tool if this app ever stops existing.
+ *   Backup  a zip holding the SQLite file AND every attachment it refers to.
+ *           Complete, restorable, and still openable without this app: unzip it
+ *           anywhere and there is `peace.db` next to an `attachments/` folder.
+ *
+ * The backup was a bare `.db` until records could carry receipts. Copying the
+ * database alone would now restore a ledger whose every photo is a broken
+ * thumbnail — on the one day the backup is being used at all. See
+ * `lib/container.ts` for the format and `lib/backup-payload.ts` for how the old
+ * shape stays restorable.
  *
  * Files are written to the CACHE directory, not documents. The share sheet
  * copies the bytes wherever they are going, so the local copy is rubbish the
@@ -86,7 +96,7 @@ function databaseFile(): File {
 }
 
 /**
- * A copy of the database file.
+ * The database and everything it refers to, in one file.
  *
  * THE CHECKPOINT IS NOT OPTIONAL. The connection runs in WAL mode, so recent
  * commits live in `peace.db-wal` rather than in `peace.db` itself. Copying the
@@ -95,15 +105,35 @@ function databaseFile(): File {
  * ones you would notice missing. `TRUNCATE` folds the WAL back into the main
  * file and empties it, so a single-file copy is complete.
  *
- * `copy` is ASYNC and the destination must not already exist, which is why this
- * returns a promise and why the staging file is deleted rather than created.
+ * Attachments are read from disk by NAME, taken from the rows — never by
+ * listing the directory. Listing would sweep up orphans a delete had left
+ * behind and pack them into every backup forever; going through the rows means
+ * a backup contains exactly what the ledger claims exists.
  */
 export async function databaseBackup(now = new Date()): Promise<Exported> {
   sqliteDb.execSync('PRAGMA wal_checkpoint(TRUNCATE);');
 
-  const destination = stagingFile(exportFilename(now, 'db'));
-  await databaseFile().copy(destination);
+  const database = await databaseFile().bytes();
+  const files = await readReferencedFiles();
+
+  const destination = stagingFile(exportFilename(now, BACKUP_EXTENSION));
+  destination.create({ overwrite: true });
+  destination.write(packContainer({ database, files }, now));
   return verify(destination);
+}
+
+/**
+ * A zip, so it can be opened by anything, anywhere, without this app.
+ *
+ * Not `.peace` or some private extension: the recovery story is "double-click
+ * it", and a stranger extension is one more thing standing between someone and
+ * their own data on the day they need it.
+ */
+export const BACKUP_EXTENSION = 'zip';
+
+/** What the backup will contain, so the screen can say so before writing it. */
+export function backupContents(): { files: number; bytes: number } {
+  return attachmentTotalBytes(db);
 }
 
 /**

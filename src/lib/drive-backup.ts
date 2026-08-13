@@ -69,14 +69,17 @@ export function describeCadence(cadence: Cadence): string {
  * `exportFilename` gives one file per DAY, which is right for a share sheet —
  * you export once and send it. Drive keeps a history, so two backups on the
  * same day must not present as the same thing.
+ *
+ * `.zip` since a backup became a container of the database plus its
+ * attachments. BOTH SUFFIXES ARE HINTS for a human reading the Drive file list
+ * and nothing more — whether a file is sealed is decided by its header and
+ * whether it is a container by its magic, because a name is the one part of a
+ * file anybody can change. Old `.db` backups in the folder restore unchanged.
  */
 export function backupName(now: Date, sealed: boolean): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const time = `${pad(now.getHours())}${pad(now.getMinutes())}`;
-  const base = exportFilename(now, 'db').replace(/\.db$/, `-${time}.db`);
-  // The suffix is a HINT for a human reading the file list. Restore never
-  // trusts it — whether a file is sealed is decided by its header, because a
-  // name is the one part of a file anybody can change.
+  const base = exportFilename(now, 'zip').replace(/\.zip$/, `-${time}.zip`);
   return sealed ? `${base}.enc` : base;
 }
 

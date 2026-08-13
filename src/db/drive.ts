@@ -21,9 +21,10 @@ import {
   uploadBackup,
   type DriveFile,
 } from '../lib/drive-api';
+import { isBackupPayload, openBackupPayload } from '../lib/backup-payload';
 import { backupName, prunable, type Cadence } from '../lib/drive-backup';
 import { withDriveToken } from '../lib/google-auth';
-import { isSealed, looksLikeSqlite, seal, SealError, unseal } from '../lib/seal';
+import { isSealed, seal, SealError, unseal } from '../lib/seal';
 import { getPassphrase } from '../lib/secrets';
 import { databaseBackup } from './backup';
 import { sqliteDb } from './client';
@@ -114,6 +115,14 @@ export type BackupCheck = {
   records: number;
   accounts: number;
   categories: number;
+  /**
+   * Attachment files inside the container.
+   *
+   * Reported because "43 records" was never the whole answer once records could
+   * carry receipts — a backup that checks out on rows and holds none of the
+   * photos is exactly the silent failure this screen exists to catch.
+   */
+  attachments: number;
 };
 
 /**
@@ -156,11 +165,22 @@ export async function checkLatestBackup(): Promise<BackupCheck> {
       throw new SealError('That backup is sealed, but no passphrase is saved on this device.');
     }
     plain = await unseal(downloaded, passphrase);
-  } else if (!looksLikeSqlite(downloaded)) {
-    throw new SealError('That backup is neither sealed nor a Peace database.');
+  } else if (!isBackupPayload(downloaded)) {
+    throw new SealError('That backup is neither sealed nor a Peace backup.');
   }
 
-  return { ...inspect(plain), name: newest.name, createdTime: newest.createdTime, bytes: newest.size, sealed: encrypted };
+  // Unwrap the container before SQLite sees it. A backup made since attachments
+  // existed is a zip; one made before is the bare database.
+  const payload = openBackupPayload(plain);
+
+  return {
+    ...inspect(payload.database),
+    name: newest.name,
+    createdTime: newest.createdTime,
+    bytes: newest.size,
+    sealed: encrypted,
+    attachments: payload.files.length,
+  };
 }
 
 const ALIAS = 'drivecheck';
@@ -235,11 +255,19 @@ export async function restoreFromDrive(id: string): Promise<RestoreResult> {
       throw new SealError('That backup is sealed. Set its passphrase before restoring.');
     }
     plain = await unseal(downloaded, passphrase);
-  } else if (!looksLikeSqlite(downloaded)) {
-    throw new SealError('That backup is neither sealed nor a Peace database.');
+  } else if (!isBackupPayload(downloaded)) {
+    throw new SealError('That backup is neither sealed nor a Peace backup.');
   }
 
-  const staged = new File(Paths.cache, 'drive-restore.db');
+  /**
+   * Handed to `restoreFrom` still wrapped, deliberately.
+   *
+   * That function is the ONE place a backup is opened, validated and applied,
+   * and it already understands both shapes. Unwrapping here would make this the
+   * second implementation of the same decision — and the two would drift, which
+   * is precisely how the ledger-side rules ended up written out in four places.
+   */
+  const staged = new File(Paths.cache, 'drive-restore.bin');
   if (staged.exists) staged.delete();
   staged.create();
   staged.write(plain);

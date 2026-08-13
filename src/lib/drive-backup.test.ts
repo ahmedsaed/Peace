@@ -59,13 +59,13 @@ describe('naming a backup', () => {
   it('distinguishes two backups taken on the same day', () => {
     const morning = backupName(new Date(2026, 7, 12, 9, 5), false);
     const evening = backupName(new Date(2026, 7, 12, 21, 30), false);
-    expect(morning).toBe('peace-2026-08-12-0905.db');
-    expect(evening).toBe('peace-2026-08-12-2130.db');
+    expect(morning).toBe('peace-2026-08-12-0905.zip');
+    expect(evening).toBe('peace-2026-08-12-2130.zip');
     expect(morning).not.toBe(evening);
   });
 
   it('marks a sealed backup for a human reading the list', () => {
-    expect(backupName(new Date(2026, 7, 12, 9, 5), true)).toBe('peace-2026-08-12-0905.db.enc');
+    expect(backupName(new Date(2026, 7, 12, 9, 5), true)).toBe('peace-2026-08-12-0905.zip.enc');
   });
 });
 
