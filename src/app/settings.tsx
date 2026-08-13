@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
+import { GeminiKeyCard } from '@/components/gemini-key';
 import { StackHeader } from '@/components/screen';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
@@ -86,9 +87,15 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        <View className="pt-6">
+          <Text className="mb-2 px-1 text-[10px] uppercase tracking-widest text-muted">
+            Receipts
+          </Text>
+          <GeminiKeyCard />
+        </View>
+
         <Text className="px-1 pt-6 text-xs leading-5 text-muted opacity-70">
-          The default date range arrives with a screen that reads it. The Gemini API key comes with
-          receipt capture — it is stored on this device and never included in a build.
+          The default date range arrives with a screen that reads it.
         </Text>
       </ScrollView>
 
