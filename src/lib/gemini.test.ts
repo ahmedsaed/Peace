@@ -1,9 +1,11 @@
 import {
   GeminiError,
   buildRequest,
+  describeFailure,
   endpoint,
   extractJson,
   readReceipt,
+  reasonOf,
 } from './gemini';
 
 const IMAGE = 'aGVsbG8='; // "hello" in base64 — the bytes never matter here.
@@ -22,8 +24,22 @@ const reply = (payload: unknown, over: Record<string, unknown> = {}) => ({
 const ok = (body: unknown) =>
   jest.fn(async () => ({ ok: true, status: 200, json: async () => body }) as unknown as Response);
 
-const status = (code: number) =>
-  jest.fn(async () => ({ ok: false, status: code, json: async () => ({}) }) as unknown as Response);
+const status = (code: number, body: unknown = {}) =>
+  jest.fn(
+    async () => ({ ok: false, status: code, json: async () => body }) as unknown as Response
+  );
+
+/** Exactly the shape Google returns, captured from a live 400. */
+const googleError = (code: number, message: string, reason?: string) => ({
+  error: {
+    code,
+    message,
+    status: 'INVALID_ARGUMENT',
+    details: reason
+      ? [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason, domain: 'googleapis.com' }]
+      : [],
+  },
+});
 
 const READING = { total: 120.5, currency: 'EGP', date: '2026-08-13', merchant: 'Grocery Mart' };
 
@@ -156,6 +172,67 @@ describe('reading a receipt end to end', () => {
     await expect(
       readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: status(code) })
     ).rejects.toThrow(expected);
+  });
+
+  /**
+   * THE ONE THE STATUS CODE GETS WRONG, found by running it against the real
+   * API with a fake key.
+   *
+   * An invalid key comes back 400 INVALID_ARGUMENT, not 401 or 403 — so mapping
+   * on the status alone sent someone whose KEY was wrong off to check their
+   * MODEL NAME, which is the single least useful thing to tell them. The reason
+   * is in the body; the body is what gets read.
+   */
+  it('blames the KEY for a 400 that is really a bad key', async () => {
+    const body = googleError(400, 'API key not valid. Please pass a valid API key.', 'API_KEY_INVALID');
+
+    await expect(
+      readReceipt('bad', 'gemini-flash-latest', IMAGE, 'image/jpeg', {
+        fetchImpl: status(400, body),
+      })
+    ).rejects.toThrow(/key was refused/i);
+  });
+
+  it('passes Google\'s own sentence through for a 400 it does not recognise', async () => {
+    // "Unable to submit request because it has an empty model name" names the
+    // fix exactly; flattening it into a generic apology would lose that.
+    const body = googleError(400, 'Unable to submit request because it has an empty model name.');
+
+    await expect(
+      readReceipt('key', '', IMAGE, 'image/jpeg', { fetchImpl: status(400, body) })
+    ).rejects.toThrow(/empty model name/);
+  });
+
+  it('falls back to the status when the error body will not parse', async () => {
+    // A proxy or a captive portal answering with HTML. The reading still fails
+    // with something a person can act on rather than a JSON exception.
+    const broken = jest.fn(
+      async () =>
+        ({
+          ok: false,
+          status: 502,
+          json: async () => {
+            throw new Error('not json');
+          },
+        }) as unknown as Response
+    );
+
+    await expect(
+      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: broken })
+    ).rejects.toThrow(/unavailable/i);
+  });
+
+  it('reads the reason out of the details array', () => {
+    expect(reasonOf(googleError(400, 'x', 'API_KEY_INVALID'))).toBe('API_KEY_INVALID');
+    expect(reasonOf(googleError(400, 'x'))).toBeNull();
+    expect(reasonOf(null)).toBeNull();
+    expect(reasonOf({ error: {} })).toBeNull();
+  });
+
+  it('names a disabled API rather than blaming the key itself', () => {
+    // Different fix entirely: the key is real, the project has not switched the
+    // API on. "Check your key" would send someone to regenerate a working key.
+    expect(describeFailure(403, googleError(403, 'x', 'SERVICE_DISABLED'))).toMatch(/not enabled/);
   });
 
   /**

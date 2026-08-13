@@ -1,0 +1,93 @@
+appId: com.ahmed.peace
+---
+# Reading a receipt with Gemini.
+#
+# WHAT THIS CAN AND CANNOT ASSERT. A successful read needs a live API key and a
+# network call to Google, so it is verified by hand — the same way Google
+# sign-in is. Putting a real key in a flow would commit a billable credential
+# to a public repository, which is the one thing this feature is designed to
+# avoid: the key lives in secure store precisely so it is never in a build.
+#
+# What IS covered is the half that must not break for people who have no key at
+# all — which is everyone, until they set one:
+#
+#   the Settings card exists and reports "Not set" rather than a blank,
+#   the model row is HIDDEN until a key exists (a control for something that
+#     cannot run is a control that silently does nothing), and
+#   the record screen is completely unchanged without a key.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- the Settings card ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "settings-screen"
+- scrollUntilVisible:
+    element:
+      id: "gemini-card"
+    direction: DOWN
+
+# "Not set" rather than an empty string: there has to be a way to tell a saved
+# key from a blank field, and blank is what a failed keystore read looks like.
+- assertVisible:
+    id: "gemini-key-state"
+    text: "Not set"
+
+# THE MODEL ROW MUST NOT BE HERE YET. Choosing a model before there is a key to
+# call it with is exactly the "setting that does nothing" this app refuses to
+# ship — and it is the sort of thing that only shows up in a screenshot.
+- assertNotVisible:
+    id: "gemini-model-state"
+- assertNotVisible:
+    id: "gemini-model-edit"
+- takeScreenshot: 01-gemini-no-key
+
+# The editor opens and closes without saving anything.
+- tapOn:
+    id: "gemini-key-edit"
+- assertVisible:
+    id: "gemini-key-input"
+- takeScreenshot: 02-gemini-key-editor
+- tapOn:
+    id: "gemini-key-cancel"
+- assertVisible:
+    id: "gemini-key-state"
+    text: "Not set"
+
+- tapOn:
+    id: "nav-back"
+
+# --- the record screen is unchanged without a key ---
+# The regression that would hit every user: this feature must be invisible
+# until it is set up, and must not disturb the screen it lives on.
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "attach-camera"
+- assertVisible:
+    id: "attach-file"
+
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£120.00"
+- takeScreenshot: 03-record-unaffected
