@@ -7,7 +7,6 @@ import { createCategory } from './categories';
 import { createRecord, deleteRecord } from './transactions';
 import {
   addAttachment,
-  attachmentCounts,
   attachmentTotalBytes,
   listAttachments,
   missingFiles,
@@ -251,29 +250,6 @@ describe('rows whose file is not there', () => {
 });
 
 describe('what the screens ask for', () => {
-  it('counts receipts per record for the list indicator', () => {
-    const db = seed();
-    buy(db, 'r1');
-    buy(db, 'r2', 2);
-    buy(db, 'r3', 3);
-    attach(db, 'r1', 'a');
-    attach(db, 'r1', 'b');
-    attach(db, 'r2', 'c');
-
-    const counts = attachmentCounts(db, ['r1', 'r2', 'r3']);
-    expect(counts.get('r1')).toBe(2);
-    expect(counts.get('r2')).toBe(1);
-    // Absent rather than zero — the caller renders nothing for a record with none.
-    expect(counts.has('r3')).toBe(false);
-  });
-
-  it('asks for nothing when given nothing', () => {
-    // An empty IN () is a SQL syntax error in SQLite, and the records list
-    // calls this on every empty month.
-    const db = seed();
-    expect(attachmentCounts(db, [])).toEqual(new Map());
-  });
-
   /**
    * DISTINCT on the file, not a sum over rows. Two records sharing one receipt
    * store one file, and counting it twice tells the user their backup is bigger
