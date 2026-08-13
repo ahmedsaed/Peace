@@ -146,6 +146,12 @@ Three things that are true only because CI caught them, and will bite again:
 **Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
 merging anything that touches a screen.
 
+**Play Protect HARD-BLOCKS the sideloaded APK, on every update.** Declaring a
+`NotificationListenerService` puts the app in the same class as `READ_SMS` and accessibility
+services, and the block has no "Install anyway". No manifest change avoids it while the feature
+exists — the declaration IS the capability. `adb install -r` uses a different path and works;
+so does pausing Play Protect. Do not go looking for a signing or manifest fix, there isn't one.
+
 ### Run E2E against a release APK, not the dev build
 
 ```
