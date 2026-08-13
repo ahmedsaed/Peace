@@ -29,6 +29,11 @@ jest.mock('../lib/google-auth', () => ({
   withDriveToken: jest.fn(async (call: (t: string) => unknown) => call('token')),
 }));
 jest.mock('../lib/secrets', () => ({ getPassphrase: jest.fn(async () => null) }));
+// The SQLite half of the check. Mocked here so the ORDER of the check can be
+// tested on its own — which is the whole reason it was moved out of this file.
+jest.mock('./inspect', () => ({
+  inspectBackup: jest.fn(() => ({ records: 43, accounts: 3, categories: 37 })),
+}));
 jest.mock('./restore', () => ({
   restoreFrom: jest.fn(async () => ({ copied: { transactions: 43 }, safetyBytes: 1000 })),
   currentCounts: jest.fn(() => ({ transactions: 0, accounts: 0 })),
@@ -41,8 +46,9 @@ import { deleteBackup, downloadBackup, listBackups, uploadBackup } from '../lib/
 import { getPassphrase } from '../lib/secrets';
 import { packContainer, readContainer } from '../lib/container';
 import { isSealed, seal } from '../lib/seal';
+import { inspectBackup } from './inspect';
 import { restoreFrom } from './restore';
-import { restoreFromDrive, runBackup } from './drive';
+import { checkLatestBackup, restoreFromDrive, runBackup } from './drive';
 /* eslint-enable import/first */
 
 const mocked = {
@@ -53,6 +59,7 @@ const mocked = {
   downloadBackup: downloadBackup as jest.Mock,
   getPassphrase: getPassphrase as jest.Mock,
   restoreFrom: restoreFrom as jest.Mock,
+  inspectBackup: inspectBackup as jest.Mock,
 };
 
 /** A SQLite-looking payload, since `seal` refuses anything else on the way back. */
@@ -84,6 +91,160 @@ beforeEach(() => {
   mocked.listBackups.mockResolvedValue([]);
   mocked.uploadBackup.mockResolvedValue({ id: 'new', name: 'n', size: 1, createdTime: 't' });
   mocked.restoreFrom.mockResolvedValue({ copied: { transactions: 43 }, safetyBytes: 1000 });
+  mocked.inspectBackup.mockReturnValue({ records: 43, accounts: 3, categories: 37 });
+});
+
+/**
+ * THE BUTTON THAT ANSWERS "AM I ACTUALLY COVERED?"
+ *
+ * A backup nobody has ever opened is a promise, not a safety net, and every way
+ * this can be wrong is silent: an upload that was really 0 bytes, a passphrase
+ * changed since the last backup, a file truncated in transit, a container whose
+ * receipts did not travel. All of them look exactly like a working setup until
+ * the day they do not.
+ *
+ * What is asserted here is the ORDER and the REPORTING. The SQLite half lives
+ * in `inspect.ts` and is mocked, which is the entire reason it was moved there.
+ */
+describe('checking the latest backup', () => {
+  const PASS = 'a good long passphrase';
+  const RECEIPT = new Uint8Array([...'a receipt photo'].map((c) => c.charCodeAt(0)));
+
+  const inDrive = (over: Partial<{ id: string; name: string; size: number | null; createdTime: string }> = {}) => ({
+    id: 'newest',
+    name: 'peace-2026-08-13-1200.zip',
+    size: 42_359,
+    createdTime: '2026-08-13T09:14:30Z',
+    ...over,
+  });
+
+  it('checks the NEWEST backup and reports what is in it', () => {
+    // `listBackups` returns newest first; checking any other one would answer a
+    // question nobody asked.
+    mocked.listBackups.mockResolvedValue([inDrive(), inDrive({ id: 'older', name: 'old.zip' })]);
+    mocked.downloadBackup.mockResolvedValue(packContainer({ database: LEDGER, files: [] }));
+
+    return checkLatestBackup().then((result) => {
+      expect(mocked.downloadBackup).toHaveBeenCalledWith('token', 'newest');
+      expect(result.name).toBe('peace-2026-08-13-1200.zip');
+      expect(result.records).toBe(43);
+      expect(result.accounts).toBe(3);
+      expect(result.categories).toBe(37);
+      expect(result.bytes).toBe(42_359);
+      expect(result.sealed).toBe(false);
+    });
+  });
+
+  /**
+   * "43 records" stopped being the whole answer once records could carry
+   * receipts. A backup that checks out on rows while holding NONE of the photos
+   * is exactly the silent failure this button exists to catch.
+   */
+  it('counts the receipts in the container, not just the rows', async () => {
+    mocked.listBackups.mockResolvedValue([inDrive()]);
+    mocked.downloadBackup.mockResolvedValue(
+      packContainer({ database: LEDGER, files: [{ name: 'r.jpg', bytes: RECEIPT }] })
+    );
+
+    expect((await checkLatestBackup()).attachments).toBe(1);
+  });
+
+  it('unwraps the container before SQLite ever sees it', async () => {
+    mocked.listBackups.mockResolvedValue([inDrive()]);
+    mocked.downloadBackup.mockResolvedValue(
+      packContainer({ database: LEDGER, files: [{ name: 'r.jpg', bytes: RECEIPT }] })
+    );
+
+    await checkLatestBackup();
+
+    // A zip handed to ATTACH fails in a way that reads like a corrupt backup.
+    const [handed] = mocked.inspectBackup.mock.calls[0];
+    expect(Array.from(handed as Uint8Array)).toEqual(Array.from(LEDGER));
+  });
+
+  it('opens a sealed backup and says it was sealed', async () => {
+    mocked.listBackups.mockResolvedValue([inDrive({ name: 'peace.zip.enc' })]);
+    mocked.downloadBackup.mockResolvedValue(
+      await seal(packContainer({ database: LEDGER, files: [] }), PASS, { logN: 8, r: 8, p: 1 })
+    );
+    mocked.getPassphrase.mockResolvedValue(PASS);
+
+    const result = await checkLatestBackup();
+
+    expect(result.sealed).toBe(true);
+    expect(result.records).toBe(43);
+  });
+
+  it('still checks a bare .db from before attachments existed', async () => {
+    mocked.listBackups.mockResolvedValue([inDrive({ name: 'peace-2026-08-10.db' })]);
+    mocked.downloadBackup.mockResolvedValue(LEDGER);
+
+    const result = await checkLatestBackup();
+
+    expect(result.records).toBe(43);
+    // No container, so no receipts — not a failure, just the age of the file.
+    expect(result.attachments).toBe(0);
+  });
+
+  describe('when it cannot vouch for the backup', () => {
+    it('says there are none rather than checking nothing', async () => {
+      mocked.listBackups.mockResolvedValue([]);
+      await expect(checkLatestBackup()).rejects.toThrow(/no backups in Drive/i);
+      expect(mocked.inspectBackup).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The failure this whole button exists for. A 0-byte upload is what actually
+     * happened on a real device, and it reported success everywhere else.
+     */
+    it('refuses an empty download instead of reporting an empty ledger', async () => {
+      mocked.listBackups.mockResolvedValue([inDrive({ size: 0 })]);
+      mocked.downloadBackup.mockResolvedValue(new Uint8Array(0));
+
+      await expect(checkLatestBackup()).rejects.toThrow(/empty/i);
+      expect(mocked.inspectBackup).not.toHaveBeenCalled();
+    });
+
+    /** The backup is fine; the passphrase is missing. Worth its own sentence. */
+    it('blames the missing passphrase, not the backup', async () => {
+      mocked.listBackups.mockResolvedValue([inDrive()]);
+      mocked.downloadBackup.mockResolvedValue(
+        await seal(packContainer({ database: LEDGER, files: [] }), PASS, { logN: 8, r: 8, p: 1 })
+      );
+      mocked.getPassphrase.mockResolvedValue(null);
+
+      await expect(checkLatestBackup()).rejects.toThrow(/sealed.*no passphrase/i);
+    });
+
+    it('refuses a file that is neither sealed nor a Peace backup', async () => {
+      mocked.listBackups.mockResolvedValue([inDrive()]);
+      mocked.downloadBackup.mockResolvedValue(
+        new Uint8Array([...'a holiday photo'].map((c) => c.charCodeAt(0)))
+      );
+
+      await expect(checkLatestBackup()).rejects.toThrow(/neither sealed nor/i);
+      expect(mocked.inspectBackup).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A container that lost entries in transit still unzips. Without the
+     * manifest count this would report a clean bill of health over a backup
+     * missing half its receipts.
+     */
+    it('refuses a container whose receipts went missing in transit', async () => {
+      const { unzipSync, zipSync } = jest.requireActual('fflate');
+      const entries = unzipSync(
+        packContainer({ database: LEDGER, files: [{ name: 'a.jpg', bytes: RECEIPT }] })
+      );
+      delete entries['attachments/a.jpg'];
+
+      mocked.listBackups.mockResolvedValue([inDrive()]);
+      mocked.downloadBackup.mockResolvedValue(zipSync(entries));
+
+      await expect(checkLatestBackup()).rejects.toThrow(/lists 1 attachment/);
+      expect(mocked.inspectBackup).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('taking a backup', () => {
