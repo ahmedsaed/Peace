@@ -11,6 +11,7 @@ import m0006 from './0006_fine_dreaming_celestial.sql';
 import m0007 from './0007_free_hawkeye.sql';
 import m0008 from './0008_medical_wonder_man.sql';
 import m0009 from './0009_jittery_namora.sql';
+import m0010 from './0010_fast_avengers.sql';
 
   export default {
     journal,
@@ -24,7 +25,8 @@ m0005,
 m0006,
 m0007,
 m0008,
-m0009
+m0009,
+m0010
     }
   }
   

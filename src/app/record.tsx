@@ -167,11 +167,16 @@ export default function RecordScreen() {
 
   const defaultAccountId = useSetting('defaultAccountId');
   const geminiModel = useSetting('geminiModel');
+  const receiptGuidance = useSetting('receiptGuidance');
 
   // A transfer can be opened from either leg; the form always presents it as
   // "from the account that lost money".
   const [accountId, setAccountId] = useState(() => {
     if (rule) return rule.accountId;
+    // The card the bank message named, when it named one this ledger has. The
+    // currency follows the account, so getting this right is what stops a
+    // foreign-card purchase being entered in the home currency.
+    if (bankMessage?.matchedAccountId) return bankMessage.matchedAccountId;
     if (source) return source.accountId;
     if (!existing) {
       // The setting is only a preference, never a guarantee: an account can be
@@ -649,6 +654,7 @@ export default function RecordScreen() {
           // The model picks from the user's OWN categories or returns nothing;
           // a category this ledger does not have is worse than none.
           categoryNames: flatCategories.map((c) => c.name),
+          guidance: receiptGuidance,
           fallbackCurrency: currency,
         }
       );

@@ -4,6 +4,7 @@ import {
   buildBankPrompt,
   captureKey,
   isUsableReading,
+  matchAccount,
   matchesSender,
   parseBankReading,
   parseCaptures,
@@ -136,6 +137,7 @@ describe('reading what came back', () => {
       currency: 'EGP',
       direction: 'out',
       merchant: 'CARREFOUR',
+      account: null,
       accountTail: '0042',
     });
   });
@@ -221,6 +223,31 @@ describe('deciding whether to offer it at all', () => {
   });
 });
 
+/**
+ * A bank writes "card ending 0042", which means nothing to this app on its own.
+ * The user's own account names are offered to the model and their guidance is
+ * where the mapping lives — this is the half that resolves the answer back.
+ */
+describe('matching an account the user actually has', () => {
+  const accounts = [
+    { id: 'a1', name: 'Kenana' },
+    { id: 'a2', name: 'Bank' },
+  ];
+
+  it('matches regardless of case and spacing', () => {
+    expect(matchAccount('kenana', accounts)?.id).toBe('a1');
+    expect(matchAccount('  Kenana ', accounts)?.id).toBe('a1');
+  });
+
+  it('never invents one', () => {
+    // Filing against the default and letting the user move it is far better
+    // than an account this ledger has never heard of.
+    expect(matchAccount('Visa', accounts)).toBeNull();
+    expect(matchAccount(null, accounts)).toBeNull();
+    expect(matchAccount('Kenana', [])).toBeNull();
+  });
+});
+
 describe('the prompt', () => {
   it('quotes the message rather than describing it', () => {
     const prompt = buildBankPrompt('Purchase of EGP 450 at CARREFOUR');
@@ -229,6 +256,27 @@ describe('the prompt', () => {
 
   it('says to read the direction from the words', () => {
     expect(buildBankPrompt('x')).toMatch(/Read the WORDS/);
+  });
+
+  /**
+   * The model cannot know which account "card ending 0042" is. Offering the
+   * user's own names is what makes their guidance ("0042 is Kenana") resolvable.
+   */
+  it('offers the user\'s own accounts to choose from', () => {
+    expect(buildBankPrompt('x', ['Kenana', 'Bank'])).toContain('Kenana, Bank');
+    expect(buildBankPrompt('x', [])).toContain('none');
+  });
+
+  it('uses the caller\'s guidance in place of the default', () => {
+    const prompt = buildBankPrompt('x', [], 'the card ending 0042 is Kenana');
+    expect(prompt).toContain('the card ending 0042 is Kenana');
+    // The system half is still wrapped around it — an editable instruction must
+    // never be able to drop the discipline that keeps the reply parseable.
+    expect(prompt).toContain('Return only what the message actually states');
+  });
+
+  it('falls back to the default when the guidance is blank', () => {
+    expect(buildBankPrompt('x', [], '   ')).toContain('Read the WORDS');
   });
 
   it('says to ignore the things that are not transactions', () => {

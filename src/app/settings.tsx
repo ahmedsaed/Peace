@@ -5,6 +5,7 @@ import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import { BankMessagesCard } from '@/components/bank-card';
+import { ReceiptsCard } from '@/components/receipts-card';
 import { GeminiKeyCard } from '@/components/gemini-key';
 import { StackHeader } from '@/components/screen';
 import { db } from '@/db/client';
@@ -93,17 +94,21 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        {/* Its own section, because the key is not a receipt setting: both
+            reading features run on it, and burying it under one of them is what
+            made "where do I put my key" a question at all. */}
         <View className="pt-6">
           <Text className="mb-2 px-1 text-[10px] uppercase tracking-widest text-muted">
-            Receipts
+            Reading with AI
           </Text>
           <GeminiKeyCard />
         </View>
 
-        <View className="pt-6">
-          <Text className="mb-2 px-1 text-[10px] uppercase tracking-widest text-muted">
-            Bank messages
-          </Text>
+        <View className="pt-4">
+          <ReceiptsCard />
+        </View>
+
+        <View className="pt-4">
           <BankMessagesCard />
         </View>
 

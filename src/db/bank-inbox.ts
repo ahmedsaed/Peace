@@ -17,10 +17,12 @@ import {
   BANK_RESPONSE_SCHEMA,
   buildBankPrompt,
   captureKey,
+  matchAccount,
   matchesSender,
   parseBankReading,
   parseCaptures,
 } from '../lib/bank-sms';
+import { listAccountsWithBalance } from './repo/accounts';
 import { GeminiError, readBankMessage } from '../lib/gemini';
 import { getGeminiKey } from '../lib/secrets';
 import { db } from './client';
@@ -108,7 +110,8 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 export async function readPending(
   fallbackCurrency: string,
-  model: string
+  model: string,
+  guidance = ''
 ): Promise<ReadOutcome> {
   const waiting = pendingCaptures(db);
   if (waiting.length === 0) return { read: 0, failed: 0, deferred: 0 };
@@ -121,15 +124,37 @@ export async function readPending(
     return { read: 0, failed: 0, deferred: 0 };
   }
 
+  /**
+   * The user's own account names, offered to the model.
+   *
+   * A bank writes "card ending 0042", which means nothing on its own — the
+   * mapping from that to an account lives in the user's guidance, and this is
+   * what gives it something real to name.
+   */
+  const accounts = listAccountsWithBalance(db);
+  const accountNames = accounts.map((a) => a.name);
+
   let read = 0;
   let failed = 0;
   let deferred = 0;
 
   for (const capture of waiting) {
-    const outcome = await readOne(key, model, capture.body, fallbackCurrency);
+    const outcome = await readOne(
+      key,
+      model,
+      capture.body,
+      fallbackCurrency,
+      accountNames,
+      guidance
+    );
 
     if (outcome.kind === 'read') {
-      markParsed(db, capture.id, outcome.fields);
+      markParsed(db, capture.id, {
+        ...outcome.fields,
+        // Resolved here rather than at approval, so the row shows the right card
+        // and the record inherits its currency and its fees.
+        matchedAccountId: matchAccount(outcome.fields.account, accounts)?.id ?? null,
+      });
       read += 1;
       continue;
     }
@@ -169,11 +194,18 @@ async function readOne(
   key: string,
   model: string,
   body: string,
-  fallbackCurrency: string
+  fallbackCurrency: string,
+  accountNames: string[],
+  guidance: string
 ): Promise<ReadOne> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const raw = await readBankMessage(key, model, buildBankPrompt(body), BANK_RESPONSE_SCHEMA);
+      const raw = await readBankMessage(
+        key,
+        model,
+        buildBankPrompt(body, accountNames, guidance.trim() || undefined),
+        BANK_RESPONSE_SCHEMA
+      );
       return { kind: 'read', fields: parseBankReading(raw, fallbackCurrency) };
     } catch (error) {
       const transient = error instanceof GeminiError && error.transient;

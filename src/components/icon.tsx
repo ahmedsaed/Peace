@@ -155,6 +155,22 @@ const CATEGORY_PATHS = {
   // already the Installments category — a transfer and a recurring charge
   // looking identical in the list is a real misread.
   transfer: 'M4 8h11V5l5 4.5-5 4.5v-3H4V8zm16 8H9v-3l-5 4.5L9 22v-3h11v-3z',
+
+  // --- added later, all rasterised at 17px before being offered ---
+  // `coffee` and a wrench were drawn too and dropped: at this size the first was
+  // indistinguishable from `cup` and the second from `key`. A picker with two
+  // identical circles gives no way to tell which one you chose.
+  dumbbell: 'M2 9h2v6H2V9zm3-2h3v10H5V7zm4 3h6v4H9v-4zm7-3h3v10h-3V7zm4 2h2v6h-2V9z',
+  briefcase: 'M9 2h6a2 2 0 0 1 2 2v2h4v14H3V6h4V4a2 2 0 0 1 2-2zm0 4h6V4H9v2z',
+  music: 'M9 3h11v3H12v11a4 4 0 1 1-2-3.5V3zm11 5v6a3.5 3.5 0 1 1-2-3.2V8h2z',
+  game: 'M7 7h10a5 5 0 0 1 0 10c-1.6 0-2.5-.8-3.3-1.6h-3.4C9.5 16.2 8.6 17 7 17A5 5 0 0 1 7 7zm-.5 3v1.5H5v2h1.5V15h2v-1.5H10v-2H8.5V10h-2zm9 1a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm2.5-2.2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z',
+  scissors: 'M6 2l7 9.5-1.6 2.2L4 4.2zM18 2l-6 8.2 1.6 2.2L20 4.2zM6.5 15a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm0 2a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm11-2a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm0 2a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z',
+  plant: 'M11 22v-7c-4 0-7-2.5-7-7 4 0 7 2.2 7 6V9c0-3.5 2.5-6 6-6 0 4.5-2.5 7-6 7v2c0-2.5 2-4.5 5-4.5 0 3.5-2.5 5.5-5 5.5v9h-2z',
+  church: 'M11 2h2v3h3v2h-3v3.2l7 4V22h-6v-5a2 2 0 1 0-4 0v5H4V14.2l7-4V7H8V5h3V2z',
+  ticket: 'M3 6h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4V6zm7 2v8h2V8h-2z',
+  truck: 'M2 6h11v9H2V6zm12 3h3.5l2.5 3.2V15h-6V9zM6 16.5a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6zm11 0a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6z',
+  water: 'M12 2c4 5 7 8.4 7 12a7 7 0 1 1-14 0c0-3.6 3-7 7-12z',
+  sun: 'M11 1h2v3.5h-2V1zm0 18.5h2V23h-2v-3.5zM1 11h3.5v2H1v-2zm18.5 0H23v2h-3.5v-2zM4 5.4L5.4 4l2.5 2.5L6.5 7.9 4 5.4zm12.1 12.1l1.4-1.4L20 18.6 18.6 20l-2.5-2.5zM5.4 20L4 18.6l2.5-2.5 1.4 1.4L5.4 20zM16.1 6.5L18.6 4 20 5.4l-2.5 2.5-1.4-1.4zM12 6.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z',
 } as const;
 
 /**

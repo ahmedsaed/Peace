@@ -79,6 +79,7 @@ export async function runBankCatchUp(input: {
   senders: string[];
   homeCurrency: string;
   geminiModel: string;
+  guidance?: string;
 }): Promise<void> {
   if (running) return;
   running = true;
@@ -95,7 +96,7 @@ export async function runBankCatchUp(input: {
     // reading of it is still in flight.
     if (drained > 0) useBankInbox.getState().reload();
 
-    const outcome = await readPending(input.homeCurrency, input.geminiModel);
+    const outcome = await readPending(input.homeCurrency, input.geminiModel, input.guidance ?? '');
 
     /**
      * THE REASON THE STORE EXISTS.
@@ -121,13 +122,14 @@ export function useBankCatchUp(): void {
   const senders = useSetting('bankSenders');
   const homeCurrency = useSetting('homeCurrency');
   const geminiModel = useSetting('geminiModel');
+  const guidance = useSetting('bankGuidance');
 
   // Read through a ref inside the listener so the subscription is created once
   // rather than rebuilt whenever a setting changes. Written in an effect, never
   // during render — a ref mutated mid-render is invisible to React.
-  const state = useRef({ senders, homeCurrency, geminiModel });
+  const state = useRef({ senders, homeCurrency, geminiModel, guidance });
   useEffect(() => {
-    state.current = { senders, homeCurrency, geminiModel };
+    state.current = { senders, homeCurrency, geminiModel, guidance };
   });
 
   useEffect(() => {

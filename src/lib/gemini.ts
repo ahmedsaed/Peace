@@ -58,13 +58,14 @@ export function endpoint(model: string): string {
 export function buildRequest(
   base64Image: string,
   mimeType: string,
-  categoryNames: string[]
+  categoryNames: string[],
+  guidance?: string
 ): unknown {
   return {
     contents: [
       {
         parts: [
-          { text: buildPrompt(categoryNames) },
+          { text: buildPrompt(categoryNames, guidance) },
           { inline_data: { mime_type: mimeType, data: base64Image } },
         ],
       },
@@ -316,6 +317,8 @@ export type ReadOptions = {
   fetchImpl?: typeof fetch;
   /** The user's own category names, so the model picks from them. */
   categoryNames?: string[];
+  /** The editable half of the prompt. Empty falls back to the shipped default. */
+  guidance?: string;
   /** Decides the decimal places when the receipt names no currency. */
   fallbackCurrency?: string;
 };
@@ -419,13 +422,14 @@ export async function readReceipt(
     fetchImpl = fetch,
     categoryNames = [],
     fallbackCurrency = 'USD',
+    guidance = '',
   }: ReadOptions = {}
 ): Promise<ReadReceipt> {
   const raw = await generateJson(
     apiKey,
     model,
     [
-      { text: buildPrompt(categoryNames) },
+      { text: buildPrompt(categoryNames, guidance.trim() || undefined) },
       { inline_data: { mime_type: mimeType, data: base64Image } },
     ],
     RESPONSE_SCHEMA,
