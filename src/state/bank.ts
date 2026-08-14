@@ -105,7 +105,9 @@ export async function runBankCatchUp(input: {
      * re-render — which on a device meant switching month or reopening the app,
      * and looked exactly like the feature not working.
      */
-    if (outcome.read > 0 || outcome.failed > 0) useBankInbox.getState().reload();
+    if (outcome.read > 0 || outcome.failed > 0 || outcome.deferred > 0) {
+      useBankInbox.getState().reload();
+    }
   } catch (error) {
     // A message left pending is read next time. Nothing is lost and nothing
     // about the app should change because this failed.
