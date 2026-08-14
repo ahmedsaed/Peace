@@ -74,6 +74,13 @@ appId: com.ahmed.peace
     id: "tab-accounts"
 - tapOn: "Cash"
 - assertVisible: "Edit account"
+# Below the same growing icon grid as account-reconcile — see credit-card.yaml.
+# This one passes today only because a cash account has no limit or fee fields
+# to make the form taller.
+- scrollUntilVisible:
+    element:
+      id: "account-delete"
+    direction: DOWN
 - tapOn:
     id: "account-delete"
 - assertVisible:
