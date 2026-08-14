@@ -31,7 +31,6 @@ const PARSED = {
   currency: 'EGP',
   direction: 'out' as const,
   merchant: 'CARREFOUR',
-  accountTail: '0042',
   matchedAccountId: null,
 };
 
@@ -94,8 +93,6 @@ describe('what the model made of a message', () => {
     expect(row.status).toBe('parsed');
     expect(row.amountMinor).toBe(45_000);
     expect(row.direction).toBe('out');
-    // Text, not a number — "0042" is not 42.
-    expect(row.accountTail).toBe('0042');
     expect(pendingCaptures(db)).toEqual([]);
   });
 

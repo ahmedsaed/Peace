@@ -19,7 +19,6 @@ import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { isCapturing, isPermitted, openListenerSettings, setCapturing } from '@/db/bank-inbox';
 import { PromptEditor } from '@/components/prompt-editor';
-import { DEFAULT_BANK_GUIDANCE } from '@/lib/bank-sms';
 import { useBankInbox } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
 
@@ -241,10 +240,10 @@ export function BankMessagesCard() {
 
       <View className="mt-3">
         <PromptEditor
-          label="What to read"
-          hint="Your banks' wording, and which card is which — for example: the card ending 0042 is Kenana. Peace offers your account names to the model, so naming one here is what puts the record on the right card."
+          label="Your rules"
+          hint="Which card is which, and anything particular to your banks' wording. Peace hands the model your account names, so naming one here is what puts the record on the right card — and its currency."
+          example={'The card ending 0042 is Kenana.\nCIB messages about "instalment" are not purchases.'}
           value={settings.bankGuidance}
-          fallback={DEFAULT_BANK_GUIDANCE}
           onChange={(next) => update('bankGuidance', next)}
           testID="bank-guidance"
         />

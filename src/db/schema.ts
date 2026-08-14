@@ -591,10 +591,6 @@ export const bankCaptures = sqliteTable(
     /** 'out' or 'in', read from the message's words — never from a sign. */
     direction: text('direction', { enum: ['out', 'in'] }),
     merchant: text('merchant'),
-    /** yyyy-mm-dd, only when the message stated one. */
-    occurredOn: text('occurred_on'),
-    /** Last digits of the card, as TEXT — "0042" is not 42. */
-    accountTail: text('account_tail'),
     /**
      * Which account the message named, once matched to a real one.
      *

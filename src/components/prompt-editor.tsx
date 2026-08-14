@@ -1,16 +1,16 @@
 /**
- * Editing the finance half of a prompt.
+ * Editing the rules only the account holder knows.
  *
- * THE CONTRACT IS NOT EDITABLE, and that split is the whole design. What a
- * "total" means, which card is which, what to ignore — that is knowledge about
- * one person's money, and they know it better than this app does. The output
- * shape is not: an instruction that could break the JSON would turn a bad
- * sentence into an unparseable reply, so the system half stays in code and is
- * wrapped around this.
+ * THE BOX HOLDS THEIR HALF AND NOTHING ELSE. It once seeded itself with the
+ * app's own field rules — what a "total" means, how a direction must be read —
+ * which is the output contract, not a preference: it put the wiring in a
+ * settings box, invited someone to delete a line the parser depends on, and
+ * buried the one thing they were there to write. That half is now appended
+ * under the hood and never shown.
  *
- * Empty means "use the shipped default" rather than "send nothing", so clearing
- * the box is a reset. The default is shown as the placeholder, which makes the
- * field double as documentation of what the model is actually being told.
+ * So this starts EMPTY, and empty is the normal state rather than a gap to be
+ * filled. The placeholder is an EXAMPLE of the kind of sentence that belongs
+ * here, never text that would be sent.
  */
 
 import { useState } from 'react';
@@ -21,31 +21,31 @@ import palette from '@/constants/palette';
 export function PromptEditor({
   label,
   hint,
+  example,
   value,
-  fallback,
   onChange,
   testID,
 }: {
   label: string;
   hint: string;
-  /** The user's own text, or '' when they have not written any. */
+  /** A sample instruction, shown as the placeholder. NEVER sent to the model. */
+  example: string;
+  /** The user's own text. Empty for almost everybody. */
   value: string;
-  /** What the app sends when `value` is empty. Shown as the placeholder. */
-  fallback: string;
   onChange: (next: string) => void;
   testID: string;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
 
-  const customised = value.trim() !== '';
+  const added = value.trim() !== '';
 
   return (
     <View className="border-t border-line pt-3">
       <View className="mb-1 flex-row items-center justify-between">
         <Text className="text-sm text-ink">{label}</Text>
         <Text className="text-xs text-muted" testID={`${testID}-state`}>
-          {customised ? 'Customised' : 'Default'}
+          {added ? 'Added' : 'None'}
         </Text>
       </View>
       <Text className="mb-2 text-xs leading-4 text-muted">{hint}</Text>
@@ -55,19 +55,19 @@ export function PromptEditor({
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder={fallback}
+            placeholder={example}
             placeholderTextColor={palette.muted}
             multiline
             textAlignVertical="top"
-            autoCapitalize="none"
+            autoCapitalize="sentences"
             autoCorrect={false}
-            style={{ minHeight: 160 }}
+            style={{ minHeight: 120 }}
             className="mb-2 rounded-lg border border-line px-3 py-2.5 text-xs leading-5 text-ink"
             testID={`${testID}-input`}
           />
           <Text className="mb-2 text-xs leading-4 text-muted">
-            Peace adds the rest — what it is reading, how to answer, and your own accounts and
-            categories. Leave this empty to go back to the default.
+            Peace already tells the model what each field means and hands it your accounts and
+            categories. Write only what it could not work out for itself.
           </Text>
           <View className="flex-row gap-2">
             <Button
@@ -87,9 +87,9 @@ export function PromptEditor({
                 setOpen(false);
               }}
             />
-            {customised ? (
+            {added ? (
               <Button
-                label="Reset"
+                label="Clear"
                 testID={`${testID}-reset`}
                 onPress={() => {
                   setDraft('');
@@ -101,17 +101,22 @@ export function PromptEditor({
           </View>
         </>
       ) : (
-        <Button
-          label={customised ? 'Edit instructions' : 'Add instructions'}
-          testID={`${testID}-edit`}
-          onPress={() => {
-            // Seeded with the DEFAULT rather than an empty box the first time:
-            // editing a prompt from scratch means guessing what the app already
-            // says, and the useful edit is almost always an addition to it.
-            setDraft(value.trim() === '' ? fallback : value);
-            setOpen(true);
-          }}
-        />
+        <>
+          {added ? (
+            <Text className="mb-2 text-xs leading-5 text-ink" testID={`${testID}-current`}>
+              {value}
+            </Text>
+          ) : null}
+          <Button
+            label={added ? 'Edit rules' : 'Add rules'}
+            testID={`${testID}-edit`}
+            onPress={() => {
+              // Opens on THEIR text, or on nothing. Never on the app's own rules.
+              setDraft(value);
+              setOpen(true);
+            }}
+          />
+        </>
       )}
     </View>
   );
