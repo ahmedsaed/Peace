@@ -32,7 +32,22 @@ const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
  */
 export const READ_TIMEOUT_MS = 30_000;
 
-export class GeminiError extends Error {}
+/**
+ * A failure talking to Gemini.
+ *
+ * `transient` is the whole reason this is not a plain Error. "The model is busy"
+ * and "your key is wrong" both stop a reading, and treating them the same is how
+ * a message that would have worked thirty seconds later gets parked forever with
+ * an error beside it. One is worth retrying and the other never will be.
+ */
+export class GeminiError extends Error {
+  readonly transient: boolean;
+
+  constructor(message: string, transient = false) {
+    super(message);
+    this.transient = transient;
+  }
+}
 
 export function endpoint(model: string): string {
   // The model id is user-editable in Settings, so it is encoded rather than
@@ -148,6 +163,26 @@ export function reasonOf(body: unknown): string | null {
   return null;
 }
 
+/** Which HTTP failures are worth trying again. */
+export function isTransientStatus(status: number, body: unknown): boolean {
+  switch (reasonOf(body)) {
+    // A quota or a rate limit clears on its own; a bad key never does.
+    case 'RATE_LIMIT_EXCEEDED':
+    case 'RESOURCE_EXHAUSTED':
+      return true;
+    case 'API_KEY_INVALID':
+    case 'API_KEY_SERVICE_BLOCKED':
+    case 'SERVICE_DISABLED':
+      return false;
+    default:
+      break;
+  }
+  // 429 is rate limiting; 5xx is Google having a bad minute. `gemini-flash-latest`
+  // answers 503 "high demand" often enough that this is the common path, not an
+  // edge case.
+  return status === 429 || status >= 500;
+}
+
 /** HTTP failures, in words that name the thing the user can actually change. */
 export function describeFailure(status: number, body: unknown): string {
   switch (reasonOf(body)) {
@@ -256,7 +291,10 @@ export async function listModels(
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      throw new GeminiError(describeFailure(response.status, body));
+      throw new GeminiError(
+        describeFailure(response.status, body),
+        isTransientStatus(response.status, body)
+      );
     }
 
     const models = parseModelList(await response.json());
@@ -337,7 +375,10 @@ async function generateJson(
       // throw over the top of the real failure, so a body that will not read
       // simply leaves the status to speak for itself.
       const body = await response.json().catch(() => null);
-      throw new GeminiError(describeFailure(response.status, body));
+      throw new GeminiError(
+        describeFailure(response.status, body),
+        isTransientStatus(response.status, body)
+      );
     }
 
     return extractJson(await response.json());
@@ -354,8 +395,15 @@ async function generateJson(
      *
      * The URL is logged; the key is not, because it is in a header.
      */
+    /**
+     * TRANSIENT BY DEFINITION. Offline, a dead signal, a stalled connection that
+     * hit the timeout — every one of these is a thing that is true now and may
+     * not be in a minute. This is also what an overloaded model looks like when
+     * it stalls rather than answering 503, which is how a busy `flash-latest`
+     * usually presents.
+     */
     console.warn(`[gemini] ${label} failed`, endpoint(model), error);
-    throw new GeminiError('Could not reach Gemini. Enter the record by hand.');
+    throw new GeminiError('Could not reach Gemini. Enter the record by hand.', true);
   } finally {
     clearTimeout(timer);
   }

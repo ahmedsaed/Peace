@@ -73,7 +73,26 @@ export function drainCaptures(senders: string[]): number {
   );
 }
 
-export type ReadOutcome = { read: number; failed: number };
+export type ReadOutcome = {
+  read: number;
+  /** Marked unreadable — something a retry cannot fix. */
+  failed: number;
+  /** Left pending because the failure was transient. Retried next time. */
+  deferred: number;
+};
+
+/**
+ * How long to wait before the second attempt.
+ *
+ * `gemini-flash-latest` answers 503 "high demand" often enough that one
+ * immediate retry turns most of those into a reading the user never knew was
+ * at risk. Short, because somebody may be watching the screen; once, because a
+ * model that is busy twice in two seconds is busy, and the next app open is a
+ * better time to ask again than a tight loop is.
+ */
+const RETRY_PAUSE_MS = 1_500;
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Read the messages that are waiting.
@@ -92,39 +111,91 @@ export async function readPending(
   model: string
 ): Promise<ReadOutcome> {
   const waiting = pendingCaptures(db);
-  if (waiting.length === 0) return { read: 0, failed: 0 };
+  if (waiting.length === 0) return { read: 0, failed: 0, deferred: 0 };
 
   const key = await getGeminiKey();
   if (key === null) {
     // Not an error and not marked as one: the messages stay pending, and the
     // moment a key is added they are read. Marking them unreadable here would
     // bury a queue of perfectly good messages behind a setting.
-    return { read: 0, failed: 0 };
+    return { read: 0, failed: 0, deferred: 0 };
   }
 
   let read = 0;
   let failed = 0;
+  let deferred = 0;
 
   for (const capture of waiting) {
-    try {
-      const raw = await readBankMessage(
-        key,
-        model,
-        buildBankPrompt(capture.body),
-        BANK_RESPONSE_SCHEMA
-      );
-      markParsed(db, capture.id, parseBankReading(raw, fallbackCurrency));
+    const outcome = await readOne(key, model, capture.body, fallbackCurrency);
+
+    if (outcome.kind === 'read') {
+      markParsed(db, capture.id, outcome.fields);
       read += 1;
+      continue;
+    }
+
+    /**
+     * A BUSY MODEL MUST NOT BURN THE MESSAGE.
+     *
+     * Marking it unreadable on a 503 parks it in the queue with an error beside
+     * it and nothing to retry it — so a message that would have read perfectly
+     * a minute later needs entering by hand forever. Left pending, it is simply
+     * read at the next launch, foreground or capture.
+     */
+    if (outcome.transient) {
+      deferred += 1;
+      continue;
+    }
+
+    markUnreadable(db, capture.id, outcome.message);
+    failed += 1;
+  }
+
+  return { read, failed, deferred };
+}
+
+type ReadOne =
+  | { kind: 'read'; fields: ReturnType<typeof parseBankReading> }
+  | { kind: 'failed'; transient: boolean; message: string };
+
+/**
+ * One message, with a single retry when the first failure is worth retrying.
+ *
+ * The retry is here rather than in `gemini.ts` because only the caller knows
+ * whether a second attempt is wanted: the receipt reader has a person watching
+ * a spinner who can tap again, and this one has nobody watching at all.
+ */
+async function readOne(
+  key: string,
+  model: string,
+  body: string,
+  fallbackCurrency: string
+): Promise<ReadOne> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const raw = await readBankMessage(key, model, buildBankPrompt(body), BANK_RESPONSE_SCHEMA);
+      return { kind: 'read', fields: parseBankReading(raw, fallbackCurrency) };
     } catch (error) {
+      const transient = error instanceof GeminiError && error.transient;
       const message =
         error instanceof GeminiError ? error.message : 'That message could not be read.';
+
       if (!(error instanceof GeminiError)) {
         console.warn('[bank] reading a message failed', error);
       }
-      markUnreadable(db, capture.id, message);
-      failed += 1;
+
+      // Nothing a second attempt would change — a wrong key, a blocked prompt,
+      // a reply that was not a reading.
+      if (!transient) return { kind: 'failed', transient: false, message };
+
+      // Second time unlucky: leave it for the next catch-up rather than sitting
+      // here retrying while somebody waits.
+      if (attempt === 1) return { kind: 'failed', transient: true, message };
+
+      await pause(RETRY_PAUSE_MS);
     }
   }
 
-  return { read, failed };
+  // Unreachable: the loop either returns or exhausts both attempts above.
+  return { kind: 'failed', transient: true, message: 'Could not reach Gemini.' };
 }

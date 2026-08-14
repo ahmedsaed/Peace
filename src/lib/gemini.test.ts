@@ -4,6 +4,7 @@ import {
   describeFailure,
   endpoint,
   extractJson,
+  isTransientStatus,
   listModels,
   parseModelList,
   readReceipt,
@@ -312,6 +313,57 @@ describe('reading a receipt end to end', () => {
     expect(reasonOf(googleError(400, 'x'))).toBeNull();
     expect(reasonOf(null)).toBeNull();
     expect(reasonOf({ error: {} })).toBeNull();
+  });
+
+  /**
+   * THE DISTINCTION THAT KEEPS A MESSAGE ALIVE.
+   *
+   * "The model is busy" and "your key is wrong" both stop a reading. Treating
+   * them the same is how a bank message that would have read perfectly a minute
+   * later gets parked forever with an error beside it — which is exactly what
+   * happened on a device, because `gemini-flash-latest` answers 503 "high
+   * demand" often enough that it is the common path rather than an edge case.
+   */
+  it('knows which failures are worth trying again', () => {
+    // Google having a bad minute, or a rate limit that clears on its own.
+    expect(isTransientStatus(503, null)).toBe(true);
+    expect(isTransientStatus(500, null)).toBe(true);
+    expect(isTransientStatus(429, null)).toBe(true);
+    expect(isTransientStatus(429, googleError(429, 'x', 'RESOURCE_EXHAUSTED'))).toBe(true);
+
+    // Nothing a retry changes.
+    expect(isTransientStatus(400, googleError(400, 'x', 'API_KEY_INVALID'))).toBe(false);
+    expect(isTransientStatus(403, googleError(403, 'x', 'SERVICE_DISABLED'))).toBe(false);
+    expect(isTransientStatus(404, null)).toBe(false);
+    expect(isTransientStatus(400, null)).toBe(false);
+  });
+
+  it('marks a busy model transient on the error it throws', async () => {
+    await expect(
+      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: status(503) })
+    ).rejects.toMatchObject({ transient: true });
+  });
+
+  it('marks a refused key permanent on the error it throws', async () => {
+    const body = googleError(400, 'API key not valid.', 'API_KEY_INVALID');
+    await expect(
+      readReceipt('bad', 'm', IMAGE, 'image/jpeg', { fetchImpl: status(400, body) })
+    ).rejects.toMatchObject({ transient: false });
+  });
+
+  /**
+   * A stalled connection that hit the timeout is what an overloaded model
+   * usually looks like — it never answers 503 at all. That has to be retryable
+   * or the common failure is the permanent one.
+   */
+  it('treats a network failure as transient', async () => {
+    const boom = jest.fn(async () => {
+      throw new Error('getaddrinfo ENOTFOUND');
+    }) as unknown as typeof fetch;
+
+    await expect(
+      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: boom })
+    ).rejects.toMatchObject({ transient: true });
   });
 
   it('names a disabled API rather than blaming the key itself', () => {
