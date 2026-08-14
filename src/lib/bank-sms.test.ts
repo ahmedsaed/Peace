@@ -128,7 +128,6 @@ describe('reading what came back', () => {
     currency: 'EGP',
     direction: 'out',
     merchant: 'CARREFOUR',
-    accountTail: '0042',
   };
 
   it('turns a clean reply into fields a record can use', () => {
@@ -138,7 +137,6 @@ describe('reading what came back', () => {
       direction: 'out',
       merchant: 'CARREFOUR',
       account: null,
-      accountTail: '0042',
     });
   });
 
@@ -171,13 +169,15 @@ describe('reading what came back', () => {
   });
 
   /**
-   * "0042" is not 42. The leading zero is exactly what makes it match the right
-   * card, so this is text and stays text.
+   * A field nothing reads must not be asked for.
+   *
+   * The card tail was read, stored, and used by nothing — the account NAME is
+   * what resolves to an account, and the raw message is on the review sheet for
+   * anyone wanting the digits. Anything extra the model volunteers is dropped
+   * here rather than carried, so it cannot quietly acquire a meaning later.
    */
-  it('keeps the account tail as digits, leading zero and all', () => {
-    expect(parseBankReading({ ...good, accountTail: '0042' }).accountTail).toBe('0042');
-    expect(parseBankReading({ ...good, accountTail: '****0042' }).accountTail).toBe('0042');
-    expect(parseBankReading({ ...good, accountTail: 'n/a' }).accountTail).toBeNull();
+  it('keeps nothing the reading has no field for', () => {
+    expect(parseBankReading({ ...good, accountTail: '0042' })).not.toHaveProperty('accountTail');
   });
 
   it('only accepts a currency that looks like a code', () => {
@@ -267,16 +267,36 @@ describe('the prompt', () => {
     expect(buildBankPrompt('x', [])).toContain('none');
   });
 
-  it('uses the caller\'s guidance in place of the default', () => {
+  it('adds the user\'s own rules without displacing the contract', () => {
     const prompt = buildBankPrompt('x', [], 'the card ending 0042 is Kenana');
     expect(prompt).toContain('the card ending 0042 is Kenana');
-    // The system half is still wrapped around it — an editable instruction must
-    // never be able to drop the discipline that keeps the reply parseable.
+    // The field rules are still there — the user's half is an ADDITION, never a
+    // replacement, or an empty box would send a prompt with no contract in it.
+    expect(prompt).toContain('Read the WORDS');
     expect(prompt).toContain('Return only what the message actually states');
   });
 
-  it('falls back to the default when the guidance is blank', () => {
-    expect(buildBankPrompt('x', [], '   ')).toContain('Read the WORDS');
+  /**
+   * THEIR RULES COME LAST, so a specific instruction can qualify a general one.
+   * Put first, "instalment messages are not purchases" argues with a field rule
+   * the model has not read yet.
+   */
+  it('puts their rules after the field rules', () => {
+    const prompt = buildBankPrompt('x', [], 'MINE');
+    expect(prompt.indexOf('MINE')).toBeGreaterThan(prompt.indexOf('Read the WORDS'));
+  });
+
+  /**
+   * THE EMPTY BOX IS THE NORMAL STATE. Almost nobody writes rules, so the prompt
+   * has to be complete without them — and must not carry an empty heading
+   * announcing rules that are not there.
+   */
+  it('is complete, and says nothing about rules, when there are none', () => {
+    for (const guidance of ['', '   ']) {
+      const prompt = buildBankPrompt('x', [], guidance);
+      expect(prompt).toContain('Read the WORDS');
+      expect(prompt).not.toContain('own rules');
+    }
   });
 
   it('says to ignore the things that are not transactions', () => {

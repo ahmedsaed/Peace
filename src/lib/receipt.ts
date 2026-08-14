@@ -49,18 +49,17 @@ export class ReceiptError extends Error {}
  * usable or absent.
  */
 /**
- * The part of the prompt the USER may edit.
+ * THE FIELD RULES, which are not the user's to edit.
  *
- * Split from the system half deliberately. What a "total" means, whether a
- * service charge counts, how to recognise a particular shop — that is domain
- * knowledge about somebody's own spending, and they know it better than this
- * file does. The output contract is not: an editable instruction that could
- * break the JSON shape would turn a bad sentence into an unparseable reply.
- *
- * Shipped as the default, so an untouched app behaves exactly as before and the
- * field doubles as documentation of what the model is being told.
+ * The line between the two halves is what a field MEANS versus what is true of
+ * one person's spending. That a "total" is the final figure and a date must be
+ * yyyy-mm-dd is the output contract — offering it as editable text put the
+ * app's own wiring in a settings box, invited someone to delete a rule the
+ * parser depends on, and left nowhere to say the thing they actually wanted to
+ * say. Their box starts EMPTY and holds only what no code could know: a shop
+ * that keeps being misread, a service charge that should not count.
  */
-export const DEFAULT_RECEIPT_GUIDANCE = [
+const FIELD_RULES = [
   'total: the FINAL amount paid, after discounts and including tax and service.',
   '  Not a subtotal, not a single line item, not the change given.',
   'currency: the ISO 4217 code, if it is printed or unambiguous from the symbol.',
@@ -72,14 +71,16 @@ export const DEFAULT_RECEIPT_GUIDANCE = [
 ].join('\n');
 
 /**
- * The whole prompt: system rules, then the user's guidance, then the data.
+ * The whole prompt: the contract, then the user's own rules, then the data.
  *
- * The ORDER matters. The system half goes first so the discipline it sets —
- * report what you see, prefer a null to an invention — frames everything after
- * it, and the category list goes last so it cannot be mistaken for prose.
+ * `guidance` is EMPTY for almost everybody and the prompt has to be complete
+ * without it. What the user adds goes AFTER the field rules so a specific
+ * instruction can qualify a general one, never the other way round, and the
+ * category list goes last so it cannot be mistaken for prose.
  */
-export function buildPrompt(categoryNames: string[], guidance = DEFAULT_RECEIPT_GUIDANCE): string {
+export function buildPrompt(categoryNames: string[], guidance = ''): string {
   const list = categoryNames.length > 0 ? categoryNames.join(', ') : 'none';
+  const mine = guidance.trim();
   return [
     'You are reading a photograph of a receipt or invoice for an expense tracker.',
     'Return only what you can actually see. Use null for anything unreadable,',
@@ -87,7 +88,8 @@ export function buildPrompt(categoryNames: string[], guidance = DEFAULT_RECEIPT_
     'than a plausible invention, because the person will be checking these',
     'numbers against the paper in their hand.',
     '',
-    guidance.trim() || DEFAULT_RECEIPT_GUIDANCE,
+    FIELD_RULES,
+    ...(mine === '' ? [] : ['', "The account holder's own rules, which override the above:", mine]),
     '',
     `The categories to choose from: ${list}.`,
   ].join('\n');

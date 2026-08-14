@@ -9,7 +9,6 @@
 import { Text, View } from 'react-native';
 
 import { PromptEditor } from '@/components/prompt-editor';
-import { DEFAULT_RECEIPT_GUIDANCE } from '@/lib/receipt';
 import { useSettingsStore } from '@/state/settings';
 
 export function ReceiptsCard() {
@@ -25,10 +24,10 @@ export function ReceiptsCard() {
       </Text>
 
       <PromptEditor
-        label="What to read"
-        hint="Tell the model what your receipts look like — which total counts, shops it keeps misreading, anything it should ignore."
+        label="Your rules"
+        hint="Anything about your own receipts the model could not work out — a shop it keeps misreading, a charge that should not count. Most people need none."
+        example={'Ignore the 12% service charge at Zooba.\nReceipts from "AMZN Mktp" are Amazon.'}
         value={settings.receiptGuidance}
-        fallback={DEFAULT_RECEIPT_GUIDANCE}
         onChange={(next) => update('receiptGuidance', next)}
         testID="receipt-guidance"
       />
