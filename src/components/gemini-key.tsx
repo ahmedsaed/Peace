@@ -131,6 +131,7 @@ export function GeminiKeyCard() {
         senders: settings.bankSenders,
         homeCurrency: settings.homeCurrency,
         geminiModel: settings.geminiModel,
+        guidance: settings.bankGuidance,
       });
     } catch (e) {
       // The keystore can refuse on a device with a broken keychain. Friendly
@@ -140,14 +141,14 @@ export function GeminiKeyCard() {
     } finally {
       setBusy(false);
     }
-  }, [draft, settings.bankSenders, settings.homeCurrency, settings.geminiModel]);
+  }, [draft, settings.bankSenders, settings.homeCurrency, settings.geminiModel, settings.bankGuidance]);
 
   return (
     <View className="rounded-xl bg-surface p-4" testID="gemini-card">
-      <Text className="mb-1 text-base font-semibold text-ink">Read receipts</Text>
+      <Text className="mb-1 text-base font-semibold text-ink">Gemini</Text>
       <Text className="mb-3 text-sm leading-5 text-muted">
-        With a Gemini API key, Peace can read a photographed receipt and fill in the amount, date
-        and shop. Your key is kept on this device and never goes into a backup.
+        One key, used by everything that reads for you — photographed receipts and bank messages
+        both. It is kept on this device and never goes into a backup.
       </Text>
 
       <View className="mb-3 flex-row items-center justify-between">

@@ -78,6 +78,8 @@ export type ParsedFields = {
   direction: 'out' | 'in' | null;
   merchant: string | null;
   accountTail: string | null;
+  /** Resolved to a real account when the model named one this ledger has. */
+  matchedAccountId: string | null;
 };
 
 /** What the model made of a message. */

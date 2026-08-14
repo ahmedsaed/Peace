@@ -31,8 +31,8 @@ const PARSED = {
   currency: 'EGP',
   direction: 'out' as const,
   merchant: 'CARREFOUR',
-  occurredOn: '2026-08-01',
   accountTail: '0042',
+  matchedAccountId: null,
 };
 
 describe('recording what was captured', () => {

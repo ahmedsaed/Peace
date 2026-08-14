@@ -48,7 +48,37 @@ export class ReceiptError extends Error {}
  * week. Asking it to choose from the user's own names makes the answer either
  * usable or absent.
  */
-export function buildPrompt(categoryNames: string[]): string {
+/**
+ * The part of the prompt the USER may edit.
+ *
+ * Split from the system half deliberately. What a "total" means, whether a
+ * service charge counts, how to recognise a particular shop — that is domain
+ * knowledge about somebody's own spending, and they know it better than this
+ * file does. The output contract is not: an editable instruction that could
+ * break the JSON shape would turn a bad sentence into an unparseable reply.
+ *
+ * Shipped as the default, so an untouched app behaves exactly as before and the
+ * field doubles as documentation of what the model is being told.
+ */
+export const DEFAULT_RECEIPT_GUIDANCE = [
+  'total: the FINAL amount paid, after discounts and including tax and service.',
+  '  Not a subtotal, not a single line item, not the change given.',
+  'currency: the ISO 4217 code, if it is printed or unambiguous from the symbol.',
+  'date: the date of the purchase in yyyy-mm-dd, not the date it was printed',
+  '  if those differ, and not today.',
+  'merchant: the trading name of the shop, as printed. No branch numbers,',
+  '  no address, no legal suffix.',
+  'category: the single best match from the list below, or null.',
+].join('\n');
+
+/**
+ * The whole prompt: system rules, then the user's guidance, then the data.
+ *
+ * The ORDER matters. The system half goes first so the discipline it sets —
+ * report what you see, prefer a null to an invention — frames everything after
+ * it, and the category list goes last so it cannot be mistaken for prose.
+ */
+export function buildPrompt(categoryNames: string[], guidance = DEFAULT_RECEIPT_GUIDANCE): string {
   const list = categoryNames.length > 0 ? categoryNames.join(', ') : 'none';
   return [
     'You are reading a photograph of a receipt or invoice for an expense tracker.',
@@ -57,14 +87,9 @@ export function buildPrompt(categoryNames: string[]): string {
     'than a plausible invention, because the person will be checking these',
     'numbers against the paper in their hand.',
     '',
-    'total: the FINAL amount paid, after discounts and including tax and service.',
-    '  Not a subtotal, not a single line item, not the change given.',
-    'currency: the ISO 4217 code, if it is printed or unambiguous from the symbol.',
-    'date: the date of the purchase in yyyy-mm-dd, not the date it was printed',
-    '  if those differ, and not today.',
-    'merchant: the trading name of the shop, as printed. No branch numbers,',
-    '  no address, no legal suffix.',
-    `category: the single best match from this list, or null: ${list}.`,
+    guidance.trim() || DEFAULT_RECEIPT_GUIDANCE,
+    '',
+    `The categories to choose from: ${list}.`,
   ].join('\n');
 }
 

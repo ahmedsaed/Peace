@@ -595,6 +595,17 @@ export const bankCaptures = sqliteTable(
     occurredOn: text('occurred_on'),
     /** Last digits of the card, as TEXT — "0042" is not 42. */
     accountTail: text('account_tail'),
+    /**
+     * Which account the message named, once matched to a real one.
+     *
+     * Resolved when the message is read rather than when it is approved, so the
+     * row can show the right card and the record inherits its currency and its
+     * fees. Null when the model named none or named one that does not exist —
+     * then the default account is used and the user can move it.
+     */
+    matchedAccountId: text('matched_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
 
     /** Set once a record has been saved from this message. */
     transactionId: text('transaction_id').references(() => transactions.id, {
