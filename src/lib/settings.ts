@@ -79,6 +79,24 @@ export const SETTING_DEFAULTS = {
   bankGuidance: '' as string,
 
   /**
+   * The newest release seen on GitHub, and when it was last looked for.
+   *
+   * CACHED because the answer changes at most once a merge and the check is
+   * pure courtesy — asking on every drawer open would be network traffic for
+   * nothing. Stored rather than held in memory so the drawer can say something
+   * on the FIRST open after a launch, before any request has finished.
+   *
+   * A build number rather than a version: `1.0.0` has been released five times.
+   * Zero means nothing has been found yet, which is also what a failed check
+   * leaves behind — there is deliberately no way to distinguish "no update"
+   * from "could not ask", because the app does the same thing either way.
+   */
+  latestBuildSeen: 0 as number,
+  latestVersionSeen: '' as string,
+  latestReleaseUrl: '' as string,
+  lastUpdateCheckAt: 0 as number,
+
+  /**
    * How often to copy the database to Google Drive. `off` until connected.
    *
    * These three live in `settings` rather than in secure storage because none

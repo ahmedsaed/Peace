@@ -32,6 +32,8 @@ const PARSED = {
   direction: 'out' as const,
   merchant: 'CARREFOUR',
   matchedAccountId: null,
+  matchedCategoryId: null,
+  isWithdrawal: false,
 };
 
 describe('recording what was captured', () => {

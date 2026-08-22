@@ -78,6 +78,11 @@ appId: com.ahmed.peace
 # The row reads as a refund, not as earnings — the colour is what a reader
 # checks at a glance, and green would say "earned".
 - assertVisible: ".*refunded.*"
+# The MARK, not just the word. A positive number in an expense list has to
+# answer "why is this not red" without being read, and the tint and the
+# subtitle both need reading. The badge is what answers it at a glance.
+- assertVisible:
+    id: "refund-badge"
 - takeScreenshot: 03-refunded
 
 # --- the category chart agrees ---

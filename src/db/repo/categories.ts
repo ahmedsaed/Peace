@@ -132,6 +132,23 @@ export function buildCategoryTree(all: Category[], kind: Category['kind']): Cate
   }));
 }
 
+/**
+ * Every live category, both kinds, flat.
+ *
+ * What a MODEL needs, as opposed to a picker: sub-categories included, because
+ * "Restaurants" is the name a receipt or a bank message actually contains and
+ * a tree cannot be offered as a list of choices. Archived ones are left out —
+ * they are not offered to a person either, and a model filing into one would
+ * resurrect a category the user retired.
+ */
+export function listCategoriesFlat(db: Db): Category[] {
+  return db
+    .select()
+    .from(categories)
+    .all()
+    .filter((c) => !c.archived);
+}
+
 /** Top-level categories of one kind, each with its children attached. */
 export function listCategoryTree(db: Db, kind: Category['kind']): CategoryNode[] {
   return buildCategoryTree(db.select().from(categories).all(), kind);

@@ -307,6 +307,9 @@ app ignoring input. `pkill -f GradleDaemon`.
   emulator. Check the CENTRING the same way — the first paperclip was four units right of centre,
   invisible on its own and obvious beside text. Solid shapes (`document`) survive small sizes;
   rings (`search`, `camera`, `paperclip`) need ~14px, which is why the attach button is a folder.
+  A BADGE is the extreme of this: the refund mark has 10px to work in, where `refresh` — the
+  obvious circular-arrow choice — closes into a featureless blob. A solid arrow survives it, and
+  reads as "came back" more directly anyway.
 - **A control floating over a scrollable strip needs trailing padding, or the last item is
   unreachable.** The attach buttons overlay the receipt previews to save a row of height; without
   `paddingRight` equal to the buttons' width, the final thumbnail comes to rest UNDERNEATH them and
@@ -527,6 +530,31 @@ app ignoring input. `pkill -f GradleDaemon`.
   spot afterwards, because that string is a valid date under two conventions and both look right.
   Do not even ask for it: a field the model returns and the app ignores is a field somebody will
   eventually wire up.
+- **Cash out of a machine is a TRANSFER, and getting it wrong double-counts.** Money leaving a
+  bank at an ATM has not been spent — it is spent later, one purchase at a time. Filed as an
+  expense it is counted twice, so the month reads high and the cash account never fills, and both
+  halves look individually plausible. The bank reader asks for `withdrawal` as its own field and
+  the record screen opens as a transfer into the first cash account. Only an explicit `true`
+  counts: a model answering `"yes"` has not said it, and wrongly calling a purchase a transfer
+  hides it from every spending total there is.
+- **The installed build is routinely AHEAD of the newest release.** PR builds are the normal way
+  this app reaches a phone, and they are not releases — build 121 sat against release 117 for a
+  week. So the update check compares `>`, never `!=`: the obvious version would have nagged
+  constantly to install a DOWNGRADE. Compare BUILD NUMBERS out of the tag (`v1.2.0+build.117`),
+  never the semver, which has repeated across five separate releases; and treat a build number of
+  zero as "no answer", because a dev build reports whatever the dev server last evaluated and
+  would otherwise claim an update forever.
+- **A queue that reports once reports nothing.** Reading bank messages is one network round trip
+  each, and reloading the store after the LOOP meant the first four of five sat finished and
+  invisible for as long as the slowest took — the app holding answers it already had. Report after
+  each item. A deferred item is not progress: it stays pending, its row keeps spinning, and
+  announcing it repaints the screen to say nothing changed.
+- **An affordance whose save path does not exist is worse than a missing feature.** Turning the
+  "spent abroad" control on for editing looked like a one-word fix — delete `&& !existing` — and
+  would have shipped a control that silently did nothing, because a foreign purchase writes the
+  charge AND the card's commission through `createCardPurchase` and `updateRecord` has no such
+  branch. What editing needed was to SEE the original amount, which the row has stored all along
+  and displayed nowhere. Before enabling a control on a new path, follow it to the write.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required

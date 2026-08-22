@@ -60,6 +60,26 @@ export type BankReading = {
    * somebody eventually wires up.
    */
   account: string | null;
+  /**
+   * A category NAME to match against the user's own. Never an id.
+   *
+   * The receipt reader has offered the user's categories from the start; this
+   * one asked for nothing and so filed every bank record as Uncategorised —
+   * which looked like the model declining to guess and was the app never
+   * asking. Same list, same matcher, same rule: an invented name resolves to
+   * nothing rather than creating a category.
+   */
+  category: string | null;
+  /**
+   * A CASH WITHDRAWAL, which is not spending at all.
+   *
+   * Money leaving a bank account at an ATM has not been spent — it has moved
+   * to the notes in a pocket, and it is spent later, one purchase at a time.
+   * Filed as an expense it is counted TWICE: once at the machine and again at
+   * the shop, so the month reads high and the cash account never fills. It is
+   * a transfer, and the only one a bank message can describe.
+   */
+  withdrawal: boolean;
 };
 
 export const EMPTY_BANK_READING: BankReading = {
@@ -68,6 +88,8 @@ export const EMPTY_BANK_READING: BankReading = {
   direction: null,
   merchant: null,
   account: null,
+  category: null,
+  withdrawal: false,
 };
 
 export class BankSmsError extends Error {}
@@ -182,6 +204,12 @@ const FIELD_RULES = [
   'account: which of my accounts was charged, chosen from the list below, or null.',
   '  A message naming only a card number matches no account on its own; choose one',
   '  only when the message or a rule below identifies it.',
+  'category: the single best match from the categories listed below, or null.',
+  '  Guess from the merchant — a supermarket is groceries, a fuel station is',
+  '  transport. Null only when the message names nothing to go on.',
+  'withdrawal: true ONLY for cash taken out — an ATM, a cash advance, a counter',
+  '  withdrawal. Cash moved into a pocket has not been spent yet, so this is not',
+  '  a purchase. False for everything else, including transfers to other people.',
   '',
   'Ignore balance figures, available-credit figures, OTPs, marketing and anything',
   'that is not a single completed transaction. If the message is not about one,',
@@ -196,8 +224,14 @@ const FIELD_RULES = [
  * which, a bank's particular wording — and it goes AFTER the field rules so a
  * specific instruction can qualify a general one, never the other way round.
  */
-export function buildBankPrompt(body: string, accountNames: string[] = [], guidance = ''): string {
+export function buildBankPrompt(
+  body: string,
+  accountNames: string[] = [],
+  guidance = '',
+  categoryNames: string[] = []
+): string {
   const accounts = accountNames.length > 0 ? accountNames.join(', ') : 'none';
+  const categories = categoryNames.length > 0 ? categoryNames.join(', ') : 'none';
   const mine = guidance.trim();
   return [
     'You are reading a bank notification for an expense tracker.',
@@ -209,6 +243,7 @@ export function buildBankPrompt(body: string, accountNames: string[] = [], guida
     ...(mine === '' ? [] : ['', "The account holder's own rules, which override the above:", mine]),
     '',
     `My accounts: ${accounts}.`,
+    `The categories to choose from: ${categories}.`,
     '',
     'The message:',
     body,
@@ -224,6 +259,8 @@ export const BANK_RESPONSE_SCHEMA = {
     direction: { type: 'string', nullable: true, enum: ['out', 'in'] },
     merchant: { type: 'string', nullable: true },
     account: { type: 'string', nullable: true },
+    category: { type: 'string', nullable: true },
+    withdrawal: { type: 'boolean', nullable: true },
   },
 } as const;
 
@@ -261,6 +298,11 @@ export function parseBankReading(raw: unknown, fallbackCurrency = 'USD'): BankRe
     direction,
     merchant: cleanString(body.merchant, 80),
     account: cleanString(body.account, 60),
+    category: cleanString(body.category, 60),
+    // Only an explicit true. A model that omits the field, or answers "yes" as
+    // a string, has not said this was a withdrawal — and wrongly calling a
+    // purchase a transfer hides it from every spending total there is.
+    withdrawal: body.withdrawal === true,
   };
 }
 
@@ -302,6 +344,29 @@ export function matchAccount<T extends { id: string; name: string }>(
   if (!wanted) return null;
   const needle = wanted.trim().toLowerCase();
   return accounts.find((a) => a.name.trim().toLowerCase() === needle) ?? null;
+}
+
+/**
+ * The note a record made from a bank message starts with.
+ *
+ * THE MESSAGE ALWAYS SURVIVES. What the model made of it goes first, because
+ * that is the line worth reading in a list — but the bank's own words are the
+ * only record of what was actually received, and they are exactly what is
+ * wanted when the reading is wrong or absent. Dropping them left a failed
+ * reading as an empty note: the app had the text, showed it in the grey row,
+ * and then threw it away at the one moment it became permanent.
+ *
+ * Kept whole. A receipt's worth of text costs nothing to store, makes the row
+ * subtitle no longer (it is one line and truncates), and gives search more of
+ * the wording a person would actually type.
+ */
+export function captureNote(capture: { merchant: string | null; body: string }): string {
+  const merchant = capture.merchant?.trim();
+  const body = capture.body.trim();
+  if (!merchant) return body;
+  // Already the whole of it — a one-line alert whose merchant IS the message.
+  if (merchant === body) return merchant;
+  return `${merchant}\n\n${body}`;
 }
 
 export function isUsableReading(reading: BankReading): boolean {

@@ -602,6 +602,25 @@ export const bankCaptures = sqliteTable(
     matchedAccountId: text('matched_account_id').references(() => accounts.id, {
       onDelete: 'set null',
     }),
+    /**
+     * The category the model chose, once matched to a real one.
+     *
+     * Resolved at reading time for the same reason the account is: the row can
+     * then show what it will be filed as, and approving it is a confirmation
+     * rather than a second round of picking. Null when the model chose nothing
+     * or chose a name this ledger does not have.
+     */
+    matchedCategoryId: text('matched_category_id').references(() => categories.id, {
+      onDelete: 'set null',
+    }),
+    /**
+     * Cash taken out, which is a TRANSFER and not spending.
+     *
+     * Money leaving a bank at an ATM has not been spent — it is spent later,
+     * one purchase at a time. Recorded as an expense it is counted twice, so
+     * the month reads high and the cash account never fills.
+     */
+    isWithdrawal: integer('is_withdrawal', { mode: 'boolean' }).notNull().default(false),
 
     /** Set once a record has been saved from this message. */
     transactionId: text('transaction_id').references(() => transactions.id, {
