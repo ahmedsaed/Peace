@@ -174,6 +174,8 @@ export function searchRecords(
       transferPairId: transactions.transferPairId,
       isAdjustment: transactions.isAdjustment,
       isRefund: transactions.isRefund,
+      originalAmountMinor: transactions.originalAmountMinor,
+      originalCurrency: transactions.originalCurrency,
       categoryName: categories.name,
       categoryIcon: categories.icon,
       categoryColor: categories.color,

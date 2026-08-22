@@ -22,7 +22,9 @@ import {
   parseBankReading,
   parseCaptures,
 } from '../lib/bank-sms';
+import { matchCategory } from '../lib/receipt';
 import { listAccountsWithBalance } from './repo/accounts';
+import { listCategoriesFlat } from './repo/categories';
 import { GeminiError, readBankMessage } from '../lib/gemini';
 import { getGeminiKey } from '../lib/secrets';
 import { db } from './client';
@@ -111,7 +113,16 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function readPending(
   fallbackCurrency: string,
   model: string,
-  guidance = ''
+  guidance = '',
+  /**
+   * Called after EACH message is settled, not once at the end.
+   *
+   * A queue of five took one network round trip each and then appeared all at
+   * once, several seconds after the first was already known — the app sitting
+   * on an answer it had. Reporting per message is what makes a backlog drain
+   * visibly rather than arrive as a block.
+   */
+  onProgress?: () => void
 ): Promise<ReadOutcome> {
   const waiting = pendingCaptures(db);
   if (waiting.length === 0) return { read: 0, failed: 0, deferred: 0 };
@@ -133,6 +144,14 @@ export async function readPending(
    */
   const accounts = listAccountsWithBalance(db);
   const accountNames = accounts.map((a) => a.name);
+  /**
+   * And the user's own categories, exactly as the receipt reader has always
+   * offered them. Asking for nothing is why every bank record arrived
+   * Uncategorised — which read as the model declining to guess and was the app
+   * never putting the question.
+   */
+  const categories = listCategoriesFlat(db);
+  const categoryNames = categories.map((c) => c.name);
 
   let read = 0;
   let failed = 0;
@@ -145,17 +164,35 @@ export async function readPending(
       capture.body,
       fallbackCurrency,
       accountNames,
-      guidance
+      guidance,
+      categoryNames
     );
 
     if (outcome.kind === 'read') {
+      const { account: _named, category: _guessed, withdrawal, ...fields } = outcome.fields;
       markParsed(db, capture.id, {
-        ...outcome.fields,
+        ...fields,
+        isWithdrawal: withdrawal,
         // Resolved here rather than at approval, so the row shows the right card
         // and the record inherits its currency and its fees.
         matchedAccountId: matchAccount(outcome.fields.account, accounts)?.id ?? null,
+        /**
+         * Matched WITHIN THE RIGHT SIDE of the ledger. Both kinds are offered
+         * to the model because a bank sends salary alerts as well as purchases,
+         * but "Refunds" as an income category must never come back attached to
+         * a debit — the picker would then be showing a category the record's
+         * own type does not contain.
+         */
+        matchedCategoryId:
+          matchCategory(
+            outcome.fields.category,
+            categories.filter(
+              (c) => c.kind === (outcome.fields.direction === 'in' ? 'income' : 'expense')
+            )
+          )?.id ?? null,
       });
       read += 1;
+      onProgress?.();
       continue;
     }
 
@@ -174,6 +211,7 @@ export async function readPending(
 
     markUnreadable(db, capture.id, outcome.message);
     failed += 1;
+    onProgress?.();
   }
 
   return { read, failed, deferred };
@@ -196,14 +234,15 @@ async function readOne(
   body: string,
   fallbackCurrency: string,
   accountNames: string[],
-  guidance: string
+  guidance: string,
+  categoryNames: string[]
 ): Promise<ReadOne> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const raw = await readBankMessage(
         key,
         model,
-        buildBankPrompt(body, accountNames, guidance.trim() || undefined),
+        buildBankPrompt(body, accountNames, guidance, categoryNames),
         BANK_RESPONSE_SCHEMA
       );
       return { kind: 'read', fields: parseBankReading(raw, fallbackCurrency) };
