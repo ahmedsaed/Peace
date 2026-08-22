@@ -1,4 +1,4 @@
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
@@ -31,8 +31,18 @@ export function BankRow({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const unreadable = capture.status === 'unreadable';
+  const reading = capture.status === 'pending';
   const sign = capture.direction === 'in' ? '' : '-';
+
+  /**
+   * THE MESSAGE'S OWN WORDS, unless there is something better to show.
+   *
+   * Once a reading has succeeded the merchant is the useful line and the raw SMS
+   * is noise. Before that — still reading, or could not be read — the text IS
+   * the information: it is what tells the user which purchase this is, and
+   * without it the row is an anonymous grey bar they have to open to identify.
+   */
+  const subtitle = capture.status === 'parsed' ? `from ${capture.sender}` : capture.body;
 
   return (
     <Pressable
@@ -51,12 +61,21 @@ export function BankRow({
         <Text className="text-[15px] text-muted" numberOfLines={1}>
           {capture.merchant ?? capture.sender}
         </Text>
-        <Text className="text-xs text-muted opacity-70" numberOfLines={1}>
-          {unreadable ? 'could not be read · hold to act' : `from ${capture.sender}`}
+        {/* Two lines for the raw message: one truncates a bank's wording right
+            where the amount usually is. */}
+        <Text
+          className="text-xs text-muted opacity-70"
+          numberOfLines={capture.status === 'parsed' ? 1 : 2}>
+          {subtitle}
         </Text>
       </View>
 
-      {capture.amountMinor === null ? (
+      {reading ? (
+        /* Being read right now. A spinner rather than a dash, because the row
+           appears the instant the message lands and the reading takes a network
+           round trip — without this it looks like a message with no amount. */
+        <ActivityIndicator size="small" color={palette.accent} testID="bank-reading" />
+      ) : capture.amountMinor === null ? (
         // No amount means the model found nothing usable. A dash rather than a
         // zero: zero is a number, and this is the absence of one.
         <Text className="text-[15px] text-muted opacity-70">—</Text>
@@ -113,9 +132,11 @@ export function BankActions({
               </Text>
               <Text className="mb-2 text-xs text-muted">
                 {capture.sender} ·{' '}
-                {capture.amountMinor === null
-                  ? 'no amount found'
-                  : formatMinor(capture.amountMinor, capture.currency || currency)}
+                {capture.status === 'pending'
+                  ? 'still being read…'
+                  : capture.amountMinor === null
+                    ? 'no amount found'
+                    : formatMinor(capture.amountMinor, capture.currency || currency)}
               </Text>
 
               {/* Scrolls rather than truncates. A bank message runs to three or

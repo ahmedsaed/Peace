@@ -77,7 +77,8 @@ export type ParsedFields = {
   currency: string | null;
   direction: 'out' | 'in' | null;
   merchant: string | null;
-  accountTail: string | null;
+  /** Resolved to a real account when the model named one this ledger has. */
+  matchedAccountId: string | null;
 };
 
 /** What the model made of a message. */
@@ -123,17 +124,29 @@ export function markSaved(db: Db, id: string, transactionId: string): void {
 }
 
 /**
- * What to show in the review queue: read, and not yet acted on.
+ * Everything the user can see: captured, and not yet acted on.
  *
- * `unreadable` is included deliberately. A message the model could not make
- * sense of is still a message the user may want to enter by hand, and hiding it
- * would mean the app quietly swallowed a bank alert.
+ * ALL THREE STATES, and each for its own reason.
+ *
+ * `pending` appears the moment the message lands, before anything has been read
+ * — waiting several seconds for a network round trip before the row exists
+ * makes the app look like it missed the notification, which is the impression
+ * this feature can least afford.
+ *
+ * `unreadable` stays because a message the model could not make sense of is
+ * still a bank alert the user may want to enter by hand; hiding it would mean
+ * the app quietly swallowed one.
  */
 export function reviewableCaptures(db: Db, limit = 100): schema.BankCapture[] {
   return db
     .select()
     .from(bankCaptures)
-    .where(and(inArray(bankCaptures.status, ['parsed', 'unreadable']), isNull(bankCaptures.transactionId)))
+    .where(
+      and(
+        inArray(bankCaptures.status, ['pending', 'parsed', 'unreadable']),
+        isNull(bankCaptures.transactionId)
+      )
+    )
     .orderBy(desc(bankCaptures.postedAt))
     .limit(limit)
     .all();

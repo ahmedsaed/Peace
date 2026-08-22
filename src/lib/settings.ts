@@ -63,6 +63,20 @@ export const SETTING_DEFAULTS = {
    * receives to Google.
    */
   bankSenders: [] as string[],
+  /**
+   * The editable half of each prompt — the finance logic, not the contract.
+   *
+   * What a "total" means, which card is which, what to ignore: that is domain
+   * knowledge about one person's money, and they know it better than this file
+   * does. The system half — report what you see, prefer a null to an invention,
+   * answer in this JSON shape — stays in code, because an instruction that could
+   * break the output contract turns a bad sentence into an unparseable reply.
+   *
+   * Empty means "use the shipped default", so clearing the box is a reset rather
+   * than a way to send the model nothing at all.
+   */
+  receiptGuidance: '' as string,
+  bankGuidance: '' as string,
 
   /**
    * How often to copy the database to Google Drive. `off` until connected.

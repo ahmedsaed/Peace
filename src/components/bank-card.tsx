@@ -18,6 +18,7 @@ import { AppState, Pressable, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { isCapturing, isPermitted, openListenerSettings, setCapturing } from '@/db/bank-inbox';
+import { PromptEditor } from '@/components/prompt-editor';
 import { useBankInbox } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
 
@@ -107,10 +108,10 @@ export function BankMessagesCard() {
 
   return (
     <View className="rounded-xl bg-surface p-4" testID="bank-card">
-      <Text className="mb-1 text-base font-semibold text-ink">Read bank messages</Text>
+      <Text className="mb-1 text-base font-semibold text-ink">Bank messages</Text>
       <Text className="mb-3 text-sm leading-5 text-muted">
-        Peace can read the SMS notifications your bank posts and offer them as records for you to
-        approve. It reads notifications, never your inbox, and only from senders you name below.
+        Peace reads the SMS notifications your bank posts and offers them as records to approve. It
+        reads notifications, never your inbox, and only from senders you name below.
       </Text>
 
       {/* Step one. Not a switch, because this is granted on a system screen and
@@ -235,6 +236,17 @@ export function BankMessagesCard() {
             <Text className="text-sm font-semibold text-accent-ink">Add</Text>
           </Pressable>
         </View>
+      </View>
+
+      <View className="mt-3">
+        <PromptEditor
+          label="Your rules"
+          hint="Which card is which, and anything particular to your banks' wording. Peace hands the model your account names, so naming one here is what puts the record on the right card — and its currency."
+          example={'The card ending 0042 is Kenana.\nCIB messages about "instalment" are not purchases.'}
+          value={settings.bankGuidance}
+          onChange={(next) => update('bankGuidance', next)}
+          testID="bank-guidance"
+        />
       </View>
     </View>
   );

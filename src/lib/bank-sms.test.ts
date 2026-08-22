@@ -4,6 +4,7 @@ import {
   buildBankPrompt,
   captureKey,
   isUsableReading,
+  matchAccount,
   matchesSender,
   parseBankReading,
   parseCaptures,
@@ -127,7 +128,6 @@ describe('reading what came back', () => {
     currency: 'EGP',
     direction: 'out',
     merchant: 'CARREFOUR',
-    accountTail: '0042',
   };
 
   it('turns a clean reply into fields a record can use', () => {
@@ -136,7 +136,7 @@ describe('reading what came back', () => {
       currency: 'EGP',
       direction: 'out',
       merchant: 'CARREFOUR',
-      accountTail: '0042',
+      account: null,
     });
   });
 
@@ -169,13 +169,15 @@ describe('reading what came back', () => {
   });
 
   /**
-   * "0042" is not 42. The leading zero is exactly what makes it match the right
-   * card, so this is text and stays text.
+   * A field nothing reads must not be asked for.
+   *
+   * The card tail was read, stored, and used by nothing — the account NAME is
+   * what resolves to an account, and the raw message is on the review sheet for
+   * anyone wanting the digits. Anything extra the model volunteers is dropped
+   * here rather than carried, so it cannot quietly acquire a meaning later.
    */
-  it('keeps the account tail as digits, leading zero and all', () => {
-    expect(parseBankReading({ ...good, accountTail: '0042' }).accountTail).toBe('0042');
-    expect(parseBankReading({ ...good, accountTail: '****0042' }).accountTail).toBe('0042');
-    expect(parseBankReading({ ...good, accountTail: 'n/a' }).accountTail).toBeNull();
+  it('keeps nothing the reading has no field for', () => {
+    expect(parseBankReading({ ...good, accountTail: '0042' })).not.toHaveProperty('accountTail');
   });
 
   it('only accepts a currency that looks like a code', () => {
@@ -221,6 +223,31 @@ describe('deciding whether to offer it at all', () => {
   });
 });
 
+/**
+ * A bank writes "card ending 0042", which means nothing to this app on its own.
+ * The user's own account names are offered to the model and their guidance is
+ * where the mapping lives — this is the half that resolves the answer back.
+ */
+describe('matching an account the user actually has', () => {
+  const accounts = [
+    { id: 'a1', name: 'Kenana' },
+    { id: 'a2', name: 'Bank' },
+  ];
+
+  it('matches regardless of case and spacing', () => {
+    expect(matchAccount('kenana', accounts)?.id).toBe('a1');
+    expect(matchAccount('  Kenana ', accounts)?.id).toBe('a1');
+  });
+
+  it('never invents one', () => {
+    // Filing against the default and letting the user move it is far better
+    // than an account this ledger has never heard of.
+    expect(matchAccount('Visa', accounts)).toBeNull();
+    expect(matchAccount(null, accounts)).toBeNull();
+    expect(matchAccount('Kenana', [])).toBeNull();
+  });
+});
+
 describe('the prompt', () => {
   it('quotes the message rather than describing it', () => {
     const prompt = buildBankPrompt('Purchase of EGP 450 at CARREFOUR');
@@ -229,6 +256,47 @@ describe('the prompt', () => {
 
   it('says to read the direction from the words', () => {
     expect(buildBankPrompt('x')).toMatch(/Read the WORDS/);
+  });
+
+  /**
+   * The model cannot know which account "card ending 0042" is. Offering the
+   * user's own names is what makes their guidance ("0042 is Kenana") resolvable.
+   */
+  it('offers the user\'s own accounts to choose from', () => {
+    expect(buildBankPrompt('x', ['Kenana', 'Bank'])).toContain('Kenana, Bank');
+    expect(buildBankPrompt('x', [])).toContain('none');
+  });
+
+  it('adds the user\'s own rules without displacing the contract', () => {
+    const prompt = buildBankPrompt('x', [], 'the card ending 0042 is Kenana');
+    expect(prompt).toContain('the card ending 0042 is Kenana');
+    // The field rules are still there — the user's half is an ADDITION, never a
+    // replacement, or an empty box would send a prompt with no contract in it.
+    expect(prompt).toContain('Read the WORDS');
+    expect(prompt).toContain('Return only what the message actually states');
+  });
+
+  /**
+   * THEIR RULES COME LAST, so a specific instruction can qualify a general one.
+   * Put first, "instalment messages are not purchases" argues with a field rule
+   * the model has not read yet.
+   */
+  it('puts their rules after the field rules', () => {
+    const prompt = buildBankPrompt('x', [], 'MINE');
+    expect(prompt.indexOf('MINE')).toBeGreaterThan(prompt.indexOf('Read the WORDS'));
+  });
+
+  /**
+   * THE EMPTY BOX IS THE NORMAL STATE. Almost nobody writes rules, so the prompt
+   * has to be complete without them — and must not carry an empty heading
+   * announcing rules that are not there.
+   */
+  it('is complete, and says nothing about rules, when there are none', () => {
+    for (const guidance of ['', '   ']) {
+      const prompt = buildBankPrompt('x', [], guidance);
+      expect(prompt).toContain('Read the WORDS');
+      expect(prompt).not.toContain('own rules');
+    }
   });
 
   it('says to ignore the things that are not transactions', () => {

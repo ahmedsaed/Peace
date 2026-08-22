@@ -48,8 +48,39 @@ export class ReceiptError extends Error {}
  * week. Asking it to choose from the user's own names makes the answer either
  * usable or absent.
  */
-export function buildPrompt(categoryNames: string[]): string {
+/**
+ * THE FIELD RULES, which are not the user's to edit.
+ *
+ * The line between the two halves is what a field MEANS versus what is true of
+ * one person's spending. That a "total" is the final figure and a date must be
+ * yyyy-mm-dd is the output contract — offering it as editable text put the
+ * app's own wiring in a settings box, invited someone to delete a rule the
+ * parser depends on, and left nowhere to say the thing they actually wanted to
+ * say. Their box starts EMPTY and holds only what no code could know: a shop
+ * that keeps being misread, a service charge that should not count.
+ */
+const FIELD_RULES = [
+  'total: the FINAL amount paid, after discounts and including tax and service.',
+  '  Not a subtotal, not a single line item, not the change given.',
+  'currency: the ISO 4217 code, if it is printed or unambiguous from the symbol.',
+  'date: the date of the purchase in yyyy-mm-dd, not the date it was printed',
+  '  if those differ, and not today.',
+  'merchant: the trading name of the shop, as printed. No branch numbers,',
+  '  no address, no legal suffix.',
+  'category: the single best match from the list below, or null.',
+].join('\n');
+
+/**
+ * The whole prompt: the contract, then the user's own rules, then the data.
+ *
+ * `guidance` is EMPTY for almost everybody and the prompt has to be complete
+ * without it. What the user adds goes AFTER the field rules so a specific
+ * instruction can qualify a general one, never the other way round, and the
+ * category list goes last so it cannot be mistaken for prose.
+ */
+export function buildPrompt(categoryNames: string[], guidance = ''): string {
   const list = categoryNames.length > 0 ? categoryNames.join(', ') : 'none';
+  const mine = guidance.trim();
   return [
     'You are reading a photograph of a receipt or invoice for an expense tracker.',
     'Return only what you can actually see. Use null for anything unreadable,',
@@ -57,14 +88,10 @@ export function buildPrompt(categoryNames: string[]): string {
     'than a plausible invention, because the person will be checking these',
     'numbers against the paper in their hand.',
     '',
-    'total: the FINAL amount paid, after discounts and including tax and service.',
-    '  Not a subtotal, not a single line item, not the change given.',
-    'currency: the ISO 4217 code, if it is printed or unambiguous from the symbol.',
-    'date: the date of the purchase in yyyy-mm-dd, not the date it was printed',
-    '  if those differ, and not today.',
-    'merchant: the trading name of the shop, as printed. No branch numbers,',
-    '  no address, no legal suffix.',
-    `category: the single best match from this list, or null: ${list}.`,
+    FIELD_RULES,
+    ...(mine === '' ? [] : ['', "The account holder's own rules, which override the above:", mine]),
+    '',
+    `The categories to choose from: ${list}.`,
   ].join('\n');
 }
 

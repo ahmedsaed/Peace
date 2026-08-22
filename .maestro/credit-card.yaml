@@ -90,6 +90,14 @@ appId: com.ahmed.peace
 
 # --- the bank disagrees: correct it ---
 - tapOn: "Kenana"
+# SCROLLED TO, never tapped blind. This form ends with an icon grid that grows
+# every time a glyph is added — eleven new ones pushed "Update balance" under
+# the fold and this flow failed on a button that was rendering perfectly. A card
+# is the tall case: it alone carries a limit and two fee fields.
+- scrollUntilVisible:
+    element:
+      id: "account-reconcile"
+    direction: DOWN
 - tapOn:
     id: "account-reconcile"
 - assertVisible:

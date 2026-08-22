@@ -31,8 +31,7 @@ const PARSED = {
   currency: 'EGP',
   direction: 'out' as const,
   merchant: 'CARREFOUR',
-  occurredOn: '2026-08-01',
-  accountTail: '0042',
+  matchedAccountId: null,
 };
 
 describe('recording what was captured', () => {
@@ -94,8 +93,6 @@ describe('what the model made of a message', () => {
     expect(row.status).toBe('parsed');
     expect(row.amountMinor).toBe(45_000);
     expect(row.direction).toBe('out');
-    // Text, not a number — "0042" is not 42.
-    expect(row.accountTail).toBe('0042');
     expect(pendingCaptures(db)).toEqual([]);
   });
 
@@ -136,13 +133,20 @@ describe('the review queue', () => {
     return { db, first, second, third };
   };
 
-  it('holds what has been read and not yet acted on', () => {
+  /**
+   * ALL THREE STATES, including `pending`.
+   *
+   * The row appears the moment the message lands rather than after the network
+   * round trip that reads it — waiting several seconds for a row to exist makes
+   * the app look like it missed the notification entirely.
+   */
+  it('holds everything captured and not yet acted on', () => {
     const { db, first, second } = seed();
     markParsed(db, first.id, PARSED);
     markUnreadable(db, second.id, 'Could not reach Gemini.');
+    // The third is still pending, and is shown too — with a reading indicator.
 
-    // The third is still pending — not read yet, so not offered yet.
-    expect(reviewableCaptures(db).map((c) => c.captureKey).sort()).toEqual(['a', 'b']);
+    expect(reviewableCaptures(db).map((c) => c.captureKey).sort()).toEqual(['a', 'b', 'c']);
   });
 
   it('drops one the user dismissed', () => {
@@ -150,7 +154,7 @@ describe('the review queue', () => {
     markParsed(db, first.id, PARSED);
     dismissCapture(db, first.id);
 
-    expect(reviewableCaptures(db)).toEqual([]);
+    expect(reviewableCaptures(db).map((c) => c.captureKey)).not.toContain('a');
     // Kept rather than deleted, so it is never offered again.
     expect(getCapture(db, first.id)!.status).toBe('dismissed');
   });
@@ -166,7 +170,7 @@ describe('the review queue', () => {
     markParsed(db, first.id, PARSED);
     markSaved(db, first.id, record.id);
 
-    expect(reviewableCaptures(db)).toEqual([]);
+    expect(reviewableCaptures(db).map((c) => c.captureKey)).not.toContain('a');
     expect(getCapture(db, first.id)!.transactionId).toBe(record.id);
   });
 
