@@ -20,7 +20,7 @@ import { listAttachments, syncAttachments } from '@/db/repo/attachments';
 import { getCapture, markSaved } from '@/db/repo/bank-captures';
 import { AttachmentError } from '@/lib/attachment';
 import { GeminiError, readReceipt } from '@/lib/gemini';
-import { isEmptyReading, matchCategory } from '@/lib/receipt';
+import { isEmptyReading, matchCategory, receiptNote } from '@/lib/receipt';
 import { getGeminiKey } from '@/lib/secrets';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import palette from '@/constants/palette';
@@ -55,6 +55,7 @@ import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
 import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
 import { CURRENCIES } from '@/lib/currencies';
+import { captureNote } from '@/lib/bank-sms';
 import { foreignPurchase } from '@/lib/fees';
 import { isLiability } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
@@ -157,6 +158,12 @@ export default function RecordScreen() {
     if (rule) return rule.type;
     // The message SAYS which way the money went. Reading it from a sign is the
     // mistake `ledgerSide` exists to prevent.
+    /**
+     * CASH OUT IS A TRANSFER, not spending. The money is in a pocket, and it
+     * gets spent later one purchase at a time — filed as an expense it is
+     * counted twice and the cash account never fills.
+     */
+    if (bankMessage?.isWithdrawal) return 'transfer';
     if (bankMessage?.direction) return bankMessage.direction === 'in' ? 'income' : 'expense';
     const from = source ?? existing;
     if (!from) return 'expense';
@@ -196,6 +203,13 @@ export default function RecordScreen() {
     // "whichever account happens to be second" produced a form that looked
     // filled in and pointed somewhere else entirely.
     if (rule) return rule.counterAccountId ?? accounts[1]?.id ?? null;
+    // Cash out of a machine lands in cash. Guessed rather than asked for: it is
+    // right nearly always, it is one tap to change, and the alternative is a
+    // transfer pointing at whichever account happens to be second.
+    if (bankMessage?.isWithdrawal) {
+      const cash = accounts.find((a) => a.type === 'cash' && a.id !== bankMessage.matchedAccountId);
+      if (cash) return cash.id;
+    }
     const from = existing ?? source;
     if (!from) return accounts[1]?.id ?? null;
     if (from.transferPairId && from.amountMinor > 0) return from.accountId;
@@ -203,10 +217,16 @@ export default function RecordScreen() {
   });
 
   const [categoryId, setCategoryId] = useState<string | null>(
-    rule?.categoryId ?? existing?.categoryId ?? source?.categoryId ?? null
+    rule?.categoryId ??
+      existing?.categoryId ??
+      source?.categoryId ??
+      // Matched when the message was read, so opening this row is a
+      // confirmation rather than a second round of picking.
+      bankMessage?.matchedCategoryId ??
+      null
   );
   const [note, setNote] = useState(
-    rule?.note ?? existing?.note ?? source?.note ?? bankMessage?.merchant ?? ''
+    rule?.note ?? existing?.note ?? source?.note ?? (bankMessage ? captureNote(bankMessage) : '')
   );
   // Dated TODAY for a refund or a copy: the money comes back, or goes out
   // again, on the day it happens — not on the day of the record it came from.
@@ -269,13 +289,18 @@ export default function RecordScreen() {
   );
 
   const account = accounts.find((a) => a.id === accountId);
-  const currency = account?.currency ?? 'EGP';
   const homeCurrency = useSetting('homeCurrency');
+  // The HOME currency when there is no account, never a hardcoded 'EGP'. This
+  // app is not an Egyptian app that others may use; a literal here is a wrong
+  // currency on the screen of everyone it is wrong for.
+  const currency = account?.currency ?? homeCurrency;
 
   const [calc, setCalc] = useState(() => {
     if (rule) return calcFromMinor(rule.amountMinor, rule.currency);
     if (bankMessage?.amountMinor !== null && bankMessage?.amountMinor !== undefined) {
-      return calcFromMinor(bankMessage.amountMinor, bankMessage.currency ?? 'EGP');
+      // In the currency the MESSAGE named. Scaling by the account's decimals
+      // instead turns "USD 50.00" into 5000 minor units read as EGP.
+      return calcFromMinor(bankMessage.amountMinor, bankMessage.currency ?? currency);
     }
     const from = existing ?? source;
     return from ? calcFromMinor(from.amountMinor, from.currency) : initialCalc();
@@ -303,8 +328,23 @@ export default function RecordScreen() {
    * different job from editing one row.
    */
   const cardAccount = !!account && isLiability(account.type);
+  /**
+   * Still not offered when EDITING, and the reason is the save path rather than
+   * the screen: a purchase abroad writes the settled charge AND the card's
+   * commission as two rows, which `createCardPurchase` does and `updateRecord`
+   * does not. Enabling the control here would show an affordance that silently
+   * did nothing. What editing needs is to SEE the original — that is rendered
+   * below, from the columns the row already carries.
+   */
   const canGoAbroad = cardAccount && !foreign && type === 'expense' && !existing;
-  const [abroad, setAbroad] = useState<string | null>(null);
+  const [abroad, setAbroad] = useState<string | null>(() =>
+    // A bank message naming a currency the card is not held in IS a purchase
+    // made abroad, arriving from the other direction. Seeding this is what
+    // stops "USD 50.00" being entered as fifty pounds.
+    bankMessage?.currency && account && bankMessage.currency !== account.currency
+      ? bankMessage.currency
+      : null
+  );
   // Deliberately NOT part of `Sheet`: that union is the one-handed flow's walk,
   // and the flow key would then insist on this optional step.
   const [abroadSheet, setAbroadSheet] = useState(false);
@@ -665,7 +705,10 @@ export default function RecordScreen() {
       }
 
       if (reading.amountMinor !== null) setCalc(calcFromMinor(reading.amountMinor, currency));
-      if (reading.merchant !== null) setNote(reading.merchant);
+      // The shop AND what was in the basket. A total three months old says what
+      // a record cost; the contents are what say what it was.
+      const filled = receiptNote(reading);
+      if (filled !== '') setNote(filled);
       if (reading.occurredOn !== null) {
         // Midday, like every other date this screen sets: a date built at
         // midnight lands on the previous day in any timezone behind UTC.
@@ -1248,6 +1291,23 @@ export default function RecordScreen() {
               </Text>
             ) : null}
           </View>
+        ) : null}
+
+        {/**
+         * WHAT WAS HANDED OVER, on a record that already has one.
+         *
+         * A foreign purchase stores both figures — the euros paid and the
+         * pounds that moved the card — and this screen showed only the second.
+         * So the one number the user recognises, the one printed on the receipt
+         * in their hand, was invisible on the screen whose whole job is
+         * checking a record. Read-only: rewriting it means rewriting the
+         * commission row beside it, which is a different job.
+         */}
+        {existing?.originalAmountMinor != null && existing.originalCurrency ? (
+          <Text className="mt-2 border-t border-line pt-2 text-xs text-muted" testID="paid-abroad">
+            Paid {formatMinor(existing.originalAmountMinor, existing.originalCurrency)} at{' '}
+            {existing.fxRate} {currency} per {existing.originalCurrency}
+          </Text>
         ) : null}
 
         {foreign ? (

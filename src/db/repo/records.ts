@@ -19,6 +19,15 @@ export type RecordRow = {
   isAdjustment: boolean;
   /** Money coming back on the expense side. */
   isRefund: boolean;
+  /**
+   * What was HANDED OVER, when that differs from what moved the account.
+   *
+   * A purchase abroad settles in the card's currency, so `amountMinor` is the
+   * pounds and these are the euros — the figure the user recognises, and the
+   * one the list showed nowhere at all.
+   */
+  originalAmountMinor: number | null;
+  originalCurrency: string | null;
   categoryName: string | null;
   categoryIcon: string | null;
   categoryColor: string | null;
@@ -102,6 +111,8 @@ export function listRecordsForPeriod(
       transferPairId: transactions.transferPairId,
       isAdjustment: transactions.isAdjustment,
       isRefund: transactions.isRefund,
+      originalAmountMinor: transactions.originalAmountMinor,
+      originalCurrency: transactions.originalCurrency,
       categoryName: categories.name,
       categoryIcon: categories.icon,
       categoryColor: categories.color,

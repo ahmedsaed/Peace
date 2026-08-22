@@ -27,6 +27,19 @@ export type ReadReceipt = {
   merchant: string | null;
   /** A category NAME to match against the user's own. Never an id. */
   category: string | null;
+  /**
+   * What was actually bought, line by line, as printed.
+   *
+   * A merchant and a total say what a record COST; this says what it was, and
+   * it is the half a person needs three months later when "Carrefour 840" no
+   * longer means anything. It goes in the note, which is one text field — so
+   * the list subtitle truncates it to a line and search reads all of it.
+   *
+   * Not capped by line count. A long receipt is a long receipt, the text costs
+   * nothing to store, and the only ceiling is a nonsense guard against a model
+   * returning a runaway blob.
+   */
+  items: string | null;
 };
 
 export const EMPTY_READING: ReadReceipt = {
@@ -35,6 +48,7 @@ export const EMPTY_READING: ReadReceipt = {
   occurredOn: null,
   merchant: null,
   category: null,
+  items: null,
 };
 
 export class ReceiptError extends Error {}
@@ -68,6 +82,9 @@ const FIELD_RULES = [
   'merchant: the trading name of the shop, as printed. No branch numbers,',
   '  no address, no legal suffix.',
   'category: the single best match from the list below, or null.',
+  'items: every line of the receipt, one per line, as "name x quantity — price",',
+  '  leaving out any part that is not printed. Copy the names as they appear,',
+  '  abbreviations and all. Null if the receipt lists nothing itemised.',
 ].join('\n');
 
 /**
@@ -111,6 +128,7 @@ export const RESPONSE_SCHEMA = {
     date: { type: 'string', nullable: true },
     merchant: { type: 'string', nullable: true },
     category: { type: 'string', nullable: true },
+    items: { type: 'string', nullable: true },
   },
 } as const;
 
@@ -168,6 +186,12 @@ export function parseReading(raw: unknown, fallbackCurrency = 'USD'): ReadReceip
   const date = cleanString(body.date, 10);
   const merchant = cleanString(body.merchant, 80);
   const category = cleanString(body.category, 60);
+  /**
+   * Generous, because a weekly shop really is forty lines — this is a guard
+   * against a model that has started generating rather than reading, not a
+   * limit on how much of a receipt may be kept.
+   */
+  const items = cleanString(body.items, 4_000);
 
   return {
     amountMinor: parseTotal(body.total, code ?? fallbackCurrency),
@@ -175,6 +199,7 @@ export function parseReading(raw: unknown, fallbackCurrency = 'USD'): ReadReceip
     occurredOn: date && isRealDate(date) ? date : null,
     merchant,
     category,
+    items,
   };
 }
 
@@ -222,8 +247,24 @@ export function isEmptyReading(reading: ReadReceipt): boolean {
     reading.amountMinor === null &&
     reading.occurredOn === null &&
     reading.merchant === null &&
-    reading.category === null
+    reading.category === null &&
+    reading.items === null
   );
+}
+
+/**
+ * The note a reading fills in: the shop, then what was in the basket.
+ *
+ * The merchant leads because it is the line the list shows. Contents follow
+ * after a blank line, which keeps the subtitle readable and leaves the detail
+ * one tap away — and makes the whole receipt searchable, which is the point.
+ */
+export function receiptNote(reading: Pick<ReadReceipt, 'merchant' | 'items'>): string {
+  const merchant = reading.merchant?.trim();
+  const items = reading.items?.trim();
+  if (!merchant) return items ?? '';
+  if (!items) return merchant;
+  return `${merchant}\n\n${items}`;
 }
 
 /**

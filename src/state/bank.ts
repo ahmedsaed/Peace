@@ -96,7 +96,20 @@ export async function runBankCatchUp(input: {
     // reading of it is still in flight.
     if (drained > 0) useBankInbox.getState().reload();
 
-    const outcome = await readPending(input.homeCurrency, input.geminiModel, input.guidance ?? '');
+    /**
+     * Repainted after EACH message, not once at the end.
+     *
+     * A queue of five is five network round trips, and reloading only after the
+     * last one meant the first four sat finished and invisible for as long as
+     * the slowest took — the app holding answers it already had. The store is
+     * cheap to reload and the screens are already subscribed.
+     */
+    const outcome = await readPending(
+      input.homeCurrency,
+      input.geminiModel,
+      input.guidance ?? '',
+      () => useBankInbox.getState().reload()
+    );
 
     /**
      * THE REASON THE STORE EXISTS.

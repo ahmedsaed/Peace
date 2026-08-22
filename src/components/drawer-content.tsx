@@ -5,11 +5,10 @@ import { Image, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { UpdateNotice } from '@/components/update-notice';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
-import { buildInfo } from '@/lib/build-info';
 import { backupDue, describeAge } from '@/lib/drive-backup';
-import { formatVersion } from '@/lib/version';
 import type { Settings } from '@/lib/settings';
 import { useSetting } from '@/state/settings';
 
@@ -138,9 +137,10 @@ export function DrawerContent({ navigation }: DrawerContentComponentProps) {
         />
       ) : null}
 
-      <Text className="px-5 pb-3 text-xs text-muted opacity-60" testID="drawer-version">
-        {formatVersion(buildInfo)}
-      </Text>
+      {/* Carries the version line itself, because when there is an update the
+          two belong together — and there usually is not, in which case this
+          renders exactly what was here before. */}
+      <UpdateNotice />
     </View>
   );
 }

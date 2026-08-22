@@ -51,6 +51,19 @@ export function RecordRow({
       ? 'Transfer'
       : (row.categoryName ?? 'Uncategorised');
 
+  /**
+   * What was HANDED OVER, when it differs from what moved the account.
+   *
+   * A purchase abroad settles in the card's currency, so the figure on the
+   * right is pounds and this is the euros actually paid — the number on the
+   * receipt, and the only one the user recognises. It was stored from the
+   * start and displayed nowhere.
+   */
+  const paid =
+    row.originalAmountMinor != null && row.originalCurrency
+      ? formatMinor(row.originalAmountMinor, row.originalCurrency)
+      : null;
+
   const subtitle = row.isTransfer
     ? `${row.accountName} → ${row.counterAccountName ?? '—'}`
     : row.isRefund
@@ -81,6 +94,30 @@ export function RecordRow({
           size={17}
           color="#FFFFFF"
         />
+        {/**
+         * A REFUND, marked on the tile rather than only in words.
+         *
+         * The tint already says "not income" and the subtitle says "refunded",
+         * but both need reading — and the one thing a positive number in an
+         * expense list has to answer at a glance is "why is this not red". The
+         * badge sits on the category icon because that is what a refund is: the
+         * same category, coming back.
+         *
+         * Inside the tile, not overhanging it. A badge hung off the corner is
+         * sliced by the list's own bounds, and this row has no padding to spare.
+         */}
+        {row.isRefund ? (
+          <View
+            testID="refund-badge"
+            accessibilityLabel="Refund"
+            className="absolute -bottom-0.5 -right-0.5 h-[15px] w-[15px] items-center justify-center rounded-full border border-ground bg-raised">
+            {/* An ARROW, not the circular-arrow glyph the correction rows use.
+                Rasterised at this size, `refresh` closes into a blob — a ring
+                needs ~14px and this has 10. A solid arrow survives it, and
+                "came back" is the more direct reading anyway. */}
+            <Icon name="back" size={10} color={palette.ink} />
+          </View>
+        ) : null}
       </View>
 
       <View className="flex-1">
@@ -108,7 +145,7 @@ export function RecordRow({
             <Text className="text-[10px] text-muted">{row.attachmentCount}</Text>
           ) : null}
           <Text className="flex-1 text-xs text-muted" numberOfLines={1}>
-            {subtitle}
+            {paid ? `${paid} · ${subtitle}` : subtitle}
           </Text>
         </View>
       </View>

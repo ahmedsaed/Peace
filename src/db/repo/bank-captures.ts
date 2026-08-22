@@ -79,6 +79,10 @@ export type ParsedFields = {
   merchant: string | null;
   /** Resolved to a real account when the model named one this ledger has. */
   matchedAccountId: string | null;
+  /** Likewise for the category, matched within the right side of the ledger. */
+  matchedCategoryId: string | null;
+  /** Cash out of a machine: a transfer, never spending. */
+  isWithdrawal: boolean;
 };
 
 /** What the model made of a message. */

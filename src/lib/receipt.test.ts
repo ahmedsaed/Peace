@@ -2,6 +2,7 @@ import {
   EMPTY_READING,
   ReceiptError,
   buildPrompt,
+  receiptNote,
   isEmptyReading,
   matchCategory,
   parseReading,
@@ -30,6 +31,7 @@ describe('reading what came back', () => {
       occurredOn: '2026-08-13',
       merchant: 'Grocery Mart',
       category: 'Groceries',
+      items: null,
     });
   });
 
@@ -180,6 +182,48 @@ describe('matching a category the user actually has', () => {
     expect(matchCategory('Sundries', categories)).toBeNull();
     expect(matchCategory(null, categories)).toBeNull();
     expect(matchCategory('Groceries', [])).toBeNull();
+  });
+});
+
+describe('what the note keeps', () => {
+  /**
+   * A total three months old says what a record COST; the contents say what it
+   * WAS. "Carrefour 840" is unrecognisable by then, and the receipt was read
+   * anyway — throwing away everything but the shop's name was free information
+   * discarded.
+   */
+  it('leads with the shop and keeps the basket under it', () => {
+    expect(receiptNote({ merchant: 'Grocery Mart', items: 'Milk x2 — 60\nBread — 25' })).toBe(
+      'Grocery Mart\n\nMilk x2 — 60\nBread — 25'
+    );
+  });
+
+  it('is happy with either half alone', () => {
+    expect(receiptNote({ merchant: 'Grocery Mart', items: null })).toBe('Grocery Mart');
+    expect(receiptNote({ merchant: null, items: 'Milk x2 — 60' })).toBe('Milk x2 — 60');
+    expect(receiptNote({ merchant: null, items: null })).toBe('');
+  });
+
+  /**
+   * NOT CAPPED BY LINE COUNT. A weekly shop really is forty lines, the text
+   * costs nothing to store, the subtitle truncates it to one line anyway, and
+   * search gets more of the wording a person would actually type. The only
+   * ceiling is a guard against a model that has started generating rather than
+   * reading.
+   */
+  it('keeps a long receipt whole', () => {
+    const long = Array.from({ length: 60 }, (_, i) => `Item ${i} — ${i}0`).join('\n');
+    expect(parseReading({ total: 10, items: long }).items).toBe(long);
+  });
+
+  it('drops a reply that is text rather than a receipt', () => {
+    expect(parseReading({ total: 10, items: 'x'.repeat(20_000) }).items).toHaveLength(4_000);
+  });
+
+  it('counts a reading with only contents as a reading', () => {
+    // The total is the valuable field, but a basket with no readable total
+    // still saves typing out what was bought.
+    expect(isEmptyReading(parseReading({ items: 'Milk — 60' }))).toBe(false);
   });
 });
 
