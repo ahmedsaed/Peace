@@ -1,0 +1,1 @@
+ALTER TABLE `bank_captures` ADD `matched_account_id` text REFERENCES accounts(id);

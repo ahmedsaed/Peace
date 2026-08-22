@@ -197,6 +197,21 @@ describe('the prompt', () => {
     expect(buildPrompt([])).toContain('none');
   });
 
+  it('adds the user\'s own rules after the field rules, never instead of them', () => {
+    const prompt = buildPrompt(['Groceries'], 'Ignore the service charge at Zooba.');
+    expect(prompt).toContain('Ignore the service charge at Zooba.');
+    expect(prompt).toMatch(/FINAL amount paid/);
+    expect(prompt.indexOf('Zooba')).toBeGreaterThan(prompt.indexOf('FINAL amount paid'));
+  });
+
+  it('is complete, and mentions no rules, when the user has written none', () => {
+    for (const guidance of ['', '   ']) {
+      const prompt = buildPrompt(['Groceries'], guidance);
+      expect(prompt).toMatch(/FINAL amount paid/);
+      expect(prompt).not.toContain('own rules');
+    }
+  });
+
   it('asks for the final total rather than a subtotal or a line item', () => {
     // The single most valuable field, and the one with the most ways to be
     // wrong on a receipt that lists twenty things.

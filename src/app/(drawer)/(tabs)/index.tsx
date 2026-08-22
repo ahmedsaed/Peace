@@ -383,7 +383,10 @@ export default function RecordsScreen() {
             return;
           }
           handleDue(() => {
-            const account = accountFor();
+            // The card the MESSAGE named, when it named one this ledger has.
+            // Its currency and its fees come with it — which is the whole
+            // reason a purchase on a foreign card stopped reading as EGP.
+            const account = capture.matchedAccountId ?? accountFor();
             if (!account) throw new Error('No account to record this against.');
             const record = createRecord(db, {
               type: capture.direction === 'in' ? 'income' : 'expense',
