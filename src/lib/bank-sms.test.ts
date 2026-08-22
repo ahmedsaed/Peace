@@ -2,6 +2,7 @@ import {
   BankSmsError,
   EMPTY_BANK_READING,
   buildBankPrompt,
+  captureNote,
   captureKey,
   isUsableReading,
   matchAccount,
@@ -137,6 +138,8 @@ describe('reading what came back', () => {
       direction: 'out',
       merchant: 'CARREFOUR',
       account: null,
+      category: null,
+      withdrawal: false,
     });
   });
 
@@ -248,6 +251,51 @@ describe('matching an account the user actually has', () => {
   });
 });
 
+describe('what a note keeps', () => {
+  /**
+   * THE MESSAGE ALWAYS SURVIVES. A failed reading used to produce an empty
+   * note: the app had the bank's own words, showed them in the grey row, and
+   * threw them away at the one moment they became permanent.
+   */
+  it('keeps the message when there was no reading at all', () => {
+    expect(captureNote({ merchant: null, body: 'Purchase of EGP 450' })).toBe(
+      'Purchase of EGP 450'
+    );
+  });
+
+  it('leads with the merchant and keeps the message under it', () => {
+    expect(captureNote({ merchant: 'CARREFOUR', body: 'Purchase of EGP 450 at CARREFOUR' })).toBe(
+      'CARREFOUR\n\nPurchase of EGP 450 at CARREFOUR'
+    );
+  });
+
+  /** A one-line alert whose merchant IS the message must not print twice. */
+  it('does not repeat itself', () => {
+    expect(captureNote({ merchant: 'CARREFOUR', body: 'CARREFOUR' })).toBe('CARREFOUR');
+  });
+});
+
+describe('cash out of a machine', () => {
+  /**
+   * A withdrawal is a TRANSFER. Filed as an expense the money is counted twice
+   * — once at the machine and again at the shop — so the month reads high and
+   * the cash account never fills.
+   */
+  it('is read from an explicit true and nothing else', () => {
+    const base = { amount: 500, currency: 'EGP', direction: 'out' };
+    expect(parseBankReading({ ...base, withdrawal: true }).withdrawal).toBe(true);
+    for (const answer of ['true', 1, 'yes', null, undefined]) {
+      expect(parseBankReading({ ...base, withdrawal: answer }).withdrawal).toBe(false);
+    }
+  });
+
+  it('asks the model for it in terms of what the money DID', () => {
+    // "Cash moved into a pocket has not been spent yet" is the whole rule; a
+    // prompt naming only "ATM" misses a counter withdrawal and a cash advance.
+    expect(buildBankPrompt('x')).toMatch(/has not been spent yet/);
+  });
+});
+
 describe('the prompt', () => {
   it('quotes the message rather than describing it', () => {
     const prompt = buildBankPrompt('Purchase of EGP 450 at CARREFOUR');
@@ -262,6 +310,17 @@ describe('the prompt', () => {
    * The model cannot know which account "card ending 0042" is. Offering the
    * user's own names is what makes their guidance ("0042 is Kenana") resolvable.
    */
+  /**
+   * The receipt reader has offered these from the start. Asking for nothing is
+   * why every bank record arrived Uncategorised — which read as the model
+   * declining to guess and was the app never putting the question.
+   */
+  it('offers the user\'s own categories, and asks for a guess', () => {
+    const prompt = buildBankPrompt('x', [], '', ['Groceries', 'Transport']);
+    expect(prompt).toContain('Groceries, Transport');
+    expect(prompt).toMatch(/Guess from the merchant/);
+  });
+
   it('offers the user\'s own accounts to choose from', () => {
     expect(buildBankPrompt('x', ['Kenana', 'Bank'])).toContain('Kenana, Bank');
     expect(buildBankPrompt('x', [])).toContain('none');

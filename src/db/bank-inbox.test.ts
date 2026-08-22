@@ -242,6 +242,57 @@ describe('reading what is waiting', () => {
     expect(mocked.getGeminiKey).not.toHaveBeenCalled();
   });
 
+  /**
+   * REPORTED AFTER EACH MESSAGE, not once at the end.
+   *
+   * Every message is its own network round trip, so a queue of three finished
+   * its first several seconds before its last — and reporting only at the end
+   * meant the app sat on answers it already had while the screen showed
+   * nothing. Counted rather than merely called: one notification at the end
+   * would satisfy "was it called".
+   */
+  it('reports progress per message, not once at the end', async () => {
+    queue('first', 'second', 'third');
+    mocked.readBankMessage.mockResolvedValue(GOOD);
+
+    const seen: number[] = [];
+    await readPending('EGP', 'gemini-flash-latest', '', () => seen.push(1));
+
+    expect(seen).toHaveLength(3);
+  });
+
+  /** A message that could not be read is news too — the row has to stop spinning. */
+  it('reports a failure as progress as well', async () => {
+    queue('first');
+    mocked.readBankMessage.mockRejectedValue(
+      new GeminiError('That Gemini API key was refused.', false)
+    );
+
+    let calls = 0;
+    await readPending('EGP', 'gemini-flash-latest', '', () => {
+      calls += 1;
+    });
+
+    expect(calls).toBe(1);
+  });
+
+  /**
+   * A DEFERRED MESSAGE IS NOT PROGRESS. It stays pending and its row keeps
+   * spinning, which is the truth — announcing it would repaint the screen to
+   * say nothing changed.
+   */
+  it('says nothing when a message is merely deferred', async () => {
+    queue('first');
+    mocked.readBankMessage.mockRejectedValue(new GeminiError('Gemini is busy.', true));
+
+    let calls = 0;
+    await readPending('EGP', 'gemini-flash-latest', '', () => {
+      calls += 1;
+    });
+
+    expect(calls).toBe(0);
+  });
+
   it('reads the oldest first, because that is the order the money moved', async () => {
     queue('oldest', 'newest');
     mocked.readBankMessage.mockResolvedValue(GOOD);
