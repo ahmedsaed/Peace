@@ -198,6 +198,18 @@ app ignoring input. `pkill -f GradleDaemon`.
 - **Money is integer minor units.** `amount_minor` is a signed integer (negative = money out).
   Never store or arithmetic money as a float. Convert only at the render boundary via
   `src/lib/money.ts`. Any new money code needs a test in `money.test.ts`.
+- **Money reaches a screen ONLY through `useMoney`, never `formatMinor`.** Amounts can be masked
+  for reading the ledger in public, and there are sixty-odd places that render one. Written out at
+  each of them, the rule gets missed at one — and the miss is silent and inverted: the header says
+  amounts are hidden, the user turns the screen towards someone, and a figure is still sitting
+  there. `src/state/money.ts` is the choke point and `no-unmasked-money.test.ts` fails if
+  `formatMinor` appears anywhere under `src/app` or `src/components`. A helper that is not a
+  component takes the `Money` type as an argument rather than reaching past it. Masking a
+  formatted STRING rather than blurring a rendered one is also why it cannot half-fail: a blur
+  fails open, leaving the number legible under a control claiming it is hidden. Geometry is
+  deliberately not masked — the ring and the budget bars are proportions, and a proportion is not
+  an amount. Exports are untouched by construction: the CSV writer and the backup deal in raw minor
+  units and never format anything.
 - **Hermes `Intl` is not Node's `Intl`.** Android ships less ICU data, and it degrades
   *silently* rather than throwing — `currencyDisplay: 'narrowSymbol'` returns `"EGP 12,500.00"`
   on device while Node returns `"E£12,500.00"`. A green `npm test` proves nothing about currency
