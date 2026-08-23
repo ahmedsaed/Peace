@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import type { RecordRow as Row } from '@/db/repo/records';
-import { formatMinor } from '@/lib/money';
+import { useMoney } from '@/state/money';
 
 /**
  * One line in the records list.
@@ -21,6 +21,7 @@ export function RecordRow({
   onPress?: () => void;
   onLongPress?: () => void;
 }) {
+  const money = useMoney();
   // A correction is its own kind of row. Rendered like an expense it would read
   // as a mystery purchase in a category you never chose — which is exactly the
   // confusion the feature exists to remove.
@@ -42,8 +43,8 @@ export function RecordRow({
   // "Bank → Cash" subtitle, so the figure itself goes unsigned.
   const amount =
     row.isTransfer || row.isAdjustment
-      ? formatMinor(Math.abs(row.amountMinor), row.currency)
-      : formatMinor(row.amountMinor, row.currency, { showSign: true });
+      ? money(Math.abs(row.amountMinor), row.currency)
+      : money(row.amountMinor, row.currency, { showSign: true });
 
   const title = row.isAdjustment
     ? 'Balance correction'
@@ -61,7 +62,7 @@ export function RecordRow({
    */
   const paid =
     row.originalAmountMinor != null && row.originalCurrency
-      ? formatMinor(row.originalAmountMinor, row.originalCurrency)
+      ? money(row.originalAmountMinor, row.originalCurrency)
       : null;
 
   const subtitle = row.isTransfer

@@ -16,7 +16,7 @@ import {
   updateAssetClass,
 } from '@/db/repo/portfolio';
 import { testIdSlug } from '@/lib/id';
-import { formatMinor, parseAmountToMinor } from '@/lib/money';
+import { parseAmountToMinor } from '@/lib/money';
 import {
   driftBand,
   FULL_ALLOCATION_BP,
@@ -24,6 +24,7 @@ import {
   type Recommendation,
 } from '@/lib/portfolio';
 import { useSetting } from '@/state/settings';
+import { useMoney } from '@/state/money';
 
 /**
  * Keeping an investment portfolio near its target allocation.
@@ -58,7 +59,8 @@ export default function PortfolioScreen() {
   const [plan, setPlan] = useState<Recommendation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const money = (minor: number) => formatMinor(minor, currency);
+  const format = useMoney();
+  const money = (minor: number) => format(minor, currency);
 
   const guard = useCallback((work: () => void) => {
     try {

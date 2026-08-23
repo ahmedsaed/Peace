@@ -3,7 +3,7 @@ import { Modal, Pressable, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import type { RecordRow } from '@/db/repo/records';
-import { formatMinor } from '@/lib/money';
+import { useMoney } from '@/state/money';
 
 /**
  * What a long press on a record offers.
@@ -31,6 +31,7 @@ export function RecordActions({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const money = useMoney();
   const ordinary = !!row && !row.isTransfer && !row.isAdjustment;
 
   /**
@@ -75,7 +76,7 @@ export function RecordActions({
                     : (row.categoryName ?? 'Uncategorised')}
               </Text>
               <Text className="text-xs text-muted" numberOfLines={1}>
-                {row.accountName} · {formatMinor(Math.abs(row.amountMinor), row.currency)}
+                {row.accountName} · {money(Math.abs(row.amountMinor), row.currency)}
               </Text>
             </View>
 

@@ -18,9 +18,9 @@ import { broughtForward, runningTotals } from '@/db/repo/carry';
 import type { CategoryKind } from '@/db/repo/spend';
 import { rankSlices, type RankedSlice } from '@/lib/analysis';
 import { testIdSlug as slug } from '@/lib/id';
-import { formatMinor } from '@/lib/money';
 import { currentPeriod, formatPeriod, parsePeriod, type Period } from '@/lib/period';
 import { useSetting } from '@/state/settings';
+import { useMoney, type Money } from '@/state/money';
 
 const EMPTY: Breakdown = {
   slices: [],
@@ -33,6 +33,7 @@ const EMPTY: Breakdown = {
 const CASH_FLOW_MONTHS = 6;
 
 export default function AnalysisScreen() {
+  const money = useMoney();
   const homeCurrency = useSetting('homeCurrency');
   const carryOver = useSetting('carryOver');
   const [period, setPeriod] = useState(currentPeriod());
@@ -87,7 +88,7 @@ export default function AnalysisScreen() {
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   testID="analysis-total">
-                  {formatMinor(breakdown.totalMinor, homeCurrency)}
+                  {money(breakdown.totalMinor, homeCurrency)}
                 </Text>
               </Donut>
             </View>
@@ -175,6 +176,7 @@ function SliceRow({
   homeCurrency: string;
   totalMinor: number;
 }) {
+  const money = useMoney();
   const id = slug(slice.id);
   // `percent` is already the share of the total; this is only the bar's length.
   const fraction = totalMinor > 0 ? slice.amountMinor / totalMinor : 0;
@@ -198,7 +200,7 @@ function SliceRow({
               kind === 'expense' ? 'text-expense' : 'text-income'
             }`}
             testID={`analysis-amount-${id}`}>
-            {formatMinor(slice.amountMinor, homeCurrency)}
+            {money(slice.amountMinor, homeCurrency)}
           </Text>
           <Text className="text-[11px] text-muted" testID={`analysis-percent-${id}`}>
             {slice.percent.toFixed(1)}%
@@ -236,6 +238,7 @@ function CashFlow({
   carryOver: boolean;
   startingMinor: number;
 }) {
+  const money = useMoney();
   const peak = cashFlowPeak(points);
   const running = runningTotals(
     startingMinor,
@@ -310,20 +313,20 @@ function CashFlow({
       {carryOver ? (
         <View className="mt-3 flex-row items-baseline justify-between">
           <Text className="text-[11px] text-muted">
-            Started {formatMinor(startingMinor, homeCurrency)}
+            Started {money(startingMinor, homeCurrency)}
           </Text>
           <Text
             className={`text-xs font-semibold ${
               runningEnd < 0 ? 'text-expense' : 'text-ink'
             }`}
             testID="analysis-running-end">
-            {formatMinor(runningEnd, homeCurrency)} now
+            {money(runningEnd, homeCurrency)} now
           </Text>
         </View>
       ) : null}
 
       <Text className="mt-3 text-[11px] text-muted" testID="analysis-cashflow-net">
-        {netSentence(points, homeCurrency)}
+        {netSentence(points, homeCurrency, money)}
       </Text>
     </View>
   );
@@ -348,13 +351,13 @@ function barHeight(valueMinor: number, peakMinor: number): number {
   return Math.max(2, (valueMinor / peakMinor) * BAR_MAX);
 }
 
-function netSentence(points: CashFlowPoint[], homeCurrency: string): string {
+function netSentence(points: CashFlowPoint[], homeCurrency: string, money: Money): string {
   const net = points.reduce((sum, p) => sum + p.netMinor, 0);
   const span = points.length;
   if (net === 0) return `Level across ${span} months.`;
   return net > 0
-    ? `${formatMinor(net, homeCurrency)} kept across ${span} months.`
-    : `${formatMinor(Math.abs(net), homeCurrency)} more spent than earned across ${span} months.`;
+    ? `${money(net, homeCurrency)} kept across ${span} months.`
+    : `${money(Math.abs(net), homeCurrency)} more spent than earned across ${span} months.`;
 }
 
 /**
@@ -373,13 +376,14 @@ function Footnotes({
   kind: CategoryKind;
   homeCurrency: string;
 }) {
+  const money = useMoney();
   if (breakdown.uncategorisedMinor === 0 && breakdown.unvaluedCount === 0) return null;
 
   return (
     <View className="mt-3 gap-1 px-4">
       {breakdown.uncategorisedMinor > 0 ? (
         <Text className="text-[11px] text-muted" testID="analysis-uncategorised">
-          {formatMinor(breakdown.uncategorisedMinor, homeCurrency)} of{' '}
+          {money(breakdown.uncategorisedMinor, homeCurrency)} of{' '}
           {kind === 'expense' ? 'spending' : 'income'} has no category and is not in the chart
         </Text>
       ) : null}

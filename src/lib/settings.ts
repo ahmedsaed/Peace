@@ -117,6 +117,23 @@ export const SETTING_DEFAULTS = {
   driveLastBackupAt: 0 as number,
   /** The connected account, shown so it is obvious WHERE backups are going. */
   driveAccount: '' as string,
+
+  /**
+   * Replace every amount on screen with a mask, for reading the app in public.
+   *
+   * PERSISTED, which is the whole point — someone who works in an open-plan
+   * office wants it on, not on again after every launch. That makes the way
+   * back out the important part: the eye lives in the app header on every tab
+   * rather than behind a settings row, so a masked ledger always shows you the
+   * control that unmasks it. A persisted state you cannot see the switch for is
+   * indistinguishable from a broken app.
+   *
+   * SHOULDER PRIVACY ONLY. It does not touch screenshots, screen recording or
+   * the recents thumbnail — that is `FLAG_SECURE`, which also blocks the
+   * screenshots people legitimately want. Naming this "privacy mode" would
+   * promise the stronger thing.
+   */
+  hideAmounts: false as boolean,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

@@ -1,0 +1,92 @@
+appId: com.ahmed.peace
+---
+# Hiding amounts, for reading the ledger with someone beside you.
+#
+# The point of this flow is NOT that an eye icon toggles. It is that a FIGURE
+# THE USER CAN READ stops being readable — on the screen that was open, on a
+# different screen that was never touched, and still after a restart. A flow
+# that asserted the icon changed would pass while every number stayed on screen,
+# which is the exact failure this feature cannot be allowed to have.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- log something with digits worth recognising ---
+# 4,321 rather than a round number: it cannot be confused with a seeded value,
+# a total elsewhere on the screen, or a date.
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "record-screen"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Restaurants"
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "record-save"
+
+# Baseline: the month's expense total is legible, and it is that figure.
+- assertVisible:
+    id: "summary-expense"
+    text: ".*4,321.*"
+- takeScreenshot: 01-amounts-shown
+
+# --- hide ---
+- tapOn:
+    id: "nav-hide-amounts"
+
+# The figure is GONE, not merely covered. Both halves matter: a mask that
+# rendered on top of a still-present number would satisfy the first assertion
+# and fail the second.
+- assertVisible:
+    id: "summary-expense"
+    text: ".*••••.*"
+- assertNotVisible:
+    id: "summary-expense"
+    text: ".*4,321.*"
+- takeScreenshot: 02-amounts-hidden
+
+# THE ASSERTION THAT MATTERS. A screen this flow never touched while toggling.
+# Masking is a choke point rather than a per-screen flag, and the only way to
+# prove that is to check a screen the toggle knows nothing about.
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-total"
+    text: ".*••••.*"
+- assertNotVisible:
+    id: "accounts-total"
+    text: ".*[0-9].*"
+
+# --- persisted, not just held in memory ---
+# Someone who works in an open-plan office wants it to still be on tomorrow.
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+- assertVisible:
+    id: "summary-expense"
+    text: ".*••••.*"
+
+# --- and the way back out is on screen, on every tab ---
+# A persisted state whose control is hidden is indistinguishable from an app
+# that has broken, so the eye has to be reachable from a masked screen without
+# navigating anywhere.
+- tapOn:
+    id: "nav-hide-amounts"
+- assertVisible:
+    id: "summary-expense"
+    text: ".*4,321.*"
+- takeScreenshot: 03-amounts-shown-again

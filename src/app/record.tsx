@@ -49,7 +49,7 @@ import {
 } from '@/lib/calculator';
 import { ageInDays, fetchRate, formatRateDate, RateError } from '@/lib/fx';
 import { byDensity, useDensity } from '@/lib/layout';
-import { convertMinor, formatMinor, groupDigits } from '@/lib/money';
+import { convertMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel } from '@/lib/period';
 import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
 import { accountBalance } from '@/db/repo/adjust';
@@ -59,6 +59,7 @@ import { captureNote } from '@/lib/bank-sms';
 import { foreignPurchase } from '@/lib/fees';
 import { isLiability } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
+import { useMoney } from '@/state/money';
 
 type RecordType = 'income' | 'expense' | 'transfer';
 
@@ -69,6 +70,7 @@ const TYPES: { value: RecordType; label: string }[] = [
 ];
 
 export default function RecordScreen() {
+  const money = useMoney();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id, refundOf, copyOf, fromRule, dueOn, capture, fromCapture } = useLocalSearchParams<{
@@ -910,7 +912,7 @@ export default function RecordScreen() {
     label: a.name,
     icon: a.icon,
     color: a.color,
-    detail: formatMinor(a.balanceMinor, a.currency),
+    detail: money(a.balanceMinor, a.currency),
     detailTone: a.balanceMinor < 0 ? ('negative' as const) : ('neutral' as const),
   }));
 
@@ -1280,9 +1282,9 @@ export default function RecordScreen() {
 
             {abroadPreview ? (
               <Text className="mt-1 text-xs text-muted" testID="abroad-preview">
-                {formatMinor(abroadPreview.settledMinor, currency)}
+                {money(abroadPreview.settledMinor, currency)}
                 {abroadPreview.feeMinor > 0
-                  ? ` + ${formatMinor(abroadPreview.feeMinor, currency)} fee = ${formatMinor(
+                  ? ` + ${money(abroadPreview.feeMinor, currency)} fee = ${money(
                       abroadPreview.totalMinor,
                       currency
                     )}`
@@ -1305,7 +1307,7 @@ export default function RecordScreen() {
          */}
         {existing?.originalAmountMinor != null && existing.originalCurrency ? (
           <Text className="mt-2 border-t border-line pt-2 text-xs text-muted" testID="paid-abroad">
-            Paid {formatMinor(existing.originalAmountMinor, existing.originalCurrency)} at{' '}
+            Paid {money(existing.originalAmountMinor, existing.originalCurrency)} at{' '}
             {existing.fxRate} {currency} per {existing.originalCurrency}
           </Text>
         ) : null}
@@ -1351,7 +1353,7 @@ export default function RecordScreen() {
                 testID="record-home-preview">
                 {homePreview === null
                   ? 'rate needed'
-                  : formatMinor(type === 'income' ? homePreview : -homePreview, homeCurrency)}
+                  : money(type === 'income' ? homePreview : -homePreview, homeCurrency)}
               </Text>
             </View>
           </View>

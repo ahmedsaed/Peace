@@ -4,7 +4,7 @@ import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import type { Proposal } from '@/db/repo/recurring';
 import { fromYmd } from '@/lib/recurrence';
-import { formatMinor } from '@/lib/money';
+import { useMoney } from '@/state/money';
 
 /**
  * A record a rule says is due, shown before it exists.
@@ -39,6 +39,7 @@ export function ProposalRow({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  const money = useMoney();
   const sign = proposal.type === 'income' ? '' : '-';
 
   return (
@@ -69,7 +70,7 @@ export function ProposalRow({
 
       <Text className="text-[15px] text-muted">
         {sign}
-        {formatMinor(proposal.amountMinor, proposal.currency || currency)}
+        {money(proposal.amountMinor, proposal.currency || currency)}
       </Text>
     </Pressable>
   );
@@ -99,6 +100,7 @@ export function ProposalActions({
   onAdd: (proposal: Proposal) => void;
   onDismiss: (proposal: Proposal) => void;
 }) {
+  const money = useMoney();
   return (
     <Modal visible={proposal !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
@@ -115,7 +117,7 @@ export function ProposalActions({
               </Text>
               <Text className="text-xs text-muted" numberOfLines={1}>
                 due {formatDue(proposal.occurredOn)} ·{' '}
-                {formatMinor(proposal.amountMinor, proposal.currency || currency)}
+                {money(proposal.amountMinor, proposal.currency || currency)}
               </Text>
             </View>
 
