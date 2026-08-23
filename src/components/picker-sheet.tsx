@@ -1,6 +1,8 @@
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Modal, Pressable, ScrollView, Text, View, type LayoutRectangle } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { centerScrollOffset } from '@/lib/layout';
 
 export type PickerOption = {
   id: string;
@@ -21,6 +23,17 @@ export type PickerOption = {
  * A plain `Modal` rather than a sheet library: the list is short, the
  * interaction is one tap, and a native modal costs no extra dependency and no
  * native rebuild.
+ *
+ * OPENS ON THE CURRENT SELECTION. A category list runs to 33 entries and the
+ * sheet shows about seven, so opening at the top means the thing you already
+ * chose is usually off screen — and the tick confirming it is the one piece of
+ * information the sheet exists to give you.
+ *
+ * Every row reports its position rather than only the selected one, because the
+ * selection can change between two opens without anything about the layout
+ * changing, and an `onLayout` only fires when the layout moves. Measuring all of
+ * them means the scroll is computed from where the selected row IS, not from
+ * where a row happened to be the last time one moved.
  */
 export function PickerSheet({
   visible,
@@ -39,6 +52,41 @@ export function PickerSheet({
   onClose: () => void;
   testID?: string;
 }) {
+  const scroller = useRef<ScrollView>(null);
+  const rows = useRef(new Map<string, LayoutRectangle>());
+  const viewport = useRef(0);
+  const content = useRef(0);
+  /** One scroll per opening. Later layout passes must not yank the list back. */
+  const centred = useRef(false);
+
+  const centreOnSelection = useCallback(() => {
+    if (centred.current || !selectedId) return;
+
+    const row = rows.current.get(selectedId);
+    if (!row) return;
+
+    const offset = centerScrollOffset(row, viewport.current, content.current);
+    // A zero offset is the answer for a short list and for a selection already
+    // at the top, so it still counts as done — otherwise every subsequent
+    // layout pass would try again.
+    centred.current = true;
+
+    // Deferred a frame: scrolling from inside the layout pass that produced
+    // these measurements gets overwritten by that same pass on Android.
+    requestAnimationFrame(() => {
+      scroller.current?.scrollTo({ y: offset, animated: false });
+    });
+  }, [selectedId]);
+
+  // A Modal keeps this component mounted while hidden, so the refs survive a
+  // close. Arm the next opening, then try immediately: if the sheet's content
+  // stayed mounted no `onLayout` will fire again and this is the only chance.
+  useEffect(() => {
+    if (!visible) return;
+    centred.current = false;
+    centreOnSelection();
+  }, [visible, centreOnSelection]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/* Tapping above the sheet dismisses it — expected of a sheet, and it
@@ -71,13 +119,26 @@ export function PickerSheet({
           </Pressable>
         </View>
 
-        <ScrollView>
+        <ScrollView
+          ref={scroller}
+          onLayout={(event) => {
+            viewport.current = event.nativeEvent.layout.height;
+            centreOnSelection();
+          }}
+          onContentSizeChange={(_width, height) => {
+            content.current = height;
+            centreOnSelection();
+          }}>
           {options.map((option) => {
             const selected = option.id === selectedId;
             return (
               <Pressable
                 key={option.id}
                 onPress={() => onSelect(option.id)}
+                onLayout={(event) => {
+                  rows.current.set(option.id, event.nativeEvent.layout);
+                  if (selected) centreOnSelection();
+                }}
                 testID={`picker-option-${option.id}`}
                 className={`flex-row items-center gap-3 px-5 py-3 active:bg-surface ${
                   option.indented ? 'pl-12' : ''

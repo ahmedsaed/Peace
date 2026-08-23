@@ -72,3 +72,33 @@ export function useKeyboardHeight(): number {
 
   return height;
 }
+
+/**
+ * Where to scroll a list so a given row sits in the middle of the viewport.
+ *
+ * Used when a picker sheet opens on an existing selection: the account or
+ * category you already chose should be the thing you are looking at, not
+ * something you have to hunt for below the fold. Centring rather than merely
+ * revealing it also shows the neighbours on both sides, which is what makes a
+ * long category list navigable.
+ *
+ * Pure, and clamped at BOTH ends, because the two edge cases are the common
+ * ones and both look like a bug. A row near the top cannot be centred without
+ * scrolling to a negative offset, and a row near the bottom cannot be centred
+ * without scrolling past the end into blank space — so the first item leaves
+ * the list at rest and the last leaves it against its end. Clamping here rather
+ * than trusting the platform keeps the whole rule in one testable place;
+ * `scrollTo` does not clamp identically everywhere.
+ */
+export function centerScrollOffset(
+  item: { y: number; height: number },
+  viewportHeight: number,
+  contentHeight: number
+): number {
+  // Not measured yet, or everything already fits — either way there is nothing
+  // to scroll and no offset that would help.
+  if (!(viewportHeight > 0) || !(contentHeight > viewportHeight)) return 0;
+
+  const ideal = item.y + item.height / 2 - viewportHeight / 2;
+  return Math.max(0, Math.min(ideal, contentHeight - viewportHeight));
+}
