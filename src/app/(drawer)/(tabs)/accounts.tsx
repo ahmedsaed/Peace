@@ -7,10 +7,11 @@ import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
 import { balanceByCurrency, listAccountsWithBalance, type CurrencyTotal } from '@/db/repo/accounts';
 import { availableCredit, isLiability, owedDisplay } from '@/lib/liability';
-import { formatMinor } from '@/lib/money';
 import { useSetting } from '@/state/settings';
+import { useMoney, type Money } from '@/state/money';
 
 export default function AccountsScreen() {
+  const money = useMoney();
   const router = useRouter();
   const [accounts, setAccounts] = useState<ReturnType<typeof listAccountsWithBalance>>([]);
   const [totals, setTotals] = useState<CurrencyTotal[]>([]);
@@ -38,7 +39,7 @@ export default function AccountsScreen() {
         <Text className="mb-1 text-[10px] uppercase tracking-widest text-muted">All accounts</Text>
         {totals.length === 0 ? (
           <Text className="text-xl font-semibold text-ink" testID="accounts-total">
-            {formatMinor(0, homeCurrency)}
+            {money(0, homeCurrency)}
           </Text>
         ) : (
           totals.map((total, index) => (
@@ -46,7 +47,7 @@ export default function AccountsScreen() {
               key={total.currency}
               className={`font-semibold text-ink ${index === 0 ? 'text-xl' : 'text-base'}`}
               testID={index === 0 ? 'accounts-total' : `accounts-total-${total.currency}`}>
-              {formatMinor(total.balanceMinor, total.currency)}
+              {money(total.balanceMinor, total.currency)}
             </Text>
           ))
         )}
@@ -68,7 +69,7 @@ export default function AccountsScreen() {
             <View className="flex-1">
               <Text className="text-base text-ink">{account.name}</Text>
               <Text className="text-xs capitalize text-muted" testID={`account-sub-${account.id}`}>
-                {accountSubtitle(account)}
+                {accountSubtitle(account, money)}
               </Text>
             </View>
 
@@ -90,13 +91,13 @@ type Row = ReturnType<typeof listAccountsWithBalance>[number];
  * Available credit is the number people actually plan against — "can I put this
  * on the card" is not answered by knowing what you owe.
  */
-function accountSubtitle(account: Row): string {
+function accountSubtitle(account: Row, money: Money): string {
   const available = isLiability(account.type)
     ? availableCredit(account.balanceMinor, account.creditLimit)
     : null;
 
   if (available === null) return `${account.type} · ${account.currency}`;
-  return `${formatMinor(available, account.currency)} of ${formatMinor(
+  return `${money(available, account.currency)} of ${money(
     account.creditLimit ?? 0,
     account.currency
   )} available`;
@@ -111,6 +112,7 @@ function accountSubtitle(account: Row): string {
  * account — this is the render boundary and only the render boundary.
  */
 function AccountAmount({ account }: { account: Row }) {
+  const money = useMoney();
   if (!isLiability(account.type)) {
     return (
       <Text
@@ -118,7 +120,7 @@ function AccountAmount({ account }: { account: Row }) {
           account.balanceMinor < 0 ? 'text-expense' : 'text-income'
         }`}
         testID={`account-amount-${account.id}`}>
-        {formatMinor(account.balanceMinor, account.currency)}
+        {money(account.balanceMinor, account.currency)}
       </Text>
     );
   }
@@ -129,7 +131,7 @@ function AccountAmount({ account }: { account: Row }) {
       <Text
         className={`text-base font-semibold ${owed.isDebt ? 'text-expense' : 'text-income'}`}
         testID={`account-amount-${account.id}`}>
-        {formatMinor(owed.magnitudeMinor, account.currency)}
+        {money(owed.magnitudeMinor, account.currency)}
       </Text>
       <Text className="text-[11px] text-muted" testID={`account-owed-${account.id}`}>
         {owed.label}

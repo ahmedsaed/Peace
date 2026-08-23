@@ -24,12 +24,13 @@ import {
 } from '@/db/repo/accounts';
 import { InvariantError } from '@/db/repo/categories';
 import type { Account } from '@/db/schema';
-import { formatMinor, parseAmountToMinor } from '@/lib/money';
+import { parseAmountToMinor } from '@/lib/money';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
 import { ReconcileSheet } from '@/components/reconcile-sheet';
 import { accountBalance, reconcileAccount } from '@/db/repo/adjust';
 import { bpToPercent, isLiability, percentToBp } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
+import { useMoney } from '@/state/money';
 
 const TYPES: { value: Account['type']; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -47,6 +48,7 @@ const CURRENCY_OPTIONS: PickerOption[] = CURRENCIES.map((c) => ({
 }));
 
 export default function AccountScreen() {
+  const money = useMoney();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -277,10 +279,10 @@ export default function AccountScreen() {
         {existing ? (
           <Text className="mt-3 text-xs leading-5 text-muted">
             {liability
-              ? `Currently ${formatMinor(Math.abs(balanceNow), existing.currency)} ${
+              ? `Currently ${money(Math.abs(balanceNow), existing.currency)} ${
                   balanceNow <= 0 ? 'owed' : 'in credit'
                 }, from every record on this card. Use "Update balance" when the bank disagrees.`
-              : `Current balance ${formatMinor(
+              : `Current balance ${money(
                   existing.openingBalance,
                   existing.currency
                 )} opening, plus every record on this account.`}

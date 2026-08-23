@@ -6,8 +6,8 @@ import { EmptyState, StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { deleteRule, listRules, nextProposalDate, setRuleActive } from '@/db/repo/recurring';
-import { formatMinor } from '@/lib/money';
 import { describeRecurrence, fromYmd } from '@/lib/recurrence';
+import { useMoney } from '@/state/money';
 
 type Rule = ReturnType<typeof listRules>[number];
 
@@ -124,6 +124,7 @@ function RuleRow({
   first: boolean;
   onLongPress: () => void;
 }) {
+  const money = useMoney();
   const schedule = describeRecurrence({
     frequency: rule.frequency,
     interval: rule.interval,
@@ -158,7 +159,7 @@ function RuleRow({
       {/* Amount and next date stack on the right, so the eye runs down two
           columns rather than along four facts crammed into one line. */}
       <View className="items-end">
-        <Text className="text-[15px] text-ink">{formatMinor(rule.amountMinor, rule.currency)}</Text>
+        <Text className="text-[15px] text-ink">{money(rule.amountMinor, rule.currency)}</Text>
         <Text className="text-xs text-muted">{whenNext(rule, next)}</Text>
       </View>
     </Pressable>
@@ -189,6 +190,7 @@ function RuleActions({
   onToggle: (rule: Rule) => void;
   onDelete: (rule: Rule) => void;
 }) {
+  const money = useMoney();
   return (
     <Modal visible={rule !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
@@ -204,7 +206,7 @@ function RuleActions({
                 {rule.name ?? 'Recurring'}
               </Text>
               <Text className="text-xs text-muted" numberOfLines={1}>
-                {formatMinor(rule.amountMinor, rule.currency)}
+                {money(rule.amountMinor, rule.currency)}
               </Text>
             </View>
 

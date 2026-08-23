@@ -28,11 +28,11 @@ import { broughtForward, type BroughtForward } from '@/db/repo/carry';
 import { dismissCapture, markSaved } from '@/db/repo/bank-captures';
 import type { BankCapture } from '@/db/schema';
 import { createRecord, deleteRecord, restoreRecords } from '@/db/repo/transactions';
-import { formatMinor } from '@/lib/money';
 import { currentPeriod } from '@/lib/period';
 import { useSetting } from '@/state/settings';
 import { useBankInbox } from '@/state/bank';
 import { useUndoStore } from '@/state/undo';
+import { useMoney } from '@/state/money';
 
 const EMPTY_SUMMARY: PeriodSummary = {
   expenseMinor: 0,
@@ -62,6 +62,7 @@ const isCapture = (row: Row | Proposal | BankCapture): row is BankCapture =>
   (row as BankCapture).captureKey !== undefined;
 
 export default function RecordsScreen() {
+  const money = useMoney();
   const router = useRouter();
   const [period, setPeriod] = useState(currentPeriod());
   const homeCurrency = useSetting('homeCurrency');
@@ -249,9 +250,9 @@ export default function RecordsScreen() {
             anywhere. It is the difference of the two cells beside it, so both
             operands stay on screen. */}
         <SummaryTrio
-          expense={formatMinor(summary.expenseMinor, homeCurrency)}
-          income={formatMinor(summary.incomeMinor, homeCurrency)}
-          balance={formatMinor(carryOver ? running : summary.balanceMinor, homeCurrency)}
+          expense={money(summary.expenseMinor, homeCurrency)}
+          income={money(summary.incomeMinor, homeCurrency)}
+          balance={money(carryOver ? running : summary.balanceMinor, homeCurrency)}
           balanceMinor={carryOver ? running : summary.balanceMinor}
           balanceLabel={carryOver ? 'Now' : 'Balance'}
           balanceTestID={carryOver ? 'summary-running' : 'summary-balance'}
@@ -339,7 +340,7 @@ export default function RecordsScreen() {
                   it as money already spent. */}
               {showTotal && section.total !== null ? (
                 <Text className="shrink-0 text-xs text-muted" testID={`day-total-${section.key}`}>
-                  {formatMinor(section.total, homeCurrency, { showSign: true })}
+                  {money(section.total, homeCurrency, { showSign: true })}
                   {section.unvalued ? ' +' : ''}
                 </Text>
               ) : null}

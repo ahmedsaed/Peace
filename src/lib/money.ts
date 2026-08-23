@@ -170,3 +170,33 @@ export function convertMinor(
 export function sumMinor(amounts: number[]): number {
   return amounts.reduce((acc, n) => acc + n, 0);
 }
+
+/** What a masked amount shows instead of its digits. */
+export const AMOUNT_MASK = '••••';
+
+/**
+ * Hide the figure in an already-formatted amount, keeping everything that is
+ * not the number itself.
+ *
+ * A MASK RATHER THAN A BLUR, and that is a correctness decision before it is a
+ * visual one. A blur is applied over a rendered number: if it fails — and on
+ * Android a `BlurView` blurs its backdrop, not the text in front of it — it
+ * fails OPEN, leaving the amount legible under a control that says it is
+ * hidden. Substituting the characters cannot half-work. It also costs no
+ * native dependency in an app that hand-draws its icons to avoid exactly that.
+ *
+ * The sign and the currency survive. Which way the money moved is the row's
+ * meaning rather than its value, the design system requires a sign on every
+ * amount, and keeping the symbol means a masked screen still says which
+ * currency you are not being shown.
+ *
+ * Operates on the OUTPUT of `formatMinor` rather than taking a number, so it
+ * cannot disagree with it about symbols, separators or placement — there is one
+ * formatter, and this blanks part of its result.
+ */
+export function maskFormatted(formatted: string): string {
+  // The first run of digits and their separators is the number; a currency code
+  // like "EGP" has no digits in it, so it is untouched. Anchoring to the first
+  // run matters for a locale that puts the symbol after the figure.
+  return formatted.replace(/\d[\d.,\u00A0\u202F\u2009 ]*\d|\d/u, AMOUNT_MASK);
+}

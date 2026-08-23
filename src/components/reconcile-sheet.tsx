@@ -8,7 +8,8 @@ import {
   targetBalanceFromOwed,
   type AccountKind,
 } from '@/lib/liability';
-import { formatMinor, parseAmountToMinor } from '@/lib/money';
+import { parseAmountToMinor } from '@/lib/money';
+import { useMoney } from '@/state/money';
 
 type Mode = 'owed' | 'available';
 
@@ -44,6 +45,7 @@ export function ReconcileSheet({
   onClose: () => void;
   onConfirm: (targetMinor: number) => void;
 }) {
+  const money = useMoney();
   const liability = isLiability(accountType);
   const [mode, setMode] = useState<Mode>('owed');
   const [draft, setDraft] = useState('');
@@ -126,12 +128,12 @@ export function ReconcileSheet({
             way the correction goes. */}
         <Text className="mt-3 text-center text-xs text-muted" testID="reconcile-difference">
           {difference === null
-            ? `Peace currently believes ${formatMinor(Math.abs(currentMinor), currency)}${
+            ? `Peace currently believes ${money(Math.abs(currentMinor), currency)}${
                 liability ? (currentMinor <= 0 ? ' owed' : ' in credit') : ''
               }`
             : difference === 0
               ? 'Already matches — nothing to correct'
-              : `Adds a ${formatMinor(Math.abs(difference), currency)} correction ${
+              : `Adds a ${money(Math.abs(difference), currency)} correction ${
                   difference < 0 ? 'against' : 'in favour of'
                 } this account`}
         </Text>

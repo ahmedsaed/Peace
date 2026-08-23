@@ -20,7 +20,6 @@ import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { listCategoryTree } from '@/db/repo/categories';
 import { groupByDay } from '@/db/repo/records';
 import { searchRecords, type SearchOutcome } from '@/db/repo/search';
-import { formatMinor } from '@/lib/money';
 import {
   activeFilterCount,
   EMPTY_QUERY,
@@ -32,6 +31,7 @@ import {
   type SearchQuery,
 } from '@/lib/search-query';
 import { useSetting } from '@/state/settings';
+import { useMoney } from '@/state/money';
 
 /**
  * How long to wait after a keystroke before querying.
@@ -48,6 +48,7 @@ const DEBOUNCE_MS = 180;
 const ANY = 'filter-any';
 
 export default function SearchScreen() {
+  const money = useMoney();
   const router = useRouter();
   const homeCurrency = useSetting('homeCurrency');
   const { height } = useWindowDimensions();
@@ -113,7 +114,7 @@ export default function SearchScreen() {
       label: a.name,
       icon: a.icon,
       color: a.color,
-      detail: formatMinor(a.balanceMinor, a.currency),
+      detail: money(a.balanceMinor, a.currency),
       detailTone: a.balanceMinor < 0 ? ('negative' as const) : ('neutral' as const),
     })),
   ];
@@ -268,6 +269,7 @@ function ResultSummary({
   outcome: SearchOutcome;
   homeCurrency: string;
 }) {
+  const money = useMoney();
   return (
     <View className="border-b border-line bg-surface px-4 py-2">
       <View className="flex-row items-center gap-4">
@@ -276,12 +278,12 @@ function ResultSummary({
         </Text>
         {outcome.expenseMinor !== 0 ? (
           <Text className="text-xs font-semibold text-expense" testID="search-expense">
-            {formatMinor(outcome.expenseMinor, homeCurrency)}
+            {money(outcome.expenseMinor, homeCurrency)}
           </Text>
         ) : null}
         {outcome.incomeMinor !== 0 ? (
           <Text className="text-xs font-semibold text-income" testID="search-income">
-            {formatMinor(outcome.incomeMinor, homeCurrency)}
+            {money(outcome.incomeMinor, homeCurrency)}
           </Text>
         ) : null}
       </View>

@@ -33,6 +33,20 @@ const CHROME_PATHS = {
   // and non-zero fill would give a solid disc, which reads as a lollipop.
   search:
     'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zm0 2.2a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 1 1 0-8.6zM15.2 16.6l1.4-1.4 4.9 4.9-1.4 1.4z',
+  // The pupil is a HOLE, punched by winding it the opposite way (sweep-flag 1
+  // against the almond's 0) — the same trick `search` uses for its lens. A
+  // solid disc drawn the same way round would simply merge into the almond and
+  // render a featureless eyelid, which is what the first attempt did.
+  eye: 'M12 5C6.6 5 2.5 8.3 1 12c1.5 3.7 5.6 7 11 7s9.5-3.3 11-7c-1.5-3.7-5.6-7-11-7z M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 1 1 0-6.4z',
+  // A CLOSED LID rather than the conventional slashed eye. A diagonal struck
+  // through the almond needs the slash to be a gap AND a line — three
+  // overlapping windings — and at 22px the overlaps count up into a
+  // checkerboard rather than a line. Rasterise the alternative before assuming
+  // the familiar shape is the drawable one. The lid is lifted so its optical
+  // centre matches the open eye's; without that the icon appears to drop half a
+  // pixel every time it is toggled.
+  'eye-off':
+    'M12 14.9c-4.4 0-8.3-2.5-10.3-6.2l1.9-1C5.3 10.8 8.4 12.9 12 12.9s6.7-2.1 8.4-5.2l1.9 1c-2 3.7-5.9 6.2-10.3 6.2z M3.4 15.1l1.9 1.1-1.7 2.9-1.9-1.1z M11 16h2v3.3h-2z M20.6 15.1l-1.9 1.1 1.7 2.9 1.9-1.1z',
   // A funnel, not the three-sliders glyph — `settings` already uses sliders,
   // and two controls one row apart drawn from the same shape would be read as
   // the same button.
