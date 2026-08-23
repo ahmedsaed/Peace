@@ -3,7 +3,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'rea
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import type { BankCapture } from '@/db/schema';
-import { formatMinor } from '@/lib/money';
+import { useMoney } from '@/state/money';
 
 /**
  * A bank message, shown in the records list before it is a record.
@@ -31,6 +31,7 @@ export function BankRow({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  const money = useMoney();
   const reading = capture.status === 'pending';
   const sign = capture.direction === 'in' ? '' : '-';
 
@@ -82,7 +83,7 @@ export function BankRow({
       ) : (
         <Text className="text-[15px] text-muted">
           {sign}
-          {formatMinor(capture.amountMinor, capture.currency || currency)}
+          {money(capture.amountMinor, capture.currency || currency)}
         </Text>
       )}
     </Pressable>
@@ -114,6 +115,7 @@ export function BankActions({
   onAdd: (capture: BankCapture) => void;
   onDismiss: (capture: BankCapture) => void;
 }) {
+  const money = useMoney();
   const usable = capture !== null && capture.amountMinor !== null && capture.direction !== null;
 
   return (
@@ -136,7 +138,7 @@ export function BankActions({
                   ? 'still being read…'
                   : capture.amountMinor === null
                     ? 'no amount found'
-                    : formatMinor(capture.amountMinor, capture.currency || currency)}
+                    : money(capture.amountMinor, capture.currency || currency)}
               </Text>
 
               {/* Scrolls rather than truncates. A bank message runs to three or

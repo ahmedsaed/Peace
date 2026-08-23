@@ -7,6 +7,7 @@ import { Icon } from '@/components/icon';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
 import { addMonths, formatPeriod, type Period } from '@/lib/period';
+import { useSetting, useSettingsStore } from '@/state/settings';
 
 /** Header icon button. 44px square: the Material minimum touch target. */
 export function HeaderButton({
@@ -29,6 +30,34 @@ export function HeaderButton({
       className="h-11 w-11 items-center justify-center rounded-full active:bg-raised">
       <Icon name={icon} size={22} color={palette.ink} />
     </Pressable>
+  );
+}
+
+/**
+ * Mask every amount on screen, for reading the ledger with someone beside you.
+ *
+ * IN THE HEADER RATHER THAN IN SETTINGS, and that is what makes persisting it
+ * safe. The state survives a restart because someone in an open-plan office
+ * wants it to — which means a masked ledger has to carry its own way out, on
+ * every tab, or it is indistinguishable from an app that has broken. A settings
+ * row would hide the exit two navigations away from the screen showing the
+ * dots.
+ *
+ * Shoulder privacy only: it does not touch screenshots or the recents
+ * thumbnail. The label says "amounts", never "privacy", so it cannot be read as
+ * the stronger promise.
+ */
+function HideAmountsButton() {
+  const hidden = useSetting('hideAmounts');
+  const update = useSettingsStore((state) => state.update);
+
+  return (
+    <HeaderButton
+      icon={hidden ? 'eye-off' : 'eye'}
+      label={hidden ? 'Show amounts' : 'Hide amounts'}
+      testID="nav-hide-amounts"
+      onPress={() => update('hideAmounts', !hidden)}
+    />
   );
 }
 
@@ -57,6 +86,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
       />
       <Wordmark style={{ flex: 1, paddingLeft: 4 }} testID="app-title" />
       {right}
+      <HideAmountsButton />
       <HeaderButton
         icon="search"
         label="Search records"

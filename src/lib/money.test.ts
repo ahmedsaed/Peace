@@ -1,4 +1,12 @@
-import { convertMinor, formatMinor, groupDigits, parseAmountToMinor, sumMinor } from './money';
+import {
+  AMOUNT_MASK,
+  convertMinor,
+  formatMinor,
+  groupDigits,
+  maskFormatted,
+  parseAmountToMinor,
+  sumMinor,
+} from './money';
 
 describe('parseAmountToMinor', () => {
   it('parses plain decimals into minor units', () => {
@@ -142,5 +150,52 @@ describe('convertMinor', () => {
       expect(Number.isInteger(convertMinor(12345, 'USD', 'EGP', rate))).toBe(true);
       expect(Number.isInteger(convertMinor(12345, 'JPY', 'KWD', rate))).toBe(true);
     }
+  });
+});
+
+describe('maskFormatted', () => {
+  // Driven through the real formatter rather than hand-written strings: the
+  // mask's whole design is that it cannot disagree with formatMinor about
+  // symbols or separators, and hand-written inputs would not prove that.
+  it('hides the figure but keeps the currency', () => {
+    expect(maskFormatted(formatMinor(1250000, 'EGP'))).toBe(`E£${AMOUNT_MASK}`);
+    expect(maskFormatted(formatMinor(150, 'USD'))).toBe(`$${AMOUNT_MASK}`);
+  });
+
+  it('keeps the sign, because which way the money moved is not its value', () => {
+    expect(maskFormatted(formatMinor(-1250000, 'EGP'))).toBe(`-E£${AMOUNT_MASK}`);
+    expect(maskFormatted(formatMinor(1250000, 'EGP', { showSign: true }))).toBe(
+      `+E£${AMOUNT_MASK}`
+    );
+  });
+
+  it('leaves nothing of the number, however long or short', () => {
+    for (const minor of [0, 1, 99, 100, 123456789, -123456789]) {
+      const masked = maskFormatted(formatMinor(minor, 'EGP'));
+      expect(masked).not.toMatch(/\d/);
+      expect(masked).toContain(AMOUNT_MASK);
+    }
+  });
+
+  // A currency with no decimal places and one with three both format
+  // differently; neither may leave a digit behind.
+  it.each(['JPY', 'KWD', 'USD', 'EGP'])('masks %s completely', (currency) => {
+    expect(maskFormatted(formatMinor(1234567, currency))).not.toMatch(/\d/);
+  });
+
+  // The separator ICU chooses is locale-dependent and includes non-breaking
+  // spaces. Stopping at one would leave "••••,500.00" — half the figure, still
+  // readable, and looking entirely deliberate.
+  it.each([
+    ['1 234,56 €', `${AMOUNT_MASK} €`],
+    ['12 500,00 €', `${AMOUNT_MASK} €`],
+    ['EGP 12,500.00', `EGP ${AMOUNT_MASK}`],
+  ])('masks %s across an exotic group separator', (input, expected) => {
+    expect(maskFormatted(input)).toBe(expected);
+  });
+
+  it('leaves a string with no figure in it alone', () => {
+    expect(maskFormatted('—')).toBe('—');
+    expect(maskFormatted('')).toBe('');
   });
 });

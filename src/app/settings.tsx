@@ -11,8 +11,8 @@ import { StackHeader } from '@/components/screen';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
-import { formatMinor } from '@/lib/money';
 import { useSettingsStore } from '@/state/settings';
+import { useMoney } from '@/state/money';
 
 /**
  * Settings.
@@ -25,6 +25,7 @@ import { useSettingsStore } from '@/state/settings';
  * records list learned to total a day.
  */
 export default function SettingsScreen() {
+  const money = useMoney();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
   const [sheet, setSheet] = useState<'currency' | 'account' | null>(null);
@@ -48,7 +49,7 @@ export default function SettingsScreen() {
       label: a.name,
       icon: a.icon,
       color: a.color,
-      detail: formatMinor(a.balanceMinor, a.currency),
+      detail: money(a.balanceMinor, a.currency),
       detailTone: a.balanceMinor < 0 ? ('negative' as const) : ('neutral' as const),
     })),
   ];

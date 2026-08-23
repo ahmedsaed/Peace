@@ -113,6 +113,9 @@ switch them on, one happens only when you tap a button, and one is a once-a-day 
 
 A few things that follow from taking that seriously:
 
+- **One tap hides every amount.** The eye in the header masks each figure on every screen, for
+  reading your ledger with someone beside you. It persists, so the eye stays in the header as the
+  way back. Shoulder privacy only — it does not touch screenshots or the recents thumbnail.
 - **No account and no server.** There is nothing to sign up for and nothing to be locked out of.
 - **Bank alerts are read, not your inbox.** Android hands over the notification your messaging app
   already showed — the same text you read off a lock screen. No `READ_SMS`, no conversation

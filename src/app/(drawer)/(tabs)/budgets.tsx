@@ -19,10 +19,11 @@ import {
   type SuggestionSet,
 } from '@/db/repo/budgets';
 import { budgetFraction, budgetPercent, budgetState, remainingMinor } from '@/lib/budget';
-import { formatMinor, minorToMajor, parseAmountToMinor } from '@/lib/money';
+import { minorToMajor, parseAmountToMinor } from '@/lib/money';
 import { testIdSlug as slug } from '@/lib/id';
 import { formatPeriod, currentPeriod, type Period } from '@/lib/period';
 import { useSetting } from '@/state/settings';
+import { useMoney } from '@/state/money';
 
 const EMPTY: BudgetSummary = {
   budgeted: [],
@@ -142,6 +143,7 @@ export default function BudgetsScreen() {
  * has to do themselves.
  */
 function Totals({ summary, homeCurrency }: { summary: BudgetSummary; homeCurrency: string }) {
+  const money = useMoney();
   const { totalBudgetMinor: budget, totalSpentMinor: spent } = summary;
   const left = remainingMinor(spent, budget);
   const state = budgetState(spent, budget);
@@ -166,11 +168,11 @@ function Totals({ summary, homeCurrency }: { summary: BudgetSummary; homeCurrenc
   return (
     <View className="mt-3">
       <View className="flex-row">
-        {cell('Budget', formatMinor(budget, homeCurrency), 'text-ink', 'budget-total-budget')}
-        {cell('Spent', formatMinor(spent, homeCurrency), 'text-expense', 'budget-total-spent')}
+        {cell('Budget', money(budget, homeCurrency), 'text-ink', 'budget-total-budget')}
+        {cell('Spent', money(spent, homeCurrency), 'text-expense', 'budget-total-spent')}
         {cell(
           left < 0 ? 'Over' : 'Left',
-          formatMinor(Math.abs(left), homeCurrency),
+          money(Math.abs(left), homeCurrency),
           left < 0 ? 'text-expense' : 'text-ink',
           'budget-total-left'
         )}
@@ -233,6 +235,7 @@ function BudgetLine({
   homeCurrency: string;
   onPress: () => void;
 }) {
+  const money = useMoney();
   const state = budgetState(row.spentMinor, row.budgetMinor);
   const left = remainingMinor(row.spentMinor, row.budgetMinor);
   const id = slug(row.categoryId);
@@ -269,8 +272,8 @@ function BudgetLine({
             {row.categoryName}
           </Text>
           <Text className="text-xs text-muted" testID={`budget-amounts-${id}`}>
-            {formatMinor(row.spentMinor, homeCurrency)} of{' '}
-            {formatMinor(row.budgetMinor, homeCurrency)}
+            {money(row.spentMinor, homeCurrency)} of{' '}
+            {money(row.budgetMinor, homeCurrency)}
           </Text>
         </View>
         <View className="items-end">
@@ -288,8 +291,8 @@ function BudgetLine({
             }`}
             testID={`budget-left-${id}`}>
             {left < 0
-              ? `${formatMinor(Math.abs(left), homeCurrency)} over`
-              : `${formatMinor(left, homeCurrency)} left`}
+              ? `${money(Math.abs(left), homeCurrency)} over`
+              : `${money(left, homeCurrency)} left`}
           </Text>
         </View>
       </View>
@@ -311,6 +314,7 @@ function UnbudgetedLine({
   homeCurrency: string;
   onPress: () => void;
 }) {
+  const money = useMoney();
   const id = slug(row.categoryId);
   return (
     <Pressable
@@ -325,7 +329,7 @@ function UnbudgetedLine({
           be answered by a list of names. */}
       {row.spentMinor > 0 ? (
         <Text className="text-xs text-muted" testID={`budget-spent-${id}`}>
-          {formatMinor(row.spentMinor, homeCurrency)} spent
+          {money(row.spentMinor, homeCurrency)} spent
         </Text>
       ) : null}
       <Text className="text-xs text-accent">Set</Text>
@@ -357,6 +361,7 @@ function StartHere({
   onUseSuggestions: () => void;
   onCopy: () => void;
 }) {
+  const money = useMoney();
   if (offer.suggestions.length === 0 && !copyFrom) {
     return (
       <EmptyState
@@ -408,7 +413,7 @@ function StartHere({
                 {suggestion.categoryName}
               </Text>
               <Text className="text-sm text-ink">
-                {formatMinor(suggestion.amountMinor, homeCurrency)}
+                {money(suggestion.amountMinor, homeCurrency)}
               </Text>
             </View>
           ))}
@@ -441,6 +446,7 @@ function StartHere({
  * nothing on either says why.
  */
 function Footnotes({ summary, homeCurrency }: { summary: BudgetSummary; homeCurrency: string }) {
+  const money = useMoney();
   if (
     summary.uncategorisedMinor === 0 &&
     summary.unvaluedCount === 0 &&
@@ -453,7 +459,7 @@ function Footnotes({ summary, homeCurrency }: { summary: BudgetSummary; homeCurr
     <View className="mt-4 gap-1 px-4">
       {summary.uncategorisedMinor > 0 ? (
         <Text className="text-[11px] text-muted" testID="budget-uncategorised">
-          {formatMinor(summary.uncategorisedMinor, homeCurrency)} spent with no category — it cannot
+          {money(summary.uncategorisedMinor, homeCurrency)} spent with no category — it cannot
           be budgeted until those records have one
         </Text>
       ) : null}
@@ -488,6 +494,7 @@ function BudgetEditor({
   onSave: (categoryId: string, raw: string) => void;
   onClear: (categoryId: string) => void;
 }) {
+  const money = useMoney();
   // Seeded once, from the initialiser, because the component is remounted per
   // category. Deliberately NOT set from an onShow callback: if that ever failed
   // to fire, the field would open empty on an existing limit — and an empty
@@ -512,7 +519,7 @@ function BudgetEditor({
               <View className="flex-1">
                 <Text className="text-base font-semibold text-ink">{row.categoryName}</Text>
                 <Text className="text-xs text-muted">
-                  {formatPeriod(period)} · {formatMinor(row.spentMinor, homeCurrency)} spent so far
+                  {formatPeriod(period)} · {money(row.spentMinor, homeCurrency)} spent so far
                 </Text>
               </View>
             </View>
