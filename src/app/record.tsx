@@ -56,6 +56,7 @@ import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
 import { CURRENCIES } from '@/lib/currencies';
 import { captureNote } from '@/lib/bank-sms';
+import { noteWithReading } from '@/lib/note';
 import { foreignPurchase } from '@/lib/fees';
 import { isLiability } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
@@ -227,8 +228,16 @@ export default function RecordScreen() {
       bankMessage?.matchedCategoryId ??
       null
   );
+  // A bank message opens the note with the bank's own words, and with blank
+  // lines above them: "what was this for" is the one thing the message cannot
+  // say, and it belongs at the top where the list shows it.
   const [note, setNote] = useState(
-    rule?.note ?? existing?.note ?? source?.note ?? (bankMessage ? captureNote(bankMessage) : '')
+    rule?.note ??
+      existing?.note ??
+      source?.note ??
+      (bankMessage
+        ? noteWithReading('', captureNote(bankMessage), { leaveRoom: density !== 'tight' })
+        : '')
   );
   // Dated TODAY for a refund or a copy: the money comes back, or goes out
   // again, on the day it happens — not on the day of the record it came from.
@@ -709,8 +718,12 @@ export default function RecordScreen() {
       if (reading.amountMinor !== null) setCalc(calcFromMinor(reading.amountMinor, currency));
       // The shop AND what was in the basket. A total three months old says what
       // a record cost; the contents are what say what it was.
-      const filled = receiptNote(reading);
-      if (filled !== '') setNote(filled);
+      // APPENDED, never assigned. This replaced the note outright, so a receipt
+      // photographed after typing threw the typing away — silently, while the
+      // user was watching the amount appear.
+      setNote((current) =>
+        noteWithReading(current, receiptNote(reading), { leaveRoom: density !== 'tight' })
+      );
       if (reading.occurredOn !== null) {
         // Midday, like every other date this screen sets: a date built at
         // midnight lands on the previous day in any timezone behind UTC.

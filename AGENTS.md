@@ -499,6 +499,17 @@ app ignoring input. `pkill -f GradleDaemon`.
   truth in `error.details[].reason` (`API_KEY_INVALID`, `SERVICE_DISABLED`, …) and its own
   `error.message` is usually better than anything you would invent — pass it through. Only a run
   against the real API finds this; a mocked 401 passes happily forever.
+- **What a model reads is APPENDED to the note, never assigned over it.** `setNote(filled)` meant
+  photographing a receipt after typing "lunch with Sara" threw the typing away — silently, while
+  the user was watching the amount appear and had no reason to re-check a field they had already
+  filled in. A reading is a suggestion; what a person typed is the record, so it stays at the top
+  and the reading goes underneath. `noteWithReading` in `src/lib/note.ts` owns this, and also
+  leaves blank lines above a reading when nothing has been typed yet — a comment belongs at the
+  beginning, where the list shows it, and tapping before the first character of a text block is
+  fiddly on a phone. It leaves NO room at `tight` density: that note field is a single 44px line,
+  where blank lines push the text out of the only visible one and the field reads as empty at the
+  moment it was filled. Reading the same receipt twice must not stack two copies of it, and a
+  reading that found nothing must not clear the note.
 - **The model is a typist, not an accountant.** Everything an LLM returns is text somebody typed
   badly: range-check it, drop what does not survive, and never let it reach the ledger directly.
   Ask for STRUCTURED OUTPUT (`responseSchema` + `responseMimeType`) so the reply is fields rather
