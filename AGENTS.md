@@ -457,7 +457,19 @@ app ignoring input. `pkill -f GradleDaemon`.
   guard an allowlist and ends its usefulness. The flows had also hidden the problem rather than
   caught it: `credit-card.yaml` typed into the field and called `hideKeyboard` before asserting
   anything, which is precisely the relaxation the last sentence above warns about. Assert BEFORE the
-  keyboard goes down.
+  keyboard goes down. `sheet-lift.test.tsx` then RENDERS two sheets and fires the event, because the
+  structural guard is blind to the obvious next mistake: a sheet that imports the hook and drops the
+  value on the floor satisfies it completely. Proven by reverting the fix — the guard's four tests
+  went on passing while the render test's three failed.
+- **Components CAN be rendered under Jest, and one line of `jest-setup.js` is why.** `db/client.ts`
+  runs `PRAGMA foreign_keys` at IMPORT time, so before the mock answered `getFirstSync` the whole
+  suite died on `sqliteDb.getFirstSync is not a function` merely for importing anything that shows
+  money — which reads like a broken test file rather than a missing stub, and is presumably why the
+  component tests here stop at pure logic. Two more traps once you are past it: RNTL 14 made
+  `render` **async** (forget the `await` and you get `render function has not been called`, which
+  points at the wrong line entirely), and `Keyboard.emit` does not exist on RN 0.86 — spy on
+  `Keyboard.addListener` and call the handler yourself, which has the side benefit of proving WHICH
+  event was subscribed to.
 - **The moment a row can point at a FILE, the backup stops being the database.** Attachments live
   on disk with only their names in `attachments`, so copying `peace.db` alone restores a ledger
   whose every receipt is a broken thumbnail — on the one day a backup is being used at all. A

@@ -3,11 +3,22 @@ global.__reanimatedWorkletInit = () => {};
 
 // expo-sqlite has no JS implementation under Node; unit tests should exercise
 // pure logic (src/lib) and components, and leave real DB behaviour to E2E.
+//
+// `getFirstSync` answers the foreign-keys PRAGMA truthfully and returns nothing
+// for everything else. It is here because `db/client.ts` runs that PRAGMA at
+// IMPORT time and shouts if it is off — so without it, merely importing any
+// component that reaches the settings store (which is any component that shows
+// money) fails the whole suite before a single test runs. Answering it with the
+// value the real app has is a stub of the environment, not of the behaviour
+// under test; a query returning a row here would be a fake.
 jest.mock('expo-sqlite', () => ({
   openDatabaseSync: () => ({
     execSync: jest.fn(),
     runSync: jest.fn(),
     getAllSync: jest.fn(() => []),
+    getFirstSync: jest.fn((sql) =>
+      String(sql).includes('foreign_keys') ? { foreign_keys: 1 } : undefined
+    ),
   }),
 }));
 
