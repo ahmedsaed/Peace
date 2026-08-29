@@ -448,6 +448,16 @@ app ignoring input. `pkill -f GradleDaemon`.
   `keyboardDidShow`, never `keyboardWillShow`: Android only fires the `Did` events, so a `Will`
   listener reports zero on the one platform that needs it. The flow has to TYPE into the field and
   then assert the button below it is still visible; asserting the field exists proves nothing.
+  **This rule was written down and then missed in two of the three sheets it applies to** — nine
+  sheets hand-roll the same shell and exactly one remembered — so it is now enforced by
+  `sheet-keyboard.test.ts`, which reads the JSX between `<Modal` and `</Modal>` and fails if a sheet
+  containing a `TextInput` never mentions `useKeyboardHeight`. Reading the modal's BODY rather than
+  the file is what keeps it honest: `drive-backup.tsx` has a passphrase field on the ordinary screen
+  and a Modal that only lists files, and flagging that would be the false positive that earns the
+  guard an allowlist and ends its usefulness. The flows had also hidden the problem rather than
+  caught it: `credit-card.yaml` typed into the field and called `hideKeyboard` before asserting
+  anything, which is precisely the relaxation the last sentence above warns about. Assert BEFORE the
+  keyboard goes down.
 - **The moment a row can point at a FILE, the backup stops being the database.** Attachments live
   on disk with only their names in `attachments`, so copying `peace.db` alone restores a ledger
   whose every receipt is a broken thumbnail — on the one day a backup is being used at all. A

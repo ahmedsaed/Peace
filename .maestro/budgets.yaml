@@ -113,6 +113,10 @@ appId: com.ahmed.peace
     text: "240"
 - eraseText
 - inputText: "800"
+# Still with the keyboard up: this sheet is a Modal too, and it keeps its full
+# height while the keyboard covers the bottom of the screen. See credit-card.yaml.
+- assertVisible:
+    id: "budget-save"
 - tapOn:
     id: "budget-save"
 

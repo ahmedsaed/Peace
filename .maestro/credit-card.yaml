@@ -111,6 +111,17 @@ appId: com.ahmed.peace
 - tapOn:
     id: "reconcile-input"
 - inputText: "520"
+# THE KEYBOARD IS STILL UP HERE, DELIBERATELY, AND THAT IS THE ASSERTION.
+# A Modal is its own window and does not resize with the keyboard the way the
+# app's window does, so before this sheet was lifted the difference line and the
+# save button sat underneath it — and because the field is `autoFocus`, that was
+# not an edge case reached by tapping something, it was the state the sheet was
+# always in. The flow passed throughout, because it hid the keyboard first.
+# Asserting after `hideKeyboard` proves only that the sheet renders.
+- assertVisible:
+    id: "reconcile-difference"
+- assertVisible:
+    id: "reconcile-save"
 - hideKeyboard
 # Shown BEFORE anything is written, and worded as an instruction — "-E£20"
 # alone says nothing about which way the correction goes.

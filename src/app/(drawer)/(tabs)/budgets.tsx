@@ -18,6 +18,7 @@ import {
   type BudgetSummary,
   type SuggestionSet,
 } from '@/db/repo/budgets';
+import { useKeyboardHeight } from '@/lib/layout';
 import { budgetFraction, budgetPercent, budgetState, remainingMinor } from '@/lib/budget';
 import { minorToMajor, parseAmountToMinor } from '@/lib/money';
 import { testIdSlug as slug } from '@/lib/id';
@@ -495,6 +496,7 @@ function BudgetEditor({
   onClear: (categoryId: string) => void;
 }) {
   const money = useMoney();
+  const keyboardHeight = useKeyboardHeight();
   // Seeded once, from the initialiser, because the component is remounted per
   // category. Deliberately NOT set from an onShow callback: if that ever failed
   // to fire, the field would open empty on an existing limit — and an empty
@@ -508,9 +510,12 @@ function BudgetEditor({
     <Modal visible={row !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
 
+      {/* Lifted by hand, like every other sheet with a field in it: a Modal is
+          its own window and keeps its full height when the keyboard opens, so
+          the limit field and "Save limit" would sit underneath it. */}
       <View
         className="rounded-t-2xl border-t border-line bg-ground px-5 pb-8 pt-5"
-        style={{ elevation: 16 }}
+        style={{ elevation: 16, marginBottom: keyboardHeight }}
         testID="budget-editor">
         {row ? (
           <>
