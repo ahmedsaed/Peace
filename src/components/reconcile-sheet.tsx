@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, Text, TextInput, View } from 'react-native';
 
 import palette from '@/constants/palette';
+import { useKeyboardHeight } from '@/lib/layout';
 import {
   isLiability,
   targetBalanceFromAvailable,
@@ -46,6 +47,7 @@ export function ReconcileSheet({
   onConfirm: (targetMinor: number) => void;
 }) {
   const money = useMoney();
+  const keyboardHeight = useKeyboardHeight();
   const liability = isLiability(accountType);
   const [mode, setMode] = useState<Mode>('owed');
   const [draft, setDraft] = useState('');
@@ -76,9 +78,15 @@ export function ReconcileSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <Pressable className="flex-1" onPress={close} accessibilityLabel="Dismiss" />
 
+      {/* LIFTED ABOVE THE KEYBOARD BY HAND. A Modal is its own window and does
+          not resize with the keyboard the way the app's window does, so the
+          difference line and the save button below the input sit underneath it.
+          The input `autoFocus`es, so the keyboard is up before the sheet has
+          been looked at — the number you are being asked to check, and the
+          button that commits it, were both hidden the whole time. */}
       <View
         className="rounded-t-2xl border-t border-line bg-ground px-5 pb-8 pt-5"
-        style={{ elevation: 16 }}
+        style={{ elevation: 16, marginBottom: keyboardHeight }}
         testID="reconcile-sheet">
         <Text className="text-base font-semibold text-ink">Update balance</Text>
         <Text className="mt-1 text-xs leading-4 text-muted">

@@ -111,12 +111,18 @@ appId: com.ahmed.peace
 - tapOn:
     id: "reconcile-input"
 - inputText: "520"
-- hideKeyboard
-# Shown BEFORE anything is written, and worded as an instruction — "-E£20"
-# alone says nothing about which way the correction goes.
+# ASSERTED WITH THE KEYBOARD STILL UP, before hideKeyboard. A Modal is its own
+# window and does not resize with the keyboard, so this sheet used to keep its
+# full height and leave the difference line and the save button underneath it —
+# and the input autoFocuses, so that was the state you arrived in. Asserting
+# after hideKeyboard passes either way and proves nothing.
 - assertVisible:
     id: "reconcile-difference"
     text: "Adds a E£20.00 correction against this account"
+- assertVisible:
+    id: "reconcile-save"
+- takeScreenshot: 03-reconcile-keyboard
+- hideKeyboard
 - takeScreenshot: 03-reconcile
 - tapOn:
     id: "reconcile-save"
