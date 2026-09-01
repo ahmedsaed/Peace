@@ -246,6 +246,63 @@ describe('transfers', () => {
     expect(outcome.expenseMinor).toBe(0);
     expect(outcome.incomeMinor).toBe(0);
   });
+
+  /**
+   * WHERE THE MONEY LANDED.
+   *
+   * Only the outgoing leg is listed, so `accountId` is the account a transfer
+   * left — the incoming leg, which is the one that would answer "what arrived
+   * in Cash", is deliberately hidden. Without `counterAccountId` that question
+   * has no expressible form at all.
+   */
+  describe('by destination', () => {
+    beforeEach(() => {
+      // A second transfer OUT of cash, so filtering on the destination cannot
+      // pass by accident just because there is one transfer in the ledger.
+      createTransfer(db, {
+        fromAccountId: 'cash',
+        toAccountId: 'usd',
+        amountMinor: 10_000,
+        note: 'buying dollars',
+        occurredAt: on(2026, 6, 6),
+      });
+    });
+
+    it('finds what arrived, not what left', () => {
+      const into = search(db, q({ counterAccountId: 'cash' }));
+      expect(into.matchCount).toBe(1);
+      expect(into.rows[0].note).toBe('topping up the wallet');
+
+      // The same account on the other filter is the opposite question, and
+      // has to give the opposite answer — this is the assertion that fails if
+      // the condition is ever pointed at `account_id`.
+      const outOf = search(db, q({ accountId: 'cash', kind: 'transfer' }));
+      expect(outOf.rows.map((r) => r.note)).toEqual(['buying dollars']);
+    });
+
+    it('combines with the source to name one leg exactly', () => {
+      expect(search(db, q({ accountId: 'bank', counterAccountId: 'cash' })).matchCount).toBe(1);
+      // ...and the reverse direction is a different transfer, not the same one
+      // read backwards.
+      expect(search(db, q({ accountId: 'cash', counterAccountId: 'bank' })).matchCount).toBe(0);
+    });
+
+    it('excludes ordinary records without needing the type filter', () => {
+      // Every non-transfer row has a NULL counter account, so the filter
+      // narrows to transfers on its own. The `kind` chip is a convenience.
+      const outcome = search(db, q({ counterAccountId: 'usd' }));
+      expect(outcome.rows).toHaveLength(1);
+      expect(outcome.rows.every((r) => r.isTransfer)).toBe(true);
+    });
+
+    it('is still excluded from the totals', () => {
+      // Narrowing to transfers must not turn them into spending: a screen
+      // showing only transfers has to show a total of nothing.
+      const outcome = search(db, q({ counterAccountId: 'cash' }));
+      expect(outcome.expenseMinor).toBe(0);
+      expect(outcome.incomeMinor).toBe(0);
+    });
+  });
 });
 
 describe('totals', () => {

@@ -5,6 +5,7 @@ import {
   isRunnable,
   likePattern,
   rangeBounds,
+  withKind,
   type SearchQuery,
 } from './search-query';
 
@@ -54,6 +55,57 @@ describe('activeFilterCount', () => {
         q({ kind: 'expense', accountId: 'a1', categoryId: 'c1', range: 'month', minAmount: '5' })
       )
     ).toBe(5);
+  });
+
+  it('counts the transfer destination', () => {
+    // Otherwise the badge under-reports and the collapsed panel hides a filter
+    // that is narrowing the results.
+    expect(activeFilterCount(q({ counterAccountId: 'a2' }))).toBe(1);
+    expect(activeFilterCount(q({ accountId: 'a1', counterAccountId: 'a2' }))).toBe(2);
+  });
+});
+
+describe('withKind', () => {
+  it('drops the category when switching to transfers', () => {
+    // A transfer has no category, so the filter can only empty the screen —
+    // from behind a control the transfer panel does not render.
+    const next = withKind(q({ kind: 'expense', categoryId: 'food' }), 'transfer');
+    expect(next.kind).toBe('transfer');
+    expect(next.categoryId).toBeNull();
+  });
+
+  it('drops the destination when switching away from transfers', () => {
+    const next = withKind(q({ kind: 'transfer', counterAccountId: 'cash' }), 'expense');
+    expect(next.counterAccountId).toBeNull();
+  });
+
+  it('drops the destination when clearing the type', () => {
+    // "All" hides the To row too, so it has to clear with the rest.
+    expect(withKind(q({ kind: 'transfer', counterAccountId: 'cash' }), null).counterAccountId).toBeNull();
+  });
+
+  it('keeps the destination while the type stays transfer', () => {
+    const next = withKind(q({ kind: 'transfer', counterAccountId: 'cash' }), 'transfer');
+    expect(next.counterAccountId).toBe('cash');
+  });
+
+  it('leaves every other filter alone', () => {
+    const before = q({
+      text: 'atm',
+      accountId: 'bank',
+      minAmount: '100',
+      maxAmount: '900',
+      range: 'year',
+    });
+    expect(withKind(before, 'transfer')).toEqual({ ...before, kind: 'transfer' });
+  });
+
+  it('never leaves both a category and a destination set', () => {
+    // Either combination is a query that matches nothing, spelled two ways.
+    for (const kind of ['expense', 'income', 'transfer', null] as const) {
+      const next = withKind(q({ categoryId: 'food', counterAccountId: 'cash' }), kind);
+      expect(next.categoryId !== null && next.counterAccountId !== null).toBe(false);
+    }
   });
 });
 

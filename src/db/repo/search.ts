@@ -114,6 +114,15 @@ function conditions(
     where.push(eq(transactions.accountId, query.accountId));
   }
 
+  // WHERE A TRANSFER LANDED. Only the outgoing leg is listed, and on that leg
+  // `counter_account_id` is the destination — so this is the only way to ask
+  // for money that arrived somewhere. Every non-transfer row has NULL here, so
+  // it narrows to transfers on its own; the type chip is a convenience, not the
+  // thing making this correct.
+  if (query.counterAccountId) {
+    where.push(eq(transactions.counterAccountId, query.counterAccountId));
+  }
+
   if (query.categoryId) {
     // A PARENT MATCHES ITS CHILDREN. Categories are two-tier, and picking
     // "Food" to then be told there were no records — because every one of them
