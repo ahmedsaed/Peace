@@ -42,6 +42,11 @@ example
 /ios
 /android
 
+# gradle build output from local native modules — generated, never commit
+modules/*/android/build/
+modules/*/android/.gradle/
+modules/*/android/.cxx/
+
 # local test artifacts
 .screenshots/
 .maestro/**/screenshots/
