@@ -19,6 +19,7 @@ import {
   type SuggestionSet,
 } from '@/db/repo/budgets';
 import { budgetFraction, budgetPercent, budgetState, remainingMinor } from '@/lib/budget';
+import { useKeyboardHeight } from '@/lib/layout';
 import { minorToMajor, parseAmountToMinor } from '@/lib/money';
 import { testIdSlug as slug } from '@/lib/id';
 import { formatPeriod, currentPeriod, type Period } from '@/lib/period';
@@ -495,6 +496,7 @@ function BudgetEditor({
   onClear: (categoryId: string) => void;
 }) {
   const money = useMoney();
+  const keyboardHeight = useKeyboardHeight();
   // Seeded once, from the initialiser, because the component is remounted per
   // category. Deliberately NOT set from an onShow callback: if that ever failed
   // to fire, the field would open empty on an existing limit — and an empty
@@ -508,9 +510,14 @@ function BudgetEditor({
     <Modal visible={row !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
 
+      {/* LIFTED ABOVE THE KEYBOARD BY HAND. A Modal is its own window and does
+          not resize with the keyboard the way the app's window does, so "Save
+          limit" and "Remove limit" sit underneath it. The input `autoFocus`es,
+          so that is the state the sheet opens in — and an empty field means
+          REMOVE, which makes a hidden pair of buttons worse here than usual. */}
       <View
         className="rounded-t-2xl border-t border-line bg-ground px-5 pb-8 pt-5"
-        style={{ elevation: 16 }}
+        style={{ elevation: 16, marginBottom: keyboardHeight }}
         testID="budget-editor">
         {row ? (
           <>

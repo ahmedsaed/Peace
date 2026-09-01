@@ -111,8 +111,23 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "budget-input"
     text: "240"
+# ERASE FIRST, then tap. The tap is what raises the IME — autoFocus alone does
+# not reliably do it under Maestro, and without a keyboard on screen the
+# assertion below would prove nothing. But tapping moves the CURSOR, and
+# eraseText deletes backwards from wherever that lands: tapping this
+# right-aligned field before erasing left "240" in place and saved a limit of
+# E£800,240.00 while every step still reported COMPLETED.
 - eraseText
+- tapOn:
+    id: "budget-input"
 - inputText: "800"
+# ASSERTED WITH THE KEYBOARD UP. A Modal is its own window and does not resize
+# with the keyboard, so this sheet used to sit entirely underneath it: the
+# category, the field and both buttons, all off screen the moment you tapped in.
+# The editor is short enough to disappear completely rather than be half hidden.
+- assertVisible:
+    id: "budget-save"
+- takeScreenshot: 03-budget-editor-keyboard
 - tapOn:
     id: "budget-save"
 
