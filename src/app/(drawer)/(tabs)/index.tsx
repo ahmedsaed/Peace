@@ -25,6 +25,7 @@ import {
   type RecordRow as Row,
 } from '@/db/repo/records';
 import { broughtForward, type BroughtForward } from '@/db/repo/carry';
+import { recordSections } from '@/lib/record-sections';
 import { linkById, reversedBy } from '@/db/repo/reversal';
 import { dismissCapture, markSaved } from '@/db/repo/bank-captures';
 import type { BankCapture } from '@/db/schema';
@@ -218,46 +219,15 @@ export default function RecordsScreen() {
     refresh();
   }
 
-  const sections = [
-    ...(due.length > 0
-      ? [
-          {
-            key: 'due',
-            title: due.length === 1 ? 'Due' : `Due · ${due.length}`,
-            // No total. These have not happened; a figure here would read as
-            // money already spent.
-            total: null as number | null,
-            unvalued: 0,
-            data: due as (Row | Proposal)[],
-          },
-        ]
-      : []),
-    ...(captures.length > 0
-      ? [
-          {
-            key: 'bank',
-            title: captures.length === 1 ? 'From your bank' : `From your bank · ${captures.length}`,
-            total: null as number | null,
-            unvalued: 0,
-            data: captures as (Row | Proposal | BankCapture)[],
-          },
-        ]
-      : []),
-    ...dayGroups,
-    // LAST, and after the real records: these have not happened. Above them
-    // they would read as the newest thing in the month.
-    ...(upcoming.length > 0
-      ? [
-          {
-            key: 'upcoming',
-            title: 'Upcoming',
-            total: null as number | null,
-            unvalued: 0,
-            data: upcoming as (Row | Proposal)[],
-          },
-        ]
-      : []),
-  ];
+  // The ORDER lives in `lib/record-sections.ts`, with a test. It was wrong
+  // here precisely because it was the shape of an array literal in the middle
+  // of a screen: nothing could contradict it and nothing recorded the decision.
+  const sections = recordSections<Row | Proposal | BankCapture>({
+    due,
+    captures,
+    upcoming,
+    days: dayGroups,
+  });
 
   return (
     <Screen testID="home-screen">

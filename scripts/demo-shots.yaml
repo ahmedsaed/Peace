@@ -8,7 +8,12 @@ appId: com.ahmed.peace
 # It is a flow rather than a set of hand-taken captures because hand-taken
 # screenshots rot. The moment a colour, a label or a layout changes, the README
 # is quietly advertising an app that no longer exists — and nothing fails, so
-# nobody notices. This regenerates all four in one command.
+# nobody notices. This regenerates all NINE in one command.
+#
+# ORDER MATTERS. The first five shots assert exact totals, so everything that
+# adds a record — the card purchase, the two standing orders — comes AFTER them.
+# Seeding it earlier would mean recomputing four assertions by hand every time
+# the demo ledger changed, which is how a flow ends up asserting nothing.
 #
 # THE LEDGER BELOW IS INVENTED. The repository is public and real records do not
 # go in it. The amounts are chosen so the budget screen shows every state at
@@ -425,3 +430,291 @@ appId: com.ahmed.peace
 - assertVisible: "Restaurants"
 - assertVisible: "Coffee"
 - takeScreenshot: search
+
+# ===========================================================================
+# 6. Accounts — balances derived from the ledger, and a card read as debt
+# ===========================================================================
+# Everything below this line is seeded AFTER the five shots above, because it
+# adds records and every one of those shots asserts an exact total.
+- back
+- tapOn:
+    id: "tab-accounts"
+- tapOn:
+    id: "fab-account"
+- tapOn:
+    id: "account-name"
+- inputText: "Kenana"
+- hideKeyboard
+- tapOn:
+    id: "acct-type-card"
+# A card gets a LIMIT, never an opening balance: what it starts owing arrives as
+# a dated correction instead. The fee lives on the card, not in the app.
+- tapOn:
+    id: "account-limit"
+- inputText: "50000"
+- hideKeyboard
+- tapOn:
+    id: "account-foreign-fee"
+- inputText: "3"
+- hideKeyboard
+- tapOn:
+    id: "form-save"
+
+# --- something on the card, so it has a debt to read ---
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-account"
+- tapOn: "Kenana"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Shopping"
+    direction: DOWN
+- tapOn: "Shopping"
+- tapOn:
+    id: "record-note"
+- inputText: "Headphones"
+- hideKeyboard
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+# --- and some of the cash moved to the bank ---
+# Three accounts with one of them at zero reads as a half-set-up app. It also
+# puts a transfer in the ledger, which is the pair of rows the whole schema is
+# shaped around.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-transfer"
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "tab-accounts"
+# The assertion that keeps this shot honest. A card at -2,300 is two thousand
+# three hundred of DEBT, not an emptied wallet — and the limit is what is left
+# of it, not a second balance. If either ever rendered like an ordinary account
+# this would capture a wrong screen rather than fail.
+- assertVisible:
+    id: "account-sub-.*"
+    text: "E£47,700.00 of E£50,000.00 available"
+- takeScreenshot: accounts
+
+# ===========================================================================
+# 7. Long press — a refund that knows what it refunds
+# ===========================================================================
+# NOT the account form with the correction sheet over it, which was the obvious
+# choice for this slot: reaching the "Update balance" button means scrolling
+# past the colour and icon pickers, so two thirds of the frame is a grid of
+# swatches. At 180px in a README that reads as texture, not as a feature.
+- tapOn:
+    id: "tab-index"
+
+# Return part of the jacket, so the sheet has a real figure to report rather
+# than "all of it".
+- longPressOn: "Cash · “Winter jacket”"
+- tapOn:
+    id: "action-refund"
+- eraseText
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+# The PURCHASE, not the refund it now carries: matched on its own subtitle,
+# which the refund's extends rather than repeats ("Cash · refunded · …"), and
+# Maestro matches whole text.
+- longPressOn: "Cash · “Winter jacket”"
+- assertVisible:
+    id: "record-actions"
+# How much came back, not merely that some did — the difference between E£400
+# and all of it is the entire question, and it is what a purchase could never
+# say before.
+- assertVisible: "Refunded · E£400.00 of E£1,200.00"
+- assertVisible:
+    id: "link-undone-0"
+- takeScreenshot: actions
+- back
+
+# ===========================================================================
+# 8. Recurring — standing orders, set while entering the record
+# ===========================================================================
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Home"
+    direction: DOWN
+- tapOn: "Home"
+- tapOn:
+    id: "record-note"
+- inputText: "Flat rent"
+- hideKeyboard
+- tapOn:
+    id: "key-6"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-repeat"
+- tapOn:
+    id: "repeat-monthly"
+- tapOn:
+    id: "repeat-day"
+- inputText: "1"
+- hideKeyboard
+- tapOn:
+    id: "repeat-save"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Insurance"
+    direction: DOWN
+- tapOn: "Insurance"
+- tapOn:
+    id: "record-note"
+- inputText: "Car cover"
+- hideKeyboard
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-repeat"
+- tapOn:
+    id: "repeat-monthly"
+- tapOn:
+    id: "repeat-day"
+- inputText: "9"
+- hideKeyboard
+- tapOn:
+    id: "repeat-save"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-recurring"
+- assertVisible:
+    id: "recurring-screen"
+# Two, not "some". A rule that silently failed to save would leave a screen
+# that still looks entirely correct.
+- assertVisible:
+    id: "rule-count"
+    text: "2 rules"
+- takeScreenshot: recurring
+
+# ===========================================================================
+# 9. Portfolio — rebalancing, deliberately not wired into the ledger
+# ===========================================================================
+- back
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-portfolio"
+- assertVisible:
+    id: "portfolio-screen"
+
+- tapOn:
+    id: "portfolio-class-name"
+- inputText: "Stocks"
+- tapOn:
+    id: "portfolio-class-target"
+- inputText: "60"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-class-add"
+
+- tapOn:
+    id: "portfolio-class-name"
+- inputText: "Bonds"
+- tapOn:
+    id: "portfolio-class-target"
+- inputText: "40"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-class-add"
+
+# Deliberately off balance — 700 of stocks against 300 of bonds on a 60/40
+# target. A portfolio already at its target shows a screen of zeroes and
+# demonstrates nothing.
+- tapOn:
+    id: "portfolio-holding-name"
+- inputText: "Index fund"
+- tapOn:
+    id: "portfolio-pick-stocks"
+- tapOn:
+    id: "portfolio-holding-units"
+- inputText: "7"
+- tapOn:
+    id: "portfolio-holding-price"
+- inputText: "100"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-holding-add"
+
+- tapOn:
+    id: "portfolio-holding-name"
+- inputText: "Bond fund"
+- tapOn:
+    id: "portfolio-pick-bonds"
+- tapOn:
+    id: "portfolio-holding-units"
+- inputText: "3"
+- tapOn:
+    id: "portfolio-holding-price"
+- inputText: "100"
+- hideKeyboard
+- tapOn:
+    id: "portfolio-holding-add"
+
+- scrollUntilVisible:
+    element:
+      id: "portfolio-drift"
+    direction: DOWN
+# The drift is the gap a person would actually check, and it is the figure a
+# plan drawn from the wrong total would get wrong while still looking like a
+# plan.
+- assertVisible: "\\+10.0%"
+- assertVisible: "-10.0%"
+- takeScreenshot: portfolio
