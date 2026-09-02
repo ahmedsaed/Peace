@@ -1,9 +1,10 @@
 import {
-  bpToPercent,
-  percentToBp,
   availableCredit,
+  bpToPercent,
+  hasCardProfile,
   isLiability,
   owedDisplay,
+  percentToBp,
   targetBalanceFromAvailable,
   targetBalanceFromOwed,
 } from './liability';
@@ -170,5 +171,33 @@ describe('fee rates', () => {
     // "3.00" in a field someone is about to edit is noise.
     expect(bpToPercent(300)).toBe('3');
     expect(bpToPercent(null)).toBe('');
+  });
+});
+
+/**
+ * THE TWO QUESTIONS, AND WHERE THEY DISAGREE.
+ *
+ * A loan is the whole reason there are two predicates: it is debt, so it reads
+ * as "owed", and it has none of a card's paperwork. Written as one predicate —
+ * which it was — the account form offered a loan a credit limit in place of its
+ * opening balance, two fees it cannot charge, and no way at all to enter the
+ * principal.
+ */
+describe('isLiability vs hasCardProfile', () => {
+  it('agree about a card', () => {
+    expect(isLiability('card')).toBe(true);
+    expect(hasCardProfile('card')).toBe(true);
+  });
+
+  it('disagree about a loan, which is the point', () => {
+    expect(isLiability('loan')).toBe(true);
+    expect(hasCardProfile('loan')).toBe(false);
+  });
+
+  it('agree about everything you hold rather than owe', () => {
+    for (const type of ['cash', 'bank', 'savings'] as const) {
+      expect([type, isLiability(type)]).toEqual([type, false]);
+      expect([type, hasCardProfile(type)]).toEqual([type, false]);
+    }
   });
 });

@@ -206,3 +206,45 @@ appId: com.ahmed.peace
     id: "analysis-total"
     text: "E£500.00"
 - assertNotVisible: "Balance correction"
+
+# --- A LOAN IS DEBT TOO, AND GETS NONE OF A CARD'S PAPERWORK ---
+# The contrast is the assertion. `isLiability` is true of both, and this form
+# used to gate its card fields on it — so a loan was offered a credit limit in
+# place of its opening balance, plus a foreign fee and a cash-advance fee it
+# cannot charge, and the principal had nowhere to go at all. Two questions, two
+# predicates: "is this balance debt?" and "does this have a card profile?"
+- tapOn:
+    id: "tab-accounts"
+- tapOn:
+    id: "fab-account"
+- tapOn:
+    id: "account-name"
+- inputText: "Car loan"
+- hideKeyboard
+- tapOn:
+    id: "acct-type-loan"
+- assertNotVisible:
+    id: "account-limit"
+- assertNotVisible:
+    id: "account-foreign-fee"
+- assertNotVisible:
+    id: "account-cash-fee"
+# The field a loan actually needs, and the one it used to be denied.
+- assertVisible:
+    id: "account-opening"
+- tapOn:
+    id: "account-opening"
+- inputText: "-250000"
+- hideKeyboard
+- tapOn:
+    id: "form-save"
+
+# Money owed is negative in the ledger like every other outflow, and the render
+# boundary turns it back into a sentence — the same one the card gets.
+- assertVisible: "E£250,000.00"
+- assertVisible:
+    id: "account-owed-.*"
+    text: "owed"
+# No limit, so no headroom line: a loan has nothing to be "available" against.
+- assertNotVisible: "of E£0.00 available"
+- takeScreenshot: 05-loan-created

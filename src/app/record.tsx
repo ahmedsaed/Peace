@@ -67,7 +67,7 @@ import { CURRENCIES } from '@/lib/currencies';
 import { captureNote } from '@/lib/bank-sms';
 import { noteWithReading } from '@/lib/note';
 import { foreignPurchase } from '@/lib/fees';
-import { isLiability } from '@/lib/liability';
+import { hasCardProfile, isLiability } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
 
@@ -413,7 +413,9 @@ export default function RecordScreen() {
    * when editing either — rewriting a purchase and its fee together is a
    * different job from editing one row.
    */
-  const cardAccount = !!account && isLiability(account.type);
+  // hasCardProfile, not isLiability: a loan is debt but charges no
+  // foreign-transaction commission, and `createCardPurchase` would write it one.
+  const cardAccount = !!account && hasCardProfile(account.type);
   /**
    * Still not offered when EDITING, and the reason is the save path rather than
    * the screen: a purchase abroad writes the settled charge AND the card's
@@ -502,6 +504,8 @@ export default function RecordScreen() {
     if (calc.entry !== '0' || calc.pendingOp !== null) return;
 
     const target = accounts.find((a) => a.id === pickedId);
+    // isLiability here, not hasCardProfile: paying down a loan is the same
+    // gesture as paying off a card, and both have something to settle.
     if (!target || !isLiability(target.type)) return;
     // Only a card in DEBT has something to settle; one in credit does not.
     const owed = -accountBalance(db, pickedId);
