@@ -22,6 +22,27 @@ export function isLiability(type: AccountKind): boolean {
 }
 
 /**
+ * Accounts that have a CARD's paperwork — a credit limit, a foreign-transaction
+ * fee, a cash-advance fee.
+ *
+ * A SECOND PREDICATE, AND THE REASON IS THE QUESTION IT ANSWERS. `isLiability`
+ * asks whether a balance is debt or holdings, and a card and a loan are the
+ * same thing under that question. "Does this have a card profile?" is a
+ * different question with a different answer, and the account form asked it
+ * with `isLiability` — so a loan was offered a credit limit INSTEAD of its
+ * opening balance, plus a foreign fee and a cash-advance fee, and the record
+ * screen offered it the "spent abroad" commission flow. None of those are
+ * things a loan has, and the principal had nowhere to go.
+ *
+ * A predicate reused for a question it was not written for is the same failure
+ * as a rule copied out by hand: it reads as correct at every call site, and
+ * only the one where the two questions disagree is wrong.
+ */
+export function hasCardProfile(type: AccountKind): boolean {
+  return type === 'card';
+}
+
+/**
  * What a liability balance should read as, and how.
  *
  * A card at −5,000 becomes `5,000` labelled "owed". A card in credit — a refund

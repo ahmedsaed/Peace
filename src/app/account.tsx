@@ -28,7 +28,7 @@ import { parseAmountToMinor } from '@/lib/money';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
 import { ReconcileSheet } from '@/components/reconcile-sheet';
 import { accountBalance, reconcileAccount } from '@/db/repo/adjust';
-import { bpToPercent, isLiability, percentToBp } from '@/lib/liability';
+import { bpToPercent, hasCardProfile, isLiability, percentToBp } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
 
@@ -84,6 +84,14 @@ export default function AccountScreen() {
   // arrives through "Update balance" as a dated adjustment — visible in the
   // list, questionable later, deletable. An undated number quietly sitting
   // under the account name is a bad place to keep a debt.
+  //
+  // CARD, NOT LIABILITY. This form used to gate all of that on `isLiability`,
+  // which is also true of a loan — so a loan was offered a credit limit in
+  // place of its opening balance, along with two card fees it cannot charge,
+  // and its principal had nowhere to go at all. `isLiability` answers "is this
+  // balance debt?", which is a different question and is still the right one
+  // for the wording at the foot of this screen.
+  const card = hasCardProfile(type);
   const liability = isLiability(type);
 
   const openingMinor = opening.trim() === '' ? 0 : parseAmountToMinor(opening, currency);
@@ -91,7 +99,7 @@ export default function AccountScreen() {
   const canSave =
     name.trim().length > 0 &&
     currency.trim().length === 3 &&
-    (liability || openingMinor !== null) &&
+    (card || openingMinor !== null) &&
     (limit.trim() === '' || limitMinor !== null);
 
   function onSave() {
@@ -101,11 +109,17 @@ export default function AccountScreen() {
         name,
         type,
         currency: currency.toUpperCase(),
-        // A liability keeps its opening balance at zero on purpose; see above.
-        openingBalance: liability ? (existing?.openingBalance ?? 0) : (openingMinor ?? 0),
-        creditLimit: liability ? (limitMinor === null ? null : Math.abs(limitMinor)) : null,
-        foreignFeeBp: liability ? percentToBp(foreignFee) : null,
-        cashFeeBp: liability ? percentToBp(cashFee) : null,
+        // A card keeps its opening balance at zero on purpose; see above.
+        // Anything else — a loan included — carries whatever was typed, which
+        // for a loan is the principal and therefore negative.
+        openingBalance: card ? (existing?.openingBalance ?? 0) : (openingMinor ?? 0),
+        // Cleared rather than preserved when a card is retyped as something
+        // else: a limit and a fee left on a loan would keep being read by the
+        // reconcile sheet and the Accounts screen, which have no way to know
+        // the field is a leftover.
+        creditLimit: card ? (limitMinor === null ? null : Math.abs(limitMinor)) : null,
+        foreignFeeBp: card ? percentToBp(foreignFee) : null,
+        cashFeeBp: card ? percentToBp(cashFee) : null,
         icon,
         color,
       };
@@ -169,7 +183,7 @@ export default function AccountScreen() {
             </Field>
           </View>
           <View className="flex-1">
-            {liability ? (
+            {card ? (
               <Field label="Credit limit">
                 <TextField
                   value={limit}
@@ -184,7 +198,11 @@ export default function AccountScreen() {
                 <TextField
                   value={opening}
                   onChangeText={setOpening}
-                  placeholder="0"
+                  // A loan starts owing money, and money owed is negative in
+                  // the ledger like every other outflow — so the placeholder
+                  // says so rather than leaving someone to type a principal as
+                  // a positive and read "in credit" back.
+                  placeholder={liability ? 'e.g. -250000' : '0'}
                   keyboardType="numeric"
                   testID="account-opening"
                 />
@@ -195,8 +213,10 @@ export default function AccountScreen() {
 
         {/* Per-card, never global. A card with these left empty behaves exactly
             like any other account — which is the point: one bank's rules baked
-            into the app is a rule every other card has to be excused from. */}
-        {liability ? (
+            into the app is a rule every other card has to be excused from.
+            A LOAN HAS NEITHER of these: it charges no foreign-transaction
+            commission and no cash-advance fee. */}
+        {card ? (
           <View className="flex-row gap-3">
             <View className="flex-1">
               <Field label="Foreign fee %">

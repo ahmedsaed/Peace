@@ -24,7 +24,13 @@ import {
   type PeriodSummary,
   type RecordRow as Row,
 } from '@/db/repo/records';
-import { broughtForward, type BroughtForward } from '@/db/repo/carry';
+import {
+  broughtForward,
+  positionByAccount,
+  type AccountPosition,
+  type BroughtForward,
+} from '@/db/repo/carry';
+import { PositionSheet } from '@/components/position-sheet';
 import { recordSections } from '@/lib/record-sections';
 import { linkById, reversedBy } from '@/db/repo/reversal';
 import { dismissCapture, markSaved } from '@/db/repo/bank-captures';
@@ -73,6 +79,17 @@ export default function RecordsScreen() {
   const [rows, setRows] = useState<Row[]>([]);
   const [summary, setSummary] = useState<PeriodSummary>(EMPTY_SUMMARY);
   const [carried, setCarried] = useState<BroughtForward>(NO_CARRY);
+  /**
+   * The breakdown behind the third summary cell, or null while it is shut.
+   *
+   * Read WHEN THE SHEET OPENS rather than on every refresh. It is a scan of
+   * every account crossed with every record up to the end of the month, which
+   * is the same shape of query as the carry above it — and unlike that one,
+   * nothing on the screen behind the sheet needs the answer. Paying for it on
+   * every focus, every month change and every save would be paying for a
+   * question almost nobody asks.
+   */
+  const [breakdown, setBreakdown] = useState<AccountPosition[] | null>(null);
   // Long-pressed row, if any. The menu is the only place Delete lives now: at
   // the bottom of the edit form it meant opening a record to change it in order
   // to remove it, with a destructive action next to Save.
@@ -170,6 +187,13 @@ export default function RecordsScreen() {
 
   // The position at the end of the month being viewed.
   const running = carried.amountMinor + summary.balanceMinor;
+  // WHAT THE THIRD CELL IS, in one place. The header and the sheet behind it
+  // both need the label and the figure, and two copies of the same ternary is
+  // two chances for a sheet to explain a number the cell above it is not
+  // showing.
+  const headline = carryOver
+    ? { label: 'Now', minor: running, testID: 'summary-running' }
+    : { label: 'Balance', minor: summary.balanceMinor, testID: 'summary-balance' };
   // One line, not two. The carry scan and the month query can each turn up
   // records they cannot value, and telling the user about them separately would
   // report the same underlying problem twice with two different numbers.
@@ -245,10 +269,12 @@ export default function RecordsScreen() {
         <SummaryTrio
           expense={money(summary.expenseMinor, homeCurrency)}
           income={money(summary.incomeMinor, homeCurrency)}
-          balance={money(carryOver ? running : summary.balanceMinor, homeCurrency)}
-          balanceMinor={carryOver ? running : summary.balanceMinor}
-          balanceLabel={carryOver ? 'Now' : 'Balance'}
-          balanceTestID={carryOver ? 'summary-running' : 'summary-balance'}
+          balance={money(headline.minor, homeCurrency)}
+          balanceMinor={headline.minor}
+          balanceLabel={headline.label}
+          balanceTestID={headline.testID}
+          // The one number on this screen whose working is nowhere else on it.
+          onBalancePress={() => setBreakdown(positionByAccount(db, period, homeCurrency))}
         />
         {/* Under-reporting in silence is the thing to avoid. This happens when
             the home currency is changed after records exist: their value in the
@@ -449,6 +475,30 @@ export default function RecordsScreen() {
           refresh();
         }}
       />
+
+      {/* Rendered from a NON-NULL list handed down, never from `breakdown!`
+          inside the sheet: it is closed almost all of the time, and an
+          assertion in a closure over state is how a screen typechecks clean and
+          crashes on first open. */}
+      {breakdown ? (
+        <PositionSheet
+          visible
+          onClose={() => setBreakdown(null)}
+          label={headline.label}
+          period={period}
+          homeCurrency={homeCurrency}
+          totalMinor={headline.minor}
+          accounts={breakdown}
+          // Null, not zero, when carry-over is off: the cell is then the
+          // month's own net and nothing was carried into it, so a "Brought
+          // forward E£0.00" row would invent a component of a sum that has one
+          // fewer.
+          broughtForwardMinor={carryOver ? carried.amountMinor : null}
+          incomeMinor={summary.incomeMinor}
+          expenseMinor={summary.expenseMinor}
+          adjustmentMinor={summary.adjustmentMinor}
+        />
+      ) : null}
 
       {pendingUndo ? (
         <Snackbar

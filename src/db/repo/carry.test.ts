@@ -2,8 +2,14 @@
  * @jest-environment node
  */
 import { createTestDb, type TestDb } from '../../test/db';
-import { createAccount, listAccountsWithBalance } from './accounts';
-import { broughtForward, runningTotals, totalHeld } from './carry';
+import { createAccount, listAccountsWithBalance, updateAccount } from './accounts';
+import {
+  broughtForward,
+  positionByAccount,
+  runningTotals,
+  totalHeld,
+  type AccountPosition,
+} from './carry';
 import { createCategory } from './categories';
 import { periodSummary } from './records';
 import { createRecord, createTransfer } from './transactions';
@@ -266,5 +272,234 @@ describe('runningTotals', () => {
 
   it('has nothing to total for an empty series', () => {
     expect(runningTotals(1_000, [])).toEqual([]);
+  });
+});
+
+/**
+ * THE SAME IDENTITY, IN TWO DIMENSIONS.
+ *
+ * The sheet behind the "Now" cell is a table: accounts down, time across. Every
+ * COLUMN has to sum to a figure the app already shows somewhere else, and every
+ * ROW has to sum to that account's balance — a table doing arithmetic in front
+ * of the user and getting it wrong is worse than no table. These assertions are
+ * the edges of it, not the individual cells.
+ */
+const sumBefore = (rows: AccountPosition[]) => rows.reduce((t, r) => t + r.beforeMinor, 0);
+const sumMonth = (rows: AccountPosition[]) => rows.reduce((t, r) => t + r.monthMinor, 0);
+const sumTotal = (rows: AccountPosition[]) => rows.reduce((t, r) => t + r.amountMinor, 0);
+
+describe('positionByAccount', () => {
+  /** Every column, against the figure it is claiming to break down. */
+  it('reconciles all three columns with the header above them', () => {
+    const db = seed({ opening: 500_000 });
+    createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP', openingBalance: 20_000 });
+
+    earn(db, 'i1', 900_000, on(2026, 6, 1));
+    spend(db, 'e1', 250_000, on(2026, 7, 5));
+    earn(db, 'i2', 900_000, on(2026, 8, 1));
+    spend(db, 'e2', 300_000, on(2026, 8, 9), 'cash');
+
+    const rows = positionByAccount(db, '2026-08');
+    const bf = broughtForward(db, '2026-08');
+    const august = periodSummary(db, '2026-08');
+
+    expect(sumBefore(rows)).toBe(bf.amountMinor);
+    expect(sumMonth(rows)).toBe(august.balanceMinor);
+    expect(sumTotal(rows)).toBe(bf.amountMinor + august.balanceMinor);
+  });
+
+  /** And every row, against itself. */
+  it('adds each account across to its own position', () => {
+    const db = seed({ opening: 500_000 });
+    earn(db, 'i1', 900_000, on(2026, 8, 1));
+
+    for (const row of positionByAccount(db, '2026-08')) {
+      expect([row.name, row.amountMinor]).toEqual([row.name, row.beforeMinor + row.monthMinor]);
+    }
+  });
+
+  /**
+   * THE QUESTION THE TABLE EXISTS TO ANSWER: how much of this is history?
+   * An account can hold a great deal and have done nothing all month, and the
+   * position alone cannot tell you that — which is the whole reason the middle
+   * column is there.
+   */
+  it('separates what an account was already holding from what the month did', () => {
+    const db = seed();
+    createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP' });
+    earn(db, 'old', 900_000, on(2026, 6, 1));
+    spend(db, 'new', 300_000, on(2026, 8, 9), 'cash');
+
+    const rows = positionByAccount(db, '2026-08');
+    expect(rows.find((r) => r.id === 'bank')).toMatchObject({
+      beforeMinor: 900_000,
+      monthMinor: 0,
+      amountMinor: 900_000,
+    });
+    expect(rows.find((r) => r.id === 'cash')).toMatchObject({
+      beforeMinor: 0,
+      monthMinor: -300_000,
+      amountMinor: -300_000,
+    });
+  });
+
+  /**
+   * An opening balance has no date, so it belongs BEFORE all time — in the
+   * first month's history column as much as in the twentieth's. Put it in the
+   * month column and every account would appear to have received its opening
+   * balance in whichever month you happened to be looking at.
+   */
+  it('puts an opening balance in the history column of every month', () => {
+    const db = seed({ opening: 500_000 });
+    for (const period of ['2020-01', '2026-08']) {
+      expect(positionByAccount(db, period).find((r) => r.id === 'bank')).toMatchObject({
+        beforeMinor: 500_000,
+        monthMinor: 0,
+      });
+    }
+  });
+
+  /**
+   * The reason the last column is the position at the END OF THE VIEWED MONTH
+   * and not today's balances: those agree only while nothing is dated later.
+   * Scroll back one month with a record in this one and the two separate.
+   */
+  it('ignores records dated after the month being viewed', () => {
+    const db = seed();
+    earn(db, 'july', 100_000, on(2026, 7, 4));
+    earn(db, 'august', 900_000, on(2026, 8, 4));
+
+    expect(sumTotal(positionByAccount(db, '2026-07'))).toBe(100_000);
+    expect(sumTotal(positionByAccount(db, '2026-08'))).toBe(1_000_000);
+    // ...where the Accounts screen, which knows nothing about a viewed month,
+    // says the same thing only for the later of the two.
+    expect(totalHeld(db)).toBe(1_000_000);
+  });
+
+  /**
+   * A transfer moves one account's position and not the total. Both legs have
+   * to land on the RIGHT accounts and in the RIGHT column — a table that put
+   * both legs on one account, or one leg in the wrong month, would still add
+   * up down the total column.
+   */
+  it('moves a transfer between the two accounts and not the total', () => {
+    const db = seed({ opening: 500_000 });
+    createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP' });
+    createTransfer(db, {
+      fromAccountId: 'bank',
+      toAccountId: 'cash',
+      amountMinor: 100_000,
+      occurredAt: on(2026, 8, 10),
+    });
+
+    const rows = positionByAccount(db, '2026-08');
+    expect(rows.find((r) => r.id === 'bank')).toMatchObject({
+      beforeMinor: 500_000,
+      monthMinor: -100_000,
+      amountMinor: 400_000,
+    });
+    expect(rows.find((r) => r.id === 'cash')).toMatchObject({
+      beforeMinor: 0,
+      monthMinor: 100_000,
+      amountMinor: 100_000,
+    });
+    expect(sumTotal(rows)).toBe(500_000);
+    // The month did nothing to the position, which is exactly what a transfer
+    // means and what the header beside it says.
+    expect(sumMonth(rows)).toBe(periodSummary(db, '2026-08').balanceMinor);
+  });
+
+  /**
+   * THE OTHER SCREEN. This table names accounts and prints a figure beside
+   * each, and the Accounts tab does exactly the same thing — two screens
+   * showing the same money, so a test has to say they agree. Transfers are the
+   * case that separates them: excluded, as every total in this file excludes
+   * them, Cash would read zero here and E£1,000 there.
+   */
+  it('agrees with the Accounts screen, account by account', () => {
+    const db = seed({ opening: 500_000 });
+    createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP', openingBalance: 20_000 });
+    earn(db, 'i1', 900_000, on(2026, 8, 1));
+    spend(db, 'e1', 300_000, on(2026, 8, 9), 'cash');
+    createTransfer(db, {
+      fromAccountId: 'bank',
+      toAccountId: 'cash',
+      amountMinor: 100_000,
+      occurredAt: on(2026, 8, 10),
+    });
+
+    const held = new Map(listAccountsWithBalance(db).map((a) => [a.id, a.balanceMinor]));
+    for (const row of positionByAccount(db, '2026-08')) {
+      expect([row.id, row.amountMinor]).toEqual([row.id, held.get(row.id)]);
+    }
+  });
+
+  /**
+   * Archiving hides an account from the pickers; it does not spend what is in
+   * it. Left out, the table would add up to less than the figure above it.
+   */
+  it('keeps an archived account that still holds money', () => {
+    const db = seed();
+    earn(db, 'i1', 300_000, on(2026, 8, 1));
+    updateAccount(db, 'bank', { archived: true });
+
+    const rows = positionByAccount(db, '2026-08');
+    expect(rows.find((r) => r.id === 'bank')?.archived).toBe(true);
+    expect(sumTotal(rows)).toBe(300_000);
+  });
+
+  /** An account with no records at all is still a row — it holds its opening balance. */
+  it('lists an account that has only an opening balance', () => {
+    const db = seed({ opening: 500_000 });
+    expect(positionByAccount(db, '2026-08').find((r) => r.id === 'bank')?.amountMinor).toBe(
+      500_000
+    );
+  });
+
+  /**
+   * A foreign opening balance has no rate attached, so it is reported rather
+   * than converted — the same rule `broughtForward` follows, and the reason
+   * the two still agree.
+   */
+  it('reports a foreign opening balance instead of valuing it', () => {
+    const { db } = createTestDb();
+    createAccount(db, { id: 'usd', name: 'Dollar jar', currency: 'USD', openingBalance: 100_000 });
+
+    const row = positionByAccount(db, '2026-08', 'EGP').find((r) => r.id === 'usd');
+    expect(row?.amountMinor).toBe(0);
+    expect(row?.unvaluedBefore).toBe(1);
+    // Dated nowhere, so it is not the MONTH that could not value it.
+    expect(row?.unvaluedMonth).toBe(0);
+  });
+
+  /**
+   * What the header counts as uncountable is what the table counts, and split
+   * the same way: the records screen adds the carry scan's count to the
+   * month's, so each has to match its own side.
+   */
+  it('counts the same unvalued records the header does, on the same side', () => {
+    const db = seed();
+    const foreign = (id: string, when: Date) =>
+      createRecord(db, {
+        id,
+        accountId: 'usd',
+        categoryId: 'food',
+        type: 'expense',
+        amountMinor: 2_500,
+        currency: 'USD',
+        fxRate: 50,
+        homeCurrency: 'EGP',
+        occurredAt: when,
+      });
+    foreign('earlier', on(2026, 6, 7));
+    foreign('inside', on(2026, 8, 7));
+
+    const rows = positionByAccount(db, '2026-08', 'USD');
+    expect(rows.reduce((n, r) => n + r.unvaluedBefore, 0)).toBe(
+      broughtForward(db, '2026-08', 'USD').unvaluedCount
+    );
+    expect(rows.reduce((n, r) => n + r.unvaluedMonth, 0)).toBe(
+      periodSummary(db, '2026-08', 'USD').unvaluedCount
+    );
   });
 });
