@@ -5,10 +5,10 @@ import { createTestDb, type TestDb } from '../../test/db';
 import { createAccount, listAccountsWithBalance, updateAccount } from './accounts';
 import {
   broughtForward,
-  movementByAccount,
   positionByAccount,
   runningTotals,
   totalHeld,
+  type AccountPosition,
 } from './carry';
 import { createCategory } from './categories';
 import { periodSummary } from './records';
@@ -276,18 +276,21 @@ describe('runningTotals', () => {
 });
 
 /**
- * THE SAME IDENTITY, BROKEN DOWN BY ACCOUNT.
+ * THE SAME IDENTITY, IN TWO DIMENSIONS.
  *
- * The sheet behind the "Now" cell lists these and prints the figure underneath
- * them, so a list that does not add up is a screen doing arithmetic in front of
- * the user and getting it wrong. That is the assertion, not the individual
- * balances.
+ * The sheet behind the "Now" cell is a table: accounts down, time across. Every
+ * COLUMN has to sum to a figure the app already shows somewhere else, and every
+ * ROW has to sum to that account's balance — a table doing arithmetic in front
+ * of the user and getting it wrong is worse than no table. These assertions are
+ * the edges of it, not the individual cells.
  */
-const sumOf = (rows: { amountMinor: number }[]) =>
-  rows.reduce((total, row) => total + row.amountMinor, 0);
+const sumBefore = (rows: AccountPosition[]) => rows.reduce((t, r) => t + r.beforeMinor, 0);
+const sumMonth = (rows: AccountPosition[]) => rows.reduce((t, r) => t + r.monthMinor, 0);
+const sumTotal = (rows: AccountPosition[]) => rows.reduce((t, r) => t + r.amountMinor, 0);
 
 describe('positionByAccount', () => {
-  it('adds up to the running position at the end of the month', () => {
+  /** Every column, against the figure it is claiming to break down. */
+  it('reconciles all three columns with the header above them', () => {
     const db = seed({ opening: 500_000 });
     createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP', openingBalance: 20_000 });
 
@@ -296,22 +299,78 @@ describe('positionByAccount', () => {
     earn(db, 'i2', 900_000, on(2026, 8, 1));
     spend(db, 'e2', 300_000, on(2026, 8, 9), 'cash');
 
-    const running = broughtForward(db, '2026-08').amountMinor + periodSummary(db, '2026-08').balanceMinor;
-    expect(sumOf(positionByAccount(db, '2026-08'))).toBe(running);
+    const rows = positionByAccount(db, '2026-08');
+    const bf = broughtForward(db, '2026-08');
+    const august = periodSummary(db, '2026-08');
+
+    expect(sumBefore(rows)).toBe(bf.amountMinor);
+    expect(sumMonth(rows)).toBe(august.balanceMinor);
+    expect(sumTotal(rows)).toBe(bf.amountMinor + august.balanceMinor);
+  });
+
+  /** And every row, against itself. */
+  it('adds each account across to its own position', () => {
+    const db = seed({ opening: 500_000 });
+    earn(db, 'i1', 900_000, on(2026, 8, 1));
+
+    for (const row of positionByAccount(db, '2026-08')) {
+      expect([row.name, row.amountMinor]).toEqual([row.name, row.beforeMinor + row.monthMinor]);
+    }
   });
 
   /**
-   * The reason this is the position at the END OF THE VIEWED MONTH and not
-   * today's balances: those agree only while nothing is dated later. Scroll
-   * back one month with a record in this one and the two answers separate.
+   * THE QUESTION THE TABLE EXISTS TO ANSWER: how much of this is history?
+   * An account can hold a great deal and have done nothing all month, and the
+   * position alone cannot tell you that — which is the whole reason the middle
+   * column is there.
+   */
+  it('separates what an account was already holding from what the month did', () => {
+    const db = seed();
+    createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP' });
+    earn(db, 'old', 900_000, on(2026, 6, 1));
+    spend(db, 'new', 300_000, on(2026, 8, 9), 'cash');
+
+    const rows = positionByAccount(db, '2026-08');
+    expect(rows.find((r) => r.id === 'bank')).toMatchObject({
+      beforeMinor: 900_000,
+      monthMinor: 0,
+      amountMinor: 900_000,
+    });
+    expect(rows.find((r) => r.id === 'cash')).toMatchObject({
+      beforeMinor: 0,
+      monthMinor: -300_000,
+      amountMinor: -300_000,
+    });
+  });
+
+  /**
+   * An opening balance has no date, so it belongs BEFORE all time — in the
+   * first month's history column as much as in the twentieth's. Put it in the
+   * month column and every account would appear to have received its opening
+   * balance in whichever month you happened to be looking at.
+   */
+  it('puts an opening balance in the history column of every month', () => {
+    const db = seed({ opening: 500_000 });
+    for (const period of ['2020-01', '2026-08']) {
+      expect(positionByAccount(db, period).find((r) => r.id === 'bank')).toMatchObject({
+        beforeMinor: 500_000,
+        monthMinor: 0,
+      });
+    }
+  });
+
+  /**
+   * The reason the last column is the position at the END OF THE VIEWED MONTH
+   * and not today's balances: those agree only while nothing is dated later.
+   * Scroll back one month with a record in this one and the two separate.
    */
   it('ignores records dated after the month being viewed', () => {
     const db = seed();
     earn(db, 'july', 100_000, on(2026, 7, 4));
     earn(db, 'august', 900_000, on(2026, 8, 4));
 
-    expect(sumOf(positionByAccount(db, '2026-07'))).toBe(100_000);
-    expect(sumOf(positionByAccount(db, '2026-08'))).toBe(1_000_000);
+    expect(sumTotal(positionByAccount(db, '2026-07'))).toBe(100_000);
+    expect(sumTotal(positionByAccount(db, '2026-08'))).toBe(1_000_000);
     // ...where the Accounts screen, which knows nothing about a viewed month,
     // says the same thing only for the later of the two.
     expect(totalHeld(db)).toBe(1_000_000);
@@ -319,8 +378,9 @@ describe('positionByAccount', () => {
 
   /**
    * A transfer moves one account's position and not the total. Both legs have
-   * to land on the RIGHT accounts, and the total has to be unchanged — a
-   * breakdown that put both legs on one account would still sum correctly.
+   * to land on the RIGHT accounts and in the RIGHT column — a table that put
+   * both legs on one account, or one leg in the wrong month, would still add
+   * up down the total column.
    */
   it('moves a transfer between the two accounts and not the total', () => {
     const db = seed({ opening: 500_000 });
@@ -333,13 +393,24 @@ describe('positionByAccount', () => {
     });
 
     const rows = positionByAccount(db, '2026-08');
-    expect(rows.find((r) => r.id === 'bank')?.amountMinor).toBe(400_000);
-    expect(rows.find((r) => r.id === 'cash')?.amountMinor).toBe(100_000);
-    expect(sumOf(rows)).toBe(500_000);
+    expect(rows.find((r) => r.id === 'bank')).toMatchObject({
+      beforeMinor: 500_000,
+      monthMinor: -100_000,
+      amountMinor: 400_000,
+    });
+    expect(rows.find((r) => r.id === 'cash')).toMatchObject({
+      beforeMinor: 0,
+      monthMinor: 100_000,
+      amountMinor: 100_000,
+    });
+    expect(sumTotal(rows)).toBe(500_000);
+    // The month did nothing to the position, which is exactly what a transfer
+    // means and what the header beside it says.
+    expect(sumMonth(rows)).toBe(periodSummary(db, '2026-08').balanceMinor);
   });
 
   /**
-   * THE OTHER SCREEN. This sheet names accounts and prints a figure beside
+   * THE OTHER SCREEN. This table names accounts and prints a figure beside
    * each, and the Accounts tab does exactly the same thing — two screens
    * showing the same money, so a test has to say they agree. Transfers are the
    * case that separates them: excluded, as every total in this file excludes
@@ -365,7 +436,7 @@ describe('positionByAccount', () => {
 
   /**
    * Archiving hides an account from the pickers; it does not spend what is in
-   * it. Left out, the list would add up to less than the figure above it.
+   * it. Left out, the table would add up to less than the figure above it.
    */
   it('keeps an archived account that still holds money', () => {
     const db = seed();
@@ -374,7 +445,7 @@ describe('positionByAccount', () => {
 
     const rows = positionByAccount(db, '2026-08');
     expect(rows.find((r) => r.id === 'bank')?.archived).toBe(true);
-    expect(sumOf(rows)).toBe(300_000);
+    expect(sumTotal(rows)).toBe(300_000);
   });
 
   /** An account with no records at all is still a row — it holds its opening balance. */
@@ -396,51 +467,39 @@ describe('positionByAccount', () => {
 
     const row = positionByAccount(db, '2026-08', 'EGP').find((r) => r.id === 'usd');
     expect(row?.amountMinor).toBe(0);
-    expect(row?.unvaluedCount).toBe(1);
-  });
-
-  /** What the header counts as uncountable is what the breakdown counts. */
-  it('counts the same unvalued records the header does', () => {
-    const db = seed({ opening: 500_000 });
-    createRecord(db, {
-      id: 'x',
-      accountId: 'usd',
-      categoryId: 'food',
-      type: 'expense',
-      amountMinor: 2_500,
-      currency: 'USD',
-      fxRate: 50,
-      homeCurrency: 'EGP',
-      occurredAt: on(2026, 8, 7),
-    });
-
-    const bf = broughtForward(db, '2026-08', 'USD');
-    const august = periodSummary(db, '2026-08', 'USD');
-    const rows = positionByAccount(db, '2026-08', 'USD');
-
-    expect(rows.reduce((n, r) => n + r.unvaluedCount, 0)).toBe(
-      bf.unvaluedCount + august.unvaluedCount
-    );
-  });
-});
-
-describe('movementByAccount', () => {
-  it("adds up to the month's net", () => {
-    const db = seed({ opening: 500_000 });
-    createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP' });
-    earn(db, 'before', 900_000, on(2026, 7, 1));
-    earn(db, 'i1', 400_000, on(2026, 8, 1));
-    spend(db, 'e1', 150_000, on(2026, 8, 9), 'cash');
-
-    expect(sumOf(movementByAccount(db, '2026-08'))).toBe(periodSummary(db, '2026-08').balanceMinor);
+    expect(row?.unvaluedBefore).toBe(1);
+    // Dated nowhere, so it is not the MONTH that could not value it.
+    expect(row?.unvaluedMonth).toBe(0);
   });
 
   /**
-   * An opening balance has no date, so it moved in no month. Counting it here
-   * would make every month report the same head start over again.
+   * What the header counts as uncountable is what the table counts, and split
+   * the same way: the records screen adds the carry scan's count to the
+   * month's, so each has to match its own side.
    */
-  it('leaves opening balances out', () => {
-    const db = seed({ opening: 500_000 });
-    expect(sumOf(movementByAccount(db, '2026-08'))).toBe(0);
+  it('counts the same unvalued records the header does, on the same side', () => {
+    const db = seed();
+    const foreign = (id: string, when: Date) =>
+      createRecord(db, {
+        id,
+        accountId: 'usd',
+        categoryId: 'food',
+        type: 'expense',
+        amountMinor: 2_500,
+        currency: 'USD',
+        fxRate: 50,
+        homeCurrency: 'EGP',
+        occurredAt: when,
+      });
+    foreign('earlier', on(2026, 6, 7));
+    foreign('inside', on(2026, 8, 7));
+
+    const rows = positionByAccount(db, '2026-08', 'USD');
+    expect(rows.reduce((n, r) => n + r.unvaluedBefore, 0)).toBe(
+      broughtForward(db, '2026-08', 'USD').unvaluedCount
+    );
+    expect(rows.reduce((n, r) => n + r.unvaluedMonth, 0)).toBe(
+      periodSummary(db, '2026-08', 'USD').unvaluedCount
+    );
   });
 });

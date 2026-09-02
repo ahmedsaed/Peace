@@ -73,6 +73,18 @@ export function formatPeriod(period: Period): string {
   return `${MONTHS[month - 1]} ${year}`;
 }
 
+/**
+ * "Sep" — a column heading, where "September 2026" would not fit.
+ *
+ * From the same hand-rolled list as `formatPeriod` and for the same reason:
+ * Hermes ships less ICU data than Node and shortens September to "Sept", so an
+ * `Intl` month name is a string the tests cannot predict.
+ */
+export function shortMonth(period: Period): string {
+  const { month } = parsePeriod(period);
+  return MONTHS[month - 1].slice(0, 3);
+}
+
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /** "Aug 08, 2026" — the record form's date footer. */

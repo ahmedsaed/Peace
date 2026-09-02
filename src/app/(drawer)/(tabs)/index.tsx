@@ -26,7 +26,6 @@ import {
 } from '@/db/repo/records';
 import {
   broughtForward,
-  movementByAccount,
   positionByAccount,
   type AccountPosition,
   type BroughtForward,
@@ -275,13 +274,7 @@ export default function RecordsScreen() {
           balanceLabel={headline.label}
           balanceTestID={headline.testID}
           // The one number on this screen whose working is nowhere else on it.
-          onBalancePress={() =>
-            setBreakdown(
-              carryOver
-                ? positionByAccount(db, period, homeCurrency)
-                : movementByAccount(db, period, homeCurrency)
-            )
-          }
+          onBalancePress={() => setBreakdown(positionByAccount(db, period, homeCurrency))}
         />
         {/* Under-reporting in silence is the thing to avoid. This happens when
             the home currency is changed after records exist: their value in the
@@ -504,10 +497,6 @@ export default function RecordsScreen() {
           incomeMinor={summary.incomeMinor}
           expenseMinor={summary.expenseMinor}
           adjustmentMinor={summary.adjustmentMinor}
-          // The SAME figure the header prints, not a second count of the same
-          // thing — two numbers for one problem is how a user learns to trust
-          // neither.
-          unvaluedCount={carryOver ? unvaluedTotal : summary.unvaluedCount}
         />
       ) : null}
 

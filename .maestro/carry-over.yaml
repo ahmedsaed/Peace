@@ -76,10 +76,11 @@ appId: com.ahmed.peace
 
 # --- WHERE THAT 7,000 CAME FROM ---
 # The cell is one number standing in for opening balances, every earlier month
-# and every account at once, and until this sheet existed nothing on any screen
-# said so. Two breakdowns, and the point is that BOTH add up to it: a single
-# column mixing brought-forward with account balances would double-count, since
-# the accounts already contain everything carried in.
+# and every account at once. The sheet is a TABLE — accounts down, time across —
+# because the question is not "where is my money" (the Accounts screen) and not
+# "what did this month do" (the two cells to the left) but both at once: is the
+# figure high because the month went well, or because an account has been
+# sitting on money since March?
 - tapOn:
     id: "summary-explain"
 - assertVisible:
@@ -88,23 +89,29 @@ appId: com.ahmed.peace
     id: "position-total"
     text: "E£7,000.00"
 
-# Where it is. Both seeded accounts are listed, Bank included at zero — an
-# ACTIVE account at nothing is an answer, and a list whose rows come and go with
-# the data is one you cannot scan.
+# Both seeded accounts are listed, Bank included at zero — an ACTIVE account at
+# nothing is an answer, and a list whose rows come and go with the data is one
+# you cannot scan.
 - assertVisible:
     id: "position-account-seed:acct:cash"
 - assertVisible:
     id: "position-account-seed:acct:bank"
+
+# THE COLUMN TOTALS. Nothing came before this month, so the history column is
+# empty and the whole figure is what September did — which is precisely the
+# reading the table exists to make possible.
+- assertVisible:
+    id: "position-carry"
+    text: "E£0.00"
+- assertVisible:
+    id: "position-month"
+    text: "E£7,000.00"
 - assertVisible:
     id: "position-accounts-total"
     text: "E£7,000.00"
 
-# How it got here. Nothing came before this month, so the whole figure is the
-# month's own 9,000 less 2,000 — and the expense line is SIGNED, because this
-# column is being added up in front of the user.
-- assertVisible:
-    id: "position-carry"
-    text: "E£0.00"
+# ...and what the month column is made of, signed, because these are being
+# added up in front of the user.
 - assertVisible:
     id: "position-income"
     text: "E£9,000.00"
@@ -112,7 +119,7 @@ appId: com.ahmed.peace
     id: "position-expense"
     text: "-E£2,000.00"
 - assertVisible:
-    id: "position-ledger-total"
+    id: "position-month-total"
     text: "E£7,000.00"
 - takeScreenshot: 01b-position-breakdown
 
@@ -121,7 +128,6 @@ appId: com.ahmed.peace
 - assertNotVisible:
     id: "position-sheet"
 
-# --- next month opens on what this one left ---
 - tapOn:
     id: "month-next"
 # The month itself is empty, so this 7,000 is ENTIRELY what was carried in —
@@ -136,6 +142,27 @@ appId: com.ahmed.peace
     id: "summary-income"
     text: "E£0.00"
 - takeScreenshot: 02-carry-next-month
+
+# --- AND THE TABLE SAYS WHY IT IS 7,000 IN A MONTH THAT DID NOTHING ---
+# THE READING THE FEATURE EXISTS FOR. The figure is unchanged from last month
+# while income and expense both read zero beside it, and the only way to tell
+# those two facts apart is the split: everything is in the history column and
+# nothing in October's. Without it the number looks like a month that earned
+# 7,000.
+- tapOn:
+    id: "summary-explain"
+- assertVisible:
+    id: "position-carry"
+    text: "E£7,000.00"
+- assertVisible:
+    id: "position-month"
+    text: "E£0.00"
+- assertVisible:
+    id: "position-accounts-total"
+    text: "E£7,000.00"
+- takeScreenshot: 02b-position-carried-in
+- tapOn:
+    id: "position-close"
 
 # --- THE RECONCILIATION: the two screens must agree ---
 - tapOn:
@@ -203,7 +230,7 @@ appId: com.ahmed.peace
 - assertNotVisible:
     id: "position-carry"
 - assertVisible:
-    id: "position-ledger-total"
+    id: "position-accounts-total"
     text: "E£0.00"
 - tapOn:
     id: "position-close"

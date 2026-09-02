@@ -175,7 +175,7 @@ appId: com.ahmed.peace
     id: "position-expense"
     text: "-E£500.00"
 - assertVisible:
-    id: "position-ledger-total"
+    id: "position-month-total"
     text: "-E£520.00"
 - takeScreenshot: 04b-position-with-card
 - tapOn:

@@ -1,4 +1,4 @@
-import { and, eq, gte, lt, sql, type SQL } from 'drizzle-orm';
+import { and, eq, lt, sql, type SQL } from 'drizzle-orm';
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { periodBounds, type Period } from '../../lib/period';
@@ -146,15 +146,22 @@ export function totalHeld(db: Db, homeCurrency = 'EGP'): number {
 // ---------------------------------------------------------------------------
 
 /**
- * One account's contribution to a running position or a month's net.
+ * One account, split by TIME as well as by account.
  *
- * `amountMinor` is SIGNED and denominated in the HOME currency, never in the
+ * The two dimensions is the whole point. `broughtForward` answers "how much of
+ * this is last month's problem?" for the ledger as a whole, and the Accounts
+ * screen answers "where is it?" — but the question people actually have is both
+ * at once: is the figure high because this month went well, or because an
+ * account has been sitting on money since March? Neither screen can say, and a
+ * total that cannot be attributed is a total you end up ignoring.
+ *
+ * Every figure is SIGNED and denominated in the HOME currency, never in the
  * account's own — these numbers are summed against each other, and minor units
  * are not comparable across currencies. A dollar jar therefore contributes
  * whatever its records were converted to on the day each was entered, and its
  * opening balance contributes nothing at all, because no rate was ever chosen
  * for money that was simply already there. That omission is reported through
- * `unvaluedCount` rather than guessed at, exactly as `broughtForward` does.
+ * the unvalued counts rather than guessed at, exactly as `broughtForward` does.
  */
 export type AccountPosition = {
   id: string;
@@ -165,79 +172,117 @@ export type AccountPosition = {
   icon: string | null;
   color: string | null;
   archived: boolean;
-  /** Signed, in home-currency minor units. Negative on a card means debt. */
+  /** Its opening balance and every month before this one. */
+  beforeMinor: number;
+  /** What the month being viewed did to it. */
+  monthMinor: number;
+  /** `beforeMinor + monthMinor` — its position at the end of that month. */
   amountMinor: number;
-  /** Records here with no value in today's home currency, plus a foreign opening balance. */
-  unvaluedCount: number;
+  /** Records with no home-currency value, split the same way. */
+  unvaluedBefore: number;
+  unvaluedMonth: number;
 };
 
 /**
- * The shared half of the two breakdowns below.
+ * Every account across the month being viewed: what it held going in, what the
+ * month did to it, and where it ended.
  *
- * The transaction filter goes in the JOIN, never in a WHERE: moved to the WHERE
- * it would drop every account that has no rows in the window, and an account
- * holding an opening balance and nothing else would silently vanish from a list
- * whose whole job is to add up to a number shown elsewhere.
+ * THREE COLUMNS THAT RECONCILE BOTH WAYS. Down, each column sums to a figure
+ * the app already shows: `broughtForward`, `periodSummary().balanceMinor`, and
+ * the running position which is the two added. Across, each row sums to that
+ * account's balance. That is what makes the table an explanation rather than a
+ * fourth opinion — every edge of it is pinned to something, and `carry.test.ts`
+ * asserts all three.
+ *
+ * The position column is deliberately the position at the end of the month
+ * being LOOKED AT rather than today's balances: those agree only while nothing
+ * is dated later, and a breakdown that stops adding up as soon as you scroll
+ * back a month is worse than none.
  */
-function contributions(
+export function positionByAccount(
   db: Db,
-  homeCurrency: string,
-  window: SQL,
-  /** Opening balances belong to a POSITION and not to a month's movement. */
-  withOpening: boolean
+  period: Period,
+  homeCurrency = 'EGP'
 ): AccountPosition[] {
+  const { start, end } = periodBounds(period);
   const home = sql`${homeCurrency.toUpperCase()}`;
 
-  // The same valuation rule as every other total in the app, and deliberately
+  // The same valuation rule as every other total in this file, and deliberately
   // the same expression `broughtForward` uses: two hand-kept copies is how a
   // breakdown stops adding up to the header above it.
   const valued = sql<number>`case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home}
       then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end`;
 
+  const before = sql`${transactions.occurredAt} < ${start.getTime()}`;
+  const during = sql`${transactions.occurredAt} >= ${start.getTime()} and ${transactions.occurredAt} < ${end.getTime()}`;
+
+  // TRANSFER LEGS ARE IN, unlike every total above. A total asks what you are
+  // worth and a transfer changes nothing about that; ONE ACCOUNT's figure asks
+  // where the money is, and a transfer is precisely the thing that moves it.
+  // Leave the legs out and the cash you withdrew last week is missing from Cash
+  // and still sitting in Bank — a table that adds up correctly along both edges
+  // while being wrong in the middle, which is the worst way for it to be wrong.
+  //
+  // The column totals survive because the two legs cancel EXACTLY:
+  // `createTransfer` writes one currency, one rate and one home currency across
+  // both, so their home values are +X and -X, they fall in the same month, and
+  // they are valued or unvalued together. Nothing else in this file may rely on
+  // that.
+  const moved = (window: SQL) =>
+    sql<number>`coalesce(sum(case when ${window} and ${movesAccountBalance()} then ${valued} else null end), 0)`;
+
+  // Counted on the POSITION rule, though, so these agree with the figures the
+  // records header prints. A transfer that cannot be valued was never counted
+  // towards anything to begin with, and reporting it as an uncounted record
+  // would describe a movement nothing was ever going to include — see
+  // `broughtForward`'s transfer test.
+  const uncounted = (window: SQL) =>
+    sql<number>`coalesce(sum(case when ${transactions.id} is not null and ${window} and ${movesPosition()} and ${valued} is null then 1 else 0 end), 0)`;
+
   const rows = db
     .select({
       account: accounts,
-      // TRANSFER LEGS ARE IN, unlike every total in this file above. A total
-      // asks what you are worth and a transfer changes nothing about that; ONE
-      // ACCOUNT's figure asks where the money is, and a transfer is precisely
-      // the thing that moves it. Leave the legs out and the cash you withdrew
-      // last week is missing from Cash and still sitting in Bank — a list that
-      // adds up to the right number while being wrong on two of its rows,
-      // which is the worst way for it to be wrong.
-      //
-      // The total survives because the two legs cancel EXACTLY: `createTransfer`
-      // writes one currency, one rate and one home currency across both, so
-      // their home values are +X and -X and they are valued or unvalued
-      // together. Nothing else in this file may rely on that.
-      moved: sql<number>`coalesce(sum(case when ${movesAccountBalance()} then ${valued} else null end), 0)`,
-      // Counted on the POSITION rule, though, so this agrees with the figure
-      // the records header prints. A transfer that cannot be valued was never
-      // counted towards anything to begin with, and reporting it as an
-      // uncounted record would describe a movement nothing was ever going to
-      // include — see `broughtForward`'s transfer test.
-      unvalued: sql<number>`coalesce(sum(case when ${transactions.id} is not null and ${movesPosition()} and ${valued} is null then 1 else 0 end), 0)`,
+      before: moved(before),
+      during: moved(during),
+      unvaluedBefore: uncounted(before),
+      unvaluedDuring: uncounted(during),
     })
     .from(accounts)
-    .leftJoin(transactions, and(eq(transactions.accountId, accounts.id), window))
+    // The window goes in the JOIN, never in a WHERE: moved to the WHERE it
+    // would drop every account with no rows in range, and an account holding an
+    // opening balance and nothing else would silently vanish from a list whose
+    // whole job is to add up to a number shown elsewhere.
+    .leftJoin(
+      transactions,
+      and(eq(transactions.accountId, accounts.id), lt(transactions.occurredAt, end))
+    )
     .groupBy(accounts.id)
     .all();
 
   return rows
     // ARCHIVED ACCOUNTS STAY IN. Their money is still in the total — archiving
     // hides an account from the pickers, it does not spend what is in it — so
-    // dropping them here would produce a list that adds up to less than the
-    // figure it is explaining, which is the one thing this screen may not do.
-    // Sorted on the ROW, while `sortOrder` is still in hand: it is ordering
-    // information and not something a breakdown has any reason to render.
+    // dropping them here would produce a table that adds up to less than the
+    // figure it is explaining, which is the one thing it may not do.
+    //
+    // Sorted on the ROW, while `sortOrder` is still in hand, and by the same
+    // rule the Accounts screen uses so the two lists read in the same order.
     .sort(
       (a, b) =>
         a.account.sortOrder - b.account.sortOrder ||
         a.account.name.localeCompare(b.account.name)
     )
-    .map(({ account, moved, unvalued }) => {
-      const openingCounts =
-        withOpening && account.currency.toUpperCase() === homeCurrency.toUpperCase();
-      const openingUnvalued = withOpening && !openingCounts && account.openingBalance !== 0;
+    .map(({ account, before: had, during: moved, unvaluedBefore, unvaluedDuring }) => {
+      // An opening balance is denominated in the ACCOUNT's currency with no
+      // conversion attached — there is no rate stored for "money that was
+      // already there" — so it counts only when the account is already held in
+      // the home currency. It has no date either, which is why it belongs in
+      // the BEFORE column of every month, the first one included.
+      const openingCounts = account.currency.toUpperCase() === homeCurrency.toUpperCase();
+      const openingUnvalued = !openingCounts && account.openingBalance !== 0;
+
+      const beforeMinor = (openingCounts ? account.openingBalance : 0) + Number(had);
+      const monthMinor = Number(moved);
 
       return {
         id: account.id,
@@ -247,46 +292,11 @@ function contributions(
         icon: account.icon,
         color: account.color,
         archived: account.archived,
-        amountMinor: (openingCounts ? account.openingBalance : 0) + Number(moved),
-        unvaluedCount: Number(unvalued) + (openingUnvalued ? 1 : 0),
+        beforeMinor,
+        monthMinor,
+        amountMinor: beforeMinor + monthMinor,
+        unvaluedBefore: Number(unvaluedBefore) + (openingUnvalued ? 1 : 0),
+        unvaluedMonth: Number(unvaluedDuring),
       };
     });
-}
-
-/**
- * Every account's position at the END of `period` — what makes up "Now".
- *
- * Summed, this is exactly `broughtForward(period) + periodSummary(period)`,
- * which is the identity `carry.test.ts` pins. It is deliberately the position
- * at the end of the month being LOOKED AT rather than today's balances: those
- * agree only while nothing is dated after the viewed month, and a breakdown
- * that stops adding up as soon as you scroll back a month is worse than none.
- */
-export function positionByAccount(
-  db: Db,
-  period: Period,
-  homeCurrency = 'EGP'
-): AccountPosition[] {
-  const { end } = periodBounds(period);
-  return contributions(db, homeCurrency, lt(transactions.occurredAt, end), true);
-}
-
-/**
- * Every account's net movement WITHIN `period` — what makes up "Balance".
- *
- * The same breakdown for the other thing the third cell can show. Opening
- * balances are excluded: they have no date, so they moved in no month.
- */
-export function movementByAccount(
-  db: Db,
-  period: Period,
-  homeCurrency = 'EGP'
-): AccountPosition[] {
-  const { start, end } = periodBounds(period);
-  return contributions(
-    db,
-    homeCurrency,
-    and(gte(transactions.occurredAt, start), lt(transactions.occurredAt, end))!,
-    false
-  );
 }
