@@ -71,7 +71,7 @@ Drive the UI with `adb shell input tap X Y`, `adb shell input text "..."`,
 
 | Field | Where it comes from | When it changes |
 |---|---|---|
-| `version` (semver) | `app.json`, by hand | when a human decides a release deserves a new number |
+| `version` (semver) | `app.json`, by hand | **every change that ships** — see the rule below |
 | `versionCode` | `git rev-list --count HEAD` | every commit |
 | `gitSha` | `git rev-parse --short HEAD` | every commit |
 
@@ -79,6 +79,20 @@ Drive the UI with `adb shell input tap X Y`, `adb shell input text "..."`,
 them back through `expo-constants`, and the About screen shows `1.0.0 (build 25)` plus the commit.
 A build made from a dirty tree is marked `-dirty`, because it is not reproducible from its sha and
 showing the sha unqualified is how you end up debugging code that was never in the APK.
+
+**BUMP THE VERSION IN THE SAME CHANGE THAT EARNS IT.** A fix takes the patch digit, a feature takes
+the minor; a major is still a human's call. Not afterwards and not at release time — the bump
+belongs in the PR that did the work, or the build that gets reviewed and installed carries a number
+that describes the one before it.
+
+This is not bookkeeping. The release tag is `v<version>+build.<n>`, so leaving the semver alone
+makes consecutive releases differ only in the build number — and that is not hypothetical, it is
+why the update check in **Hard rules** below **cannot use the semver at all** and has to parse the
+build number out of the tag instead: the same `version` has already gone out across five separate
+releases. Every skipped bump makes the one number a person actually reads mean less.
+
+`versionCode` moves on its own with every commit, which is what makes this easy to forget: the
+About screen keeps changing, so nothing ever looks stale.
 
 Three ways this breaks:
 
@@ -578,6 +592,9 @@ app ignoring input. `pkill -f GradleDaemon`.
   charge AND the card's commission through `createCardPurchase` and `updateRecord` has no such
   branch. What editing needed was to SEE the original amount, which the row has stored all along
   and displayed nowhere. Before enabling a control on a new path, follow it to the write.
+- **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
+  feature, in the same PR that does the work. See **Versioning** above for why the release tag
+  makes this load-bearing rather than tidy.
 - **Schema changes go through drizzle-kit.** Edit `src/db/schema.ts`, run `npm run db:generate`,
   commit the generated `drizzle/` files. Never hand-edit a migration that has shipped.
 - **Native module added? The Expo Go client is no longer enough** — a dev build is required
