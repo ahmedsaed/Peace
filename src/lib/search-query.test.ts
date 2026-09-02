@@ -57,6 +57,13 @@ describe('activeFilterCount', () => {
     ).toBe(5);
   });
 
+  it('counts several tags as ONE filter', () => {
+    // Like min and max: "tagged kitchen and urgent" is a single idea, and
+    // badging it as two overstates how narrow the search is.
+    expect(activeFilterCount(q({ tagIds: ['a'] }))).toBe(1);
+    expect(activeFilterCount(q({ tagIds: ['a', 'b', 'c'] }))).toBe(1);
+  });
+
   it('counts the transfer destination', () => {
     // Otherwise the badge under-reports and the collapsed panel hides a filter
     // that is narrowing the results.
@@ -87,6 +94,15 @@ describe('withKind', () => {
   it('keeps the destination while the type stays transfer', () => {
     const next = withKind(q({ kind: 'transfer', counterAccountId: 'cash' }), 'transfer');
     expect(next.counterAccountId).toBe('cash');
+  });
+
+  it('never drops the tags, whatever the type', () => {
+    // Unlike a category, a tag applies to every kind of row there is — a
+    // transfer made FOR the kitchen is part of the kitchen — so no type can
+    // make one meaningless.
+    for (const kind of ['expense', 'income', 'transfer', null] as const) {
+      expect(withKind(q({ tagIds: ['kitchen'] }), kind).tagIds).toEqual(['kitchen']);
+    }
   });
 
   it('leaves every other filter alone', () => {

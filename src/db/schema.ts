@@ -3,6 +3,7 @@ import {
   type AnySQLiteColumn,
   index,
   integer,
+  primaryKey,
   real,
   sqliteTable,
   text,
@@ -661,6 +662,90 @@ export const bankCaptures = sqliteTable(
 );
 
 // ---------------------------------------------------------------------------
+// Tags — the axis categories cannot be
+// ---------------------------------------------------------------------------
+
+/**
+ * A LABEL, not a category.
+ *
+ * Categories are exclusive and permanent: a record has exactly one, and the
+ * ring, the budgets and the analysis screen are all built on that. Tags are
+ * neither, and that is the entire point of them.
+ *
+ *   - MANY per record, so a holiday can be flights under Travel, dinners under
+ *     Food and taxis under Transportation. One exclusive axis cannot answer
+ *     "what did the trip cost".
+ *   - ARCHIVABLE, because a tag has a lifetime and a category does not. A
+ *     sub-category called "Kitchen renovation" is in the picker and in the ring
+ *     for ever; the renovation is not.
+ *
+ * They are a FILTER over the ledger and never a dimension of it. No total in
+ * this app is tag-shaped, and none may become so — see the comment on
+ * `tagBreakdown` for why a ring of tags is the one chart that cannot be drawn
+ * honestly.
+ */
+export const tags = sqliteTable(
+  'tags',
+  {
+    id: text('id').primaryKey(),
+    /** As typed, and as shown. */
+    name: text('name').notNull(),
+    /**
+     * The same name reduced to what makes two tags THE SAME: NFC-normalised,
+     * trimmed, inner runs of whitespace collapsed, lower-cased.
+     *
+     * Unique on this rather than on `name`, or "Kitchen" and "kitchen" become
+     * two projects and the total for either is wrong with nothing to show for
+     * it. NFC because the same accented character can be typed as one code
+     * point or two depending on the keyboard, and the two compare unequal —
+     * the identical trap `seal.ts` records for passphrases.
+     */
+    normalised: text('normalised').notNull().unique(),
+    /**
+     * Out of the picker, still on its records.
+     *
+     * What a finished project needs. Deleting the tag instead would rewrite
+     * history to say the spending was never part of anything.
+     */
+    archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().default(now),
+  },
+  (table) => [index('idx_tags_archived').on(table.archived, table.name)]
+);
+
+/**
+ * Which records carry which tags.
+ *
+ * A join table rather than a column, because the relationship is many-to-many
+ * in both directions and there is no third thing to say about it. Both sides
+ * CASCADE: a deleted record's labels are meaningless, and a deleted tag is a
+ * label nobody chose.
+ *
+ * ONE ROW PER TRANSACTION, and for a transfer that is the OUTGOING leg — the
+ * one every list renders and the one whose id a screen holds. Tagging both
+ * would double every tag total, silently, since the two legs cancel only in
+ * arithmetic that tags do not take part in.
+ */
+export const transactionTags = sqliteTable(
+  'transaction_tags',
+  {
+    transactionId: text('transaction_id')
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    tagId: text('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.transactionId, table.tagId] }),
+    // "Everything tagged kitchen" — the query the whole feature exists for, and
+    // the one the primary key's leading column cannot serve.
+    index('idx_transaction_tags_tag').on(table.tagId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
@@ -682,3 +767,5 @@ export type HoldingRow = typeof holdings.$inferSelect;
 export type NewHoldingRow = typeof holdings.$inferInsert;
 export type BankCapture = typeof bankCaptures.$inferSelect;
 export type NewBankCapture = typeof bankCaptures.$inferInsert;
+export type Tag = typeof tags.$inferSelect;
+export type NewTag = typeof tags.$inferInsert;

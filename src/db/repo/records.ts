@@ -4,7 +4,7 @@ import { alias, type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { formatDayHeading, periodBounds, type Period } from '../../lib/period';
 import * as schema from '../schema';
 import { ledgerSide, movesPosition, onExpenseSide, onIncomeSide } from './predicates';
-import { accounts, attachments, categories, transactions } from '../schema';
+import { accounts, attachments, categories, tags, transactionTags, transactions } from '../schema';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -29,6 +29,14 @@ export type RecordRow = {
    * deliberate.
    */
   reversesId: string | null;
+  /**
+   * The labels on this row, in the order a picker lists them.
+   *
+   * On the SHARED type so search carries them too, and so a screen cannot show
+   * a record without them by forgetting to ask — the same forcing function
+   * `attachmentCount` and `reversesId` rely on.
+   */
+  tags: string[];
   /**
    * What was HANDED OVER, when that differs from what moved the account.
    *
@@ -94,7 +102,46 @@ export function homeValue(homeCurrency: string) {
   end`;
 }
 
-export { attachmentCount };
+/**
+ * The row's tag names, newline-separated, as a correlated subquery.
+ *
+ * Same reasoning as the count above: one query, on an indexed column. A second
+ * pass keyed by id would be a round trip that can disagree with the first and
+ * that every screen showing a record would have to remember to make.
+ *
+ * NEWLINE as the separator, not a comma: a tag may not contain one — `\s+` is
+ * collapsed to single spaces by `cleanTagName` before the name is ever stored
+ * — where a comma is an ordinary character in "Phone, 6 of 12" and splitting
+ * on it would invent tags that nobody typed.
+ */
+const tagNames = sql<string | null>`(
+  select group_concat(${tags.name}, char(10)) from ${transactionTags}
+  join ${tags} on ${tags.id} = ${transactionTags.tagId}
+  where ${transactionTags.transactionId} = ${transactions.id}
+)`;
+
+/**
+ * The newline-joined names back into a list, ordered.
+ *
+ * SORTED HERE, not in the subquery. An `order by` after `group_concat` orders
+ * the aggregate's single output row and does nothing at all to the names inside
+ * it — it looks exactly like working ordering and is not, which is how the
+ * first version came back "Urgent, Kitchen". SQLite can order inside the
+ * aggregate, but only in versions newer than some of the Androids this runs on.
+ *
+ * Compared on the LOWER-CASED name rather than through `localeCompare`, so the
+ * order is the same on Hermes as in Node: Android ships less ICU data and
+ * degrades silently, and a list that sorts differently on the device from the
+ * test is a difference nobody would look for.
+ */
+export function splitTagNames(joined: string | null): string[] {
+  if (!joined) return [];
+  return joined
+    .split('\n')
+    .sort((a, b) => (a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0));
+}
+
+export { attachmentCount, tagNames };
 
 /**
  * One month of records, newest first.
@@ -130,6 +177,7 @@ export function listRecordsForPeriod(
       accountName: accounts.name,
       counterAccountName: counter.name,
       attachmentCount,
+      tagNames,
       homeValueMinor: homeValue(homeCurrency),
     })
     .from(transactions)
@@ -147,9 +195,10 @@ export function listRecordsForPeriod(
     .orderBy(desc(transactions.occurredAt), desc(transactions.createdAt))
     .all();
 
-  return rows.map(({ transferPairId, ...row }) => ({
+  return rows.map(({ transferPairId, tagNames: joined, ...row }) => ({
     ...row,
     isTransfer: transferPairId !== null,
+    tags: splitTagNames(joined),
   }));
 }
 

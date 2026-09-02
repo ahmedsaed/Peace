@@ -20,9 +20,9 @@ import {
   type SearchQuery,
 } from '../../lib/search-query';
 import * as schema from '../schema';
-import { accounts, categories, transactions } from '../schema';
+import { accounts, categories, tags, transactionTags, transactions } from '../schema';
 import { countsAsSpending, onExpenseSide, onIncomeSide } from './predicates';
-import { attachmentCount, homeValue, type RecordRow } from './records';
+import { attachmentCount, homeValue, splitTagNames, tagNames, type RecordRow } from './records';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -91,7 +91,14 @@ function conditions(
         like(sql`coalesce(${transactions.note}, '')`),
         like(sql`coalesce(${categories.name}, '')`),
         like(accounts.name),
-        like(sql`coalesce(${counter.name}, '')`)
+        like(sql`coalesce(${counter.name}, '')`),
+        // Typing a project's name should find it without opening the filters.
+        // EXISTS rather than a join, or a record with three matching tags
+        // would come back three times.
+        sql`exists (select 1 from ${transactionTags}
+              join ${tags} on ${tags.id} = ${transactionTags.tagId}
+              where ${transactionTags.transactionId} = ${transactions.id}
+                and ${tags.name} like ${pattern} escape '\\')`
       )!
     );
   }
@@ -121,6 +128,17 @@ function conditions(
   // thing making this correct.
   if (query.counterAccountId) {
     where.push(eq(transactions.counterAccountId, query.counterAccountId));
+  }
+
+  // ALL of them, as one EXISTS each. A single `tag_id in (...)` would match a
+  // record carrying ANY of them, which is a different question — and the
+  // difference is invisible until a record happens to carry only one.
+  for (const tagId of query.tagIds) {
+    where.push(
+      sql`exists (select 1 from ${transactionTags}
+            where ${transactionTags.transactionId} = ${transactions.id}
+              and ${transactionTags.tagId} = ${tagId})`
+    );
   }
 
   if (query.categoryId) {
@@ -195,6 +213,7 @@ export function searchRecords(
       // Search found this by refusing to typecheck when the field was added to
       // `RecordRow`, which is the point of it living on the shared type.
       attachmentCount,
+      tagNames,
       homeValueMinor: homeValue(homeCurrency),
     })
     .from(transactions)
@@ -237,9 +256,10 @@ export function searchRecords(
   const matchCount = Number(totals.matches ?? 0);
 
   return {
-    rows: rows.map(({ transferPairId, ...row }) => ({
+    rows: rows.map(({ transferPairId, tagNames: joined, ...row }) => ({
       ...row,
       isTransfer: transferPairId !== null,
+      tags: splitTagNames(joined),
     })),
     matchCount,
     truncated: matchCount > rows.length,

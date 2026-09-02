@@ -15,6 +15,7 @@ import {
   type CashFlowPoint,
 } from '@/db/repo/analysis';
 import { broughtForward, runningTotals } from '@/db/repo/carry';
+import { tagBreakdown, type TagTotal } from '@/db/repo/tags';
 import type { CategoryKind } from '@/db/repo/spend';
 import { rankSlices, type RankedSlice } from '@/lib/analysis';
 import { testIdSlug as slug } from '@/lib/id';
@@ -41,9 +42,22 @@ export default function AnalysisScreen() {
   const [breakdown, setBreakdown] = useState<Breakdown>(EMPTY);
   const [flow, setFlow] = useState<CashFlowPoint[]>([]);
   const [flowOpening, setFlowOpening] = useState(0);
+  const [tagTotals, setTagTotals] = useState<TagTotal[]>([]);
+  /**
+   * Narrow every figure on this screen to one tag.
+   *
+   * WHAT MAKES TAGS SAFE HERE. A ring OF tags cannot be drawn honestly — they
+   * overlap and most records carry none, so the slices would both double-count
+   * each other and leave a remainder — but a ring of CATEGORIES within a tag
+   * sums to exactly 100% like any other, because categories stay exclusive
+   * inside any subset of the ledger. "Where did the kitchen money go" is a
+   * category question asked of fewer rows.
+   */
+  const [tagId, setTagId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
-    setBreakdown(categoryBreakdown(db, period, kind, homeCurrency));
+    setBreakdown(categoryBreakdown(db, period, kind, homeCurrency, tagId));
+    setTagTotals(tagBreakdown(db, period, kind, homeCurrency));
     const points = cashFlow(db, period, { months: CASH_FLOW_MONTHS, homeCurrency });
     setFlow(points);
     // The strip starts at its OLDEST month, not at the month being viewed —
@@ -54,7 +68,7 @@ export default function AnalysisScreen() {
         ? broughtForward(db, points[0].period, homeCurrency).amountMinor
         : 0
     );
-  }, [period, kind, homeCurrency, carryOver]);
+  }, [period, kind, homeCurrency, carryOver, tagId]);
 
   // On focus rather than on mount: every number here moves when a record is
   // logged, and returning from the record screen has to show that.
@@ -62,6 +76,7 @@ export default function AnalysisScreen() {
 
   const ranked = rankSlices(breakdown.slices, { otherColor: palette.line });
   const nothing = breakdown.totalMinor === 0;
+  const filteredTo = tagTotals.find((t) => t.id === tagId)?.name ?? null;
 
   return (
     <Screen testID="analysis-screen">
@@ -73,15 +88,31 @@ export default function AnalysisScreen() {
         {nothing ? (
           <EmptyState
             icon="analysis"
-            title={`No ${kind === 'expense' ? 'spending' : 'income'} in ${formatPeriod(period)}`}
-            hint="Log a record, or step back a month."
+            title={
+              filteredTo
+                ? `Nothing tagged ${filteredTo} in ${formatPeriod(period)}`
+                : `No ${kind === 'expense' ? 'spending' : 'income'} in ${formatPeriod(period)}`
+            }
+            hint={
+              filteredTo
+                ? 'Tap the tag below to see the whole month again.'
+                : 'Log a record, or step back a month.'
+            }
           />
         ) : (
           <>
             <View className="items-center pt-2">
               <Donut slices={ranked} testID="analysis-donut">
-                <Text className="text-[10px] uppercase tracking-widest text-muted">
-                  {kind === 'expense' ? 'Spent' : 'Earned'}
+                {/* THE NAME OF WHAT IS BEING SHOWN, when it is not the whole
+                    month. The tag row that set this is far below and usually
+                    scrolled off, so without this the ring silently means
+                    something narrower than the header above it says — copy tied
+                    to a computed value belongs beside the value. */}
+                <Text
+                  className="text-[10px] uppercase tracking-widest text-muted"
+                  numberOfLines={1}
+                  testID="analysis-scope">
+                  {filteredTo ?? (kind === 'expense' ? 'Spent' : 'Earned')}
                 </Text>
                 <Text
                   className="text-center text-xl font-semibold text-ink"
@@ -106,6 +137,14 @@ export default function AnalysisScreen() {
             </View>
           </>
         )}
+
+        <TagTotals
+          totals={tagTotals}
+          selectedId={tagId}
+          kind={kind}
+          homeCurrency={homeCurrency}
+          onSelect={(id) => setTagId((current) => (current === id ? null : id))}
+        />
 
         <Footnotes breakdown={breakdown} kind={kind} homeCurrency={homeCurrency} />
 
@@ -393,6 +432,85 @@ function Footnotes({
           not counted — no {homeCurrency} value
         </Text>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * What each tag came to, as a ranked LIST and never as a ring.
+ *
+ * Tags overlap and most records carry none, so slices of them would
+ * double-count each other and still leave a remainder nothing accounts for — a
+ * legend that does not add to 100 reads as a bug on a screen whose whole job is
+ * accounting for money, which is the rule `sharePercents` exists to keep. So:
+ * amounts and counts, no percentages, no geometry.
+ *
+ * Tapping one filters the ring ABOVE instead, which is the honest way to see a
+ * tag as a chart — within a tag, categories are still exclusive and still sum
+ * to exactly 100%.
+ */
+function TagTotals({
+  totals,
+  selectedId,
+  kind,
+  homeCurrency,
+  onSelect,
+}: {
+  totals: TagTotal[];
+  selectedId: string | null;
+  kind: CategoryKind;
+  homeCurrency: string;
+  onSelect: (id: string) => void;
+}) {
+  const money = useMoney();
+  if (totals.length === 0) return null;
+
+  return (
+    <View className="mt-6" testID="analysis-tags">
+      <Text className="px-4 pb-1 text-[10px] uppercase tracking-widest text-muted">
+        By tag
+      </Text>
+      {/* Said once, here, rather than left for someone to work out from a total
+          that does not match the ring: a record can carry two tags, so these
+          figures overlap each other and do not add up to the month. */}
+      <Text className="px-4 pb-2 text-[11px] text-muted">
+        {selectedId
+          ? 'Showing one tag. Tap it again for the whole month.'
+          : 'Tags can overlap, so these do not add up to the month. Tap one to filter.'}
+      </Text>
+      {totals.map((tag) => {
+        const selected = tag.id === selectedId;
+        return (
+          <Pressable
+            key={tag.id}
+            onPress={() => onSelect(tag.id)}
+            testID={`analysis-tag-${slug(tag.name)}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            className={`flex-row items-center gap-3 border-b border-line px-4 py-2.5 active:bg-surface ${
+              selected ? 'bg-surface' : ''
+            }`}>
+            <Icon name="label" size={16} color={selected ? palette.accent : palette.muted} />
+            <View className="flex-1">
+              <Text
+                className={`text-sm text-ink ${selected ? 'font-semibold' : ''}`}
+                numberOfLines={1}>
+                {tag.name}
+              </Text>
+              <Text className="text-[11px] text-muted">
+                {tag.recordCount === 1 ? '1 record' : `${tag.recordCount} records`}
+              </Text>
+            </View>
+            <Text
+              className={`text-sm font-semibold ${
+                kind === 'expense' ? 'text-expense' : 'text-income'
+              }`}
+              testID={`analysis-tag-amount-${slug(tag.name)}`}>
+              {money(tag.amountMinor, homeCurrency)}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

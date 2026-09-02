@@ -40,6 +40,16 @@ export type SearchQuery = {
   counterAccountId: string | null;
   /** A parent category also matches its children — see the repository. */
   categoryId: string | null;
+  /**
+   * Records carrying ALL of these tags.
+   *
+   * AND, like every other control in the panel: account AND category AND range
+   * all narrow, and one row that gathered instead would be the odd one out.
+   * Counted as ONE filter on the badge for the same reason min and max are —
+   * "tagged kitchen and urgent" is a single idea, and badging it as two
+   * overstates how narrow the search is.
+   */
+  tagIds: string[];
   minAmount: string;
   maxAmount: string;
   range: DateRange;
@@ -51,6 +61,7 @@ export const EMPTY_QUERY: SearchQuery = {
   accountId: null,
   counterAccountId: null,
   categoryId: null,
+  tagIds: [],
   minAmount: '',
   maxAmount: '',
   range: 'any',
@@ -80,6 +91,7 @@ export function activeFilterCount(query: SearchQuery): number {
   if (query.accountId !== null) count++;
   if (query.counterAccountId !== null) count++;
   if (query.categoryId !== null) count++;
+  if (query.tagIds.length > 0) count++;
   if (query.range !== 'any') count++;
   // Min and max are one filter between them: "between 100 and 200" is a single
   // idea, and badging it as 2 overstates how narrow the search is.
@@ -102,6 +114,9 @@ export function activeFilterCount(query: SearchQuery): number {
  * two different ways.
  */
 export function withKind(query: SearchQuery, kind: RecordKind | null): SearchQuery {
+  // Tags are untouched on purpose. Unlike a category, a tag applies to every
+  // kind of row there is — a transfer made FOR the kitchen is part of the
+  // kitchen — so no type can make one meaningless.
   return {
     ...query,
     kind,
