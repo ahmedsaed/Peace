@@ -26,6 +26,7 @@ import {
   isRunnable,
   KIND_LABELS,
   RANGE_LABELS,
+  withKind,
   type DateRange,
   type RecordKind,
   type SearchQuery,
@@ -56,7 +57,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState<SearchQuery>(EMPTY_QUERY);
   const [outcome, setOutcome] = useState<SearchOutcome | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [picking, setPicking] = useState<'account' | 'category' | null>(null);
+  const [picking, setPicking] = useState<'account' | 'counter' | 'category' | null>(null);
 
   const accounts = useMemo(() => listAccountsWithBalance(db), []);
   // Both kinds in one list: a search is not scoped to expense or income until
@@ -103,6 +104,7 @@ export default function SearchScreen() {
   }));
 
   const accountName = accounts.find((a) => a.id === query.accountId)?.name;
+  const counterAccountName = accounts.find((a) => a.id === query.counterAccountId)?.name;
   const categoryName = categoryTree
     .flatMap((node) => [node, ...node.children])
     .find((c) => c.id === query.categoryId)?.name;
@@ -179,8 +181,11 @@ export default function SearchScreen() {
           patch={patch}
           maxHeight={Math.max(190, height * 0.4)}
           accountName={accountName}
+          counterAccountName={counterAccountName}
           categoryName={categoryName}
+          onKind={(kind) => setQuery((q) => withKind(q, kind))}
           onPickAccount={() => setPicking('account')}
+          onPickCounter={() => setPicking('counter')}
           onPickCategory={() => setPicking('category')}
           onClear={() => setQuery({ ...EMPTY_QUERY, text: query.text })}
           canClear={filterCount > 0}
@@ -229,7 +234,10 @@ export default function SearchScreen() {
       <PickerSheet
         visible={picking === 'account'}
         title="Account"
-        options={accountOptions}
+        // The two ends of a transfer cannot be the same account, so offering it
+        // on both rows offers a query that is guaranteed to match nothing.
+        // Null unless a transfer is being filtered, which excludes nothing.
+        options={accountOptions.filter((o) => o.id !== query.counterAccountId)}
         selectedId={query.accountId ?? ANY}
         onSelect={(id) => {
           patch({ accountId: id === ANY ? null : id });
@@ -237,6 +245,22 @@ export default function SearchScreen() {
         }}
         onClose={() => setPicking(null)}
         testID="account-sheet"
+      />
+
+      {/* The other end of a transfer. A separate sheet from the one above
+          rather than one with computed props: they are two different filters
+          and a flow has to be able to say which one it opened. */}
+      <PickerSheet
+        visible={picking === 'counter'}
+        title="Transferred to"
+        options={accountOptions.filter((o) => o.id !== query.accountId)}
+        selectedId={query.counterAccountId ?? ANY}
+        onSelect={(id) => {
+          patch({ counterAccountId: id === ANY ? null : id });
+          setPicking(null);
+        }}
+        onClose={() => setPicking(null)}
+        testID="counter-account-sheet"
       />
 
       <PickerSheet
@@ -380,20 +404,26 @@ function FilterRow({
 function FilterPanel({
   query,
   patch,
+  onKind,
   maxHeight,
   accountName,
+  counterAccountName,
   categoryName,
   onPickAccount,
+  onPickCounter,
   onPickCategory,
   onClear,
   canClear,
 }: {
   query: SearchQuery;
   patch: (next: Partial<SearchQuery>) => void;
+  onKind: (kind: RecordKind | null) => void;
   maxHeight: number;
   accountName?: string;
+  counterAccountName?: string;
   categoryName?: string;
   onPickAccount: () => void;
+  onPickCounter: () => void;
   onPickCategory: () => void;
   onClear: () => void;
   canClear: boolean;
@@ -401,6 +431,12 @@ function FilterPanel({
   const label = (text: string) => (
     <Text className="mb-1.5 text-[10px] uppercase tracking-widest text-muted">{text}</Text>
   );
+
+  // A transfer has no category, so that row could only ever empty the screen.
+  // What a transfer HAS instead is a far end, and the account row on its own
+  // cannot reach it: search lists the outgoing leg, so "Account" is where the
+  // money left from.
+  const isTransfer = query.kind === 'transfer';
 
   return (
     <View
@@ -416,7 +452,7 @@ function FilterPanel({
             <Chip
               label="All"
               selected={query.kind === null}
-              onPress={() => patch({ kind: null })}
+              onPress={() => onKind(null)}
               testID="filter-kind-all"
             />
             {(Object.keys(KIND_LABELS) as RecordKind[]).map((kind) => (
@@ -427,7 +463,12 @@ function FilterPanel({
                 // Tapping the selected chip clears it. Without that the only way
                 // back to "All" is to find the All chip, and a filter you cannot
                 // undo where you set it is the one people give up on.
-                onPress={() => patch({ kind: query.kind === kind ? null : kind })}
+                //
+                // Through `withKind`, not `patch`: switching type hides one of
+                // the two account/category rows, and a filter left set behind a
+                // control that is no longer on screen empties the results with
+                // no way to see why.
+                onPress={() => onKind(query.kind === kind ? null : kind)}
                 testID={`filter-kind-${kind}`}
               />
             ))}
@@ -451,17 +492,26 @@ function FilterPanel({
 
         <View className="gap-2">
           <FilterRow
-            label="Account"
+            label={isTransfer ? 'From' : 'Account'}
             value={accountName ?? 'Any'}
             onPress={onPickAccount}
             testID="filter-account"
           />
-          <FilterRow
-            label="Category"
-            value={categoryName ?? 'Any'}
-            onPress={onPickCategory}
-            testID="filter-category"
-          />
+          {isTransfer ? (
+            <FilterRow
+              label="To"
+              value={counterAccountName ?? 'Any'}
+              onPress={onPickCounter}
+              testID="filter-counter-account"
+            />
+          ) : (
+            <FilterRow
+              label="Category"
+              value={categoryName ?? 'Any'}
+              onPress={onPickCategory}
+              testID="filter-category"
+            />
+          )}
         </View>
 
         <View>

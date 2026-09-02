@@ -77,6 +77,56 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "home-screen"
 
+# 4. + 5. Two transfers in OPPOSITE directions between the same pair of
+# accounts. One of each is what makes the destination filter provable: with a
+# single transfer in the ledger, filtering on either end returns it and the
+# query could be pointed at the wrong column without anything failing.
+#
+# Kept under E£100 so the amount filter further down still separates the same
+# two records it always did.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-transfer"
+# Cash -> Bank is the default pair, so this one needs no picker.
+- tapOn:
+    id: "record-note"
+- inputText: "moving to bank"
+- hideKeyboard
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-transfer"
+- tapOn:
+    id: "pick-account"
+- tapOn: "Bank"
+# The To account has to be set as well: it still holds the default second
+# account, which is now the same one, and a transfer to itself is refused.
+- tapOn:
+    id: "pick-to-account"
+- tapOn: "Cash"
+- tapOn:
+    id: "record-note"
+- inputText: "cash withdrawal"
+- hideKeyboard
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
 # --- the screen opens with nothing searched ---
 - tapOn:
     id: "nav-search"
@@ -183,6 +233,65 @@ appId: com.ahmed.peace
     id: "filter-kind-income"
 - assertVisible: "Search every record"
 
+# --- a transfer is filtered by where it LANDED ---
+#
+# Search lists only the OUTGOING leg, so the Account row is the account the
+# money left. Without a second row for the far end, "what arrived in Bank" is a
+# question the screen cannot ask at all — the leg that would answer it is the
+# one deliberately hidden.
+
+# First: switching to Transfer must DROP the category filter rather than hide
+# it. A transfer has no category, so a filter left set behind a control that is
+# no longer on screen empties the results with nothing on screen to say why.
+- tapOn:
+    id: "filter-category"
+- tapOn: "Food"
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- tapOn:
+    id: "filter-kind-transfer"
+# Both transfers, not zero — and the badge counts ONE filter, not two. If the
+# category leaked through, this reads "0 records" under a badge of "2".
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- assertVisible:
+    id: "search-filter-count"
+    text: "1"
+
+# The Category row is replaced by the two ends of the transfer.
+- assertNotVisible:
+    id: "filter-category"
+- assertVisible:
+    id: "filter-counter-account"
+- tapOn:
+    id: "filter-counter-account"
+- tapOn: "Bank"
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+# The one that ARRIVED in Bank — the other transfer LEFT Bank, and is what
+# comes back if this filter is ever pointed at account_id.
+#
+# Asserted on the row's own subtitle rather than on the note: a transfer row
+# renders "<from> → <to>" and does not show its note at all, so the direction
+# IS the visible text. It is also the stronger assertion of the two — it names
+# both ends, and the wrong leg would read "Bank → Cash".
+- assertVisible: "Cash → Bank"
+- assertNotVisible: "Bank → Cash"
+# Narrowing to transfers must not turn them into spending: a screen showing
+# only transfers shows no total at all.
+- assertNotVisible:
+    id: "search-expense"
+- assertNotVisible:
+    id: "search-income"
+- takeScreenshot: 03-search-transfer-destination
+
+- tapOn:
+    id: "filter-clear"
+- assertVisible: "Search every record"
+
 # --- filter by amount, unsigned ---
 # 250 is stored as -25000. A signed comparison would miss it and this would
 # come back with only the salary.
@@ -207,4 +316,4 @@ appId: com.ahmed.peace
     id: "amount-display"
     text: "250"
 - assertVisible: "Cilantro flat white"
-- takeScreenshot: 03-search-opens-record
+- takeScreenshot: 04-search-opens-record
