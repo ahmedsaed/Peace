@@ -1,0 +1,122 @@
+appId: com.ahmed.peace
+---
+# Reversing a transfer, and the links that let you get from either half to the
+# other.
+#
+# A reversal IS an ordinary transfer as far as every total is concerned — money
+# moving between your own accounts is neither earning nor spending, in both
+# directions — so nothing here asserts income or expense changing. What it
+# asserts is the DIRECTION and the two links, because a reversal that quietly
+# repeats the original transfer instead of undoing it looks completely ordinary
+# in the list and moves the money twice.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- move E£500 from Cash to Bank ---
+# Cash -> Bank is the default pair, so this needs no picker.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "type-transfer"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+- assertVisible: "Cash → Bank"
+
+# --- a transfer offers Reverse, and nothing that makes no sense on one ---
+- longPressOn: "Cash → Bank"
+- assertVisible:
+    id: "record-actions"
+- assertVisible:
+    id: "action-reverse"
+# A transfer has no category to net against and no reason to be copied.
+- assertNotVisible:
+    id: "action-refund"
+- assertNotVisible:
+    id: "action-duplicate"
+- takeScreenshot: 01-transfer-actions
+
+# --- reverse it ---
+- tapOn:
+    id: "action-reverse"
+- assertVisible:
+    id: "record-title"
+    text: "Reverse transfer"
+# The whole amount arrives filled in.
+- assertVisible:
+    id: "amount-display"
+    text: "500"
+- takeScreenshot: 02-reverse-prefilled
+- tapOn:
+    id: "record-save"
+
+# --- THE ENDS SWAPPED ---
+# The assertion the whole feature rests on. Inheriting the original's accounts
+# the way Duplicate does would repeat the transfer rather than undo it, and
+# "Cash → Bank" twice is not something anybody spots in a list.
+- assertVisible: "Bank → Cash · reversal"
+# Said twice, in the word and in the mark, for the reason the arrow is: a 10px
+# badge is not a signal anyone can rely on reading.
+- assertVisible:
+    id: "reversal-badge"
+- takeScreenshot: 03-reversed
+
+# --- the money is back where it started ---
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-total"
+    text: "E£0.00"
+- tapOn:
+    id: "tab-index"
+
+# --- from the reversal, back to what it reverses ---
+- longPressOn: "Bank → Cash · reversal"
+- assertVisible:
+    id: "link-reverses"
+# Named the way the list names it, so the sheet is not describing the record in
+# a dialect of its own.
+- assertVisible: "Reverses Cash → Bank"
+# Reversing a reversal re-creates the original transfer. Nobody means that from
+# a menu.
+- assertNotVisible:
+    id: "action-reverse"
+- takeScreenshot: 04-reversal-actions
+- back
+
+# --- and from the original, forward to the reversal ---
+- longPressOn: "Cash → Bank"
+- assertVisible:
+    id: "link-reversed-by"
+# How much actually came back, not merely that some did.
+- assertVisible: "Reversed · E£500.00 of E£500.00"
+# Reversing the same transfer twice moves the money back twice, and both
+# transfers look entirely ordinary afterwards.
+- assertNotVisible:
+    id: "action-reverse"
+- takeScreenshot: 05-original-actions
+
+# Tapping the link opens the record it names.
+- tapOn:
+    id: "link-undone-0"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "record-title"
+    text: "Edit record"
+- assertVisible:
+    id: "amount-display"
+    text: "500"
+- takeScreenshot: 06-opened-from-link

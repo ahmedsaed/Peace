@@ -3,7 +3,39 @@ import { Modal, Pressable, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import type { RecordRow } from '@/db/repo/records';
-import { useMoney } from '@/state/money';
+import type { ReversalLink } from '@/db/repo/reversal';
+import { canDuplicate, canRefund, canReverse } from '@/lib/record-actions';
+import { useMoney, type Money } from '@/state/money';
+
+/**
+ * Everything this sheet knows about how the row relates to others.
+ *
+ * Resolved by the screen when the sheet opens, not carried on every row in the
+ * list: it is two indexed lookups on one id, paid once per long press, where
+ * folding them into the list query would pay for them on every row of every
+ * month whether or not anybody ever asks.
+ */
+export type ReversalContext = {
+  /** What this row exists to undo, or null when it undoes nothing. */
+  reverses: ReversalLink | null;
+  /**
+   * True when this row DOES undo something whose record has since been deleted.
+   *
+   * Distinct from `reverses: null`, because the sheet has different things to
+   * say: "nothing to show" is silence, "the record it reversed is gone" is
+   * worth a line — otherwise a refund that used to link somewhere silently
+   * stops, and it looks like the link never existed.
+   */
+  danglingSource: boolean;
+  /** What undoes this row: its refunds, or the transfer that reversed it. */
+  reversedBy: { links: ReversalLink[]; count: number; totalMinor: number };
+};
+
+const NOTHING: ReversalContext = {
+  reverses: null,
+  danglingSource: false,
+  reversedBy: { links: [], count: 0, totalMinor: 0 },
+};
 
 /**
  * What a long press on a record offers.
@@ -12,50 +44,39 @@ import { useMoney } from '@/state/money';
  * record to change it in order to remove it — and put a destructive action in
  * the same place as the save button.
  *
- * Refund starts from the record it reverses, which is the whole reason it is
- * here rather than a fourth type on the record screen: the refund inherits the
- * account and the category of the purchase, so it CANNOT be filed against the
- * wrong one. Picking a category by hand is exactly how a return ends up
- * reducing Groceries because that is what was on screen.
+ * Refund and Reverse both start FROM the record they undo, which is the whole
+ * reason they are here rather than types on the record screen: each inherits
+ * what it cannot be allowed to get wrong. A refund inherits the account and
+ * category of the purchase, so it cannot net against the wrong one; a reversal
+ * inherits the two accounts and swaps them, so it cannot send the money
+ * somewhere it never came from. Both mistakes look completely ordinary in the
+ * list afterwards.
+ *
+ * The rules for which of them appear are in `lib/record-actions.ts`, not here:
+ * they overlap, and a rule spelled out at each call site is a rule that gets
+ * forgotten at one of them.
  */
 export function RecordActions({
   row,
+  context = NOTHING,
   onClose,
   onRefund,
+  onReverse,
   onDuplicate,
   onDelete,
+  onOpen,
 }: {
   row: RecordRow | null;
+  context?: ReversalContext;
   onClose: () => void;
-  onRefund: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
+  onRefund: (row: RecordRow) => void;
+  onReverse: (row: RecordRow) => void;
+  onDuplicate: (row: RecordRow) => void;
+  onDelete: (row: RecordRow) => void;
+  /** Open one of the linked records. */
+  onOpen: (id: string) => void;
 }) {
   const money = useMoney();
-  const ordinary = !!row && !row.isTransfer && !row.isAdjustment;
-
-  /**
-   * Only spending can be refunded.
-   *
-   * A transfer has no category to net against, a correction is not a purchase,
-   * income coming back is simply an expense, and a refund of a refund is not a
-   * thing. Each of those would be a menu item that does nothing sensible.
-   */
-  const refundable = ordinary && !row.isRefund && row.amountMinor < 0;
-
-  /**
-   * Duplicate is for ordinary records only.
-   *
-   * NOT a refund: the case it appears to serve — three people settling a shared
-   * dinner separately — is served better by refunding the ORIGINAL purchase
-   * three times, so each refund derives from the thing it reverses. Copying a
-   * refund detaches it from that for no gain and makes double-refunding a
-   * one-tap mistake.
-   *
-   * NOT a correction: reconciling twice by the same amount is not a thing you
-   * ever want; you reconcile again against the real balance instead.
-   */
-  const duplicable = ordinary && !row.isRefund;
 
   return (
     <Modal visible={row !== null} transparent animationType="slide" onRequestClose={onClose}>
@@ -65,53 +86,206 @@ export function RecordActions({
         className="rounded-t-2xl border-t border-line bg-ground pb-8"
         style={{ elevation: 16 }}
         testID="record-actions">
+        {/* Rendered from a NON-NULL row handed down, never from `row!` inside a
+            handler: the sheet is closed almost all of the time, and an assertion
+            in a closure over state is how a screen typechecks clean and crashes
+            on first open. */}
         {row ? (
-          <>
-            <View className="border-b border-line px-5 py-4">
-              <Text className="text-base font-semibold text-ink" numberOfLines={1}>
-                {row.isTransfer
-                  ? 'Transfer'
-                  : row.isAdjustment
-                    ? 'Balance correction'
-                    : (row.categoryName ?? 'Uncategorised')}
-              </Text>
-              <Text className="text-xs text-muted" numberOfLines={1}>
-                {row.accountName} · {money(Math.abs(row.amountMinor), row.currency)}
-              </Text>
-            </View>
-
-            {refundable ? (
-              <Action
-                icon="refresh"
-                label="Refund"
-                hint="Money coming back — nets against this category"
-                onPress={onRefund}
-                testID="action-refund"
-              />
-            ) : null}
-
-            {duplicable ? (
-              <Action
-                icon="records"
-                label="Duplicate"
-                hint="Same again, dated today"
-                onPress={onDuplicate}
-                testID="action-duplicate"
-              />
-            ) : null}
-
-            <Action
-              icon="dots"
-              label="Delete"
-              hint="Undo is offered straight after"
-              onPress={onDelete}
-              testID="action-delete"
-              danger
-            />
-          </>
+          <Body
+            row={row}
+            context={context}
+            money={money}
+            onRefund={onRefund}
+            onReverse={onReverse}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+            onOpen={onOpen}
+          />
         ) : null}
       </View>
     </Modal>
+  );
+}
+
+function Body({
+  row,
+  context,
+  money,
+  onRefund,
+  onReverse,
+  onDuplicate,
+  onDelete,
+  onOpen,
+}: {
+  row: RecordRow;
+  context: ReversalContext;
+  money: Money;
+  onRefund: (row: RecordRow) => void;
+  onReverse: (row: RecordRow) => void;
+  onDuplicate: (row: RecordRow) => void;
+  onDelete: (row: RecordRow) => void;
+  onOpen: (id: string) => void;
+}) {
+  const subject = {
+    isTransfer: row.isTransfer,
+    isAdjustment: row.isAdjustment,
+    isRefund: row.isRefund,
+    amountMinor: row.amountMinor,
+    reversesId: row.reversesId,
+    reversedByCount: context.reversedBy.count,
+  };
+
+  const { links, count, totalMinor } = context.reversedBy;
+  // A local const, so the JSX below narrows it instead of asserting it.
+  const reverses = context.reverses;
+  const undoneWord = row.isTransfer ? 'Reversed' : 'Refunded';
+
+  return (
+    <>
+      <View className="border-b border-line px-5 py-4">
+        <Text className="text-base font-semibold text-ink" numberOfLines={1}>
+          {row.isTransfer
+            ? 'Transfer'
+            : row.isAdjustment
+              ? 'Balance correction'
+              : (row.categoryName ?? 'Uncategorised')}
+        </Text>
+        <Text className="text-xs text-muted" numberOfLines={1}>
+          {row.accountName} · {money(Math.abs(row.amountMinor), row.currency)}
+        </Text>
+      </View>
+
+      {/* WHAT THIS ROW UNDOES, and what undoes it.
+          Above the actions, because they describe the record you are looking at
+          rather than something to do to it — and because the first question a
+          refund raises is "of what?", which used to have no answer anywhere in
+          the app. */}
+      {reverses ? (
+        <Link
+          label={`${row.isTransfer ? 'Reverses' : 'Refunds'} ${reverses.label}`}
+          detail={`${money(Math.abs(reverses.amountMinor), reverses.currency)} · ${dayOf(reverses.occurredAt)}`}
+          onPress={() => onOpen(reverses.id)}
+          testID="link-reverses"
+        />
+      ) : context.danglingSource ? (
+        // Said rather than hidden: a link that quietly disappears looks like it
+        // was never there. Delete is undoable, so this can come back.
+        <View className="border-b border-line px-5 py-3" testID="link-deleted">
+          <Text className="text-xs text-muted">
+            The record this {row.isTransfer ? 'reversed' : 'refunded'} has been deleted
+          </Text>
+        </View>
+      ) : null}
+
+      {count > 0 ? (
+        <View className="border-b border-line" testID="link-reversed-by">
+          <Text className="px-5 pb-1 pt-3 text-[10px] uppercase tracking-widest text-muted">
+            {/* The AMOUNT that came back, not just that some did. "Refunded"
+                on an E£800 purchase says nothing about whether E£50 or all of
+                it returned, and the difference is the entire question. */}
+            {undoneWord} · {money(Math.abs(totalMinor), row.currency)} of{' '}
+            {money(Math.abs(row.amountMinor), row.currency)}
+          </Text>
+          {links.map((link, index) => (
+            <Link
+              key={link.id}
+              label={link.label}
+              detail={`${money(Math.abs(link.amountMinor), link.currency)} · ${dayOf(link.occurredAt)}`}
+              onPress={() => onOpen(link.id)}
+              // By POSITION, not by id: a flow cannot predict a UUID, and the
+              // list is ordered newest first so index 0 is a stable target.
+              testID={`link-undone-${index}`}
+            />
+          ))}
+          {count > links.length ? (
+            <Text className="px-5 pb-3 pt-1 text-xs text-muted">
+              +{count - links.length} more
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {canRefund(subject) ? (
+        <Action
+          icon="refresh"
+          label="Refund"
+          hint="Money coming back — nets against this category"
+          onPress={() => onRefund(row)}
+          testID="action-refund"
+        />
+      ) : null}
+
+      {canReverse(subject) ? (
+        <Action
+          icon="transfer"
+          label="Reverse"
+          hint="Send it back the other way"
+          onPress={() => onReverse(row)}
+          testID="action-reverse"
+        />
+      ) : null}
+
+      {canDuplicate(subject) ? (
+        <Action
+          icon="records"
+          label="Duplicate"
+          hint="Same again, dated today"
+          onPress={() => onDuplicate(row)}
+          testID="action-duplicate"
+        />
+      ) : null}
+
+      <Action
+        icon="dots"
+        label="Delete"
+        hint="Undo is offered straight after"
+        onPress={() => onDelete(row)}
+        testID="action-delete"
+        danger
+      />
+    </>
+  );
+}
+
+/**
+ * Short and local, never through `Intl`'s month names.
+ *
+ * Android ships different ICU data from Node — September shortens to "Sept",
+ * not "Sep" — so anything formatted this way has to be seen on a device before
+ * a test can assert it. A numeric day and month has no such disagreement.
+ */
+function dayOf(date: Date): string {
+  return `${date.getDate()}/${date.getMonth() + 1}`;
+}
+
+function Link({
+  label,
+  detail,
+  onPress,
+  testID,
+}: {
+  label: string;
+  detail: string;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}, ${detail}`}
+      className="flex-row items-center gap-3 border-b border-line px-5 py-3 active:bg-surface">
+      <View className="flex-1">
+        <Text className="text-sm text-ink" numberOfLines={1}>
+          {label}
+        </Text>
+        <Text className="text-xs text-muted" numberOfLines={1}>
+          {detail}
+        </Text>
+      </View>
+      <Icon name="chevron" size={12} color={palette.muted} />
+    </Pressable>
   );
 }
 

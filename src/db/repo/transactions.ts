@@ -44,6 +44,16 @@ export type RecordInput = {
   note?: string | null;
   occurredAt?: Date;
   id?: string;
+  /**
+   * The record this one UNDOES — the purchase a refund hands back, or the
+   * outgoing leg of the transfer a reversal cancels.
+   *
+   * Provenance only. Nothing about the amounts or the totals depends on it, so
+   * a pointer at a record that has since been deleted is harmless and simply
+   * resolves to nothing. See the column comment in schema.ts for why it is not
+   * a foreign key.
+   */
+  reversesId?: string | null;
 };
 
 export type TransferInput = {
@@ -63,6 +73,16 @@ export type TransferInput = {
   recurringRuleId?: string | null;
   note?: string | null;
   occurredAt?: Date;
+  /**
+   * The record this one UNDOES — the purchase a refund hands back, or the
+   * outgoing leg of the transfer a reversal cancels.
+   *
+   * Provenance only. Nothing about the amounts or the totals depends on it, so
+   * a pointer at a record that has since been deleted is harmless and simply
+   * resolves to nothing. See the column comment in schema.ts for why it is not
+   * a foreign key.
+   */
+  reversesId?: string | null;
 };
 
 function assertAmount(amountMinor: number): void {
@@ -129,6 +149,7 @@ export function createRecord(db: Db, input: RecordInput): Transaction {
       note: input.note ?? null,
       occurredAt: input.occurredAt ?? new Date(),
       recurringRuleId: input.recurringRuleId ?? null,
+      reversesId: input.reversesId ?? null,
     })
     .run();
 
@@ -178,6 +199,11 @@ export function createTransfer(db: Db, input: TransferInput): { out: Transaction
           counterAccountId: input.toAccountId,
           amountMinor: -input.amountMinor,
           ...homeAmount(-input.amountMinor, currency, input.homeCurrency, fxRate),
+          // THE OUTGOING LEG ONLY. Both legs exist, but every list renders the
+          // negative one and every id a screen holds is that leg's — so writing
+          // the pointer on both would make "what reverses this transfer?"
+          // answer with the same transfer twice.
+          reversesId: input.reversesId ?? null,
         },
         {
           ...shared,
@@ -326,6 +352,20 @@ export function updateTransfer(
     updatedAt: new Date(),
   };
 
+  /**
+   * A REVERSAL IS ITS DIRECTION, so redirecting one stops it being that.
+   *
+   * The claim is not harmless if it goes stale: it marks the ORIGINAL transfer
+   * as undone and takes its Reverse action away, while this money now moves
+   * between two accounts that have nothing to do with it. Cleared here rather
+   * than re-checked, because a transfer cannot BECOME a reversal by being
+   * edited into the mirror of one by coincidence.
+   *
+   * The amount is deliberately not part of this — sending part of it back is a
+   * real reversal of part, and the sheet reports how much actually went.
+   */
+  const redirected = from !== outLeg.accountId || to !== inLeg.accountId;
+
   db.transaction((tx) => {
     tx.update(transactions)
       .set({
@@ -334,6 +374,7 @@ export function updateTransfer(
         counterAccountId: to,
         amountMinor: -unsigned,
         ...homeAmount(-unsigned, currencyNew, patch.homeCurrency, fxRateNew),
+        ...(redirected ? { reversesId: null } : {}),
       })
       .where(eq(transactions.id, outLeg.id))
       .run();

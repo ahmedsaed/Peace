@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, SectionList, Text, View } from 'react-native';
 
 import { BankActions, BankRow } from '@/components/bank-row';
@@ -11,7 +11,7 @@ import {
   upcomingProposals,
   type Proposal,
 } from '@/db/repo/recurring';
-import { RecordActions } from '@/components/record-actions';
+import { RecordActions, type ReversalContext } from '@/components/record-actions';
 import { RecordRow } from '@/components/record-row';
 import { Snackbar } from '@/components/snackbar';
 import { EmptyState, Fab, MonthHeader, Screen, SummaryTrio } from '@/components/screen';
@@ -25,6 +25,7 @@ import {
   type RecordRow as Row,
 } from '@/db/repo/records';
 import { broughtForward, type BroughtForward } from '@/db/repo/carry';
+import { linkById, reversedBy } from '@/db/repo/reversal';
 import { dismissCapture, markSaved } from '@/db/repo/bank-captures';
 import type { BankCapture } from '@/db/schema';
 import { createRecord, deleteRecord, restoreRecords } from '@/db/repo/transactions';
@@ -75,6 +76,28 @@ export default function RecordsScreen() {
   // the bottom of the edit form it meant opening a record to change it in order
   // to remove it, with a destructive action next to Save.
   const [acting, setActing] = useState<Row | null>(null);
+  /**
+   * How the long-pressed row relates to others — what it undoes, and what
+   * undoes it.
+   *
+   * Resolved HERE rather than carried on every row of the list: two indexed
+   * lookups on one id, paid once when the sheet opens. Folding them into the
+   * list query would pay for them on every row of every month to answer a
+   * question almost nobody asks of almost any row.
+   */
+  const actingLinks: ReversalContext | undefined = useMemo(() => {
+    if (!acting) return undefined;
+    // `reversesId` is a bare column by design, so it can name a record that has
+    // been deleted — and delete is undoable, so this resolves again if the
+    // original comes back. Looked up ONCE: the two fields are two readings of
+    // the same answer.
+    const source = acting.reversesId ? linkById(db, acting.reversesId) : null;
+    return {
+      reverses: source,
+      danglingSource: !!acting.reversesId && !source,
+      reversedBy: reversedBy(db, acting.id),
+    };
+  }, [acting]);
   /**
    * Records that rules say are owed but which do not exist yet.
    *
@@ -426,19 +449,31 @@ export default function RecordsScreen() {
 
       <RecordActions
         row={acting}
+        context={actingLinks}
         onClose={() => setActing(null)}
-        onRefund={() => {
+        onRefund={(row) => {
           // Starts from the record being reversed, so the refund inherits its
           // account and category and cannot be filed against the wrong one.
-          router.push({ pathname: '/record', params: { refundOf: acting!.id } });
+          router.push({ pathname: '/record', params: { refundOf: row.id } });
           setActing(null);
         }}
-        onDuplicate={() => {
-          router.push({ pathname: '/record', params: { copyOf: acting!.id } });
+        onReverse={(row) => {
+          // Same reasoning, one step further: the reversal inherits BOTH
+          // accounts and swaps them, so it cannot send the money back to an
+          // account it never came from.
+          router.push({ pathname: '/record', params: { reverseOf: row.id } });
           setActing(null);
         }}
-        onDelete={() => {
-          const removed = deleteRecord(db, acting!.id);
+        onOpen={(id) => {
+          router.push({ pathname: '/record', params: { id } });
+          setActing(null);
+        }}
+        onDuplicate={(row) => {
+          router.push({ pathname: '/record', params: { copyOf: row.id } });
+          setActing(null);
+        }}
+        onDelete={(row) => {
+          const removed = deleteRecord(db, row.id);
           offerUndo(removed, removed.length > 1 ? 'Transfer deleted' : 'Record deleted');
           setActing(null);
           refresh();

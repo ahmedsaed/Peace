@@ -20,6 +20,16 @@ export type RecordRow = {
   /** Money coming back on the expense side. */
   isRefund: boolean;
   /**
+   * The record this one exists to UNDO — the purchase a refund hands back, or
+   * the transfer a reversal cancels. Null for almost every row.
+   *
+   * On the shared type so the list can badge a reversal without a second query
+   * and so search carries it too. The pointer may name a record that has since
+   * been deleted; see the column comment in schema.ts for why that is
+   * deliberate.
+   */
+  reversesId: string | null;
+  /**
    * What was HANDED OVER, when that differs from what moved the account.
    *
    * A purchase abroad settles in the card's currency, so `amountMinor` is the
@@ -111,6 +121,7 @@ export function listRecordsForPeriod(
       transferPairId: transactions.transferPairId,
       isAdjustment: transactions.isAdjustment,
       isRefund: transactions.isRefund,
+      reversesId: transactions.reversesId,
       originalAmountMinor: transactions.originalAmountMinor,
       originalCurrency: transactions.originalCurrency,
       categoryName: categories.name,
