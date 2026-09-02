@@ -30,13 +30,16 @@ fi
 DEST=docs/screenshots
 mkdir -p "$DEST"
 
-echo "running the demo flow (this seeds a ledger and takes ~5 minutes)..."
+echo "running the demo flow (this seeds a ledger and takes ~10 minutes)..."
 maestro test scripts/demo-shots.yaml
 
 SRC=$(ls -td "$HOME"/.maestro/tests/*/demo-shots/takeScreenshot 2>/dev/null | head -1)
 [ -n "$SRC" ] || { echo "no screenshots produced — the flow must have failed early"; exit 1; }
 
-for name in records record budgets analysis search; do
+# The names README.md references. Changing one means editing both.
+SHOTS=(records record budgets analysis search accounts actions recurring portfolio)
+
+for name in "${SHOTS[@]}"; do
   if [ ! -f "$SRC/$name.png" ]; then
     echo "missing $name.png in $SRC" >&2
     exit 1
@@ -51,8 +54,7 @@ done
 if command -v magick >/dev/null 2>&1; then
   magick mogrify -resize 540x "$DEST"/*.png
 elif command -v convert >/dev/null 2>&1; then
-  convert -resize 540x "$DEST"/records.png "$DEST"/records.png
-  for name in record budgets analysis search; do
+  for name in "${SHOTS[@]}"; do
     convert -resize 540x "$DEST/$name.png" "$DEST/$name.png"
   done
 else
