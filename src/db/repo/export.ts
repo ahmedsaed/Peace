@@ -1,9 +1,9 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { alias, type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { decimalsFor, minorToMajor } from '../../lib/money';
 import * as schema from '../schema';
-import { accounts, categories, transactions } from '../schema';
+import { accounts, categories, tags, transactionTags, transactions } from '../schema';
 import { ledgerSide } from './predicates';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
@@ -41,6 +41,13 @@ export const CSV_HEADER = [
    * in the ledger; a file that drops it is a lossy copy of it.
    */
   'reverses_id',
+  /**
+   * Appended like the two above. Semicolon-separated because a tag cannot
+   * contain one — `cleanTagName` collapses whitespace and the picker takes a
+   * single name at a time — where a comma would collide with the CSV itself
+   * and a space would make "Holiday 2026" two tags on the way back in.
+   */
+  'tags',
 ] as const;
 
 /** Local date and time, split, because a spreadsheet sorts and filters them separately. */
@@ -83,6 +90,12 @@ export function exportRows(db: Db): string[][] {
       isAdjustment: transactions.isAdjustment,
       isRefund: transactions.isRefund,
       reversesId: transactions.reversesId,
+      tagNames: sql<string | null>`(
+        select group_concat(${tags.name}, ';') from ${transactionTags}
+        join ${tags} on ${tags.id} = ${transactionTags.tagId}
+        where ${transactionTags.transactionId} = ${transactions.id}
+        order by ${tags.normalised}
+      )`,
       accountName: accounts.name,
       counterAccountName: counter.name,
       categoryName: categories.name,
@@ -116,6 +129,7 @@ export function exportRows(db: Db): string[][] {
       row.id,
       row.isRefund ? '1' : '',
       row.reversesId ?? '',
+      row.tagNames ?? '',
     ];
   });
 }

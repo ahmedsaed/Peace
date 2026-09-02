@@ -38,6 +38,7 @@ import { listBudgets, setBudget } from './repo/budgets';
 import { createCardPurchase, withFeeRows } from './repo/card';
 import { broughtForward, totalHeld } from './repo/carry';
 import { reversedBy, reverses } from './repo/reversal';
+import { ensureTag, setRecordTags, tagBreakdown, tagsForRecord } from './repo/tags';
 import {
   createAssetClass,
   createHolding,
@@ -141,6 +142,13 @@ function buildLedger(db: Db) {
     reversesId: 'txn-jacket',
   });
 
+  // A label on two records in DIFFERENT categories — the thing a category
+  // cannot express, and the reason tags exist. It moves no total, which is why
+  // the snapshot has to name it.
+  const kitchen = ensureTag(db, 'Kitchen reno');
+  setRecordTags(db, 'txn-jacket', [kitchen.id]);
+  setRecordTags(db, 'txn-rome', [kitchen.id]);
+
   createTransfer(db, {
     fromAccountId: accountId('bank'),
     toAccountId: accountId('cash'),
@@ -227,6 +235,14 @@ function snapshot(db: Db) {
     reversal: {
       refunds: reverses(db, 'txn-jacket-refund')?.id,
       refundedBy: reversedBy(db, 'txn-jacket').links.map((l) => l.id),
+    },
+    // TWO TABLES, and a new table is copied by NOTHING unless it is listed in
+    // RESTORE_TABLES by hand. Tags move no figure above them either, so without
+    // this a restore could drop every label in the ledger and every other
+    // assertion in this file would still pass.
+    tags: {
+      onJacket: tagsForRecord(db, 'txn-jacket').map((t) => t.name),
+      breakdown: tagBreakdown(db, PERIOD, 'expense'),
     },
     portfolio: portfolioSnapshot(db),
     // Attachment rows travel in the database like any others; the FILES they
@@ -344,6 +360,19 @@ describe('a restored ledger still means the same thing', () => {
       // Losing `fee_for_id` would orphan the fee: deleting the purchase would
       // leave its commission behind as an unexplained expense.
       expect(withFeeRows(live.db, 'txn-rome').map((r) => r.id)).toContain('txn-rome-fee');
+    });
+
+    it('keeps the tags, which are two whole TABLES', () => {
+      // `copyFromBackup` picks up a new COLUMN on its own and a new TABLE not
+      // at all — it has to be named in RESTORE_TABLES. Tags move no figure, so
+      // every other assertion in this file would pass with the labels gone.
+      expect(tagsForRecord(live.db, 'txn-jacket').map((t) => t.name)).toEqual(['Kitchen reno']);
+      // The join too, not just the tag rows: half of it restored is a ledger
+      // full of labels attached to nothing.
+      const kitchen = tagBreakdown(live.db, PERIOD, 'expense').find(
+        (t) => t.name === 'Kitchen reno'
+      );
+      expect(kitchen?.recordCount).toBe(2);
     });
 
     it('keeps a refund pointing at the purchase it hands back', () => {

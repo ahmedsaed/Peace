@@ -49,6 +49,13 @@ export const RESTORE_TABLES = [
   'asset_classes',
   'holdings',
   'bank_captures',
+  // Tags before the join that points at them, per the parent-first rule above.
+  // Two TABLES, so two lines here: `copyFromBackup` picks up a new column on
+  // its own and a new table not at all, which is why restore-fidelity.test.ts
+  // asserts figures rather than columns — and why tags needed a case of their
+  // own there, since they move no figure at all.
+  'tags',
+  'transaction_tags',
 ] as const;
 
 export type RestoreTable = (typeof RESTORE_TABLES)[number];

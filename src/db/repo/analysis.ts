@@ -34,13 +34,22 @@ export function categoryBreakdown(
   db: Db,
   period: Period,
   kind: CategoryKind,
-  homeCurrency = 'EGP'
+  homeCurrency = 'EGP',
+  /**
+   * Narrow the whole breakdown to one tag.
+   *
+   * "Where did the kitchen money go" is the question a project raises, and it
+   * is a CATEGORY question asked of a subset — which is why it can still be a
+   * ring. See `tagBreakdown` for why the tags themselves cannot be one.
+   */
+  tagId: string | null = null
 ): Breakdown {
   const { byCategory, uncategorised, unvalued } = totalsByTopCategory(
     db,
     period,
     kind,
-    homeCurrency
+    homeCurrency,
+    tagId
   );
 
   const slices: Slice[] = [];

@@ -87,9 +87,10 @@ And it stays on your phone. That is the part most of the alternatives get wrong.
 
 **Making sense of it**
 - Records grouped by day, each day netted, with the month's expense, income and running position in the header
-- A category ring and a ranked breakdown of where the money went
+- A category ring and a ranked breakdown of where the money went — filterable by tag, so "where did the kitchen money go" is still a ring
 - Budgets per category, **suggested from what you actually spend** — no blank screen asking for nineteen numbers on day one
-- Free-text search across notes, categories and accounts, with filters and a total
+- **Tags** — the axis categories cannot be: many per record, crossing categories, and archivable when the project they name is over
+- Free-text search across notes, categories, accounts and tags, with filters and a total
 - Accounts, with balances derived from the ledger rather than stored
 - Balance corrections for when the bank disagrees — they move your position without ever counting as spending
 

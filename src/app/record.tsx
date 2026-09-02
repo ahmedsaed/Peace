@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AttachmentBar } from '@/components/attachments';
 import { AttachmentViewer } from '@/components/attachment-viewer';
 import { Icon } from '@/components/icon';
+import { TagChips, TagSheet } from '@/components/tag-sheet';
 import { Keypad, type KeyPress } from '@/components/keypad';
 import {
   attachFromCamera,
@@ -27,6 +28,14 @@ import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { InvariantError, listCategoryTree } from '@/db/repo/categories';
+import {
+  ensureTag,
+  listTags,
+  renameTag,
+  setRecordTags,
+  setTagArchived,
+  tagsForRecord,
+} from '@/db/repo/tags';
 import { describeRepeat, RepeatSheet, type Repeat } from '@/components/repeat-sheet';
 import { createRule, getRule, markHandled } from '@/db/repo/recurring';
 import { toYmd } from '@/lib/recurrence';
@@ -333,6 +342,20 @@ export default function RecordScreen() {
     id ? stagedFromRows(listAttachments(db, id)) : []
   );
   const [viewing, setViewing] = useState<StagedAttachment | null>(null);
+  /**
+   * The labels on this record.
+   *
+   * Inherited from the source the way the note and the category are: a refund,
+   * a reversal and a duplicate all belong to whatever the original belonged to,
+   * and re-picking the project by hand is exactly the re-typing these shortcuts
+   * exist to remove.
+   */
+  const [allTags, setAllTags] = useState(() => listTags(db));
+  const [tagIds, setTagIds] = useState<string[]>(() => {
+    const from = existing ?? source;
+    return from ? tagsForRecord(db, from.id).map((tag) => tag.id) : [];
+  });
+  const [tagSheet, setTagSheet] = useState(false);
   const [attaching, setAttaching] = useState(false);
   /** The receipt currently being read, so only its own badge spins. */
   const [readingFile, setReadingFile] = useState<string | null>(null);
@@ -924,6 +947,12 @@ export default function RecordScreen() {
        * leaving it on disk would keep it in every backup from then on — for a
        * photo no screen shows.
        */
+      // AFTER the record exists, for the same reason the attachments are: rows
+      // pointing at a transaction that failed to save would be rows about
+      // nothing. And on `savedId`, which for a transfer is the OUTGOING leg —
+      // tagging both would double every tag total silently.
+      setRecordTags(db, savedId, tagIds);
+
       const changed = syncAttachments(db, savedId, attached);
       if (changed.removed > 0) sweepOrphans();
 
@@ -1271,6 +1300,14 @@ export default function RecordScreen() {
                 style={{ minHeight: noteMinHeight }}
                 className="flex-1 p-0 text-base text-ink"
               />
+              {/* Inside the note's surface, with the attach buttons, because a
+                  label is a property of what was written rather than a field of
+                  its own — and because this is the one place on the screen with
+                  the height for a row that wraps. */}
+              <TagChips
+                names={allTags.filter((t) => tagIds.includes(t.id)).map((t) => t.name)}
+                onOpen={() => setTagSheet(true)}
+              />
               <AttachmentBar
                 attachments={attached}
                 onCamera={() => pick('camera')}
@@ -1546,6 +1583,42 @@ export default function RecordScreen() {
         }}
         onClose={() => setAbroadSheet(false)}
         testID="sheet-abroad"
+      />
+
+      <TagSheet
+        visible={tagSheet}
+        tags={allTags}
+        selectedIds={tagIds}
+        onToggle={(id) =>
+          setTagIds((current) =>
+            current.includes(id) ? current.filter((t) => t !== id) : [...current, id]
+          )
+        }
+        onCreate={(name) => {
+          // Created and selected in one action. A tag you made and then had to
+          // find in the list would be a picker asking you to confirm what you
+          // just typed.
+          const tag = ensureTag(db, name);
+          setAllTags(listTags(db));
+          setTagIds((current) => (current.includes(tag.id) ? current : [...current, tag.id]));
+        }}
+        onRename={(id, name) => {
+          try {
+            renameTag(db, id, name);
+            setAllTags(listTags(db));
+          } catch (err) {
+            setError(err instanceof InvariantError ? err.message : 'Could not rename that tag.');
+          }
+        }}
+        onArchive={(id) => {
+          setTagArchived(db, id, true);
+          setAllTags(listTags(db));
+          // Off the picker AND off this record: an archived tag the form still
+          // carries would be saved onto it while no longer being offerable,
+          // which is a state no screen could explain.
+          setTagIds((current) => current.filter((t) => t !== id));
+        }}
+        onClose={() => setTagSheet(false)}
       />
 
       <PickerSheet

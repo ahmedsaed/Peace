@@ -4,7 +4,7 @@ import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { periodBounds, type Period } from '../../lib/period';
 import { movesPosition, onExpenseSide, onIncomeSide } from './predicates';
 import * as schema from '../schema';
-import { categories, transactions } from '../schema';
+import { categories, transactionTags, transactions } from '../schema';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -38,7 +38,17 @@ export function totalsByTopCategory(
   db: Db,
   period: Period,
   kind: CategoryKind,
-  homeCurrency = 'EGP'
+  homeCurrency = 'EGP',
+  /**
+   * Narrow to records carrying this tag.
+   *
+   * WHAT MAKES A TAG SAFE ON THIS SCREEN. Tags overlap and most records carry
+   * none, so a ring OF tags cannot sum to 100 — but a ring of CATEGORIES
+   * within a tag can, because categories are still exclusive inside any subset
+   * of the ledger. Filtering rather than re-slicing is what keeps the chart
+   * and its legend honest.
+   */
+  tagId: string | null = null
 ): TopCategoryTotals {
   const { start, end } = periodBounds(period);
   const home = sql`${homeCurrency.toUpperCase()}`;
@@ -67,7 +77,15 @@ export function totalsByTopCategory(
         lt(transactions.occurredAt, end),
         // `direction` already excludes adjustments; this drops transfer legs.
         movesPosition(),
-        direction
+        direction,
+        // EXISTS rather than a join: a record can carry several tags, and
+        // joining would count it once per tag and inflate the very total this
+        // screen exists to state.
+        tagId
+          ? sql`exists (select 1 from ${transactionTags}
+                where ${transactionTags.transactionId} = ${transactions.id}
+                  and ${transactionTags.tagId} = ${tagId})`
+          : undefined
       )
     )
     .groupBy(sql`coalesce(${categories.parentId}, ${categories.id})`)

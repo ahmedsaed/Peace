@@ -12,12 +12,14 @@ import {
 
 import { Icon } from '@/components/icon';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
+import { TagSheet } from '@/components/tag-sheet';
 import { RecordRow } from '@/components/record-row';
 import { EmptyState, StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { listCategoryTree } from '@/db/repo/categories';
+import { listTags } from '@/db/repo/tags';
 import { groupByDay } from '@/db/repo/records';
 import { searchRecords, type SearchOutcome } from '@/db/repo/search';
 import {
@@ -58,6 +60,11 @@ export default function SearchScreen() {
   const [outcome, setOutcome] = useState<SearchOutcome | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [picking, setPicking] = useState<'account' | 'counter' | 'category' | null>(null);
+  const [tagSheet, setTagSheet] = useState(false);
+  // Archived tags included: a finished project is exactly the thing you go
+  // looking for afterwards, and hiding it here would make its records
+  // unfindable by the one label that groups them.
+  const tags = useMemo(() => listTags(db, { includeArchived: true }), []);
 
   const accounts = useMemo(() => listAccountsWithBalance(db), []);
   // Both kinds in one list: a search is not scoped to expense or income until
@@ -105,6 +112,7 @@ export default function SearchScreen() {
 
   const accountName = accounts.find((a) => a.id === query.accountId)?.name;
   const counterAccountName = accounts.find((a) => a.id === query.counterAccountId)?.name;
+  const tagNames = tags.filter((t) => query.tagIds.includes(t.id)).map((t) => t.name);
   const categoryName = categoryTree
     .flatMap((node) => [node, ...node.children])
     .find((c) => c.id === query.categoryId)?.name;
@@ -184,6 +192,8 @@ export default function SearchScreen() {
           counterAccountName={counterAccountName}
           categoryName={categoryName}
           onKind={(kind) => setQuery((q) => withKind(q, kind))}
+          tagNames={tagNames}
+          onPickTags={() => setTagSheet(true)}
           onPickAccount={() => setPicking('account')}
           onPickCounter={() => setPicking('counter')}
           onPickCategory={() => setPicking('category')}
@@ -261,6 +271,24 @@ export default function SearchScreen() {
         }}
         onClose={() => setPicking(null)}
         testID="counter-account-sheet"
+      />
+
+      {/* No create, no rename: this sheet is for FINDING by a label, and a
+          search screen that could rename a tag would be editing the ledger from
+          the one place built to read it. */}
+      <TagSheet
+        visible={tagSheet}
+        tags={tags}
+        selectedIds={query.tagIds}
+        onToggle={(id) =>
+          patch({
+            tagIds: query.tagIds.includes(id)
+              ? query.tagIds.filter((t) => t !== id)
+              : [...query.tagIds, id],
+          })
+        }
+        onClose={() => setTagSheet(false)}
+        testID="search-tag-sheet"
       />
 
       <PickerSheet
@@ -409,6 +437,8 @@ function FilterPanel({
   accountName,
   counterAccountName,
   categoryName,
+  tagNames,
+  onPickTags,
   onPickAccount,
   onPickCounter,
   onPickCategory,
@@ -422,6 +452,8 @@ function FilterPanel({
   accountName?: string;
   counterAccountName?: string;
   categoryName?: string;
+  tagNames: string[];
+  onPickTags: () => void;
   onPickAccount: () => void;
   onPickCounter: () => void;
   onPickCategory: () => void;
@@ -512,6 +544,15 @@ function FilterPanel({
               testID="filter-category"
             />
           )}
+          {/* Below the account and category rows, and shown for every type: a
+              label is orthogonal to the ledger side, so unlike the two above it
+              nothing about the type can make it meaningless. */}
+          <FilterRow
+            label="Tags"
+            value={tagNames.length > 0 ? tagNames.join(', ') : 'Any'}
+            onPress={onPickTags}
+            testID="filter-tags"
+          />
         </View>
 
         <View>

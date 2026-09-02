@@ -114,6 +114,21 @@ const CHROME_PATHS = {
    */,
   sparkle:
     'M13 2l1.9 5.6L20.5 9.5l-5.6 1.9L13 17l-1.9-5.6L5.5 9.5l5.6-1.9L13 2zM5.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6L2 17.5l2.6-.9L5.5 14z',
+  /**
+   * A TAG, and deliberately NOT the `tag` glyph in the category map below.
+   *
+   * That one is the 45-degree kite, and it is already the Categories tab icon
+   * — the two draw byte-identical paths. A label control wearing it would be
+   * indistinguishable from the tab for the feature it exists to be an
+   * ALTERNATIVE to, which is the one confusion tags cannot afford.
+   *
+   * So: horizontal, pointing right, with the eyelet punched by winding it the
+   * opposite way, the same trick `search` and `eye` use. The eyelet is the only
+   * thing separating this from a banner, and a hole is exactly what closes up
+   * at small sizes — rasterised at 18 and 20, which is where it is drawn.
+   */
+  label:
+    'M3 5h11l7 7-7 7H3V5zm4 5.3a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 1 1 0-3.4z',
 } as const;
 
 /**

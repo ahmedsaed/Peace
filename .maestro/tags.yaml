@@ -1,0 +1,238 @@
+appId: com.ahmed.peace
+---
+# Tags: the axis categories cannot be.
+#
+# The case the whole feature exists for is a project — one that ends. A
+# sub-category called "Kitchen reno" is in the picker and in the ring for ever;
+# the renovation is not. And a project crosses categories, which one exclusive
+# axis cannot express at all.
+#
+# So the assertions here are the CROSS-CATEGORY total and the filtered ring,
+# not that a chip appeared. A tag that attached to nothing, or that gathered
+# instead of narrowing, would still render chips and still look correct.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- E£1,200 of tiles under Home ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Home"
+    direction: DOWN
+- tapOn: "Home"
+- tapOn:
+    id: "record-note"
+- inputText: "Tiles"
+- hideKeyboard
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+
+# The tag is made from the record, where the rest of it is already being typed.
+- tapOn:
+    id: "record-tags"
+- assertVisible:
+    id: "tag-sheet"
+- tapOn:
+    id: "tag-input"
+- inputText: "Kitchen"
+# THE FIELD AND THE LIST BELOW IT, WITH THE KEYBOARD UP. A Modal is its own
+# window and does not resize the way the app's window does, so without lifting
+# the sheet by hand the entire list sits underneath the keyboard.
+- assertVisible:
+    id: "tag-create"
+- tapOn:
+    id: "tag-create"
+- hideKeyboard
+- tapOn:
+    id: "tag-done"
+# Selected as well as created. A tag you made and then had to find in the list
+# would be a picker asking you to confirm what you just typed.
+- assertVisible: "Kitchen"
+- takeScreenshot: 01-tagged
+- tapOn:
+    id: "record-save"
+
+# It shows in the ledger, marked so it does not read as more note.
+- assertVisible: "Cash · “Tiles” · #Kitchen"
+
+# --- E£300 of lunch under Food, same tag ---
+# A DIFFERENT category, which is the whole point: one exclusive axis cannot
+# answer "what did the kitchen cost".
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Restaurants"
+    direction: DOWN
+- tapOn: "Restaurants"
+- tapOn:
+    id: "record-note"
+- inputText: "Builders lunch"
+- hideKeyboard
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-tags"
+# The tag exists now, so it is picked rather than typed.
+- tapOn:
+    id: "tag-row-kitchen"
+- tapOn:
+    id: "tag-done"
+- tapOn:
+    id: "record-save"
+
+# --- one untagged record, so the tag has to actually narrow something ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Coffee"
+    direction: DOWN
+- tapOn: "Coffee"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£1,550.00"
+
+# ===========================================================================
+# Search — the lifetime total for the project
+# ===========================================================================
+- tapOn:
+    id: "nav-search"
+- tapOn:
+    id: "search-filters"
+- tapOn:
+    id: "filter-tags"
+- tapOn:
+    id: "tag-row-kitchen"
+- tapOn:
+    id: "tag-done"
+- hideKeyboard
+# TWO records across TWO categories, and E£1,500 — not E£1,550. This is the
+# assertion the feature exists for, and it fails if the tag attached to nothing,
+# if it matched everything, or if the total came from the rows on screen.
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- assertVisible:
+    id: "search-expense"
+    text: "-E£1,500.00"
+- assertVisible: "Home"
+- assertVisible: "Restaurants"
+- assertNotVisible: "Coffee"
+- takeScreenshot: 02-search-by-tag
+
+# Typing the name finds it too, without opening the filters at all.
+- tapOn:
+    id: "filter-clear"
+- tapOn:
+    id: "search-input"
+- inputText: "Kitchen"
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+# The keyboard first: Android's back closes the IME before it leaves a screen,
+# so without this the `back` is spent on the keyboard and the next tap looks
+# for a tab bar that is still two screens away.
+- hideKeyboard
+- back
+
+# ===========================================================================
+# Analysis — a list of tags, and a ring filtered by one
+# ===========================================================================
+- tapOn:
+    id: "tab-analysis"
+- assertVisible:
+    id: "analysis-total"
+    text: "E£1,550.00"
+- scrollUntilVisible:
+    element:
+      id: "analysis-tags"
+    direction: DOWN
+# Amounts, never percentages: tags overlap and most records carry none, so a
+# ring of them could not sum to 100.
+- assertVisible:
+    id: "analysis-tag-amount-Kitchen"
+    text: "E£1,500.00"
+- takeScreenshot: 03-analysis-tags
+
+# Tapping it filters the RING, which is the honest way to see a tag as a chart:
+# within a tag, categories are still exclusive and still add to 100%.
+- tapOn:
+    id: "analysis-tag-Kitchen"
+- scrollUntilVisible:
+    element:
+      id: "analysis-total"
+    direction: UP
+- assertVisible:
+    id: "analysis-total"
+    text: "E£1,500.00"
+# The ring says what it is showing. The row that set this is far below and
+# usually scrolled off, so without this the chart quietly means something
+# narrower than the header above it.
+- assertVisible:
+    id: "analysis-scope"
+    text: "Kitchen"
+- takeScreenshot: 04-analysis-filtered
+
+# ===========================================================================
+# The project ends — archive keeps the history and drops the offer
+# ===========================================================================
+- tapOn:
+    id: "tab-index"
+- tapOn: "Home"
+- tapOn:
+    id: "record-tags"
+- longPressOn:
+    id: "tag-row-kitchen"
+- assertVisible:
+    id: "tag-editing"
+- tapOn:
+    id: "tag-archive"
+# Off the picker...
+- assertVisible:
+    id: "tag-empty"
+- tapOn:
+    id: "tag-done"
+- tapOn:
+    id: "record-cancel"
+
+# ...and still on the records that were part of it. Deleting the tag instead
+# would rewrite history to say the spending was never part of anything.
+- assertVisible: "Cash · “Tiles” · #Kitchen"
+- tapOn:
+    id: "nav-search"
+- tapOn:
+    id: "search-input"
+- inputText: "Kitchen"
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- takeScreenshot: 05-archived-still-found
