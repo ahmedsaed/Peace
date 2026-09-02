@@ -74,6 +74,53 @@ appId: com.ahmed.peace
     text: "E£7,000.00"
 - takeScreenshot: 01-carry-this-month
 
+# --- WHERE THAT 7,000 CAME FROM ---
+# The cell is one number standing in for opening balances, every earlier month
+# and every account at once, and until this sheet existed nothing on any screen
+# said so. Two breakdowns, and the point is that BOTH add up to it: a single
+# column mixing brought-forward with account balances would double-count, since
+# the accounts already contain everything carried in.
+- tapOn:
+    id: "summary-explain"
+- assertVisible:
+    id: "position-sheet"
+- assertVisible:
+    id: "position-total"
+    text: "E£7,000.00"
+
+# Where it is. Both seeded accounts are listed, Bank included at zero — an
+# ACTIVE account at nothing is an answer, and a list whose rows come and go with
+# the data is one you cannot scan.
+- assertVisible:
+    id: "position-account-seed:acct:cash"
+- assertVisible:
+    id: "position-account-seed:acct:bank"
+- assertVisible:
+    id: "position-accounts-total"
+    text: "E£7,000.00"
+
+# How it got here. Nothing came before this month, so the whole figure is the
+# month's own 9,000 less 2,000 — and the expense line is SIGNED, because this
+# column is being added up in front of the user.
+- assertVisible:
+    id: "position-carry"
+    text: "E£0.00"
+- assertVisible:
+    id: "position-income"
+    text: "E£9,000.00"
+- assertVisible:
+    id: "position-expense"
+    text: "-E£2,000.00"
+- assertVisible:
+    id: "position-ledger-total"
+    text: "E£7,000.00"
+- takeScreenshot: 01b-position-breakdown
+
+- tapOn:
+    id: "position-close"
+- assertNotVisible:
+    id: "position-sheet"
+
 # --- next month opens on what this one left ---
 - tapOn:
     id: "month-next"
@@ -144,6 +191,22 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "summary-balance"
     text: "E£0.00"
+
+# The breakdown follows the cell. With carry-over off the figure is the month's
+# own net, so there is nothing carried into it — and the "Brought forward" row
+# is GONE rather than showing zero, because a zero row would invent a component
+# of a sum that has one fewer.
+- tapOn:
+    id: "summary-explain"
+- assertVisible:
+    id: "position-sheet"
+- assertNotVisible:
+    id: "position-carry"
+- assertVisible:
+    id: "position-ledger-total"
+    text: "E£0.00"
+- tapOn:
+    id: "position-close"
 
 # --- and back on again ---
 - tapOn:

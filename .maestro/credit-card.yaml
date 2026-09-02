@@ -150,6 +150,37 @@ appId: com.ahmed.peace
 - assertVisible: "Kenana · not counted as spending"
 - takeScreenshot: 04-correction-listed
 
+# --- and the breakdown behind the position says all of that again ---
+# The card is the case that separates a sum from a list of balances: its row is
+# NEGATIVE here, in a column being added up in front of the user, while the
+# Accounts screen shows the same money unsigned as "E£520.00 owed". The word
+# carries the sign there; the sign carries it here, because arithmetic with
+# unsigned magnitudes in it does not work.
+- tapOn:
+    id: "summary-explain"
+- assertVisible:
+    id: "position-total"
+    text: "-E£520.00"
+- assertVisible: "owed"
+- assertVisible:
+    id: "position-accounts-total"
+    text: "-E£520.00"
+# The correction has its OWN line, and only because there is one — a permanent
+# zero row would invite the question of what it is on every ledger where nobody
+# has ever made one.
+- assertVisible:
+    id: "position-adjustment"
+    text: "-E£20.00"
+- assertVisible:
+    id: "position-expense"
+    text: "-E£500.00"
+- assertVisible:
+    id: "position-ledger-total"
+    text: "-E£520.00"
+- takeScreenshot: 04b-position-with-card
+- tapOn:
+    id: "position-close"
+
 # --- paying the card fills in what it owes ---
 # Not a button: transferring into a card IS paying it, and the app already had
 # that. Only the amount was missing, which meant leaving the screen to look it

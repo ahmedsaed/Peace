@@ -198,6 +198,7 @@ export function SummaryTrio({
   balanceMinor,
   balanceLabel = 'Balance',
   balanceTestID = 'summary-balance',
+  onBalancePress,
 }: {
   expense: string;
   income: string;
@@ -216,6 +217,16 @@ export function SummaryTrio({
    */
   balanceLabel?: string;
   balanceTestID?: string;
+  /**
+   * Opens the breakdown behind the third cell.
+   *
+   * ONLY THE THIRD CELL is tappable, and that asymmetry is deliberate: expense
+   * and income are sums of the list directly underneath them, where this one
+   * number stands in for opening balances, every earlier month and every
+   * account at once. It is the only one of the three whose working is not
+   * already on screen.
+   */
+  onBalancePress?: () => void;
 }) {
   const cell = (label: string, value: string, tone: string, testID: string) => (
     <View className="flex-1 items-center">
@@ -226,6 +237,8 @@ export function SummaryTrio({
     </View>
   );
 
+  const balanceTone = balanceMinor < 0 ? 'text-expense' : 'text-income';
+
   return (
     <View className="mt-3 flex-row">
       {cell('Expense', expense, 'text-expense', 'summary-expense')}
@@ -233,11 +246,33 @@ export function SummaryTrio({
       {/* Takes its colour from its sign. Showing a month you overspent — or a
           position you are underwater on — in the income colour is exactly
           backwards. */}
-      {cell(
-        balanceLabel,
-        balance,
-        balanceMinor < 0 ? 'text-expense' : 'text-income',
-        balanceTestID
+      {onBalancePress ? (
+        <Pressable
+          className="flex-1 items-center active:opacity-60"
+          onPress={onBalancePress}
+          testID="summary-explain"
+          accessibilityRole="button"
+          // The figure is IN the label, because a screen reader announcing
+          // "Now, button" would give no reason to press it and no way to hear
+          // the number without doing so.
+          accessibilityLabel={`${balanceLabel} ${balance}. See how this is worked out`}>
+          <View className="mb-0.5 flex-row items-center gap-1">
+            <Text className="text-[10px] uppercase tracking-widest text-muted">
+              {balanceLabel}
+            </Text>
+            {/* 13px against a 10px label, and the label is the smaller of the
+                two on purpose: this glyph is a disc with the "i" PUNCHED out,
+                so its legibility is set by the gap. Rasterised at 10, 11, 12,
+                13 and 14 — below 13 the stem closes up and it reads as a plain
+                dot, which is an affordance nobody would press. */}
+            <Icon name="info" size={13} color={palette.muted} />
+          </View>
+          <Text className={`text-xs font-semibold ${balanceTone}`} testID={balanceTestID}>
+            {balance}
+          </Text>
+        </Pressable>
+      ) : (
+        cell(balanceLabel, balance, balanceTone, balanceTestID)
       )}
     </View>
   );
