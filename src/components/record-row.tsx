@@ -65,8 +65,18 @@ export function RecordRow({
       ? money(row.originalAmountMinor, row.originalCurrency)
       : null;
 
+  /**
+   * A transfer that exists to undo another one.
+   *
+   * Said TWICE, in the badge and in the subtitle, for the reason the transfer
+   * arrow is: a 10px mark is a signal nobody can rely on reading, and this one
+   * distinguishes a row from an ordinary transfer between the same two accounts
+   * going the same way — which is exactly what it looks like otherwise.
+   */
+  const isReversal = row.isTransfer && row.reversesId !== null;
+
   const subtitle = row.isTransfer
-    ? `${row.accountName} → ${row.counterAccountName ?? '—'}`
+    ? `${row.accountName} → ${row.counterAccountName ?? '—'}${isReversal ? ' · reversal' : ''}`
     : row.isRefund
       ? `${row.accountName} · refunded${row.note ? ` · “${row.note}”` : ''}`
       : row.isAdjustment
@@ -107,15 +117,20 @@ export function RecordRow({
          * Inside the tile, not overhanging it. A badge hung off the corner is
          * sliced by the list's own bounds, and this row has no padding to spare.
          */}
-        {row.isRefund ? (
+        {row.isRefund || isReversal ? (
           <View
-            testID="refund-badge"
-            accessibilityLabel="Refund"
+            testID={isReversal ? 'reversal-badge' : 'refund-badge'}
+            accessibilityLabel={isReversal ? 'Reversal' : 'Refund'}
             className="absolute -bottom-0.5 -right-0.5 h-[15px] w-[15px] items-center justify-center rounded-full border border-ground bg-raised">
             {/* An ARROW, not the circular-arrow glyph the correction rows use.
                 Rasterised at this size, `refresh` closes into a blob — a ring
                 needs ~14px and this has 10. A solid arrow survives it, and
-                "came back" is the more direct reading anyway. */}
+                "came back" is the more direct reading anyway.
+
+                The SAME mark for a refund and a reversal, deliberately: they
+                are one idea — this row undoes that one — and the two can never
+                appear on the same row, so a second glyph would be a second
+                thing to rasterise and learn for no distinction gained. */}
             <Icon name="back" size={10} color={palette.ink} />
           </View>
         ) : null}

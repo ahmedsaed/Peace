@@ -33,6 +33,14 @@ export const CSV_HEADER = [
    * the wrong place to lose the fact, so the fact goes here.
    */
   'is_refund',
+  /**
+   * Appended for the same reason, and it carries the same weight as
+   * `transfer_pair_id` beside it: without it a refund exports as an ordinary
+   * positive expense and a reversal as an ordinary transfer, and nothing in the
+   * file says which purchase or which transfer they undid. The relationship is
+   * in the ledger; a file that drops it is a lossy copy of it.
+   */
+  'reverses_id',
 ] as const;
 
 /** Local date and time, split, because a spreadsheet sorts and filters them separately. */
@@ -74,6 +82,7 @@ export function exportRows(db: Db): string[][] {
       transferPairId: transactions.transferPairId,
       isAdjustment: transactions.isAdjustment,
       isRefund: transactions.isRefund,
+      reversesId: transactions.reversesId,
       accountName: accounts.name,
       counterAccountName: counter.name,
       categoryName: categories.name,
@@ -106,6 +115,7 @@ export function exportRows(db: Db): string[][] {
       row.transferPairId ?? '',
       row.id,
       row.isRefund ? '1' : '',
+      row.reversesId ?? '',
     ];
   });
 }

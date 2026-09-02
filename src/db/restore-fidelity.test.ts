@@ -37,6 +37,7 @@ import { categoryBreakdown } from './repo/analysis';
 import { listBudgets, setBudget } from './repo/budgets';
 import { createCardPurchase, withFeeRows } from './repo/card';
 import { broughtForward, totalHeld } from './repo/carry';
+import { reversedBy, reverses } from './repo/reversal';
 import {
   createAssetClass,
   createHolding,
@@ -135,6 +136,9 @@ function buildLedger(db: Db) {
     amountMinor: 300_00,
     currency: 'EGP',
     occurredAt: new Date('2026-08-09T12:00:00'),
+    // Which purchase it hands back. Pure provenance — it moves no total, which
+    // is exactly why the snapshot has to name it explicitly.
+    reversesId: 'txn-jacket',
   });
 
   createTransfer(db, {
@@ -216,6 +220,14 @@ function snapshot(db: Db) {
     feeRowsForPurchase: withFeeRows(db, 'txn-rome')
       .map((r) => r.id)
       .sort(),
+    // WHAT UNDOES WHAT. `reverses_id` reaches no total either, so losing it in
+    // a restore would be invisible to every figure above — and the refund would
+    // silently stop naming the purchase it handed back, on the one day a backup
+    // is being used at all.
+    reversal: {
+      refunds: reverses(db, 'txn-jacket-refund')?.id,
+      refundedBy: reversedBy(db, 'txn-jacket').links.map((l) => l.id),
+    },
     portfolio: portfolioSnapshot(db),
     // Attachment rows travel in the database like any others; the FILES they
     // name travel in the container, which the round-trip test below proves.
@@ -332,6 +344,17 @@ describe('a restored ledger still means the same thing', () => {
       // Losing `fee_for_id` would orphan the fee: deleting the purchase would
       // leave its commission behind as an unexplained expense.
       expect(withFeeRows(live.db, 'txn-rome').map((r) => r.id)).toContain('txn-rome-fee');
+    });
+
+    it('keeps a refund pointing at the purchase it hands back', () => {
+      // Losing `reverses_id` moves no total, so nothing else in this file would
+      // notice — the refund would simply stop naming what it refunded, and the
+      // purchase would stop knowing anything came back. On the one day a backup
+      // is being used at all.
+      expect(reverses(live.db, 'txn-jacket-refund')?.id).toBe('txn-jacket');
+      expect(reversedBy(live.db, 'txn-jacket').links.map((l) => l.id)).toEqual([
+        'txn-jacket-refund',
+      ]);
     });
 
     it('keeps what a foreign purchase was originally in', () => {

@@ -183,6 +183,7 @@ export function searchRecords(
       transferPairId: transactions.transferPairId,
       isAdjustment: transactions.isAdjustment,
       isRefund: transactions.isRefund,
+      reversesId: transactions.reversesId,
       originalAmountMinor: transactions.originalAmountMinor,
       originalCurrency: transactions.originalCurrency,
       categoryName: categories.name,

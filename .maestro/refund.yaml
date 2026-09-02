@@ -85,6 +85,39 @@ appId: com.ahmed.peace
     id: "refund-badge"
 - takeScreenshot: 03-refunded
 
+# --- "a refund of WHAT?" ---
+# The first question a refund raises, and until now the app had no answer to it
+# anywhere: the row was marked as a refund and pointed at nothing. The purchase
+# id was known the whole time — the screen was opened from it — and thrown away
+# on save.
+- longPressOn: ".*refunded.*"
+- assertVisible:
+    id: "link-reverses"
+- assertVisible: "Refunds Clothing"
+- back
+
+# ...and the other way round, from the purchase to what came back.
+#
+# Matched on the purchase's own subtitle, which for a record with no note is
+# bare the account name — "Cash", the seeded default, NOT the first account a
+# reader would think of. The refund's subtitle reads "Cash · refunded", and
+# Maestro matches WHOLE text, so this addresses exactly one of the two rows.
+- longPressOn: "Cash"
+- assertVisible:
+    id: "link-reversed-by"
+# How much came back, not merely that some did — on an E£800 purchase the
+# difference between E£50 and all of it is the entire question.
+- assertVisible: "Refunded · E£800.00 of E£800.00"
+- tapOn:
+    id: "link-undone-0"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "amount-display"
+    text: "800"
+- takeScreenshot: 04-refund-links
+- back
+
 # --- the category chart agrees ---
 - tapOn:
     id: "tab-analysis"
@@ -138,7 +171,7 @@ appId: com.ahmed.peace
     id: "action-duplicate"
 - assertVisible:
     id: "action-delete"
-- takeScreenshot: 04-refund-actions
+- takeScreenshot: 05-refund-actions
 - back
 
 # --- duplicating an ordinary record does work ---
@@ -177,4 +210,4 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "summary-income"
     text: "E£0.00"
-- takeScreenshot: 05-duplicated
+- takeScreenshot: 06-duplicated

@@ -74,7 +74,8 @@ export default function RecordScreen() {
   const money = useMoney();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, refundOf, copyOf, fromRule, dueOn, capture, fromCapture } = useLocalSearchParams<{
+  const { id, refundOf, reverseOf, copyOf, fromRule, dueOn, capture, fromCapture } =
+    useLocalSearchParams<{
     id?: string;
     /**
      * Opened by holding the + button: photograph a receipt, then read it.
@@ -86,6 +87,15 @@ export default function RecordScreen() {
     capture?: string;
     /** Reverse this record: same account and category, marked a refund. */
     refundOf?: string;
+    /**
+     * Undo this TRANSFER: the same amount sent back the other way.
+     *
+     * The two accounts are swapped rather than picked, which is the whole
+     * reason this is an action on the record rather than a fourth type on the
+     * form — a reversal chosen by hand can point at the wrong account, and it
+     * is money moving, so nothing about the row would look wrong afterwards.
+     */
+    reverseOf?: string;
     /** Same again, dated today. */
     copyOf?: string;
     /**
@@ -125,9 +135,25 @@ export default function RecordScreen() {
    * whichever category happened to be on screen.
    */
   const source = useMemo(
-    () => (refundOf ? getRecord(db, refundOf) : copyOf ? getRecord(db, copyOf) : undefined),
-    [refundOf, copyOf]
+    () =>
+      refundOf
+        ? getRecord(db, refundOf)
+        : reverseOf
+          ? getRecord(db, reverseOf)
+          : copyOf
+            ? getRecord(db, copyOf)
+            : undefined,
+    [refundOf, reverseOf, copyOf]
   );
+
+  /**
+   * REVERSING A TRANSFER SWAPS ITS ENDS, and only a transfer has ends to swap.
+   *
+   * Guarded on the source actually being one: the id arrives as a URL
+   * parameter, and a screen opened with a stale or hand-typed one would
+   * otherwise present an ordinary record as a transfer to nowhere.
+   */
+  const reversalSource = reverseOf && source?.transferPairId ? source : null;
 
   /**
    * The rule a due row came from.
@@ -187,6 +213,11 @@ export default function RecordScreen() {
     // currency follows the account, so getting this right is what stops a
     // foreign-card purchase being entered in the home currency.
     if (bankMessage?.matchedAccountId) return bankMessage.matchedAccountId;
+    // THE ENDS SWAP. A reversal sends the money back, so it leaves the account
+    // the original arrived in. Inheriting `source.accountId` the way a copy
+    // does would repeat the transfer rather than undo it — and the two look
+    // identical in the list, so the mistake is invisible after the fact.
+    if (reversalSource) return reversalSource.counterAccountId ?? reversalSource.accountId;
     if (source) return source.accountId;
     if (!existing) {
       // The setting is only a preference, never a guarantee: an account can be
@@ -213,11 +244,32 @@ export default function RecordScreen() {
       const cash = accounts.find((a) => a.type === 'cash' && a.id !== bankMessage.matchedAccountId);
       if (cash) return cash.id;
     }
+    // The other half of the swap above.
+    if (reversalSource) return reversalSource.accountId;
     const from = existing ?? source;
     if (!from) return accounts[1]?.id ?? null;
     if (from.transferPairId && from.amountMinor > 0) return from.accountId;
     return from.counterAccountId ?? accounts[1]?.id ?? null;
   });
+
+  /**
+   * Still the transfer this set out to undo?
+   *
+   * The account pickers stay live — this is the ordinary record screen, and
+   * locking two of its fields would be a worse screen for the sake of one
+   * claim. So the claim is checked instead: change either end and the row saves
+   * as an ordinary transfer, because "reverses that one" would then be false,
+   * and a false one is not harmless — it marks the ORIGINAL as undone and takes
+   * its Reverse action away while the money sits somewhere else entirely.
+   *
+   * The AMOUNT is deliberately not checked. Sending part of it back is a real
+   * reversal of part, and the sheet reports how much actually went back rather
+   * than assuming all of it did.
+   */
+  const stillReverses =
+    !!reversalSource &&
+    accountId === (reversalSource.counterAccountId ?? reversalSource.accountId) &&
+    toAccountId === reversalSource.accountId;
 
   const [categoryId, setCategoryId] = useState<string | null>(
     rule?.categoryId ??
@@ -816,6 +868,10 @@ export default function RecordScreen() {
           homeCurrency,
           note: note.trim() || null,
           occurredAt,
+          // Only when the ends are still the ones this reverses. The pickers
+          // stay live, so a reversal whose accounts have been changed by hand
+          // is an ordinary transfer and must not claim to undo anything.
+          reversesId: reversalSource && stillReverses ? reversalSource.id : null,
         });
         // The leg money LEAVES on. A transfer's receipt describes the payment,
         // and the paying side is the one a user would look for it on.
@@ -849,6 +905,10 @@ export default function RecordScreen() {
           note: note.trim() || null,
           occurredAt,
           recurringRuleId: fromRule ?? null,
+          // The purchase this hands back. Known since the screen opened and
+          // thrown away until now, which is why a refund could say it WAS one
+          // but never which record it came from.
+          reversesId: refundOf && source ? source.id : null,
         }).id;
       }
 
@@ -1006,7 +1066,15 @@ export default function RecordScreen() {
             {/* Names the ACTION you are in, not the row that will result.
                 Duplicating a refund still produces a refund, but "Refund" here
                 would leave you wondering which of the two things you tapped. */}
-            {isEdit ? 'Edit record' : refundOf ? 'Refund' : copyOf ? 'Duplicate' : 'New record'}
+            {isEdit
+              ? 'Edit record'
+              : refundOf
+                ? 'Refund'
+                : reversalSource
+                  ? 'Reverse transfer'
+                  : copyOf
+                    ? 'Duplicate'
+                    : 'New record'}
           </Text>
         </View>
 

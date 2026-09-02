@@ -275,6 +275,30 @@ export const transactions = sqliteTable(
       onDelete: 'set null',
     }),
 
+    /**
+     * THE ROW THIS ONE UNDOES.
+     *
+     * One column for the two shapes of the same fact: a refund points at the
+     * purchase it hands back, and a reversing transfer points at the outgoing
+     * leg of the transfer it cancels. They are the same statement — "this
+     * exists to undo that" — and splitting them into two flags would be two
+     * places to forget it.
+     *
+     * NOT a foreign key, and deliberately so. `on delete set null` is the
+     * obvious declaration and it is wrong here: deleting a record is UNDOABLE,
+     * so nulling the pointer means tapping Undo restores the purchase with the
+     * link silently gone for ever. A bare id survives the round trip and simply
+     * resolves to nothing while the original is away. `fee_for_id` is a bare
+     * column for the same reason.
+     *
+     * Provenance, never identity. `is_refund` still decides which SIDE of the
+     * ledger a refund belongs to, because that has to stay true whether or not
+     * the purchase it came from still exists. A REVERSAL needs no such flag: it
+     * is a transfer leg with this column set, and a transfer is already outside
+     * every total there is.
+     */
+    reversesId: text('reverses_id'),
+
     /** Set when this row was materialised from a recurring rule. */
     recurringRuleId: text('recurring_rule_id').references(() => recurringRules.id, {
       onDelete: 'set null',
@@ -292,6 +316,10 @@ export const transactions = sqliteTable(
     index('idx_tx_category_occurred').on(table.categoryId, table.occurredAt),
     index('idx_tx_transfer_pair').on(table.transferPairId),
     index('idx_tx_recurring').on(table.recurringRuleId),
+    // "What undoes this row?" — asked when a record's actions are opened, so
+    // never on a hot path, but a table scan per long press is not worth saving
+    // one index on a column that is null for almost every row.
+    index('idx_tx_reverses').on(table.reversesId),
   ]
 );
 
