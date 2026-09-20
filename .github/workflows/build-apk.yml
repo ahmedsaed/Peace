@@ -6,6 +6,17 @@ name: Build APK
 # that was reviewed.
 on:
   workflow_call:
+    inputs:
+      abi:
+        description: >
+          Which ABI to build. arm64-v8a is a phone; x86_64 is the emulator, and
+          the E2E workflow asks for it. They are NOT interchangeable: an arm64
+          APK installs happily on the emulator (arm64-v8a is in its abilist)
+          and then dies at startup with "couldn't find DSO to load:
+          libreactnative.so", which reads like a broken native module rather
+          than an ABI mismatch.
+        type: string
+        default: arm64-v8a
     outputs:
       version:
         description: Semver from app.json
@@ -75,8 +86,14 @@ jobs:
           BUILD=$(git rev-list --count HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build-number=$BUILD" >> "$GITHUB_OUTPUT"
-          echo "artifact=peace-$VERSION-build$BUILD" >> "$GITHUB_OUTPUT"
-          echo "Building Peace $VERSION (build $BUILD) from $(git rev-parse --short HEAD)"
+          # The ABI is in the NAME whenever it is not the one a phone wants,
+          # so an x86_64 APK downloaded from an E2E run weeks later cannot be
+          # mistaken for an installable build. The default keeps its old name,
+          # which the release workflow globs for.
+          SUFFIX=""
+          [ "${{ inputs.abi }}" = "arm64-v8a" ] || SUFFIX="-${{ inputs.abi }}"
+          echo "artifact=peace-$VERSION-build$BUILD$SUFFIX" >> "$GITHUB_OUTPUT"
+          echo "Building Peace $VERSION (build $BUILD) for ${{ inputs.abi }} from $(git rev-parse --short HEAD)"
 
       # android/ is gitignored — it is generated from app.json plus the config
       # plugins, so CI has to produce it rather than check it out.
@@ -116,9 +133,10 @@ jobs:
           ORG_GRADLE_PROJECT_PEACE_KEY_ALIAS: ${{ secrets.PEACE_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_PEACE_KEY_PASSWORD: ${{ secrets.PEACE_KEY_PASSWORD }}
         working-directory: android
-        # arm64 only: it covers every phone since ~2017 and roughly quarters the
-        # C++ compile time versus building all four ABIs.
-        run: ./gradlew app:assembleRelease -x lint -x test -PreactNativeArchitectures=arm64-v8a
+        # ONE ABI, whichever was asked for: arm64 covers every phone since ~2017
+        # and x86_64 is what the emulator runs, and building one roughly quarters
+        # the C++ compile time versus building all four.
+        run: ./gradlew app:assembleRelease -x lint -x test -PreactNativeArchitectures=${{ inputs.abi }}
 
       # An assertion, not a log line: if the secrets were present, the APK MUST
       # carry our certificate. Without this check a misconfigured secret would

@@ -2,7 +2,12 @@
  * @jest-environment node
  */
 import { createTestDb, type TestDb } from '../../test/db';
-import { createAccount, listAccountsWithBalance, updateAccount } from './accounts';
+import {
+  balanceByCurrency,
+  createAccount,
+  listAccountsWithBalance,
+  updateAccount,
+} from './accounts';
 import {
   broughtForward,
   positionByAccount,
@@ -247,6 +252,40 @@ describe('brought forward + this month = what you hold', () => {
 
     expect(bf.amountMinor + august.balanceMinor).toBe(accountsTotal);
     expect(totalHeld(db)).toBe(accountsTotal);
+  });
+
+  /**
+   * The identity has to survive somebody tidying up.
+   *
+   * It was asserted on a fixture with no archived account in it, and that is
+   * exactly how it came to be false: `balanceByCurrency` skipped archived
+   * accounts, `broughtForward` never has, and archiving one moved the Accounts
+   * total while the home screen's "Now" stayed put. Both sides are compared
+   * here through the totals the two SCREENS actually show.
+   */
+  it('still reconciles after an account is archived', () => {
+    const db = seed();
+    earn(db, 'i1', 900_000, on(2026, 7, 1));
+    spend(db, 'e1', 250_000, on(2026, 8, 4));
+    createAccount(db, { id: 'drawer', name: 'Drawer', currency: 'EGP', openingBalance: 20_000 });
+
+    const before = balanceByCurrency(db);
+    updateAccount(db, 'drawer', { archived: true });
+
+    // The Accounts screen's figure does not move when an account is put away.
+    expect(balanceByCurrency(db)).toEqual(before);
+
+    const bf = broughtForward(db, '2026-08');
+    const august = periodSummary(db, '2026-08');
+    const accountsTotal = balanceByCurrency(db)[0].balanceMinor;
+
+    expect(bf.amountMinor + august.balanceMinor).toBe(accountsTotal);
+    expect(totalHeld(db)).toBe(accountsTotal);
+    // And the money really is in the archived account, so this is not passing
+    // by both sides ignoring it.
+    expect(listAccountsWithBalance(db).reduce((sum, a) => sum + a.balanceMinor, 0)).toBe(
+      accountsTotal - 20_000
+    );
   });
 
   it('still reconciles when nothing has been recorded at all', () => {

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -44,6 +44,7 @@ export default function CategoryScreen() {
   const [parentId, setParentId] = useState<string | null>(existing?.parentId ?? null);
   const [icon, setIcon] = useState(existing?.icon ?? 'dots');
   const [color, setColor] = useState(existing?.color ?? '#6B5B4A');
+  const [archived, setArchived] = useState(existing?.archived ?? false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +61,7 @@ export default function CategoryScreen() {
     if (!canSave) return;
     try {
       if (existing) {
-        updateCategory(db, existing.id, { name, kind, parentId, icon, color });
+        updateCategory(db, existing.id, { name, kind, parentId, icon, color, archived });
       } else {
         createCategory(db, { id: newId(), name, kind, parentId, icon, color });
       }
@@ -150,6 +151,35 @@ export default function CategoryScreen() {
           <Text className="mb-4 text-sm text-expense" testID="category-error">
             {error}
           </Text>
+        ) : null}
+
+        {existing ? (
+          <Field label="Archived">
+            {/* The way to retire a category you still want on old records.
+                Deleting keeps the money too, but the records come back
+                UNCATEGORISED — the history stops saying what it was spent on,
+                which is the part you cannot reconstruct later. */}
+            <Pressable
+              onPress={() => setArchived((a) => !a)}
+              testID="category-archived"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: archived }}
+              className="flex-row items-center justify-between rounded-lg bg-surface px-4 py-3 active:opacity-70">
+              <Text className="text-sm text-ink">
+                {archived ? 'Hidden from pickers' : 'Active'}
+              </Text>
+              <View
+                className={`h-6 w-11 justify-center rounded-full px-0.5 ${
+                  archived ? 'bg-accent' : 'bg-line'
+                }`}>
+                <View className={`h-5 w-5 rounded-full bg-ink ${archived ? 'self-end' : ''}`} />
+              </View>
+            </Pressable>
+            <Text className="mt-1.5 text-xs text-muted">
+              Records keep it. Sub-categories are put away with their parent, and Settings brings
+              any of them back.
+            </Text>
+          </Field>
         ) : null}
 
         {existing ? (

@@ -36,6 +36,8 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Regenerate app icons | `npm i --no-save sharp && node scripts/make-icons.mjs` |
 | Check the lockfile like CI does | `npm run verify:lock` |
 | Validate the JS bundle without a device | `npx expo export --platform android` |
+| Check every flow's testIDs without a device | `npm test -- flows` |
+| E2E without an emulator to hand | Actions › **E2E** › Run workflow (manual) |
 | Dev server | `npm start` |
 
 ## How to verify a change
@@ -157,8 +159,34 @@ Three things that are true only because CI caught them, and will bite again:
   those packages under `@unrs/resolver-binding-wasm32-wasi` where they belong, and the lockfile
   became self-consistent. An override that survives its original problem becomes the next one.
 
-**Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
-merging anything that touches a screen.
+**Maestro does not run on every push** — it needs a booted emulator, which is minutes rather than
+seconds. Run `npm run e2e` locally before merging anything that touches a screen.
+
+**When there is no emulator to hand, run the E2E workflow.** `.github/workflows/e2e.yml` is
+`workflow_dispatch` only: it builds the x86_64 APK through the SAME reusable build the PR and the
+release use (hence the `abi` input — an arm64 APK installs on the emulator and then dies on a
+missing `libreactnative.so`), boots an emulator on a GitHub runner and runs the flows, uploading
+Maestro's hierarchy dumps and screenshots so a failure is readable by somebody who cannot attach to
+the device. `ubuntu-latest` runners have KVM, which is what makes this possible at all — an
+environment without it (most cloud dev containers: no `/dev/kvm`, no `vmx`/`svm` in
+`/proc/cpuinfo`) cannot boot an x86_64 image, and there is no software fallback worth having.
+
+It is MANUAL and it is not a gate. Some flows want what a runner does not have — an API key, a
+photo in the gallery, a Google account — so a red run there is as likely to mean "CI lacks
+something" as "the app is broken". Start with `tags: core`, widen to a single flow by path, and
+read the uploaded screenshots before believing a failure. It also proves nothing about a real
+phone: Play Protect, the device's ICU data and anything about how the thing feels in a hand are
+still only answerable on hardware.
+
+**The part of a flow that CAN be checked without a device is checked by `npm test`.**
+`src/lib/flows.test.ts` reads every `id:` in `.maestro/` and demands it exist in `src/` — a flow
+naming an id that was renamed or mistyped otherwise fails on a machine with an emulator, looking
+exactly like a broken app. It stops short where a testID is built from data: `archive-delete-${key}`
+becomes `^archive-delete-.+$`, so the keys a flow spells out by hand are pinned separately against
+the seed and the same `idSlug` the screen uses. It nearly shipped useless — generalising every
+template turned `${testIDPrefix}-${option.value}` into `^.+-.+$`, which matches every hyphenated id
+there is, so all 24 flows passed while nothing was being compared. A template only becomes a pattern
+if it has a LITERAL head, and a case asserts that a made-up id is still rejected.
 
 **Play Protect HARD-BLOCKS the sideloaded APK, on every update.** Declaring a
 `NotificationListenerService` puts the app in the same class as `READ_SMS` and accessibility
@@ -296,7 +324,16 @@ app ignoring input. `pkill -f GradleDaemon`.
 - **Two screens showing the same money must reconcile, and a test must say so.** `broughtForward` +
   this month's balance is exactly the Accounts total, opening balances included — `carry.test.ts`
   asserts that identity directly rather than testing each side on its own. Without it the two
-  screens can drift apart and the user has no way to tell which one is lying.
+  screens can drift apart and the user has no way to tell which one is lying. **And the fixture
+  decides what the identity is worth**: it was asserted on a ledger with no archived account in it,
+  which is exactly how it came to be false. `balanceByCurrency` skipped archived accounts and
+  `broughtForward` never has, so putting an account away moved the Accounts total, left "Now" where
+  it was, and neither screen said why. Money in an archived account has not been spent, so the
+  TOTAL counts it and the list grew an Archived group to show where it is — a figure that includes
+  money the screen never mentions is a screen disagreeing with itself. The version that looks
+  consistent, filtering both sides, is the wrong one: the running position would drop whenever
+  somebody tidied up, with no record explaining the fall. When a test asserts an identity, ask
+  which states the fixture never reaches.
 - **Percentages that are rounded independently do not add up to 100.** Three equal slices print
   33.3 three times, and a legend summing to 99.9 reads as a bug on a screen whose whole job is
   accounting for money. `sharePercents` in `src/lib/analysis.ts` distributes the error by largest
@@ -355,16 +392,42 @@ app ignoring input. `pkill -f GradleDaemon`.
   "Back up everything" on the same day deleted it: the screen promised the restore was undoable
   while the only thing making it undoable was one tap from destruction. There is now an explicit
   "Undo last restore" button, because a recovery file the user cannot reach is not a recovery.
-- **A state you can enter from the UI must be one you can LEAVE from the UI.** Archiving an account
-  is set by a toggle in the account editor, and the only route into that editor is tapping the
-  account on the Accounts tab — which hides archived ones. So the switch that undoes it sat behind
-  a row that no longer existed: an archived account holding money was at least an untappable line
-  in the Now breakdown, and one at zero appeared on no screen at all. The way out cannot depend on
-  the very thing the state removes, which is why "Archived accounts" lives in Settings rather than
-  in the list it is absent from. The tell is a writer with one caller: `setTagArchived` is only
-  ever called with `true`, and categories carry an `archived` column no screen writes at all —
-  both the same shape, neither fixed yet. A flow proves the way back by asserting the account is
-  on a DIFFERENT screen afterwards, not that the sheet listed it.
+- **A state you can enter from the UI must be one you can LEAVE from the UI.** Archiving is set by
+  a toggle in an editor you reach by tapping the thing in a list — and every one of those lists
+  hides what is archived, so the switch that undoes it sat behind a row that no longer existed. An
+  archived account holding money was at least an untappable line in the Now breakdown; one at zero
+  appeared on no screen at all. The way out cannot live where the state removed it from, which is
+  why Settings has an **Archived** section for all three rather than each list carrying its own.
+  **The tell is a writer with one caller**: `setTagArchived` was only ever called with `true`, and
+  `categories.archived` was READ by every picker and written by nothing — a filter with no way to
+  set it is a feature that exists only in the schema. Grep a boolean setter for its callers before
+  believing the state is reachable in both directions. A flow proves the way back by asserting the
+  thing is on a DIFFERENT screen afterwards, never that the sheet listed it.
+- **A refusal has to hand over the list.** An archived account or category can only be deleted
+  once nothing points at it, and for good reason: `transactions.account_id` CASCADES, so deleting
+  an account with history takes every record on it — a month that suddenly balances differently
+  with nothing to say why — and `deleteCategory` leaves its records UNCATEGORISED, which loses
+  what the money went on and cannot be reconstructed. But "you cannot delete this" is a dead end,
+  so the row carries the COUNT instead of a dead button, and tapping it opens search filtered to
+  exactly those records with a notice saying what to do. **The count and the list must come from
+  one query** — `checkDeletion` returns the filter it counted with and the screen hands that same
+  filter to the search page, or the sheet says 4 over a list of 3 and somebody goes looking for a
+  record that is not there. The one place they cannot agree by construction: search lists a
+  transfer ONCE, as the leg the money left on, so an account that has only ever RECEIVED transfers
+  holds rows `accountId` cannot find. `counterAccountId` reaches them, and the blocking count
+  comes from `accountRecordCount` — the ledger — because that is what the delete would actually
+  refuse on. A TAG is the deliberate exception: its links cascade and touch no money, so nothing
+  blocks it and the count becomes the COST, said before the second tap rather than in the sentence
+  afterwards.
+- **Archiving travels along the category tree, and it has to go both ways.** A live category has a
+  live parent: archive "Food" and leave "Groceries" behind, and `buildCategoryTree` promotes the
+  child to top level — a sub-category silently becoming a heading, which reads as a bug in the
+  picker rather than as something the user did. Restore a child whose parent is still away and the
+  same promotion happens in reverse. So archiving cascades DOWN to the children and restoring
+  pulls the parent UP, and restoring a parent deliberately leaves its children put away: dragging
+  back a sub-category somebody retired on its own is the one direction that undoes a decision
+  nobody made twice. Both cascades live inside `updateCategory`, beside the `kind` cascade they
+  are modelled on, so no caller can set the flag and miss them.
 - **A file that exists is not a file that has content.** The backup flow passed while producing a
   **0-byte** `.db` — `File.copy()` is async and was being called synchronously, so the share sheet
   offered an empty file under a perfectly correct filename. Nothing downstream could tell. Every

@@ -1,0 +1,159 @@
+name: E2E
+
+# Maestro on a runner, because a session without an emulator cannot run it.
+#
+# MANUAL ON PURPOSE. This is not a gate: it takes half an hour, some flows need
+# a key or a photo on the device that CI does not have, and a flow failing here
+# is as likely to mean "CI lacks something" as "the app is broken". It exists so
+# that a change written somewhere without hardware acceleration — a cloud
+# session, a Codespace, a borrowed laptop — can still be put in front of a real
+# Android before it is merged, instead of merging on unit tests and hope.
+#
+# `ubuntu-latest` runners have KVM, which is the whole reason this is possible:
+# the Android emulator refuses to run x86_64 images without it, and there is no
+# software fallback worth having. The runner still needs the udev rule below to
+# let a non-root user open /dev/kvm.
+on:
+  workflow_dispatch:
+    inputs:
+      flows:
+        description: 'What to run — a directory or one .maestro/<flow>.yaml'
+        type: string
+        default: .maestro/
+      tags:
+        description: 'Only flows carrying these tags (e.g. core). Blank runs every flow in the path.'
+        type: string
+        default: ''
+      api-level:
+        description: 'Android API level to boot'
+        type: string
+        default: '34'
+
+concurrency:
+  # One emulator at a time per ref. Two runs of this on the same branch would
+  # only compete for the same runner minutes to answer the same question.
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The SAME reusable build the PR and the release use, asked for the emulator's
+  # ABI. A second copy of those steps here would eventually drift, and then this
+  # workflow would be testing an APK nobody ships.
+  apk:
+    uses: ./.github/workflows/build-apk.yml
+    with:
+      abi: x86_64
+    secrets: inherit
+
+  flows:
+    name: Maestro
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      # Through the environment rather than interpolated into the shell below:
+      # a workflow input pasted straight into a command line is a command line
+      # somebody else gets to write.
+      FLOWS: ${{ inputs.flows }}
+      TAGS: ${{ inputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Maestro is a JVM CLI. Same 17 the Android build uses, so there is one
+      # JDK version in this repository rather than two.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # The artifact NAME starts with "peace", which is the value of the
+      # PEACE_KEY_ALIAS secret — so it is never passed between jobs as an
+      # output (it would arrive empty, silently). Glob for the file instead;
+      # the release workflow downloads it the same way.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+
+      - name: Find the APK
+        run: |
+          APK=$(ls *.apk | head -1)
+          [ -n "$APK" ] || { echo "::error::No APK in the build artifact."; exit 1; }
+          echo "APK=$PWD/$APK" >> "$GITHUB_ENV"
+          echo "testing $APK"
+          # An assertion, not a log line: an arm64 APK installs on the emulator
+          # and then dies at startup with a message about a missing DSO, which
+          # reads like a broken native module rather than the wrong ABI.
+          unzip -l "$APK" | grep -q 'lib/x86_64/' || {
+            echo "::error::That APK has no x86_64 libraries — it will install and then crash."
+            exit 1
+          }
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      # Without this the emulator cannot open /dev/kvm on a GitHub runner, and
+      # fails with an acceleration error that looks like the image is missing.
+      - name: Enable KVM for the runner user
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Run the flows
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ inputs.api-level }}
+          arch: x86_64
+          # An image WITHOUT Google Play, deliberately. Play Protect hard-blocks
+          # this APK on a phone because of the NotificationListenerService, and
+          # an image carrying it would reproduce that here for no benefit.
+          target: default
+          profile: pixel_6
+          # `swiftshader_indirect` is measured, not guessed: on a machine with
+          # no real GPU it beat `host` (llvmpipe behind it) by 21% on one flow,
+          # and every Maestro step waits on rendering to settle.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
+          disable-animations: true
+          script: |
+            # A modal over the app swallows every tap, and Maestro then fails on
+            # the launch gate looking exactly like a broken screen.
+            adb shell settings put global hide_error_dialogs 1
+
+            adb uninstall com.ahmed.peace || true
+            adb install -r "$APK"
+
+            # The flows run against the RELEASE APK, never a dev build:
+            # `clearState` wipes the dev client's packager URL and the next
+            # launch dies on an embedded bundle a debug build does not have.
+            if [ -n "$TAGS" ]; then
+              maestro test --include-tags="$TAGS" "$FLOWS"
+            else
+              maestro test "$FLOWS"
+            fi
+
+      # The point of running this here at all: a failure has to be readable by
+      # somebody who cannot attach to the device. Maestro writes a hierarchy
+      # dump and a screenshot per failed step, and `takeScreenshot` leaves its
+      # PNGs in the working directory. `~` is not expanded by upload-artifact,
+      # so the shell does it here.
+      - name: Gather the evidence
+        if: always()
+        run: |
+          mkdir -p evidence
+          cp -r "$HOME/.maestro/tests" evidence/tests 2>/dev/null || true
+          cp ./*.png evidence/ 2>/dev/null || true
+          ls -R evidence | head -40
+
+      - name: Upload the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-output
+          path: evidence
+          retention-days: 14
+          if-no-files-found: warn

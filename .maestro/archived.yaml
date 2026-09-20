@@ -1,0 +1,291 @@
+appId: com.ahmed.peace
+---
+# Putting things away, and getting them back.
+#
+# Archiving was a one-way door: the toggle that undoes it lives in an editor
+# you reach by tapping the thing in a list, and every one of those lists hides
+# what is archived. So the point of this flow is NOT that a settings row
+# renders — it is that something which has VANISHED from its own screen can be
+# brought back from Settings and is on that screen again afterwards. Asserting
+# only that the sheet listed it would pass just as well if the restore wrote
+# nothing.
+#
+# Accounts and categories here; the tag half lives at the foot of tags.yaml,
+# where a tag has already been archived for its own reasons.
+- launchApp:
+    clearState: true
+
+# Gate on the first screen rather than racing migrations and seeding — see
+# manage.yaml for why this is an extendedWaitUntil and not an assertion.
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- put money in Cash, so the total has something to be wrong about ---
+# Cash is the first seeded account, so a record with no account chosen lands
+# on it. E£9.00 out of it is the figure every assertion below watches.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-screen"
+- assertVisible:
+    id: "accounts-total"
+    text: "-E£9.00"
+- assertVisible: "Cash"
+
+# --- put it away ---
+- tapOn: "Cash"
+- assertVisible: "Edit account"
+# The toggle sits below the icon grid, which grows as glyphs are added — the
+# same scroll every other flow that reaches the foot of this form needs.
+- scrollUntilVisible:
+    element:
+      id: "account-archived"
+    direction: DOWN
+- tapOn:
+    id: "account-archived"
+- assertVisible: "Hidden from pickers"
+- tapOn:
+    id: "form-save"
+
+# THE TOTAL DOES NOT MOVE. Money in an archived account has not been spent —
+# a wallet in a drawer is still yours. This used to fall to E£0.00 here while
+# the home screen's "Now" went on saying -E£9.00, two screens disagreeing by
+# exactly the archived balance with nothing on either to explain it.
+- assertVisible:
+    id: "accounts-screen"
+- assertVisible:
+    id: "accounts-total"
+    text: "-E£9.00"
+# ...and the list says where that money is, rather than counting an account it
+# never mentions.
+- assertVisible:
+    id: "accounts-archived"
+- takeScreenshot: 01-account-archived
+
+# Off the pickers, which is what archiving is actually for.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-account"
+- assertVisible:
+    id: "sheet-account"
+- assertNotVisible: "Cash"
+- tapOn:
+    id: "picker-close"
+- tapOn:
+    id: "record-cancel"
+
+# --- find it in Settings ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "settings-screen"
+- assertVisible:
+    id: "setting-archived-accounts"
+# The row counts what is waiting, so an empty archive and a broken query do not
+# look the same from here.
+- assertVisible: "1 put away"
+
+- tapOn:
+    id: "setting-archived-accounts"
+- assertVisible:
+    id: "sheet-archived-accounts"
+- assertVisible: "Cash"
+- takeScreenshot: 02-archived-listed
+
+# --- what deleting it would cost, before it is offered ---
+# Cash carries the E£9.00 record, so the row offers the COUNT rather than a
+# delete button: tapping it is a question, and the answer is the search page
+# filtered to exactly those records. A dead "you cannot delete this" with no
+# way to see what is holding it is how people learn to stop pressing things.
+- assertVisible:
+    id: "archive-move-seed-acct-cash"
+- tapOn:
+    id: "archive-move-seed-acct-cash"
+- assertVisible:
+    id: "search-screen"
+- assertVisible:
+    id: "search-notice"
+# The count on the row and the list that opens come from one query, so this is
+# the same "1" the sheet printed a moment ago.
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- takeScreenshot: 03-blocked-by-records
+
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-screen"
+- tapOn:
+    id: "setting-archived-accounts"
+- assertVisible:
+    id: "sheet-archived-accounts"
+
+# --- bring it back ---
+- tapOn: "Cash"
+- assertVisible:
+    id: "archive-restored"
+# Nothing is put away any more. Asserted as the ABSENCE of a count rather than
+# the presence of "None": all three rows in this section read "None" when they
+# are empty, so a "None" is visible here whether or not the account came back.
+- assertNotVisible: "1 put away"
+- takeScreenshot: 04-account-restored
+
+# THE ASSERTION THAT MATTERS. On a different screen, the account is listed
+# again — and it is offered by the record screen's account picker, which is the
+# thing archiving actually took away.
+#
+# Settings is PUSHED OVER the tabs, so it carries a back arrow and no tab bar:
+# every hop from here to a tab has to pop the stack first. Tapping `tab-accounts`
+# straight from Settings fails on a missing element, not on a wrong screen.
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-screen"
+- assertVisible: "Cash"
+# The Archived group is gone, which is the assertion that means something now
+# that an archived account is ON this screen rather than missing from it.
+- assertNotVisible:
+    id: "accounts-archived"
+- assertVisible:
+    id: "accounts-total"
+    text: "-E£9.00"
+
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-account"
+- assertVisible:
+    id: "sheet-account"
+- assertVisible: "Cash"
+- tapOn:
+    id: "picker-close"
+- tapOn:
+    id: "record-cancel"
+- takeScreenshot: 05-back-in-the-picker
+
+# ===========================================================================
+# The same round trip for a category
+# ===========================================================================
+# A category could not be archived at all until this change — the column was
+# read by every picker and written by nothing.
+- tapOn:
+    id: "tab-categories"
+- assertVisible:
+    id: "categories-screen"
+- scrollUntilVisible:
+    element: "Pets"
+    direction: DOWN
+- tapOn: "Pets"
+- assertVisible: "Edit category"
+- scrollUntilVisible:
+    element:
+      id: "category-archived"
+    direction: DOWN
+- tapOn:
+    id: "category-archived"
+- assertVisible: "Hidden from pickers"
+- tapOn:
+    id: "form-save"
+- assertVisible:
+    id: "categories-screen"
+- takeScreenshot: 06-category-archived
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "setting-archived-categories"
+- assertVisible: "1 put away"
+- tapOn:
+    id: "setting-archived-categories"
+- assertVisible:
+    id: "sheet-archived-categories"
+- tapOn: "Pets"
+- assertVisible:
+    id: "archive-restored"
+
+# Back on the tab it vanished from — off the Settings stack first, as above.
+# `scrollUntilVisible` fails the flow if it is not there, which
+# `assertNotVisible` on a long scrolling list could never prove in the other
+# direction.
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "tab-categories"
+- scrollUntilVisible:
+    element: "Pets"
+    direction: DOWN
+- takeScreenshot: 07-category-restored
+
+# ===========================================================================
+# Deleting one that nothing points at
+# ===========================================================================
+# Baby has no records, so the row offers a delete rather than a count — and it
+# takes a second tap that names what is about to go, because this is the one
+# action here that cannot be undone.
+- scrollUntilVisible:
+    element: "Baby"
+    direction: DOWN
+- tapOn: "Baby"
+- assertVisible: "Edit category"
+- scrollUntilVisible:
+    element:
+      id: "category-archived"
+    direction: DOWN
+- tapOn:
+    id: "category-archived"
+- tapOn:
+    id: "form-save"
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-archived-categories"
+- assertVisible:
+    id: "sheet-archived-categories"
+- tapOn:
+    id: "archive-delete-seed-cat-baby"
+# Armed, not done: the row asks before it goes.
+- assertVisible: "Delete Baby for good?"
+- takeScreenshot: 08-delete-armed
+- tapOn:
+    id: "archive-confirm-seed-cat-baby"
+- assertVisible:
+    id: "archive-restored"
+- assertVisible: "Baby deleted."
+
+# Gone from the archive it was in, and gone from the categories tab.
+- assertVisible:
+    id: "setting-archived-categories"
+- assertNotVisible:
+    id: "sheet-archived-categories"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "tab-categories"
+- assertVisible:
+    id: "categories-screen"
+- assertNotVisible: "Baby"
+- takeScreenshot: 09-category-deleted

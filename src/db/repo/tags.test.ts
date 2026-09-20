@@ -10,8 +10,10 @@ import { listRecordsForPeriod, periodSummary } from './records';
 import { searchRecords } from './search';
 import {
   ensureTag,
+  listArchivedTags,
   listTags,
   renameTag,
+  restoreTag,
   setRecordTags,
   setTagArchived,
   tagBreakdown,
@@ -128,6 +130,45 @@ describe('archiving', () => {
     expect(tagsForRecord(db, 'cake').map((t) => t.name)).toEqual(['Wedding']);
     // ...and still findable, which is the point of keeping it.
     expect(searchRecords(db, q({ tagIds: [tag.id] })).matchCount).toBe(1);
+  });
+
+  /**
+   * The way back. `setTagArchived` was only ever called with `true` from any
+   * screen, so a tag put away was put away for good — the picker that would
+   * offer it is the one thing that stops listing it.
+   */
+  it('reports what has been put away, and nothing else', () => {
+    const wedding = ensureTag(db, 'Wedding');
+    ensureTag(db, 'Work');
+    setTagArchived(db, wedding.id, true);
+
+    expect(listArchivedTags(db).map((t) => t.name)).toEqual(['Wedding']);
+  });
+
+  it('finds nothing when nothing has been put away', () => {
+    ensureTag(db, 'Work');
+    expect(listArchivedTags(db)).toEqual([]);
+  });
+
+  it('offers it again, with the records it never stopped being on', () => {
+    const tag = ensureTag(db, 'Wedding');
+    buy(db, 'cake', 'food', 80_000, 3);
+    setRecordTags(db, 'cake', [tag.id]);
+    setTagArchived(db, tag.id, true);
+
+    const restored = restoreTag(db, tag.id);
+
+    expect(restored.archived).toBe(false);
+    expect(restored.name).toBe('Wedding');
+    expect(listTags(db).map((t) => t.name)).toEqual(['Wedding']);
+    expect(listArchivedTags(db)).toEqual([]);
+    expect(tagsForRecord(db, 'cake').map((t) => t.name)).toEqual(['Wedding']);
+  });
+
+  it('refuses to report success for a tag that does not exist', () => {
+    // An UPDATE matching no row is silent, and "restored" with nothing
+    // restored is the one answer a way back must never give.
+    expect(() => restoreTag(db, 'tag-nope')).toThrow(InvariantError);
   });
 });
 

@@ -5,7 +5,12 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
-import { balanceByCurrency, listAccountsWithBalance, type CurrencyTotal } from '@/db/repo/accounts';
+import {
+  balanceByCurrency,
+  listAccountsWithBalance,
+  listArchivedAccounts,
+  type CurrencyTotal,
+} from '@/db/repo/accounts';
 import { availableCredit, isLiability, owedDisplay } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
 import { useMoney, type Money } from '@/state/money';
@@ -14,6 +19,7 @@ export default function AccountsScreen() {
   const money = useMoney();
   const router = useRouter();
   const [accounts, setAccounts] = useState<ReturnType<typeof listAccountsWithBalance>>([]);
+  const [archived, setArchived] = useState<ReturnType<typeof listAccountsWithBalance>>([]);
   const [totals, setTotals] = useState<CurrencyTotal[]>([]);
   const homeCurrency = useSetting('homeCurrency');
 
@@ -22,6 +28,7 @@ export default function AccountsScreen() {
   useFocusEffect(
     useCallback(() => {
       setAccounts(listAccountsWithBalance(db));
+      setArchived(listArchivedAccounts(db));
       setTotals(balanceByCurrency(db));
     }, [])
   );
@@ -55,27 +62,35 @@ export default function AccountsScreen() {
 
       <ScrollView contentContainerClassName="p-4 gap-3">
         {accounts.map((account) => (
-          <Pressable
+          <AccountRow
             key={account.id}
+            account={account}
             onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
-            className="flex-row items-center gap-3 rounded-xl bg-surface p-3 active:opacity-70"
-            testID={`account-${account.id}`}>
-            <View
-              className="h-10 w-10 items-center justify-center rounded-full"
-              style={{ backgroundColor: account.color ?? '#6B5B4A' }}>
-              <Icon name={account.icon ?? 'wallet'} size={18} color="#FFFFFF" />
-            </View>
+          />
+        ))}
 
-            <View className="flex-1">
-              <Text className="text-base text-ink">{account.name}</Text>
-              <Text className="text-xs capitalize text-muted" testID={`account-sub-${account.id}`}>
-                {accountSubtitle(account, money)}
+        {/* The total above counts these, so the list has to show them — a
+            figure that includes money the screen never mentions is a screen
+            disagreeing with itself. They sit at the foot, dimmed, because the
+            point of archiving one is that it stops being in the way. */}
+        {archived.length > 0 ? (
+          <View className="gap-3 pt-3" testID="accounts-archived">
+            <View className="px-1">
+              <Text className="text-[10px] uppercase tracking-widest text-muted">Archived</Text>
+              <Text className="pt-0.5 text-xs text-muted">
+                Still counted above, and off every picker. Settings brings one back.
               </Text>
             </View>
-
-            <AccountAmount account={account} />
-          </Pressable>
-        ))}
+            {archived.map((account) => (
+              <AccountRow
+                key={account.id}
+                account={account}
+                dimmed
+                onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
+              />
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
 
       <Fab onPress={() => router.push('/account')} testID="fab-account" />
@@ -84,6 +99,50 @@ export default function AccountsScreen() {
 }
 
 type Row = ReturnType<typeof listAccountsWithBalance>[number];
+
+/**
+ * One account, in either group.
+ *
+ * Shared rather than written twice: an archived account is the same row with
+ * the colour turned down, and two copies would drift the moment a card grew a
+ * field. It stays tappable while dimmed — the editor is where the archive
+ * toggle lives, so the row is also a way back.
+ */
+function AccountRow({
+  account,
+  onPress,
+  dimmed = false,
+}: {
+  account: Row;
+  onPress: () => void;
+  dimmed?: boolean;
+}) {
+  const money = useMoney();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`flex-row items-center gap-3 rounded-xl bg-surface p-3 active:opacity-70 ${
+        dimmed ? 'opacity-60' : ''
+      }`}
+      testID={`account-${account.id}`}>
+      <View
+        className="h-10 w-10 items-center justify-center rounded-full"
+        style={{ backgroundColor: account.color ?? '#6B5B4A' }}>
+        <Icon name={account.icon ?? 'wallet'} size={18} color="#FFFFFF" />
+      </View>
+
+      <View className="flex-1">
+        <Text className="text-base text-ink">{account.name}</Text>
+        <Text className="text-xs capitalize text-muted" testID={`account-sub-${account.id}`}>
+          {accountSubtitle(account, money)}
+        </Text>
+      </View>
+
+      <AccountAmount account={account} />
+    </Pressable>
+  );
+}
 
 /**
  * "card · EGP", or the headroom left when a limit is recorded.

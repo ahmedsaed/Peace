@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
@@ -56,7 +56,37 @@ export default function SearchScreen() {
   const homeCurrency = useSetting('homeCurrency');
   const { height } = useWindowDimensions();
 
-  const [query, setQuery] = useState<SearchQuery>(EMPTY_QUERY);
+  /**
+   * Opened with a filter already set — from Settings, where deleting an
+   * archived account or category sends you here to move what is in the way.
+   *
+   * The params carry the SAME filter `checkDeletion` counted with, so the
+   * number on that row and this list cannot disagree about how much work is
+   * left. `deleting` and `deletingName` are only for the notice below: nothing
+   * is deleted from this screen, because the records have to move first and
+   * that is the whole reason for the trip.
+   */
+  const params = useLocalSearchParams<{
+    accountId?: string;
+    counterAccountId?: string;
+    categoryId?: string;
+    deleting?: string;
+    deletingName?: string;
+  }>();
+
+  /**
+   * The handed-down filter is read ONCE, here, because `router.push` puts a
+   * fresh screen on the stack every time — this component mounts with those
+   * params rather than receiving them later. Reading them in an effect would
+   * paint the unfiltered ledger for a frame first and re-run on every change
+   * the user then made to the same fields.
+   */
+  const [query, setQuery] = useState<SearchQuery>(() => ({
+    ...EMPTY_QUERY,
+    accountId: params.accountId ?? null,
+    counterAccountId: params.counterAccountId ?? null,
+    categoryId: params.categoryId ?? null,
+  }));
   const [outcome, setOutcome] = useState<SearchOutcome | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [picking, setPicking] = useState<'account' | 'counter' | 'category' | null>(null);
@@ -66,16 +96,24 @@ export default function SearchScreen() {
   // unfindable by the one label that groups them.
   const tags = useMemo(() => listTags(db, { includeArchived: true }), []);
 
-  const accounts = useMemo(() => listAccountsWithBalance(db), []);
+  // Archived accounts included, for the same reason as the tags above: a
+  // retired account is exactly the thing you go looking for afterwards, and a
+  // filter naming one the picker cannot list would show its records under a
+  // chip reading "Any account".
+  const accounts = useMemo(() => listAccountsWithBalance(db, true), []);
   // Both kinds in one list: a search is not scoped to expense or income until
   // the type filter says so, and asking someone to set the type before they can
   // pick a category would be a filter that gates another filter.
   const categoryTree = useMemo(
-    () => [...listCategoryTree(db, 'expense'), ...listCategoryTree(db, 'income')],
+    () => [
+      ...listCategoryTree(db, 'expense', { includeArchived: true }),
+      ...listCategoryTree(db, 'income', { includeArchived: true }),
+    ],
     []
   );
 
   const patch = (next: Partial<SearchQuery>) => setQuery((q) => ({ ...q, ...next }));
+
 
   const run = useCallback(() => {
     // An empty query is not a search. Returning the whole ledger would be the
@@ -200,6 +238,20 @@ export default function SearchScreen() {
           onClear={() => setQuery({ ...EMPTY_QUERY, text: query.text })}
           canClear={filterCount > 0}
         />
+      ) : null}
+
+      {params.deleting ? (
+        <View className="mx-4 mb-1 mt-2 rounded-lg bg-surface px-4 py-3" testID="search-notice">
+          <Text className="text-sm text-ink">
+            Move these records off {params.deletingName ?? 'it'} first.
+          </Text>
+          <Text className="pt-1 text-xs leading-4 text-muted">
+            Open each one and give it another {params.deleting === 'account' ? 'account' : 'category'}
+            . Deleting with records still on it would take them with it — or leave them with no{' '}
+            {params.deleting === 'account' ? 'account' : 'category'} at all. Settings › Archived
+            still has the delete when this list is empty.
+          </Text>
+        </View>
       ) : null}
 
       {outcome ? <ResultSummary outcome={outcome} homeCurrency={homeCurrency} /> : null}

@@ -99,6 +99,32 @@ export function updateCategory(
     db.update(categories).set({ kind: patch.kind }).where(eq(categories.parentId, id)).run();
   }
 
+  // ARCHIVING TRAVELS ALONG THE TREE, for the same reason, and it is here
+  // rather than in a helper so that no caller can set the flag and miss it.
+  //
+  // The invariant is that a LIVE category has a live parent. Archive a parent
+  // and leave its children, and `buildCategoryTree` promotes them to top level
+  // — "Groceries" silently becomes a heading beside "Food", which reads as a
+  // bug in the picker rather than as something the user did. Restore a child
+  // whose parent is still away and the same promotion happens in reverse. So
+  // archiving goes DOWN to the children and restoring goes UP to the parent;
+  // restoring a parent deliberately leaves its children where they are, since
+  // bringing back a sub-category somebody retired on its own would be the one
+  // direction that undoes a decision nobody made twice.
+  if (patch.archived !== undefined && patch.archived !== existing.archived) {
+    if (patch.archived) {
+      db.update(categories)
+        .set({ archived: true, updatedAt: new Date() })
+        .where(eq(categories.parentId, id))
+        .run();
+    } else if (existing.parentId) {
+      db.update(categories)
+        .set({ archived: false, updatedAt: new Date() })
+        .where(eq(categories.id, existing.parentId))
+        .run();
+    }
+  }
+
   db.update(categories)
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(categories.id, id))
@@ -121,8 +147,12 @@ const byOrder = (a: Category, b: Category) =>
  * promoted to top level rather than silently disappearing — losing a category
  * from the picker is worse than showing it in the wrong place.
  */
-export function buildCategoryTree(all: Category[], kind: Category['kind']): CategoryNode[] {
-  const ofKind = all.filter((c) => c.kind === kind && !c.archived);
+export function buildCategoryTree(
+  all: Category[],
+  kind: Category['kind'],
+  { includeArchived = false } = {}
+): CategoryNode[] {
+  const ofKind = all.filter((c) => c.kind === kind && (includeArchived || !c.archived));
   const ids = new Set(ofKind.map((c) => c.id));
   const tops = ofKind.filter((c) => !c.parentId || !ids.has(c.parentId)).sort(byOrder);
 
@@ -149,9 +179,54 @@ export function listCategoriesFlat(db: Db): Category[] {
     .filter((c) => !c.archived);
 }
 
-/** Top-level categories of one kind, each with its children attached. */
-export function listCategoryTree(db: Db, kind: Category['kind']): CategoryNode[] {
-  return buildCategoryTree(db.select().from(categories).all(), kind);
+/**
+ * The categories that have been put away.
+ *
+ * Both kinds in one list, parents before their own children, because the sheet
+ * offering them back is one list — and a sub-category on its own says almost
+ * nothing without the parent it belonged to above it.
+ */
+export function listArchivedCategories(db: Db): Category[] {
+  const all = db.select().from(categories).all();
+  const archived = all.filter((c) => c.archived);
+  const tops = archived.filter((c) => !c.parentId).sort(byOrder);
+  const orphans = archived.filter((c) => c.parentId && !archived.some((p) => p.id === c.parentId));
+
+  return [
+    ...tops.flatMap((top) => [top, ...archived.filter((c) => c.parentId === top.id).sort(byOrder)]),
+    // A child whose parent is still live: it was retired on its own, and it
+    // belongs in the list rather than being unreachable because the loop above
+    // only walks archived parents.
+    ...orphans.sort(byOrder),
+  ];
+}
+
+/**
+ * Bring an archived category back into the pickers and the tree.
+ *
+ * Records never lost it — an archived category stays on every record already
+ * filed under it, which is the whole difference between archiving one and
+ * deleting one, where the records survive but come back UNCATEGORISED.
+ */
+export function restoreCategory(db: Db, id: string): Category {
+  return updateCategory(db, id, { archived: false });
+}
+
+/**
+ * Top-level categories of one kind, each with its children attached.
+ *
+ * `includeArchived` exists for SEARCH, and for nothing else so far: a retired
+ * category is exactly the thing somebody goes looking for afterwards, and a
+ * filter naming one it cannot list would show the records while the chip above
+ * them read "Any category". Every picker that OFFERS a category for new data
+ * leaves the default alone.
+ */
+export function listCategoryTree(
+  db: Db,
+  kind: Category['kind'],
+  options?: { includeArchived?: boolean }
+): CategoryNode[] {
+  return buildCategoryTree(db.select().from(categories).all(), kind, options);
 }
 
 export function listTopLevel(db: Db, kind: Category['kind']): Category[] {
