@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
@@ -9,7 +10,11 @@ import { ReceiptsCard } from '@/components/receipts-card';
 import { GeminiKeyCard } from '@/components/gemini-key';
 import { StackHeader } from '@/components/screen';
 import { db } from '@/db/client';
-import { listAccountsWithBalance } from '@/db/repo/accounts';
+import {
+  listAccountsWithBalance,
+  listArchivedAccounts,
+  restoreAccount,
+} from '@/db/repo/accounts';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
 import { useSettingsStore } from '@/state/settings';
 import { useMoney } from '@/state/money';
@@ -28,9 +33,25 @@ export default function SettingsScreen() {
   const money = useMoney();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
-  const [sheet, setSheet] = useState<'currency' | 'account' | null>(null);
+  const [sheet, setSheet] = useState<'currency' | 'account' | 'archived' | null>(null);
 
-  const accounts = useMemo(() => listAccountsWithBalance(db), []);
+  const [accounts, setAccounts] = useState(() => listAccountsWithBalance(db));
+  const [archived, setArchived] = useState(() => listArchivedAccounts(db));
+  /** The account this visit brought back, for the line that says so. */
+  const [restored, setRestored] = useState<string | null>(null);
+
+  // Re-read on focus, like every other screen that shows rows from the ledger.
+  // An account archived in the editor while this screen sat mounted behind it
+  // would otherwise leave the row below saying "None" at the exact moment the
+  // archive it is offering to open stopped being empty.
+  useFocusEffect(
+    useCallback(() => {
+      setAccounts(listAccountsWithBalance(db));
+      setArchived(listArchivedAccounts(db));
+      setRestored(null);
+    }, [])
+  );
+
   const defaultAccount = accounts.find((a) => a.id === settings.defaultAccountId);
 
   const currencyOptions: PickerOption[] = CURRENCIES.map((c) => ({
@@ -54,6 +75,17 @@ export default function SettingsScreen() {
     })),
   ];
 
+  const archivedOptions: PickerOption[] = archived.map((a) => ({
+    id: a.id,
+    label: a.name,
+    icon: a.icon,
+    color: a.color,
+    // What is still in it, because "which one was the old current account"
+    // is answered by the balance far more often than by the name.
+    detail: money(a.balanceMinor, a.currency),
+    detailTone: a.balanceMinor < 0 ? ('negative' as const) : ('neutral' as const),
+  }));
+
   return (
     <View className="flex-1 bg-ground" testID="settings-screen">
       <StackHeader title="Settings" />
@@ -76,6 +108,33 @@ export default function SettingsScreen() {
             last
           />
         </Section>
+
+        {/* Archiving is reached from the account editor, and undoing it was
+            not reachable from anywhere: the editor opens by tapping the
+            account on the Accounts tab, which hides archived ones. The way
+            back belongs somewhere that does not depend on the account being
+            listed, and Settings is the screen that already holds the accounts
+            it would offer. */}
+        <View className="pb-6 pt-6">
+          <Section title="Accounts">
+            <Row
+              label="Archived accounts"
+              value={archived.length === 0 ? 'None' : `${archived.length} put away`}
+              hint="They keep every record and leave the pickers and totals. Tap to bring one back."
+              // No archive, no destination: a row that opens an empty sheet
+              // teaches you that the feature is broken rather than that you
+              // have nothing put away.
+              onPress={archived.length === 0 ? undefined : () => setSheet('archived')}
+              testID="setting-archived-accounts"
+              last
+            />
+          </Section>
+          {restored ? (
+            <Text className="px-1 pt-2 text-xs text-muted" testID="account-restored">
+              {restored} is back in your accounts.
+            </Text>
+          ) : null}
+        </View>
 
         <Section title="Reporting">
           <Toggle
@@ -129,6 +188,24 @@ export default function SettingsScreen() {
         }}
         onClose={() => setSheet(null)}
         testID="sheet-currency"
+      />
+
+      <PickerSheet
+        visible={sheet === 'archived'}
+        title="Bring an account back"
+        options={archivedOptions}
+        onSelect={(id) => {
+          // Restoring is one flag and is undone by the same toggle that set
+          // it, now that the account is listed again — so there is nothing
+          // here worth a confirmation step in front of it.
+          const account = restoreAccount(db, id);
+          setAccounts(listAccountsWithBalance(db));
+          setArchived(listArchivedAccounts(db));
+          setRestored(account.name);
+          setSheet(null);
+        }}
+        onClose={() => setSheet(null)}
+        testID="sheet-archived-accounts"
       />
 
       <PickerSheet
@@ -199,6 +276,14 @@ function Toggle({
   );
 }
 
+/**
+ * A row that leads somewhere — or, with no `onPress`, one that only reports.
+ *
+ * A row with nowhere to go keeps its place in the list rather than
+ * disappearing, but loses the chevron and the press state: a control that
+ * looks tappable and does nothing is the same lie as a switch that changes
+ * nothing.
+ */
 function Row({
   label,
   value,
@@ -210,27 +295,45 @@ function Row({
   label: string;
   value: string;
   hint: string;
-  onPress: () => void;
+  onPress?: () => void;
   testID: string;
   last?: boolean;
 }) {
+  const className = `flex-row items-center gap-3 px-4 py-3.5 ${
+    last ? '' : 'border-b border-line'
+  }`;
+
+  const body = (
+    <>
+      <View className="flex-1">
+        <Text className="text-[15px] text-ink">{label}</Text>
+        <Text className="text-xs text-muted">{hint}</Text>
+      </View>
+      <Text
+        className={`max-w-[45%] text-right text-sm ${onPress ? 'text-accent' : 'text-muted'}`}
+        numberOfLines={1}>
+        {value}
+      </Text>
+      {onPress ? <Icon name="chevron" size={14} color={palette.muted} /> : null}
+    </>
+  );
+
+  if (!onPress) {
+    return (
+      <View className={className} testID={testID} accessibilityLabel={`${label}, ${value}`}>
+        {body}
+      </View>
+    );
+  }
+
   return (
     <Pressable
       onPress={onPress}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={`${label}, ${value}`}
-      className={`flex-row items-center gap-3 px-4 py-3.5 active:bg-raised ${
-        last ? '' : 'border-b border-line'
-      }`}>
-      <View className="flex-1">
-        <Text className="text-[15px] text-ink">{label}</Text>
-        <Text className="text-xs text-muted">{hint}</Text>
-      </View>
-      <Text className="max-w-[45%] text-right text-sm text-accent" numberOfLines={1}>
-        {value}
-      </Text>
-      <Icon name="chevron" size={14} color={palette.muted} />
+      className={`${className} active:bg-raised`}>
+      {body}
     </Pressable>
   );
 }

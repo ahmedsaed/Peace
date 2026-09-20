@@ -355,6 +355,16 @@ app ignoring input. `pkill -f GradleDaemon`.
   "Back up everything" on the same day deleted it: the screen promised the restore was undoable
   while the only thing making it undoable was one tap from destruction. There is now an explicit
   "Undo last restore" button, because a recovery file the user cannot reach is not a recovery.
+- **A state you can enter from the UI must be one you can LEAVE from the UI.** Archiving an account
+  is set by a toggle in the account editor, and the only route into that editor is tapping the
+  account on the Accounts tab — which hides archived ones. So the switch that undoes it sat behind
+  a row that no longer existed: an archived account holding money was at least an untappable line
+  in the Now breakdown, and one at zero appeared on no screen at all. The way out cannot depend on
+  the very thing the state removes, which is why "Archived accounts" lives in Settings rather than
+  in the list it is absent from. The tell is a writer with one caller: `setTagArchived` is only
+  ever called with `true`, and categories carry an `archived` column no screen writes at all —
+  both the same shape, neither fixed yet. A flow proves the way back by asserting the account is
+  on a DIFFERENT screen afterwards, not that the sheet listed it.
 - **A file that exists is not a file that has content.** The backup flow passed while producing a
   **0-byte** `.db` — `File.copy()` is async and was being called synchronously, so the share sheet
   offered an empty file under a perfectly correct filename. Nothing downstream could tell. Every

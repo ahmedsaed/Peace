@@ -11,7 +11,9 @@ import {
   deleteAccount,
   getAccount,
   listAccountsWithBalance,
+  listArchivedAccounts,
   balanceByCurrency,
+  restoreAccount,
   updateAccount,
 } from './accounts';
 import {
@@ -577,5 +579,111 @@ describe('category delete', () => {
 
   it('reports zero for a category nothing uses', () => {
     expect(deleteCategory(db, catId('pets'))).toEqual({ orphanedRecords: 0 });
+  });
+});
+
+/**
+ * Archiving is the one state you could enter from the UI and not leave: the
+ * toggle that undoes it lives in the account editor, and the only way into
+ * that editor is tapping the account in a list that hides archived ones.
+ * These are the two halves Settings needs — finding what was put away, and
+ * putting it back — and the promise archiving makes in the first place, which
+ * is that nothing is lost.
+ */
+describe('archiving an account, and coming back from it', () => {
+  function seeded() {
+    const { db } = createTestDb();
+    seedDefaults(db);
+    createRecord(db, {
+      id: 'txn-1',
+      type: 'expense',
+      accountId: CASH,
+      categoryId: catId('groceries'),
+      amountMinor: 2_500,
+      occurredAt: new Date(2026, 7, 9, 12),
+    });
+    return db;
+  }
+
+  it('takes the account out of the pickers and out of the total', () => {
+    const db = seeded();
+    const before = homeTotal(db);
+
+    updateAccount(db, CASH, { archived: true });
+
+    expect(listAccountsWithBalance(db).map((a) => a.id)).not.toContain(CASH);
+    // The money went nowhere — it is just no longer being counted here, which
+    // is the whole reason someone would want the account back.
+    expect(homeTotal(db)).toBe(before + 2_500);
+  });
+
+  it('keeps every record on it, which is what makes archiving not a delete', () => {
+    const db = seeded();
+    updateAccount(db, CASH, { archived: true });
+
+    const rows = db.select().from(transactions).where(eq(transactions.accountId, CASH)).all();
+    expect(rows).toHaveLength(1);
+    expect(getAccount(db, CASH)?.archived).toBe(true);
+  });
+
+  it('is the only thing listArchivedAccounts reports, balance and all', () => {
+    const db = seeded();
+    updateAccount(db, CASH, { archived: true });
+
+    const archived = listArchivedAccounts(db);
+    expect(archived.map((a) => a.id)).toEqual([CASH]);
+    // The balance comes with it: "which one was my old current account" is
+    // answered by the figure far more often than by the name.
+    expect(archived[0].balanceMinor).toBe(-2_500);
+  });
+
+  it('finds nothing when nothing has been put away', () => {
+    // The empty case is a real state, not an error — Settings renders a row
+    // with nowhere to go rather than a sheet with nothing in it.
+    expect(listArchivedAccounts(seeded())).toEqual([]);
+  });
+
+  it('brings it back to the pickers, the total and the editor', () => {
+    const db = seeded();
+    const before = homeTotal(db);
+    updateAccount(db, CASH, { archived: true });
+
+    const account = restoreAccount(db, CASH);
+
+    expect(account.archived).toBe(false);
+    expect(listArchivedAccounts(db)).toEqual([]);
+    expect(listAccountsWithBalance(db).map((a) => a.id)).toContain(CASH);
+    expect(homeTotal(db)).toBe(before);
+  });
+
+  it('changes nothing else about the account', () => {
+    const db = seeded();
+    createAccount(db, {
+      id: 'acct-card',
+      name: 'Kenana',
+      type: 'card',
+      creditLimit: 50_000_00,
+      foreignFeeBp: 300,
+      statementDay: 25,
+    });
+    const before = getAccount(db, 'acct-card');
+
+    updateAccount(db, 'acct-card', { archived: true });
+    restoreAccount(db, 'acct-card');
+
+    // A round trip through the archive must not quietly reset the card
+    // profile: those fields reach no total, so nothing else would notice.
+    expect(getAccount(db, 'acct-card')).toMatchObject({
+      name: before!.name,
+      type: before!.type,
+      creditLimit: before!.creditLimit,
+      foreignFeeBp: before!.foreignFeeBp,
+      statementDay: before!.statementDay,
+      openingBalance: before!.openingBalance,
+    });
+  });
+
+  it('refuses to report success for an account that does not exist', () => {
+    expect(() => restoreAccount(seeded(), 'acct-nope')).toThrow(InvariantError);
   });
 });

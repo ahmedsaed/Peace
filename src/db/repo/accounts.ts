@@ -69,6 +69,35 @@ export function balanceByCurrency(db: Db): CurrencyTotal[] {
     .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
+/**
+ * The accounts that have been put away — hidden from every picker and every
+ * total, with their history untouched.
+ *
+ * Archiving was the one state in this app you could enter and not leave. The
+ * switch that undoes it lives in the account editor, and the only route into
+ * that editor is tapping the account on the Accounts tab — which filters
+ * archived accounts out, so the control sat behind a row that no longer
+ * existed. An archived account holding money was at least visible as an
+ * untappable line in the Now breakdown; one at zero appeared on no screen at
+ * all. Settings reads this to offer them back.
+ */
+export function listArchivedAccounts(db: Db): AccountWithBalance[] {
+  return listAccountsWithBalance(db, true).filter((account) => account.archived);
+}
+
+/**
+ * Bring an archived account back into the pickers and the totals.
+ *
+ * ONLY the flag moves. Nothing was ever deleted — the account kept its
+ * records, its opening balance and its card profile the whole time it was
+ * away — so there is nothing here to rebuild and nothing that can half-happen.
+ * Throws through `updateAccount` if the id is not an account, rather than
+ * reporting success for a restore that restored nothing.
+ */
+export function restoreAccount(db: Db, id: string): Account {
+  return updateAccount(db, id, { archived: false });
+}
+
 /** Thrown when a write would break a documented invariant. Re-exported for convenience. */
 export { InvariantError } from './categories';
 
