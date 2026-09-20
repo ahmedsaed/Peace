@@ -265,6 +265,10 @@ appId: com.ahmed.peace
     id: "archive-restored"
 - takeScreenshot: 06-tag-restored
 
+# Settings is a stack screen too, for the same reason the search screen was:
+# a back arrow and no tab bar, so the hop to a tab has to pop it first.
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "tab-index"
 - tapOn:
@@ -323,6 +327,8 @@ appId: com.ahmed.peace
 
 # THE ASSERTION THAT MATTERS: the records kept everything a record is, and
 # lost only the label. Deleting a tag must never reach the money.
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "tab-index"
 - assertNotVisible: "Cash · “Tiles” · #Kitchen"

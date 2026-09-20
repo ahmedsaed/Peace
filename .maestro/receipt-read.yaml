@@ -56,6 +56,15 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "gemini-key-input"
 - takeScreenshot: 02-gemini-key-editor
+# Scroll to the BUTTON, not to the card. `scrollUntilVisible` on `gemini-card`
+# above is satisfied by the card's top edge, so everything further down is on
+# screen only as long as the page above it is short enough — and Settings grew
+# an Archived section, which put Save and Cancel under the fold while the input
+# they belong to stayed visible. Reach for the control being tapped.
+- scrollUntilVisible:
+    element:
+      id: "gemini-key-cancel"
+    direction: DOWN
 - tapOn:
     id: "gemini-key-cancel"
 - assertVisible:
