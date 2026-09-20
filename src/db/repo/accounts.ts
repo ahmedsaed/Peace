@@ -56,11 +56,20 @@ export type CurrencyTotal = { currency: string; balanceMinor: number };
  * So the screen shows what is true: how much sits in each currency. With a
  * single currency — the normal case — that is exactly one row and reads as the
  * total it always was.
+ *
+ * ARCHIVED ACCOUNTS COUNT. This skipped them once, and the money did not go
+ * anywhere: a wallet in a drawer with E£200 in it is not spent. `broughtForward`
+ * has never filtered them, so archiving an account moved the Accounts total and
+ * left the home screen's "Now" where it was — the two screens disagreeing by
+ * exactly the archived balance, with nothing on either of them to say why, and
+ * the identity `carry.test.ts` asserts quietly false. Filtering here is the
+ * version that LOOKS consistent and is wrong: it would drop the running
+ * position the moment somebody tidied up, with no record explaining the fall.
+ * The list says where the money is; this says how much there is.
  */
 export function balanceByCurrency(db: Db): CurrencyTotal[] {
   const totals = new Map<string, number>();
-  for (const account of listAccountsWithBalance(db)) {
-    if (account.archived) continue;
+  for (const account of listAccountsWithBalance(db, true)) {
     const key = account.currency.toUpperCase();
     totals.set(key, (totals.get(key) ?? 0) + account.balanceMinor);
   }

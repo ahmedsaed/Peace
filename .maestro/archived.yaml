@@ -22,11 +22,23 @@ appId: com.ahmed.peace
       id: "home-screen"
     timeout: 90000
 
-# --- Cash starts out an ordinary account ---
+# --- put money in Cash, so the total has something to be wrong about ---
+# Cash is the first seeded account, so a record with no account chosen lands
+# on it. E£9.00 out of it is the figure every assertion below watches.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "record-save"
+
 - tapOn:
     id: "tab-accounts"
 - assertVisible:
     id: "accounts-screen"
+- assertVisible:
+    id: "accounts-total"
+    text: "-E£9.00"
 - assertVisible: "Cash"
 
 # --- put it away ---
@@ -44,11 +56,35 @@ appId: com.ahmed.peace
 - tapOn:
     id: "form-save"
 
-# Gone from the list, which is exactly what left no way back.
+# THE TOTAL DOES NOT MOVE. Money in an archived account has not been spent —
+# a wallet in a drawer is still yours. This used to fall to E£0.00 here while
+# the home screen's "Now" went on saying -E£9.00, two screens disagreeing by
+# exactly the archived balance with nothing on either to explain it.
 - assertVisible:
     id: "accounts-screen"
-- assertNotVisible: "Cash"
+- assertVisible:
+    id: "accounts-total"
+    text: "-E£9.00"
+# ...and the list says where that money is, rather than counting an account it
+# never mentions.
+- assertVisible:
+    id: "accounts-archived"
 - takeScreenshot: 01-account-archived
+
+# Off the pickers, which is what archiving is actually for.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "pick-account"
+- assertVisible:
+    id: "sheet-account"
+- assertNotVisible: "Cash"
+- tapOn:
+    id: "picker-close"
+- tapOn:
+    id: "record-cancel"
 
 # --- find it in Settings ---
 - tapOn:
@@ -88,6 +124,13 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "accounts-screen"
 - assertVisible: "Cash"
+# The Archived group is gone, which is the assertion that means something now
+# that an archived account is ON this screen rather than missing from it.
+- assertNotVisible:
+    id: "accounts-archived"
+- assertVisible:
+    id: "accounts-total"
+    text: "-E£9.00"
 
 - tapOn:
     id: "tab-index"
@@ -98,6 +141,8 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "sheet-account"
 - assertVisible: "Cash"
+- tapOn:
+    id: "picker-close"
 - tapOn:
     id: "record-cancel"
 - takeScreenshot: 04-back-in-the-picker

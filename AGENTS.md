@@ -296,7 +296,16 @@ app ignoring input. `pkill -f GradleDaemon`.
 - **Two screens showing the same money must reconcile, and a test must say so.** `broughtForward` +
   this month's balance is exactly the Accounts total, opening balances included — `carry.test.ts`
   asserts that identity directly rather than testing each side on its own. Without it the two
-  screens can drift apart and the user has no way to tell which one is lying.
+  screens can drift apart and the user has no way to tell which one is lying. **And the fixture
+  decides what the identity is worth**: it was asserted on a ledger with no archived account in it,
+  which is exactly how it came to be false. `balanceByCurrency` skipped archived accounts and
+  `broughtForward` never has, so putting an account away moved the Accounts total, left "Now" where
+  it was, and neither screen said why. Money in an archived account has not been spent, so the
+  TOTAL counts it and the list grew an Archived group to show where it is — a figure that includes
+  money the screen never mentions is a screen disagreeing with itself. The version that looks
+  consistent, filtering both sides, is the wrong one: the running position would drop whenever
+  somebody tidied up, with no record explaining the fall. When a test asserts an identity, ask
+  which states the fixture never reaches.
 - **Percentages that are rounded independently do not add up to 100.** Three equal slices print
   33.3 three times, and a legend summing to 99.9 reads as a bug on a screen whose whole job is
   accounting for money. `sharePercents` in `src/lib/analysis.ts` distributes the error by largest

@@ -608,16 +608,22 @@ describe('archiving an account, and coming back from it', () => {
     return db;
   }
 
-  it('takes the account out of the pickers and out of the total', () => {
+  it('takes the account out of the pickers and leaves the total alone', () => {
     const db = seeded();
     const before = homeTotal(db);
 
     updateAccount(db, CASH, { archived: true });
 
     expect(listAccountsWithBalance(db).map((a) => a.id)).not.toContain(CASH);
-    // The money went nowhere — it is just no longer being counted here, which
-    // is the whole reason someone would want the account back.
-    expect(homeTotal(db)).toBe(before + 2_500);
+    // The money went nowhere, so the total does not move. It used to: this
+    // skipped archived accounts while `broughtForward` never has, so tidying
+    // up an account moved the Accounts total and left the home screen's "Now"
+    // where it was — two screens disagreeing by exactly the archived balance.
+    expect(homeTotal(db)).toBe(before);
+    // ...and the account is still there to be found, with what is in it.
+    expect(
+      listAccountsWithBalance(db, true).find((a) => a.id === CASH)?.balanceMinor
+    ).toBe(-2_500);
   });
 
   it('keeps every record on it, which is what makes archiving not a delete', () => {
