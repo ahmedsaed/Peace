@@ -29,6 +29,7 @@ import {
 } from '@/db/repo/categories';
 import { listArchivedTags, restoreTag } from '@/db/repo/tags';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
+import { idSlug } from '@/lib/slug';
 import { useSettingsStore } from '@/state/settings';
 import { useMoney } from '@/state/money';
 
@@ -150,15 +151,13 @@ export default function SettingsScreen() {
     });
   }
 
-  /** A testID key: ids carry colons and names carry spaces, regexes carry neither. */
-  const testKey = (value: string) => value.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase();
 
   const archivedAccountItems: ArchiveItem[] = archived.accounts.map((a) => ({
     id: a.id,
     name: a.name,
     icon: a.icon,
     color: a.color,
-    testKey: testKey(a.id),
+    testKey: idSlug(a.id),
     // What is still in it, because "which one was the old current account"
     // is answered by the balance far more often than by the name.
     detail: money(a.balanceMinor, a.currency),
@@ -170,7 +169,7 @@ export default function SettingsScreen() {
     name: c.name,
     icon: c.icon,
     color: c.color,
-    testKey: testKey(c.id),
+    testKey: idSlug(c.id),
     // Sub-categories sit under the parent they were put away with, the same
     // shape the category picker uses — a lone "Restaurants" in a flat list
     // does not say which Food it belonged to.
@@ -185,7 +184,7 @@ export default function SettingsScreen() {
       id: t.id,
       name: t.name,
       icon: 'tag',
-      testKey: testKey(t.normalised),
+      testKey: idSlug(t.normalised),
       // A tag is never blocked — it owns no money — so the count is not a
       // wall, it is the cost, and it belongs where it can be read BEFORE the
       // delete rather than in the sentence afterwards.

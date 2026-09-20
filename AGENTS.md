@@ -36,6 +36,7 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Regenerate app icons | `npm i --no-save sharp && node scripts/make-icons.mjs` |
 | Check the lockfile like CI does | `npm run verify:lock` |
 | Validate the JS bundle without a device | `npx expo export --platform android` |
+| Check every flow's testIDs without a device | `npm test -- flows` |
 | Dev server | `npm start` |
 
 ## How to verify a change
@@ -159,6 +160,16 @@ Three things that are true only because CI caught them, and will bite again:
 
 **Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
 merging anything that touches a screen.
+
+**The part of a flow that CAN be checked without a device is checked by `npm test`.**
+`src/lib/flows.test.ts` reads every `id:` in `.maestro/` and demands it exist in `src/` — a flow
+naming an id that was renamed or mistyped otherwise fails on a machine with an emulator, looking
+exactly like a broken app. It stops short where a testID is built from data: `archive-delete-${key}`
+becomes `^archive-delete-.+$`, so the keys a flow spells out by hand are pinned separately against
+the seed and the same `idSlug` the screen uses. It nearly shipped useless — generalising every
+template turned `${testIDPrefix}-${option.value}` into `^.+-.+$`, which matches every hyphenated id
+there is, so all 24 flows passed while nothing was being compared. A template only becomes a pattern
+if it has a LITERAL head, and a case asserts that a made-up id is still rejected.
 
 **Play Protect HARD-BLOCKS the sideloaded APK, on every update.** Declaring a
 `NotificationListenerService` puts the app in the same class as `READ_SMS` and accessibility
