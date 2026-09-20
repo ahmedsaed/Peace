@@ -155,10 +155,15 @@ export function validateBackup(db: RawDb, alias: string): void {
 /**
  * Replace every row in the live database with the backup's.
  *
- * Only columns present in BOTH schemas are copied. Migrations in this project
- * only ever add columns (see AGENTS.md), so an older backup simply leaves the
- * newer columns at their defaults — which is the correct outcome, and far
- * better than refusing every backup taken before the last schema change.
+ * Only columns present in BOTH schemas are copied, which is what covers both
+ * directions. A backup older than a column leaves it at its default — the
+ * correct outcome, and far better than refusing every backup taken before the
+ * last schema change. A backup holding a column this build has DROPPED has
+ * nowhere to put it, and the intersection is the only reason that is not an
+ * error: "migrations only ever add" (AGENTS.md) is the intent, and migration
+ * `0011` is already an exception, having dropped two columns from
+ * `bank_captures`. `restore-compat.test.ts` restores a backup from every
+ * schema this app has had, so neither direction rests on the claim.
  *
  * A whole TABLE the backup does not have is the same situation one level up,
  * and gets the same answer: the live rows are deleted like every other table's
