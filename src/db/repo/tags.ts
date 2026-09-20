@@ -82,6 +82,32 @@ export function setTagArchived(db: Db, id: string, archived: boolean): void {
   db.update(tags).set({ archived, updatedAt: new Date() }).where(eq(tags.id, id)).run();
 }
 
+/**
+ * The tags that have been put away.
+ *
+ * Archiving a tag is the end of a project, not the end of its records: the
+ * label stays on everything it was ever put on and `tagBreakdown` still counts
+ * it. This is only what the picker stopped offering.
+ */
+export function listArchivedTags(db: Db): Tag[] {
+  return listTags(db, { includeArchived: true }).filter((tag) => tag.archived);
+}
+
+/**
+ * Offer a tag again.
+ *
+ * Throws for an id that is not a tag rather than reporting success: an UPDATE
+ * that matches no row is silent, and "restored" with nothing restored is the
+ * one answer a recovery path must never give.
+ */
+export function restoreTag(db: Db, id: string): Tag {
+  const existing = db.select().from(tags).where(eq(tags.id, id)).get();
+  if (!existing) throw new InvariantError(`Tag "${id}" does not exist.`);
+
+  setTagArchived(db, id, false);
+  return db.select().from(tags).where(eq(tags.id, id)).get()!;
+}
+
 /** The tags on one record, in the order a picker would list them. */
 export function tagsForRecord(db: Db, transactionId: string): Tag[] {
   return db

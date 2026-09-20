@@ -22,6 +22,9 @@ import {
   deleteCategory,
   getCategory,
   InvariantError,
+  listArchivedCategories,
+  listCategoryTree,
+  restoreCategory,
   updateCategory,
 } from './categories';
 import {
@@ -685,5 +688,129 @@ describe('archiving an account, and coming back from it', () => {
 
   it('refuses to report success for an account that does not exist', () => {
     expect(() => restoreAccount(seeded(), 'acct-nope')).toThrow(InvariantError);
+  });
+});
+
+/**
+ * Archiving a category, and the tree invariant that decides how it travels.
+ *
+ * A LIVE category has a live parent. Archive a parent and leave its children
+ * and `buildCategoryTree` promotes them — "Groceries" becomes a heading beside
+ * "Food", which reads as a bug in the picker rather than as something anyone
+ * did. So archiving goes DOWN to the children and restoring goes UP to the
+ * parent, and the one direction that would undo a decision nobody made twice —
+ * restoring a parent dragging back a sub-category retired on its own — does
+ * not happen.
+ */
+describe('archiving a category, and coming back from it', () => {
+  function seeded() {
+    const { db } = createTestDb();
+    createCategory(db, { id: 'food', name: 'Food', kind: 'expense', sortOrder: 0 });
+    createCategory(db, {
+      id: 'groceries',
+      name: 'Groceries',
+      kind: 'expense',
+      parentId: 'food',
+      sortOrder: 0,
+    });
+    createCategory(db, {
+      id: 'restaurants',
+      name: 'Restaurants',
+      kind: 'expense',
+      parentId: 'food',
+      sortOrder: 1,
+    });
+    createAccount(db, { id: 'bank', name: 'Bank' });
+    createRecord(db, {
+      id: 'txn-1',
+      type: 'expense',
+      accountId: 'bank',
+      categoryId: 'groceries',
+      amountMinor: 4_000,
+      occurredAt: new Date(2026, 7, 9, 12),
+    });
+    return db;
+  }
+
+  const treeNames = (db: TestDb) =>
+    listCategoryTree(db, 'expense').map((top) => [top.name, top.children.map((c) => c.name)]);
+
+  it('takes the sub-categories with it rather than promoting them', () => {
+    const db = seeded();
+    expect(treeNames(db)).toEqual([['Food', ['Groceries', 'Restaurants']]]);
+
+    updateCategory(db, 'food', { archived: true });
+
+    // The whole subtree leaves together. Without the cascade, this reads
+    // [['Groceries', []], ['Restaurants', []]] — two new top-level categories
+    // nobody created.
+    expect(treeNames(db)).toEqual([]);
+    expect(getCategory(db, 'groceries')?.archived).toBe(true);
+  });
+
+  it('leaves the records filed under it, which is what delete does not', () => {
+    const db = seeded();
+    updateCategory(db, 'food', { archived: true });
+
+    // Deleting "Groceries" would leave this record uncategorised — the history
+    // stops saying what the money went on, and that cannot be reconstructed.
+    const row = db.select().from(transactions).where(eq(transactions.id, 'txn-1')).get();
+    expect(row?.categoryId).toBe('groceries');
+  });
+
+  it('lists what is away, parents before their own children', () => {
+    const db = seeded();
+    updateCategory(db, 'food', { archived: true });
+
+    expect(listArchivedCategories(db).map((c) => c.name)).toEqual([
+      'Food',
+      'Groceries',
+      'Restaurants',
+    ]);
+  });
+
+  it('lists a sub-category retired on its own, whose parent is still here', () => {
+    const db = seeded();
+    updateCategory(db, 'restaurants', { archived: true });
+
+    expect(listArchivedCategories(db).map((c) => c.name)).toEqual(['Restaurants']);
+    expect(treeNames(db)).toEqual([['Food', ['Groceries']]]);
+  });
+
+  it('brings a parent back without dragging its children with it', () => {
+    const db = seeded();
+    updateCategory(db, 'restaurants', { archived: true });
+    updateCategory(db, 'food', { archived: true });
+
+    restoreCategory(db, 'food');
+
+    // Groceries went away WITH Food and comes back on its own terms; so does
+    // Restaurants, which was retired before either of them.
+    expect(treeNames(db)).toEqual([['Food', []]]);
+    expect(listArchivedCategories(db).map((c) => c.name)).toEqual(['Groceries', 'Restaurants']);
+  });
+
+  it('brings the parent back with a sub-category, never an orphan', () => {
+    const db = seeded();
+    updateCategory(db, 'food', { archived: true });
+
+    restoreCategory(db, 'groceries');
+
+    // Restoring the child alone would promote it to top level, which is the
+    // same wrong picture as archiving the parent alone.
+    expect(treeNames(db)).toEqual([['Food', ['Groceries']]]);
+    expect(getCategory(db, 'food')?.archived).toBe(false);
+    expect(listArchivedCategories(db).map((c) => c.name)).toEqual(['Restaurants']);
+  });
+
+  it('keeps the tree out of every picker while it is away', () => {
+    const db = seeded();
+    updateCategory(db, 'food', { archived: true });
+
+    expect(buildCategoryTree(db.select().from(categories).all(), 'expense')).toEqual([]);
+  });
+
+  it('refuses to report success for a category that does not exist', () => {
+    expect(() => restoreCategory(seeded(), 'cat-nope')).toThrow(InvariantError);
   });
 });

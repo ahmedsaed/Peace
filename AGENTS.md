@@ -355,16 +355,26 @@ app ignoring input. `pkill -f GradleDaemon`.
   "Back up everything" on the same day deleted it: the screen promised the restore was undoable
   while the only thing making it undoable was one tap from destruction. There is now an explicit
   "Undo last restore" button, because a recovery file the user cannot reach is not a recovery.
-- **A state you can enter from the UI must be one you can LEAVE from the UI.** Archiving an account
-  is set by a toggle in the account editor, and the only route into that editor is tapping the
-  account on the Accounts tab — which hides archived ones. So the switch that undoes it sat behind
-  a row that no longer existed: an archived account holding money was at least an untappable line
-  in the Now breakdown, and one at zero appeared on no screen at all. The way out cannot depend on
-  the very thing the state removes, which is why "Archived accounts" lives in Settings rather than
-  in the list it is absent from. The tell is a writer with one caller: `setTagArchived` is only
-  ever called with `true`, and categories carry an `archived` column no screen writes at all —
-  both the same shape, neither fixed yet. A flow proves the way back by asserting the account is
-  on a DIFFERENT screen afterwards, not that the sheet listed it.
+- **A state you can enter from the UI must be one you can LEAVE from the UI.** Archiving is set by
+  a toggle in an editor you reach by tapping the thing in a list — and every one of those lists
+  hides what is archived, so the switch that undoes it sat behind a row that no longer existed. An
+  archived account holding money was at least an untappable line in the Now breakdown; one at zero
+  appeared on no screen at all. The way out cannot live where the state removed it from, which is
+  why Settings has an **Archived** section for all three rather than each list carrying its own.
+  **The tell is a writer with one caller**: `setTagArchived` was only ever called with `true`, and
+  `categories.archived` was READ by every picker and written by nothing — a filter with no way to
+  set it is a feature that exists only in the schema. Grep a boolean setter for its callers before
+  believing the state is reachable in both directions. A flow proves the way back by asserting the
+  thing is on a DIFFERENT screen afterwards, never that the sheet listed it.
+- **Archiving travels along the category tree, and it has to go both ways.** A live category has a
+  live parent: archive "Food" and leave "Groceries" behind, and `buildCategoryTree` promotes the
+  child to top level — a sub-category silently becoming a heading, which reads as a bug in the
+  picker rather than as something the user did. Restore a child whose parent is still away and the
+  same promotion happens in reverse. So archiving cascades DOWN to the children and restoring
+  pulls the parent UP, and restoring a parent deliberately leaves its children put away: dragging
+  back a sub-category somebody retired on its own is the one direction that undoes a decision
+  nobody made twice. Both cascades live inside `updateCategory`, beside the `kind` cascade they
+  are modelled on, so no caller can set the flag and miss them.
 - **A file that exists is not a file that has content.** The backup flow passed while producing a
   **0-byte** `.db` — `File.copy()` is async and was being called synchronously, so the share sheet
   offered an empty file under a perfectly correct filename. Nothing downstream could tell. Every

@@ -236,3 +236,47 @@ appId: com.ahmed.peace
     id: "search-count"
     text: "2 records"
 - takeScreenshot: 05-archived-still-found
+
+# ===========================================================================
+# ...and the way back, which did not exist
+# ===========================================================================
+# `setTagArchived` was only ever called with `true` from any screen, so a
+# finished project was finished for good. Settings now offers it again — and
+# the assertion that matters is the PICKER offering it, not the sheet listing
+# it.
+#
+# Leaving the search screen first: it is a stack screen with its own header,
+# so the drawer button that Settings is behind is not on it.
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "setting-archived-tags"
+- assertVisible: "1 put away"
+- tapOn:
+    id: "setting-archived-tags"
+- assertVisible:
+    id: "sheet-archived-tags"
+- tapOn: "Kitchen"
+- assertVisible:
+    id: "archive-restored"
+- takeScreenshot: 06-tag-restored
+
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "record-tags"
+# Back in the list that stopped offering it — and still carrying the records it
+# never left, which the search above already proved.
+- assertVisible:
+    id: "tag-row-kitchen"
+- tapOn:
+    id: "tag-done"
+- tapOn:
+    id: "record-cancel"
+- takeScreenshot: 07-tag-offered-again
