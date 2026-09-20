@@ -475,6 +475,18 @@ app ignoring input. `pkill -f GradleDaemon`.
   and report success. The manifest records how many attachments were packed and `readContainer`
   CHECKS it, which is what makes the loss visible before anything is deleted. Any container format
   needs a count that is verified rather than trusted.
+- **A new TABLE is required in the APP and optional in a BACKUP.** Restore's table list was doing
+  two jobs with one array — which tables to copy, and which tables a file must have to BE a Peace
+  backup — so adding `tags` and `transaction_tags` to it (correctly: a table absent from that list
+  is copied by nothing) made every backup written before tags shipped come back as "This file is
+  not a Peace backup — it is missing tags, transaction_tags". A backup is OLDER than the app far
+  more often than it is newer, and the person reading that sentence is by definition someone whose
+  data is already gone. The rule is the one `copyFromBackup` has always applied to columns, one
+  level up: what the backup does not have, it could not have had. Only the tables migration 0000
+  created identify a backup; every later one is copied when present and left empty when absent —
+  never kept from the outgoing ledger, or the restored records would be wearing somebody else's
+  labels. `restore-core.test.ts` checks both halves against `drizzle/` itself, so the next
+  migration cannot get this wrong by hand.
 - **Attachments are content-addressed (`<sha256>.<ext>`), and that is three rules in one.** The
   same receipt attached twice is one file; a name a file manager supplied never reaches the disk or
   the archive (`../../evil.jpg` is the classic zip escape); and a file cannot change under its own

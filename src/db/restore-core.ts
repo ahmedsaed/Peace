@@ -23,42 +23,74 @@ export type RawDb = {
 };
 
 /**
- * Restore order is parent-first. Foreign keys are deferred inside the
- * transaction anyway, but inserting parents first means the intermediate state
- * is valid too — which matters if this ever runs without deferral.
+ * Every table a restore copies, parent-first, each saying whether a backup
+ * without it is a backup at all.
+ *
+ * Foreign keys are deferred inside the transaction anyway, but inserting
+ * parents first means the intermediate state is valid too — which matters if
+ * this ever runs without deferral.
+ *
+ * `required` is the half of this that was missing, and its absence broke every
+ * old backup the day tags shipped. The seven original tables are in migration
+ * 0000, so every Peace database that has ever existed has them: a file without
+ * one is somebody else's database, and refusing it is the point. Every other
+ * table arrived in a LATER migration, which means a backup taken before that
+ * migration ran is not a foreign file — it is an OLDER Peace backup, and the
+ * feature simply did not exist when it was written. Demanding those tables
+ * turned "the ledger you are restoring predates tags" into "This file is not a
+ * Peace backup — it is missing tags, transaction_tags", on the one day a backup
+ * is being used at all.
+ *
+ * This is the same rule `copyFromBackup` has always applied to COLUMNS one
+ * level up: migrations only ever add, so what the backup does not have, it
+ * could not have had. A flat list of names cannot say which tables identify a
+ * backup and which merely arrived later, so the list says both per table —
+ * beside the name, where a new table is added, rather than in a second list
+ * that the next migration forgets. `restore-core.test.ts` checks both halves
+ * against `drizzle/` itself: a table created by any migration and not named
+ * here is copied by NOTHING, and a table flagged `required` that migration 0000
+ * did not create would refuse every backup older than it.
  *
  * `__drizzle_migrations` is deliberately absent: the live database keeps its
  * own migration history. Copying the backup's would claim migrations had run
  * that have not, and the next launch would skip them.
  */
-export const RESTORE_TABLES = [
-  'accounts',
-  'categories',
-  'settings',
-  'transactions',
-  'budgets',
-  'recurring_rules',
-  'attachments',
+export const BACKUP_TABLES = [
+  { name: 'accounts', required: true },
+  { name: 'categories', required: true },
+  { name: 'settings', required: true },
+  { name: 'transactions', required: true },
+  { name: 'budgets', required: true },
+  { name: 'recurring_rules', required: true },
+  { name: 'attachments', required: true },
   // The portfolio keeps its own tables and never touches the ledger — but a
   // backup that quietly dropped them would still be a backup that lost data.
   // A table absent from this list is copied by nothing; unlike a new COLUMN,
   // which `copyFromBackup` picks up on its own, a new TABLE has to be added
   // here by hand. That asymmetry is the whole reason restore-fidelity.test.ts
   // asserts figures rather than columns.
-  'recurring_skips',
-  'asset_classes',
-  'holdings',
-  'bank_captures',
+  { name: 'recurring_skips', required: false },
+  { name: 'asset_classes', required: false },
+  { name: 'holdings', required: false },
+  { name: 'bank_captures', required: false },
   // Tags before the join that points at them, per the parent-first rule above.
   // Two TABLES, so two lines here: `copyFromBackup` picks up a new column on
   // its own and a new table not at all, which is why restore-fidelity.test.ts
   // asserts figures rather than columns — and why tags needed a case of their
   // own there, since they move no figure at all.
-  'tags',
-  'transaction_tags',
+  { name: 'tags', required: false },
+  { name: 'transaction_tags', required: false },
 ] as const;
 
-export type RestoreTable = (typeof RESTORE_TABLES)[number];
+export type RestoreTable = (typeof BACKUP_TABLES)[number]['name'];
+
+/** Every table copied, in the order they are copied in. */
+export const RESTORE_TABLES: readonly RestoreTable[] = BACKUP_TABLES.map((t) => t.name);
+
+/** The tables whose absence means the file is not a Peace backup. */
+export const REQUIRED_TABLES: readonly RestoreTable[] = BACKUP_TABLES.filter(
+  (t) => t.required
+).map((t) => t.name);
 
 function run(db: RawDb, sql: string): void {
   if (db.execSync) db.execSync(sql);
@@ -101,7 +133,7 @@ export class RestoreError extends Error {}
  * backup and their current data, and can be told why.
  */
 export function validateBackup(db: RawDb, alias: string): void {
-  const missing = RESTORE_TABLES.filter((t) => !tableExists(db, alias, t));
+  const missing = REQUIRED_TABLES.filter((t) => !tableExists(db, alias, t));
   if (missing.length > 0) {
     throw new RestoreError(
       `This file is not a Peace backup — it is missing ${missing.join(', ')}.`
@@ -128,6 +160,13 @@ export function validateBackup(db: RawDb, alias: string): void {
  * newer columns at their defaults — which is the correct outcome, and far
  * better than refusing every backup taken before the last schema change.
  *
+ * A whole TABLE the backup does not have is the same situation one level up,
+ * and gets the same answer: the live rows are deleted like every other table's
+ * and nothing is put back, because the feature did not exist when the backup
+ * was written. Keeping them would be worse than empty — the restored ledger
+ * would be wearing the OUTGOING ledger's tags, on records that are not the
+ * records they were attached to.
+ *
  * One transaction: either the whole ledger is replaced or none of it is. There
  * is no state in which half the records are the backup's and half are yours.
  */
@@ -143,6 +182,14 @@ export function copyFromBackup(db: RawDb, alias: string): Record<RestoreTable, n
     }
 
     for (const table of RESTORE_TABLES) {
+      if (!tableExists(db, alias, table)) {
+        // Older than the migration that created it. `validateBackup` has
+        // already established this is a Peace backup, so there is nothing to
+        // refuse here — there is simply nothing to copy.
+        copied[table] = 0;
+        continue;
+      }
+
       const mine = columnsOf(db, 'main', table);
       const theirs = new Set(columnsOf(db, alias, table));
       const shared = mine.filter((c) => theirs.has(c));
