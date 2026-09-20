@@ -37,6 +37,7 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Check the lockfile like CI does | `npm run verify:lock` |
 | Validate the JS bundle without a device | `npx expo export --platform android` |
 | Check every flow's testIDs without a device | `npm test -- flows` |
+| E2E without an emulator to hand | Actions › **E2E** › Run workflow (manual) |
 | Dev server | `npm start` |
 
 ## How to verify a change
@@ -158,8 +159,24 @@ Three things that are true only because CI caught them, and will bite again:
   those packages under `@unrs/resolver-binding-wasm32-wasi` where they belong, and the lockfile
   became self-consistent. An override that survives its original problem becomes the next one.
 
-**Maestro does not run in CI** — it needs a booted emulator. Run `npm run e2e` locally before
-merging anything that touches a screen.
+**Maestro does not run on every push** — it needs a booted emulator, which is minutes rather than
+seconds. Run `npm run e2e` locally before merging anything that touches a screen.
+
+**When there is no emulator to hand, run the E2E workflow.** `.github/workflows/e2e.yml` is
+`workflow_dispatch` only: it builds the x86_64 APK through the SAME reusable build the PR and the
+release use (hence the `abi` input — an arm64 APK installs on the emulator and then dies on a
+missing `libreactnative.so`), boots an emulator on a GitHub runner and runs the flows, uploading
+Maestro's hierarchy dumps and screenshots so a failure is readable by somebody who cannot attach to
+the device. `ubuntu-latest` runners have KVM, which is what makes this possible at all — an
+environment without it (most cloud dev containers: no `/dev/kvm`, no `vmx`/`svm` in
+`/proc/cpuinfo`) cannot boot an x86_64 image, and there is no software fallback worth having.
+
+It is MANUAL and it is not a gate. Some flows want what a runner does not have — an API key, a
+photo in the gallery, a Google account — so a red run there is as likely to mean "CI lacks
+something" as "the app is broken". Start with `tags: core`, widen to a single flow by path, and
+read the uploaded screenshots before believing a failure. It also proves nothing about a real
+phone: Play Protect, the device's ICU data and anything about how the thing feels in a hand are
+still only answerable on hardware.
 
 **The part of a flow that CAN be checked without a device is checked by `npm test`.**
 `src/lib/flows.test.ts` reads every `id:` in `.maestro/` and demands it exist in `src/` — a flow
