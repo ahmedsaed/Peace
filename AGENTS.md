@@ -375,6 +375,22 @@ app ignoring input. `pkill -f GradleDaemon`.
   set it is a feature that exists only in the schema. Grep a boolean setter for its callers before
   believing the state is reachable in both directions. A flow proves the way back by asserting the
   thing is on a DIFFERENT screen afterwards, never that the sheet listed it.
+- **A refusal has to hand over the list.** An archived account or category can only be deleted
+  once nothing points at it, and for good reason: `transactions.account_id` CASCADES, so deleting
+  an account with history takes every record on it — a month that suddenly balances differently
+  with nothing to say why — and `deleteCategory` leaves its records UNCATEGORISED, which loses
+  what the money went on and cannot be reconstructed. But "you cannot delete this" is a dead end,
+  so the row carries the COUNT instead of a dead button, and tapping it opens search filtered to
+  exactly those records with a notice saying what to do. **The count and the list must come from
+  one query** — `checkDeletion` returns the filter it counted with and the screen hands that same
+  filter to the search page, or the sheet says 4 over a list of 3 and somebody goes looking for a
+  record that is not there. The one place they cannot agree by construction: search lists a
+  transfer ONCE, as the leg the money left on, so an account that has only ever RECEIVED transfers
+  holds rows `accountId` cannot find. `counterAccountId` reaches them, and the blocking count
+  comes from `accountRecordCount` — the ledger — because that is what the delete would actually
+  refuse on. A TAG is the deliberate exception: its links cascade and touch no money, so nothing
+  blocks it and the count becomes the COST, said before the second tap rather than in the sentence
+  afterwards.
 - **Archiving travels along the category tree, and it has to go both ways.** A live category has a
   live parent: archive "Food" and leave "Groceries" behind, and `buildCategoryTree` promotes the
   child to top level — a sub-category silently becoming a heading, which reads as a bug in the

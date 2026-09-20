@@ -147,8 +147,12 @@ const byOrder = (a: Category, b: Category) =>
  * promoted to top level rather than silently disappearing — losing a category
  * from the picker is worse than showing it in the wrong place.
  */
-export function buildCategoryTree(all: Category[], kind: Category['kind']): CategoryNode[] {
-  const ofKind = all.filter((c) => c.kind === kind && !c.archived);
+export function buildCategoryTree(
+  all: Category[],
+  kind: Category['kind'],
+  { includeArchived = false } = {}
+): CategoryNode[] {
+  const ofKind = all.filter((c) => c.kind === kind && (includeArchived || !c.archived));
   const ids = new Set(ofKind.map((c) => c.id));
   const tops = ofKind.filter((c) => !c.parentId || !ids.has(c.parentId)).sort(byOrder);
 
@@ -208,9 +212,21 @@ export function restoreCategory(db: Db, id: string): Category {
   return updateCategory(db, id, { archived: false });
 }
 
-/** Top-level categories of one kind, each with its children attached. */
-export function listCategoryTree(db: Db, kind: Category['kind']): CategoryNode[] {
-  return buildCategoryTree(db.select().from(categories).all(), kind);
+/**
+ * Top-level categories of one kind, each with its children attached.
+ *
+ * `includeArchived` exists for SEARCH, and for nothing else so far: a retired
+ * category is exactly the thing somebody goes looking for afterwards, and a
+ * filter naming one it cannot list would show the records while the chip above
+ * them read "Any category". Every picker that OFFERS a category for new data
+ * leaves the default alone.
+ */
+export function listCategoryTree(
+  db: Db,
+  kind: Category['kind'],
+  options?: { includeArchived?: boolean }
+): CategoryNode[] {
+  return buildCategoryTree(db.select().from(categories).all(), kind, options);
 }
 
 export function listTopLevel(db: Db, kind: Category['kind']): Category[] {

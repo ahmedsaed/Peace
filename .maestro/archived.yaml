@@ -106,6 +106,35 @@ appId: com.ahmed.peace
 - assertVisible: "Cash"
 - takeScreenshot: 02-archived-listed
 
+# --- what deleting it would cost, before it is offered ---
+# Cash carries the E£9.00 record, so the row offers the COUNT rather than a
+# delete button: tapping it is a question, and the answer is the search page
+# filtered to exactly those records. A dead "you cannot delete this" with no
+# way to see what is holding it is how people learn to stop pressing things.
+- assertVisible:
+    id: "archive-move-seed-acct-cash"
+- tapOn:
+    id: "archive-move-seed-acct-cash"
+- assertVisible:
+    id: "search-screen"
+- assertVisible:
+    id: "search-notice"
+# The count on the row and the list that opens come from one query, so this is
+# the same "1" the sheet printed a moment ago.
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- takeScreenshot: 03-blocked-by-records
+
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-screen"
+- tapOn:
+    id: "setting-archived-accounts"
+- assertVisible:
+    id: "sheet-archived-accounts"
+
 # --- bring it back ---
 - tapOn: "Cash"
 - assertVisible:
@@ -114,7 +143,7 @@ appId: com.ahmed.peace
 # the presence of "None": all three rows in this section read "None" when they
 # are empty, so a "None" is visible here whether or not the account came back.
 - assertNotVisible: "1 put away"
-- takeScreenshot: 03-account-restored
+- takeScreenshot: 04-account-restored
 
 # THE ASSERTION THAT MATTERS. On a different screen, the account is listed
 # again — and it is offered by the record screen's account picker, which is the
@@ -145,7 +174,7 @@ appId: com.ahmed.peace
     id: "picker-close"
 - tapOn:
     id: "record-cancel"
-- takeScreenshot: 04-back-in-the-picker
+- takeScreenshot: 05-back-in-the-picker
 
 # ===========================================================================
 # The same round trip for a category
@@ -172,7 +201,7 @@ appId: com.ahmed.peace
     id: "form-save"
 - assertVisible:
     id: "categories-screen"
-- takeScreenshot: 05-category-archived
+- takeScreenshot: 06-category-archived
 
 - tapOn:
     id: "nav-menu"
@@ -197,4 +226,55 @@ appId: com.ahmed.peace
 - scrollUntilVisible:
     element: "Pets"
     direction: DOWN
-- takeScreenshot: 06-category-restored
+- takeScreenshot: 07-category-restored
+
+# ===========================================================================
+# Deleting one that nothing points at
+# ===========================================================================
+# Baby has no records, so the row offers a delete rather than a count — and it
+# takes a second tap that names what is about to go, because this is the one
+# action here that cannot be undone.
+- scrollUntilVisible:
+    element: "Baby"
+    direction: DOWN
+- tapOn: "Baby"
+- assertVisible: "Edit category"
+- scrollUntilVisible:
+    element:
+      id: "category-archived"
+    direction: DOWN
+- tapOn:
+    id: "category-archived"
+- tapOn:
+    id: "form-save"
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-archived-categories"
+- assertVisible:
+    id: "sheet-archived-categories"
+- tapOn:
+    id: "archive-delete-seed-cat-baby"
+# Armed, not done: the row asks before it goes.
+- assertVisible: "Delete Baby for good?"
+- takeScreenshot: 08-delete-armed
+- tapOn:
+    id: "archive-confirm-seed-cat-baby"
+- assertVisible:
+    id: "archive-restored"
+- assertVisible: "Baby deleted."
+
+# Gone from the archive it was in, and gone from the categories tab.
+- assertVisible:
+    id: "setting-archived-categories"
+- assertNotVisible:
+    id: "sheet-archived-categories"
+- tapOn:
+    id: "tab-categories"
+- assertVisible:
+    id: "categories-screen"
+- assertNotVisible: "Baby"
+- takeScreenshot: 09-category-deleted

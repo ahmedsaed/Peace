@@ -280,3 +280,52 @@ appId: com.ahmed.peace
 - tapOn:
     id: "record-cancel"
 - takeScreenshot: 07-tag-offered-again
+
+# ===========================================================================
+# ...and deleting it, which is not the same thing at all
+# ===========================================================================
+# Archiving keeps the label on its records; deleting takes it off them. The
+# sheet says how many are about to forget BEFORE the second tap, because that
+# is the only moment the number can still change anyone's mind.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "record-tags"
+- longPressOn:
+    id: "tag-row-kitchen"
+- tapOn:
+    id: "tag-archive"
+- tapOn:
+    id: "tag-done"
+- tapOn:
+    id: "record-cancel"
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-archived-tags"
+- assertVisible:
+    id: "sheet-archived-tags"
+# The cost is on the row before it is on the confirmation.
+- assertVisible: "On 2 records"
+- tapOn:
+    id: "archive-delete-kitchen"
+- assertVisible: "Delete Kitchen for good?"
+- assertVisible: ".*2 records will lose the label.*"
+- takeScreenshot: 08-tag-delete-armed
+- tapOn:
+    id: "archive-confirm-kitchen"
+- assertVisible:
+    id: "archive-restored"
+- assertVisible: "Kitchen deleted, and taken off 2 records."
+
+# THE ASSERTION THAT MATTERS: the records kept everything a record is, and
+# lost only the label. Deleting a tag must never reach the money.
+- tapOn:
+    id: "tab-index"
+- assertNotVisible: "Cash · “Tiles” · #Kitchen"
+- assertVisible: ".*Tiles.*"
+- assertVisible: "-E£1,200.00"
+- takeScreenshot: 09-tag-deleted

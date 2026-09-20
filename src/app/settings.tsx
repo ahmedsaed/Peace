@@ -1,9 +1,10 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
+import { ArchiveSheet, type ArchiveItem } from '@/components/archive-sheet';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import { BankMessagesCard } from '@/components/bank-card';
 import { ReceiptsCard } from '@/components/receipts-card';
@@ -15,7 +16,17 @@ import {
   listArchivedAccounts,
   restoreAccount,
 } from '@/db/repo/accounts';
-import { listArchivedCategories, restoreCategory } from '@/db/repo/categories';
+import {
+  archivedName,
+  checkDeletion,
+  deleteArchived,
+  type ArchivedTarget,
+} from '@/db/repo/archive';
+import {
+  InvariantError,
+  listArchivedCategories,
+  restoreCategory,
+} from '@/db/repo/categories';
 import { listArchivedTags, restoreTag } from '@/db/repo/tags';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
 import { useSettingsStore } from '@/state/settings';
@@ -33,6 +44,7 @@ import { useMoney } from '@/state/money';
  */
 export default function SettingsScreen() {
   const money = useMoney();
+  const router = useRouter();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
   const [sheet, setSheet] = useState<
@@ -42,8 +54,9 @@ export default function SettingsScreen() {
   const [accounts, setAccounts] = useState(() => listAccountsWithBalance(db));
   /** Everything put away, read together because one section offers all of it. */
   const [archived, setArchived] = useState(() => readArchive());
-  /** What this visit brought back, for the line that says so. */
+  /** What this visit brought back or removed, for the line that says so. */
   const [restored, setRestored] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     setAccounts(listAccountsWithBalance(db));
@@ -58,6 +71,7 @@ export default function SettingsScreen() {
     useCallback(() => {
       reload();
       setRestored(null);
+      setProblem(null);
     }, [reload])
   );
 
@@ -87,37 +101,102 @@ export default function SettingsScreen() {
   function bringBack(name: string) {
     reload();
     setRestored(name);
+    setProblem(null);
     setSheet(null);
   }
 
-  const archivedAccountOptions: PickerOption[] = archived.accounts.map((a) => ({
+  /**
+   * Delete it, or go and look at what is stopping you.
+   *
+   * The sheet only offers the button when `checkDeletion` said nothing is in
+   * the way, so this is belt and braces — but the repository throws rather
+   * than trusting a screen, and a caught error here is better than a crash on
+   * a ledger that changed underneath the sheet.
+   */
+  function remove(target: ArchivedTarget, name: string, records: number) {
+    try {
+      deleteArchived(db, target);
+      reload();
+      setProblem(null);
+      setRestored(
+        target.kind === 'tag' && records > 0
+          ? `${name} deleted, and taken off ${records} record${records === 1 ? '' : 's'}.`
+          : `${name} deleted.`
+      );
+    } catch (error) {
+      setProblem(
+        error instanceof InvariantError ? error.message : `Could not delete ${name}.`
+      );
+    }
+    setSheet(null);
+  }
+
+  /**
+   * Hand the records standing in the way to the screen built for lists of
+   * records, rather than describing them in a sentence nobody can act on.
+   *
+   * The filter comes from the same `checkDeletion` that produced the count, so
+   * the number on the row and the list that opens cannot disagree.
+   */
+  function showBlockers(target: ArchivedTarget) {
+    const name = archivedName(db, target);
+    const { filter } = checkDeletion(db, target);
+    if (!filter || !name) return;
+
+    setSheet(null);
+    router.push({
+      pathname: '/search',
+      params: { ...filter, deleting: target.kind, deletingName: name },
+    });
+  }
+
+  /** A testID key: ids carry colons and names carry spaces, regexes carry neither. */
+  const testKey = (value: string) => value.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase();
+
+  const archivedAccountItems: ArchiveItem[] = archived.accounts.map((a) => ({
     id: a.id,
-    label: a.name,
+    name: a.name,
     icon: a.icon,
     color: a.color,
+    testKey: testKey(a.id),
     // What is still in it, because "which one was the old current account"
     // is answered by the balance far more often than by the name.
     detail: money(a.balanceMinor, a.currency),
-    detailTone: a.balanceMinor < 0 ? ('negative' as const) : ('neutral' as const),
+    blocking: checkDeletion(db, { kind: 'account', id: a.id }).blocking,
   }));
 
-  const archivedCategoryOptions: PickerOption[] = archived.categories.map((c) => ({
+  const archivedCategoryItems: ArchiveItem[] = archived.categories.map((c) => ({
     id: c.id,
-    label: c.name,
+    name: c.name,
     icon: c.icon,
     color: c.color,
+    testKey: testKey(c.id),
     // Sub-categories sit under the parent they were put away with, the same
     // shape the category picker uses — a lone "Restaurants" in a flat list
     // does not say which Food it belonged to.
     indented: !!c.parentId,
     detail: c.kind === 'income' ? 'Income' : 'Expense',
+    blocking: checkDeletion(db, { kind: 'category', id: c.id }).blocking,
   }));
 
-  const archivedTagOptions: PickerOption[] = archived.tags.map((t) => ({
-    id: t.id,
-    label: t.name,
-    icon: 'tag',
-  }));
+  const archivedTagItems: ArchiveItem[] = archived.tags.map((t) => {
+    const { records } = checkDeletion(db, { kind: 'tag', id: t.id });
+    return {
+      id: t.id,
+      name: t.name,
+      icon: 'tag',
+      testKey: testKey(t.normalised),
+      // A tag is never blocked — it owns no money — so the count is not a
+      // wall, it is the cost, and it belongs where it can be read BEFORE the
+      // delete rather than in the sentence afterwards.
+      detail: records === 0 ? 'On no records' : `On ${records} record${records === 1 ? '' : 's'}`,
+      cost:
+        records === 0
+          ? undefined
+          : `${records} record${records === 1 ? '' : 's'} will lose the label. Their money, ` +
+            'categories and notes are untouched.',
+    };
+  });
 
   return (
     <View className="flex-1 bg-ground" testID="settings-screen">
@@ -177,7 +256,12 @@ export default function SettingsScreen() {
           </Section>
           {restored ? (
             <Text className="px-1 pt-2 text-xs text-muted" testID="archive-restored">
-              {restored} is back.
+              {restored.endsWith('.') ? restored : `${restored} is back.`}
+            </Text>
+          ) : null}
+          {problem ? (
+            <Text className="px-1 pt-2 text-xs text-expense" testID="archive-problem">
+              {problem}
             </Text>
           ) : null}
         </View>
@@ -236,32 +320,51 @@ export default function SettingsScreen() {
         testID="sheet-currency"
       />
 
-      <PickerSheet
+      <ArchiveSheet
         visible={sheet === 'accounts'}
-        title="Bring an account back"
-        options={archivedAccountOptions}
-        // Restoring is one flag, and it is undone by the same toggle that set
-        // it now that the thing is listed again — so none of these three is
-        // worth a confirmation step in front of it.
-        onSelect={(id) => bringBack(restoreAccount(db, id).name)}
+        title="Archived accounts"
+        hint="Tap one to bring it back."
+        items={archivedAccountItems}
+        // Restoring is one flag, undone by the same toggle that set it now
+        // that the thing is listed again — so it needs no confirmation in
+        // front of it, and deleting, which is forever, gets one.
+        onRestore={(id) => bringBack(restoreAccount(db, id).name)}
+        onResolve={(id) => showBlockers({ kind: 'account', id })}
+        onDelete={(id) => {
+          const item = archivedAccountItems.find((a) => a.id === id);
+          if (item) remove({ kind: 'account', id }, item.name, 0);
+        }}
         onClose={() => setSheet(null)}
         testID="sheet-archived-accounts"
       />
 
-      <PickerSheet
+      <ArchiveSheet
         visible={sheet === 'categories'}
-        title="Bring a category back"
-        options={archivedCategoryOptions}
-        onSelect={(id) => bringBack(restoreCategory(db, id).name)}
+        title="Archived categories"
+        hint="Tap one to bring it back."
+        items={archivedCategoryItems}
+        onRestore={(id) => bringBack(restoreCategory(db, id).name)}
+        onResolve={(id) => showBlockers({ kind: 'category', id })}
+        onDelete={(id) => {
+          const item = archivedCategoryItems.find((c) => c.id === id);
+          if (item) remove({ kind: 'category', id }, item.name, 0);
+        }}
         onClose={() => setSheet(null)}
         testID="sheet-archived-categories"
       />
 
-      <PickerSheet
+      <ArchiveSheet
         visible={sheet === 'tags'}
-        title="Bring a tag back"
-        options={archivedTagOptions}
-        onSelect={(id) => bringBack(restoreTag(db, id).name)}
+        title="Archived tags"
+        hint="Tap one to bring it back."
+        items={archivedTagItems}
+        onRestore={(id) => bringBack(restoreTag(db, id).name)}
+        onResolve={() => undefined}
+        onDelete={(id) => {
+          const item = archivedTagItems.find((t) => t.id === id);
+          if (!item) return;
+          remove({ kind: 'tag', id }, item.name, checkDeletion(db, { kind: 'tag', id }).records);
+        }}
         onClose={() => setSheet(null)}
         testID="sheet-archived-tags"
       />
