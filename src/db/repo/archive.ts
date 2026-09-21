@@ -9,12 +9,17 @@
  * because SQLite cannot — `transactions.account_id` cascades, which is exactly
  * the problem: deleting an account with history would silently take every
  * record on it, a month that suddenly balances differently with nothing to say
- * why. A category is quieter still, since `deleteCategory` leaves its records
- * UNCATEGORISED: the money survives and the history stops saying what it went
- * on, which cannot be reconstructed afterwards. So the answer is not a refusal
- * with an apology — it is the list of records standing in the way, which is
- * `SearchQuery`'s whole job. `blockingFilter` returns the search that shows
- * them, and the screen hands it to the search page rather than describing it.
+ * why. A category is quieter still: `category_id` is SET NULL, so the money
+ * survives and the history stops saying what it went on, which cannot be
+ * reconstructed afterwards. So the answer is not a refusal with an apology —
+ * it is the list of records standing in the way, which is `SearchQuery`'s whole
+ * job. `blockingFilter` returns the search that shows them, and the screen
+ * hands it to the search page rather than describing it.
+ *
+ * BOTH GUARDS LIVE IN THE REPOSITORY, not here: `deleteAccount` and
+ * `deleteCategory` refuse on their own. This module used to be the only place
+ * that knew, which is how the editor's "Delete category" came to do the exact
+ * opposite of Settings' — same entity, same word, one of them lossy.
  *
  * A TAG IS DIFFERENT, and deliberately so. Its rows cascade through
  * `transaction_tags`, which touches no money and no category — the records keep
@@ -22,17 +27,25 @@
  * count travels with the answer so the sheet can say what is about to forget.
  *
  * THE COUNT AND THE SEARCH MUST AGREE. Counting one way and filtering another
- * is how a screen comes to say "4 records" over a list of three, so both come
- * from `searchRecords` with the same query — except for the one case search
- * cannot express, which is documented on `blockingFilter` below.
+ * is how a screen comes to say "4 records" over a list of three, so the count
+ * and the guard that refuses the delete are ONE function per kind —
+ * `accountRecordCount` and `categoryRecordCountDeep` — and the filter returned
+ * beside them selects exactly what they counted. The one case search cannot
+ * express is documented on `accountFilter` below.
  */
 
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
+import type { EntityKind } from '../../lib/entity-actions';
 import { EMPTY_QUERY, type SearchQuery } from '../../lib/search-query';
 import * as schema from '../schema';
 import { accountRecordCount, deleteAccount, getAccount } from './accounts';
-import { deleteCategory, getCategory, InvariantError } from './categories';
+import {
+  categoryRecordCountDeep,
+  deleteCategory,
+  getCategory,
+  InvariantError,
+} from './categories';
 import { searchRecords } from './search';
 import { deleteTag, tagUsage } from './tags';
 import { tags } from '../schema';
@@ -40,8 +53,13 @@ import { eq } from 'drizzle-orm';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
-export type ArchivedKind = 'account' | 'category' | 'tag';
-export type ArchivedTarget = { kind: ArchivedKind; id: string };
+/**
+ * Re-exported so the three lists, the sheet and this module cannot come to
+ * disagree about what kinds exist. `lib/entity-actions.ts` owns the type
+ * because that is where the rules about each kind live.
+ */
+export type { EntityKind };
+export type EntityTarget = { kind: EntityKind; id: string };
 
 /** The subset of a search that finds what is in the way. */
 export type BlockingFilter = Partial<
@@ -82,7 +100,7 @@ function accountFilter(db: Db, id: string): BlockingFilter {
  * `searchRecords` computes them separately from the rows precisely so that a
  * total never means "the first 300 of them".
  */
-export function checkDeletion(db: Db, target: ArchivedTarget): DeletionCheck {
+export function checkDeletion(db: Db, target: EntityTarget): DeletionCheck {
   switch (target.kind) {
     case 'account': {
       // Counted from the LEDGER, not from search: the delete cascades over
@@ -97,12 +115,12 @@ export function checkDeletion(db: Db, target: ArchivedTarget): DeletionCheck {
       };
     }
     case 'category': {
-      // A parent also matches its children here, exactly as the search page
-      // does — the records under "Groceries" are records standing between
-      // "Food" and being deleted, and the user has to be shown all of them.
-      const blocking = searchRecords(db, query({ categoryId: target.id }), {
-        limit: 1,
-      }).matchCount;
+      // The SAME predicate `deleteCategory` refuses on, not a second query that
+      // happens to agree today. A parent matches its children here exactly as
+      // the search page does — the records under "Groceries" are records
+      // standing between "Food" and being deleted, and the user has to be shown
+      // all of them.
+      const blocking = categoryRecordCountDeep(db, target.id);
       return {
         blocking,
         records: blocking,
@@ -120,7 +138,7 @@ export function checkDeletion(db: Db, target: ArchivedTarget): DeletionCheck {
 }
 
 /** The name to put in a sentence about it, or null if it is already gone. */
-export function archivedName(db: Db, target: ArchivedTarget): string | null {
+export function entityName(db: Db, target: EntityTarget): string | null {
   switch (target.kind) {
     case 'account':
       return getAccount(db, target.id)?.name ?? null;
@@ -139,7 +157,7 @@ export function archivedName(db: Db, target: ArchivedTarget): string | null {
  * and the next caller — a bulk tidy-up, a flow, whatever comes — would not
  * inherit it.
  */
-export function deleteArchived(db: Db, target: ArchivedTarget): void {
+export function deleteEntity(db: Db, target: EntityTarget): void {
   const check = checkDeletion(db, target);
   if (check.blocking > 0) {
     throw new InvariantError(

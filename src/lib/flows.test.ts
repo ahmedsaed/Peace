@@ -22,7 +22,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { accountId, catId } from '../db/seed';
 import { tagKey } from './tag';
 import { idSlug } from './slug';
 
@@ -172,32 +171,33 @@ describe('testIDs are regex-safe, because Maestro matches them as regexes', () =
 /**
  * The keys a flow spells out by hand.
  *
- * `archive-delete-seed-cat-baby` is matched by the pattern above whatever it
- * says after the prefix, so the half that matters — that this is the key the
- * screen will actually render for that seeded row — is pinned here, through
- * the same `idSlug` the sheet uses.
+ * `tag-kitchen` is matched by the `tag-${slug}` pattern above whatever it says
+ * after the prefix, so the half that matters — that this is the key the screen
+ * will actually render for that row — is pinned here, through the same
+ * `idSlug` the screen uses.
+ *
+ * ACCOUNTS AND CATEGORIES NO LONGER APPEAR HERE, and that is the point of the
+ * redesign rather than a gap: their actions are reached by HOLDING the row,
+ * which Maestro finds by the visible name, so no flow has to know a seeded id.
+ * Tags keep a key because a tag row carries no amount or subtitle to hold onto
+ * and its name is the only thing on it.
  */
-describe('the archive keys the flows hardcode', () => {
-  it('are what the screen builds for the seeded rows', () => {
-    expect(idSlug(accountId('cash'))).toBe('seed-acct-cash');
-    expect(idSlug(catId('pets'))).toBe('seed-cat-pets');
-    expect(idSlug(catId('baby'))).toBe('seed-cat-baby');
-  });
-
-  it('are what the tag sheet builds for a tag called Kitchen', () => {
+describe('the keys the flows hardcode', () => {
+  it('are what the screen builds for a tag called Kitchen', () => {
     // The tag rows are keyed by the NORMALISED name, which is what survives
     // a rename to "kitchen" and back.
     expect(idSlug(tagKey('Kitchen'))).toBe('kitchen');
+    expect(idSlug(tagKey('Kitchen redo'))).toBe('kitchen-redo');
   });
 
   it('are spelled the same way in the flows', () => {
     const ids = new Set(referenced.map((ref) => ref.id));
     for (const id of [
-      `archive-move-${idSlug(accountId('cash'))}`,
-      `archive-delete-${idSlug(catId('baby'))}`,
-      `archive-confirm-${idSlug(catId('baby'))}`,
-      `archive-delete-${idSlug(tagKey('Kitchen'))}`,
-      `archive-confirm-${idSlug(tagKey('Kitchen'))}`,
+      `tag-${idSlug(tagKey('Kitchen'))}`,
+      `tag-count-${idSlug(tagKey('Kitchen'))}`,
+      `tag-${idSlug(tagKey('Kitchen redo'))}`,
+      `tag-count-${idSlug(tagKey('Kitchen redo'))}`,
+      `tag-row-${idSlug(tagKey('Kitchen redo'))}`,
     ]) {
       expect([...ids]).toContain(id);
     }

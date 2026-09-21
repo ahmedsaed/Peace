@@ -59,6 +59,19 @@ tags:
 - assertVisible:
     id: "about-commit"
     text: "[0-9a-f]{7}(-dirty)?"
+
+# --- and the one control on it ---
+# The drawer tells you about a newer build without being asked and says nothing
+# the rest of the time, which leaves no way to tell "up to date" from "broken".
+# This row is the way to ask. Its RESULT needs a network and a GitHub that is
+# answering, so the flow asserts the row and its resting state only — the three
+# sentences it can settle on are pinned in update-check.test.ts instead.
+- assertVisible:
+    id: "check-updates"
+- assertVisible:
+    id: "check-updates-state"
+    text: "You have [0-9]+\\.[0-9]+\\.[0-9]+ \\(build [0-9]+\\)\\."
+- takeScreenshot: 02-about
 - assertVisible:
     id: "about-package"
     text: "com.ahmed.peace"

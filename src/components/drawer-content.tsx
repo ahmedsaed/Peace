@@ -36,6 +36,13 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
     testID: 'drawer-recurring',
   },
   {
+    icon: 'label',
+    label: 'Tags',
+    hint: 'Every label, and how much each is used',
+    href: '/tags',
+    testID: 'drawer-tags',
+  },
+  {
     icon: 'analysis',
     label: 'Portfolio',
     hint: 'Target allocation and rebalancing',

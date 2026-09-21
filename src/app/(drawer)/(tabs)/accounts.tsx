@@ -2,16 +2,25 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { ArchivedGroup } from '@/components/archived-group';
+import { EntityActions, type EntityItem } from '@/components/entity-actions';
+import { Snackbar } from '@/components/snackbar';
 import { Icon } from '@/components/icon';
+import { ReconcileSheet } from '@/components/reconcile-sheet';
 import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
 import {
   balanceByCurrency,
   listAccountsWithBalance,
   listArchivedAccounts,
+  updateAccount,
   type CurrencyTotal,
 } from '@/db/repo/accounts';
+import { accountBalance, reconcileAccount } from '@/db/repo/adjust';
+import { checkDeletion, deleteEntity } from '@/db/repo/archive';
+import { InvariantError } from '@/db/repo/categories';
 import { availableCredit, isLiability, owedDisplay } from '@/lib/liability';
+import { idSlug } from '@/lib/slug';
 import { useSetting } from '@/state/settings';
 import { useMoney, type Money } from '@/state/money';
 
@@ -21,17 +30,111 @@ export default function AccountsScreen() {
   const [accounts, setAccounts] = useState<ReturnType<typeof listAccountsWithBalance>>([]);
   const [archived, setArchived] = useState<ReturnType<typeof listAccountsWithBalance>>([]);
   const [totals, setTotals] = useState<CurrencyTotal[]>([]);
+  const [acting, setActing] = useState<EntityItem | null>(null);
+  /** The account whose balance is being corrected, held apart from the sheet. */
+  const [reconciling, setReconciling] = useState<Row | null>(null);
+  /**
+   * What just happened, shown over the list rather than at the top of it.
+   *
+   * It was a line of text above the rows, which meant a message about the
+   * account you had just scrolled down to and held was rendered off-screen
+   * above you — a screen answering a question where you were not looking. The
+   * snackbar is pinned, so the answer arrives where the action did. `token`
+   * restarts its timer, or a second message inherits the first's countdown.
+   */
+  const [said, setSaid] = useState<{ text: string; bad: boolean; token: number } | null>(null);
+  const say = useCallback((text: string, bad = false) => {
+    setSaid({ text, bad, token: Date.now() });
+  }, []);
   const homeCurrency = useSetting('homeCurrency');
+
+  const reload = useCallback(() => {
+    setAccounts(listAccountsWithBalance(db));
+    setArchived(listArchivedAccounts(db));
+    setTotals(balanceByCurrency(db));
+  }, []);
 
   // Re-read on focus so a balance change, or a newly added account, shows up on
   // the way back from any other screen.
   useFocusEffect(
     useCallback(() => {
-      setAccounts(listAccountsWithBalance(db));
-      setArchived(listArchivedAccounts(db));
-      setTotals(balanceByCurrency(db));
-    }, [])
+      reload();
+    }, [reload])
   );
+
+  /**
+   * Everything the sheet needs, asked for once per long press.
+   *
+   * The counts are aggregate queries; folding them into the list would pay for
+   * them on every row whether or not anybody ever asks.
+   */
+  function open(account: Row) {
+    const { blocking, records } = checkDeletion(db, { kind: 'account', id: account.id });
+    setSaid(null);
+    setActing({
+      kind: 'account',
+      id: account.id,
+      name: account.name,
+      icon: account.icon,
+      color: account.color,
+      // Capitalised HERE rather than with a `capitalize` class on the sheet:
+      // that detail line also carries "On 2 records" for a tag, which CSS
+      // would turn into "On 2 Records".
+      detail: `${capitalise(account.type)} · ${money(account.balanceMinor, account.currency)}`,
+      archived: account.archived,
+      records,
+      blocking,
+      testKey: idSlug(account.id),
+    });
+  }
+
+  /**
+   * Its records, as an ordinary search.
+   *
+   * `deleting` is deliberately NOT passed: nothing was refused, so the search
+   * page has nothing to explain and shows no notice.
+   */
+  function showRecords(item: EntityItem) {
+    const { filter } = checkDeletion(db, { kind: 'account', id: item.id });
+    setActing(null);
+    // Null only when nothing points at it, and the action is not offered then.
+    if (filter) router.push({ pathname: '/search', params: filter });
+  }
+
+  /** The same list, arrived at because a delete was refused — so it says so. */
+  function showBlockers(item: EntityItem) {
+    const { filter } = checkDeletion(db, { kind: 'account', id: item.id });
+    setActing(null);
+    if (filter) {
+      router.push({
+        pathname: '/search',
+        params: { ...filter, deleting: item.kind, deletingName: item.name },
+      });
+    }
+  }
+
+  function archive(item: EntityItem) {
+    updateAccount(db, item.id, { archived: !item.archived });
+    setActing(null);
+    say(item.archived ? `${item.name} is back.` : `${item.name} is put away.`);
+    reload();
+  }
+
+  function remove(item: EntityItem) {
+    try {
+      deleteEntity(db, { kind: 'account', id: item.id });
+      say(`${item.name} deleted.`);
+    } catch (error) {
+      // The repository refuses rather than trusting a screen, so a caught error
+      // here is better than a crash on a ledger that changed underneath.
+      say(
+        error instanceof InvariantError ? error.message : `Could not delete ${item.name}.`,
+        true
+      );
+    }
+    setActing(null);
+    reload();
+  }
 
   return (
     <Screen testID="accounts-screen">
@@ -66,55 +169,135 @@ export default function AccountsScreen() {
             key={account.id}
             account={account}
             onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
+            onLongPress={() => open(account)}
           />
         ))}
 
-        {/* The total above counts these, so the list has to show them — a
-            figure that includes money the screen never mentions is a screen
-            disagreeing with itself. They sit at the foot, dimmed, because the
-            point of archiving one is that it stops being in the way. */}
-        {archived.length > 0 ? (
-          <View className="gap-3 pt-3" testID="accounts-archived">
-            <View className="px-1">
-              <Text className="text-[10px] uppercase tracking-widest text-muted">Archived</Text>
-              <Text className="pt-0.5 text-xs text-muted">
-                Still counted above, and off every picker. Settings brings one back.
-              </Text>
-            </View>
-            {archived.map((account) => (
-              <AccountRow
-                key={account.id}
-                account={account}
-                dimmed
-                onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
-              />
-            ))}
-          </View>
-        ) : null}
+        {/* The total above counts these, so the list has to account for them —
+            a figure that includes money the screen never mentions is a screen
+            disagreeing with itself. The header carries that money, so the
+            group can stay shut. */}
+        <ArchivedGroup
+          count={archived.length}
+          summary={archivedSummary(archived, money)}
+          hint="Still counted in the total above, and off every picker. Hold one to bring it back."
+          testID="accounts-archived">
+          {archived.map((account) => (
+            <AccountRow
+              key={account.id}
+              account={account}
+              dimmed
+              onPress={() => router.push({ pathname: '/account', params: { id: account.id } })}
+              onLongPress={() => open(account)}
+            />
+          ))}
+        </ArchivedGroup>
+
+        <Text className="px-1 pt-2 text-xs leading-5 text-muted">
+          Hold an account for its records, its balance, or to put it away.
+        </Text>
       </ScrollView>
 
-      <Fab onPress={() => router.push('/account')} testID="fab-account" />
+      <EntityActions
+        item={acting}
+        onClose={() => setActing(null)}
+        onShowRecords={showRecords}
+        onShowBlockers={showBlockers}
+        onUpdateBalance={(item) => {
+          const row = [...accounts, ...archived].find((a) => a.id === item.id) ?? null;
+          setActing(null);
+          setReconciling(row);
+        }}
+        onEdit={(item) => {
+          setActing(null);
+          router.push({ pathname: '/account', params: { id: item.id } });
+        }}
+        onRename={() => {}}
+        onArchive={archive}
+        onDelete={remove}
+      />
+
+      {/* Handed the account as a NON-NULL prop rather than read back out of
+          state inside a handler — the sheet is closed almost all of the time. */}
+      {reconciling ? (
+        <ReconcileSheet
+          visible
+          accountName={reconciling.name}
+          accountType={reconciling.type}
+          currency={reconciling.currency}
+          currentMinor={accountBalance(db, reconciling.id)}
+          creditLimitMinor={reconciling.creditLimit}
+          onClose={() => setReconciling(null)}
+          onConfirm={(targetMinor) => {
+            reconcileAccount(db, reconciling.id, targetMinor);
+            setReconciling(null);
+            reload();
+          }}
+        />
+      ) : null}
+
+
+      {/* Pinned, so the answer arrives where the action did rather than at the
+          top of a list the user has scrolled away from. */}
+      {said ? (
+        <Snackbar
+          message={said.text}
+          token={said.token}
+          onDismiss={() => setSaid(null)}
+          durationMs={said.bad ? 12000 : 5000}
+          testID="accounts-notice"
+        />
+      ) : null}
+
+      <Fab onPress={() => router.push('/account')} testID="fab-account"
+        // Lifted clear of the snackbar, exactly as the records list does:
+        // otherwise the message — and on that screen its Undo — sits under it.
+        raised={!!said}
+      />
     </Screen>
   );
 }
 
 type Row = ReturnType<typeof listAccountsWithBalance>[number];
 
+/** "cash" is how the type is stored; "Cash" is how a sentence starts. */
+function capitalise(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/**
+ * What is still sitting in the archive.
+ *
+ * Only when everything in there is held in ONE currency. With several, a single
+ * sum would be a number nobody could check — the same reason the total above is
+ * one line per currency rather than one converted figure — so the header says
+ * nothing and the group is there to be opened.
+ */
+function archivedSummary(rows: Row[], money: Money): string | undefined {
+  if (rows.length === 0) return undefined;
+  const currencies = new Set(rows.map((r) => r.currency));
+  if (currencies.size !== 1) return undefined;
+  const total = rows.reduce((sum, r) => sum + r.balanceMinor, 0);
+  return money(total, rows[0].currency);
+}
+
 /**
  * One account, in either group.
  *
  * Shared rather than written twice: an archived account is the same row with
  * the colour turned down, and two copies would drift the moment a card grew a
- * field. It stays tappable while dimmed — the editor is where the archive
- * toggle lives, so the row is also a way back.
+ * field. Tapping edits it; HOLDING is where everything that is not editing
+ * lives, which is the same split the records list has used all along.
  */
 function AccountRow({
   account,
   onPress,
+  onLongPress,
   dimmed = false,
 }: {
   account: Row;
   onPress: () => void;
+  onLongPress: () => void;
   dimmed?: boolean;
 }) {
   const money = useMoney();
@@ -122,6 +305,7 @@ function AccountRow({
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       className={`flex-row items-center gap-3 rounded-xl bg-surface p-3 active:opacity-70 ${
         dimmed ? 'opacity-60' : ''
       }`}

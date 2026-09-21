@@ -13,7 +13,9 @@ import {
 import { Icon } from '@/components/icon';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import { TagSheet } from '@/components/tag-sheet';
+import { RecordActions, type ReversalContext } from '@/components/record-actions';
 import { RecordRow } from '@/components/record-row';
+import { Snackbar } from '@/components/snackbar';
 import { EmptyState, StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
@@ -21,7 +23,10 @@ import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { listCategoryTree } from '@/db/repo/categories';
 import { listTags } from '@/db/repo/tags';
 import { groupByDay } from '@/db/repo/records';
+import { linkById, reversedBy } from '@/db/repo/reversal';
 import { searchRecords, type SearchOutcome } from '@/db/repo/search';
+import { deleteRecord, restoreRecords } from '@/db/repo/transactions';
+import { useUndoStore } from '@/state/undo';
 import {
   activeFilterCount,
   EMPTY_QUERY,
@@ -57,8 +62,9 @@ export default function SearchScreen() {
   const { height } = useWindowDimensions();
 
   /**
-   * Opened with a filter already set — from Settings, where deleting an
-   * archived account or category sends you here to move what is in the way.
+   * Opened with a filter already set — by "Show records" on any account,
+   * category or tag, and by the blocked delete that sends you here to move
+   * what is in the way.
    *
    * The params carry the SAME filter `checkDeletion` counted with, so the
    * number on that row and this list cannot disagree about how much work is
@@ -70,6 +76,8 @@ export default function SearchScreen() {
     accountId?: string;
     counterAccountId?: string;
     categoryId?: string;
+    /** A single tag, from the Tags list. The filter itself holds many. */
+    tagId?: string;
     deleting?: string;
     deletingName?: string;
   }>();
@@ -86,8 +94,23 @@ export default function SearchScreen() {
     accountId: params.accountId ?? null,
     counterAccountId: params.counterAccountId ?? null,
     categoryId: params.categoryId ?? null,
+    tagIds: params.tagId ? [params.tagId] : [],
   }));
   const [outcome, setOutcome] = useState<SearchOutcome | null>(null);
+  /**
+   * The long-pressed row.
+   *
+   * A record found by searching is the same record as one found by scrolling
+   * the month, so it gets the same actions. It did not before: `RecordRow` was
+   * rendered here with a press handler and nothing else, so holding a row on
+   * this screen did nothing at all — a gesture that works everywhere else and
+   * silently fails in the one place you arrive at when you are looking for a
+   * particular record to act on.
+   */
+  const [acting, setActing] = useState<SearchOutcome['rows'][number] | null>(null);
+  const pendingUndo = useUndoStore((state) => state.pending);
+  const clearUndo = useUndoStore((state) => state.clear);
+  const offerUndo = useUndoStore((state) => state.offer);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [picking, setPicking] = useState<'account' | 'counter' | 'category' | null>(null);
   const [tagSheet, setTagSheet] = useState(false);
@@ -130,6 +153,36 @@ export default function SearchScreen() {
     const timer = setTimeout(run, DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [run]);
+
+  /**
+   * What the held row undoes, and what undoes it — resolved once, when the
+   * sheet opens, exactly as the records list does it. Folding these into the
+   * search query would pay for two lookups on every one of up to 300 rows to
+   * answer a question almost nobody asks of almost any of them.
+   */
+  const actingLinks: ReversalContext | undefined = useMemo(() => {
+    if (!acting) return undefined;
+    const source = acting.reversesId ? linkById(db, acting.reversesId) : null;
+    return {
+      reverses: source,
+      danglingSource: !!acting.reversesId && !source,
+      reversedBy: reversedBy(db, acting.id),
+    };
+  }, [acting]);
+
+  function onUndo() {
+    if (!pendingUndo) return;
+    try {
+      restoreRecords(db, pendingUndo.rows);
+    } catch {
+      // The rows may no longer be insertable — an account deleted in the
+      // meantime, say. Nothing to do but drop the offer; the re-run below
+      // shows the true state either way.
+    } finally {
+      clearUndo();
+      run();
+    }
+  }
 
   // Re-run on focus so an edited record reappears with its new values — but
   // through a ref, because `run` changes identity on every keystroke and a
@@ -240,16 +293,23 @@ export default function SearchScreen() {
         />
       ) : null}
 
+      {/* ONLY WHEN A DELETE WAS REFUSED. An ordinary search — including "Show
+          records" on an account or a category — has nothing to explain, so it
+          shows no notice at all. The two arrive at the same screen by design:
+          this is the list of records in the way, and the screen built for
+          lists of records is this one. */}
       {params.deleting ? (
         <View className="mx-4 mb-1 mt-2 rounded-lg bg-surface px-4 py-3" testID="search-notice">
           <Text className="text-sm text-ink">
             Move these records off {params.deletingName ?? 'it'} first.
           </Text>
           <Text className="pt-1 text-xs leading-4 text-muted">
-            Open each one and give it another {params.deleting === 'account' ? 'account' : 'category'}
-            . Deleting with records still on it would take them with it — or leave them with no{' '}
-            {params.deleting === 'account' ? 'account' : 'category'} at all. Settings › Archived
-            still has the delete when this list is empty.
+            Open each one and give it another{' '}
+            {params.deleting === 'account' ? 'account' : 'category'}. Deleting with records still
+            on it would take them with it — or leave them with no{' '}
+            {params.deleting === 'account' ? 'account' : 'category'} at all. Hold{' '}
+            {params.deletingName ?? 'it'} in the list again once this is empty and the delete will
+            be there.
           </Text>
         </View>
       ) : null}
@@ -276,6 +336,7 @@ export default function SearchScreen() {
             <RecordRow
               row={item}
               onPress={() => router.push({ pathname: '/record', params: { id: item.id } })}
+              onLongPress={() => setActing(item)}
             />
           )}
           renderSectionHeader={({ section }) => (
@@ -342,6 +403,51 @@ export default function SearchScreen() {
         onClose={() => setTagSheet(false)}
         testID="search-tag-sheet"
       />
+
+      {/* THE SAME ACTIONS AS THE RECORDS LIST. A record is a record wherever it
+          was found, and this is the screen you land on when you went looking
+          for one in particular — the place a refund or a delete is most likely
+          to be wanted, and the one place holding a row used to do nothing. */}
+      <RecordActions
+        row={acting}
+        context={actingLinks}
+        onClose={() => setActing(null)}
+        onRefund={(row) => {
+          router.push({ pathname: '/record', params: { refundOf: row.id } });
+          setActing(null);
+        }}
+        onReverse={(row) => {
+          router.push({ pathname: '/record', params: { reverseOf: row.id } });
+          setActing(null);
+        }}
+        onOpen={(id) => {
+          router.push({ pathname: '/record', params: { id } });
+          setActing(null);
+        }}
+        onDuplicate={(row) => {
+          router.push({ pathname: '/record', params: { copyOf: row.id } });
+          setActing(null);
+        }}
+        onDelete={(row) => {
+          const removed = deleteRecord(db, row.id);
+          offerUndo(removed, removed.length > 1 ? 'Transfer deleted' : 'Record deleted');
+          setActing(null);
+          run();
+        }}
+      />
+
+      {/* The undo store is shared, which is what lets the offer outlive the
+          screen that made it — delete here, and it is still on the records
+          list if you go back before the timer runs out. */}
+      {pendingUndo ? (
+        <Snackbar
+          message={pendingUndo.message}
+          actionLabel="Undo"
+          onAction={onUndo}
+          onDismiss={clearUndo}
+          token={pendingUndo.token}
+        />
+      ) : null}
 
       <PickerSheet
         visible={picking === 'category'}

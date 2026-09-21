@@ -19,6 +19,7 @@ export function Snackbar({
   onDismiss,
   token,
   durationMs = 8000,
+  testID = 'snackbar',
 }: {
   message: string;
   actionLabel?: string;
@@ -26,6 +27,8 @@ export function Snackbar({
   onDismiss: () => void;
   token: number;
   durationMs?: number;
+  /** Named per screen where a flow has to tell two of them apart. */
+  testID?: string;
 }) {
   useEffect(() => {
     const timer = setTimeout(onDismiss, durationMs);
@@ -35,7 +38,7 @@ export function Snackbar({
 
   return (
     <View
-      testID="snackbar"
+      testID={testID}
       className="absolute bottom-4 left-4 right-4 flex-row items-center justify-between gap-4 rounded-xl bg-raised px-4 py-3"
       style={{
         elevation: 8,

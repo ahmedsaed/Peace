@@ -2,25 +2,43 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { ArchivedGroup } from '@/components/archived-group';
+import { EntityActions, type EntityItem } from '@/components/entity-actions';
+import { Snackbar } from '@/components/snackbar';
 import { Icon } from '@/components/icon';
 import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
-import { listCategoryTree, type CategoryNode } from '@/db/repo/categories';
+import { checkDeletion, deleteEntity } from '@/db/repo/archive';
+import {
+  InvariantError,
+  listArchivedCategories,
+  listCategoryTree,
+  updateCategory,
+  type CategoryNode,
+} from '@/db/repo/categories';
 import type { Category } from '@/db/schema';
+import { idSlug } from '@/lib/slug';
 
 function Row({
   category,
   indented,
+  dimmed = false,
   onPress,
+  onLongPress,
 }: {
   category: Category;
   indented?: boolean;
+  dimmed?: boolean;
   onPress: () => void;
+  onLongPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      className={`flex-row items-center gap-3 py-2.5 active:opacity-70 ${indented ? 'pl-10' : ''}`}
+      onLongPress={onLongPress}
+      className={`flex-row items-center gap-3 py-2.5 active:opacity-70 ${
+        indented ? 'pl-10' : ''
+      } ${dimmed ? 'opacity-60' : ''}`}
       testID={`category-${category.id}`}>
       <View
         className={`items-center justify-center rounded-full ${indented ? 'h-7 w-7' : 'h-9 w-9'}`}
@@ -38,10 +56,12 @@ function Section({
   title,
   nodes,
   onOpen,
+  onHold,
 }: {
   title: string;
   nodes: CategoryNode[];
   onOpen: (id: string) => void;
+  onHold: (category: Category) => void;
 }) {
   return (
     <View className="mb-6">
@@ -50,9 +70,15 @@ function Section({
       </Text>
       {nodes.map((node) => (
         <View key={node.id}>
-          <Row category={node} onPress={() => onOpen(node.id)} />
+          <Row category={node} onPress={() => onOpen(node.id)} onLongPress={() => onHold(node)} />
           {node.children.map((child) => (
-            <Row key={child.id} category={child} indented onPress={() => onOpen(child.id)} />
+            <Row
+              key={child.id}
+              category={child}
+              indented
+              onPress={() => onOpen(child.id)}
+              onLongPress={() => onHold(child)}
+            />
           ))}
         </View>
       ))}
@@ -65,15 +91,94 @@ export default function CategoriesScreen() {
   // Two separate lists, never mixed — a category is income XOR expense.
   const [expense, setExpense] = useState<CategoryNode[]>([]);
   const [income, setIncome] = useState<CategoryNode[]>([]);
+  const [archived, setArchived] = useState<Category[]>([]);
+  const [acting, setActing] = useState<EntityItem | null>(null);
+  /**
+   * What just happened, shown over the list rather than at the top of it.
+   *
+   * It was a line of text above the rows, which meant a message about the
+   * category you had just scrolled down to and held was rendered off-screen
+   * above you — a screen answering a question where you were not looking. The
+   * snackbar is pinned, so the answer arrives where the action did. `token`
+   * restarts its timer, or a second message inherits the first's countdown.
+   */
+  const [said, setSaid] = useState<{ text: string; bad: boolean; token: number } | null>(null);
+  const say = useCallback((text: string, bad = false) => {
+    setSaid({ text, bad, token: Date.now() });
+  }, []);
+
+  const reload = useCallback(() => {
+    setExpense(listCategoryTree(db, 'expense'));
+    setIncome(listCategoryTree(db, 'income'));
+    setArchived(listArchivedCategories(db));
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      setExpense(listCategoryTree(db, 'expense'));
-      setIncome(listCategoryTree(db, 'income'));
-    }, [])
+      reload();
+    }, [reload])
   );
 
   const open = (id: string) => router.push({ pathname: '/category', params: { id } });
+
+  function hold(category: Category) {
+    const { blocking, records } = checkDeletion(db, { kind: 'category', id: category.id });
+    setSaid(null);
+    setActing({
+      kind: 'category',
+      id: category.id,
+      name: category.name,
+      icon: category.icon,
+      color: category.color,
+      detail: category.kind === 'income' ? 'Income' : 'Expense',
+      archived: category.archived,
+      records,
+      blocking,
+      testKey: idSlug(category.id),
+    });
+  }
+
+  /** Its records, as an ordinary search — nothing was refused, so no notice. */
+  function showRecords(item: EntityItem) {
+    const { filter } = checkDeletion(db, { kind: 'category', id: item.id });
+    setActing(null);
+    if (filter) router.push({ pathname: '/search', params: filter });
+  }
+
+  /** The same list, arrived at because a delete was refused — so it says so. */
+  function showBlockers(item: EntityItem) {
+    const { filter } = checkDeletion(db, { kind: 'category', id: item.id });
+    setActing(null);
+    if (filter) {
+      router.push({
+        pathname: '/search',
+        params: { ...filter, deleting: item.kind, deletingName: item.name },
+      });
+    }
+  }
+
+  function archive(item: EntityItem) {
+    // Both cascades — down to the children, up to the parent — live inside
+    // `updateCategory`, so nothing here has to remember them.
+    updateCategory(db, item.id, { archived: !item.archived });
+    setActing(null);
+    say(item.archived ? `${item.name} is back.` : `${item.name} is put away.`);
+    reload();
+  }
+
+  function remove(item: EntityItem) {
+    try {
+      deleteEntity(db, { kind: 'category', id: item.id });
+      say(`${item.name} deleted.`);
+    } catch (error) {
+      say(
+        error instanceof InvariantError ? error.message : `Could not delete ${item.name}.`,
+        true
+      );
+    }
+    setActing(null);
+    reload();
+  }
 
   return (
     <Screen testID="categories-screen">
@@ -82,11 +187,65 @@ export default function CategoriesScreen() {
           so leading with it keeps both sections reachable — putting ~26 expense
           rows first buries income below the fold entirely. */}
       <ScrollView contentContainerClassName="px-4 pt-4 pb-8">
-        <Section title="Income categories" nodes={income} onOpen={open} />
-        <Section title="Expense categories" nodes={expense} onOpen={open} />
+        <Section title="Income categories" nodes={income} onOpen={open} onHold={hold} />
+        <Section title="Expense categories" nodes={expense} onOpen={open} onHold={hold} />
+
+        {/* This tab had NO archived surface at all: a category put away simply
+            vanished, and the only way back was a Settings screen. */}
+        <ArchivedGroup
+          count={archived.length}
+          hint="Still on every record that wore them, and off every picker. Hold one to bring it back."
+          testID="categories-archived">
+          {archived.map((category) => (
+            <Row
+              key={category.id}
+              category={category}
+              indented={!!category.parentId}
+              dimmed
+              onPress={() => open(category.id)}
+              onLongPress={() => hold(category)}
+            />
+          ))}
+        </ArchivedGroup>
+
+        <Text className="px-1 pt-3 text-xs leading-5 text-muted">
+          Hold a category to see its records, put it away, or delete it.
+        </Text>
       </ScrollView>
 
-      <Fab onPress={() => router.push('/category')} testID="fab-category" />
+      <EntityActions
+        item={acting}
+        onClose={() => setActing(null)}
+        onShowRecords={showRecords}
+        onShowBlockers={showBlockers}
+        onUpdateBalance={() => {}}
+        onEdit={(item) => {
+          setActing(null);
+          open(item.id);
+        }}
+        onRename={() => {}}
+        onArchive={archive}
+        onDelete={remove}
+      />
+
+
+      {/* Pinned, so the answer arrives where the action did rather than at the
+          top of a list the user has scrolled away from. */}
+      {said ? (
+        <Snackbar
+          message={said.text}
+          token={said.token}
+          onDismiss={() => setSaid(null)}
+          durationMs={said.bad ? 12000 : 5000}
+          testID="categories-notice"
+        />
+      ) : null}
+
+      <Fab onPress={() => router.push('/category')} testID="fab-category"
+        // Lifted clear of the snackbar, exactly as the records list does:
+        // otherwise the message — and on that screen its Undo — sits under it.
+        raised={!!said}
+      />
     </Screen>
   );
 }

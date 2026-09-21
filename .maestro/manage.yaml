@@ -59,7 +59,8 @@ appId: com.ahmed.peace
 
 # --- the account delete guard ---
 # Log something against Cash, then try to delete Cash. Deleting cascades to
-# transactions, so the repository refuses and says to archive instead.
+# transactions, so the repository refuses — and the refusal is a DESTINATION,
+# not a sentence: the row carries the count and goes to the records in the way.
 - tapOn:
     id: "tab-index"
 - tapOn:
@@ -72,20 +73,29 @@ appId: com.ahmed.peace
 
 - tapOn:
     id: "tab-accounts"
-- tapOn: "Cash"
-- assertVisible: "Edit account"
-# Below the same growing icon grid as account-reconcile — see credit-card.yaml.
-# This one passes today only because a cash account has no limit or fee fields
-# to make the form taller.
-- scrollUntilVisible:
-    element:
-      id: "account-delete"
-    direction: DOWN
-- tapOn:
-    id: "account-delete"
+# HOLD, not tap. Delete used to live at the foot of the edit form, below an
+# icon grid that grew every time a glyph was added — so this flow had to scroll
+# to find a button that was rendering perfectly. Nothing to scroll past now.
+- longPressOn: "Cash"
 - assertVisible:
-    id: "account-error"
+    id: "entity-actions"
+- assertVisible:
+    id: "entity-delete-blocked"
 # Maestro matches text as a regex anchored to the WHOLE element, so a substring
-# needs explicit wildcards — "Archive it instead" alone never matches a sentence.
-- assertVisible: ".*Archive it instead.*"
+# needs explicit wildcards.
+- assertVisible: ".*1 record must move first.*"
 - takeScreenshot: 03-delete-guarded
+
+# THE ASSERTION THAT MATTERS: the count is not just printed, it is a way to the
+# records it counted. This is what a user could never reach before — the list
+# existed only behind a count chip in Settings, after archiving the account.
+- tapOn:
+    id: "entity-delete-blocked"
+- assertVisible:
+    id: "search-screen"
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- takeScreenshot: 04-blocked-shows-the-records
+- tapOn:
+    id: "nav-back"
