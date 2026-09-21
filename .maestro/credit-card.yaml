@@ -125,9 +125,13 @@ appId: com.ahmed.peace
 - takeScreenshot: 03-reconcile
 - tapOn:
     id: "reconcile-save"
-- tapOn:
-    id: "form-cancel"
 
+# NOTHING TO CANCEL. Correcting a balance used to mean opening the editor to
+# reach the button, so this flow had to leave that form afterwards. The sheet
+# now opens from the list and closes back onto it, so the assertions below read
+# the row itself.
+- assertVisible:
+    id: "accounts-screen"
 - assertVisible: "E£520.00"
 - assertVisible: "E£49,480.00 of E£50,000.00 available"
 
