@@ -221,6 +221,16 @@ appId: com.ahmed.peace
     id: "categories-notice"
 - assertNotVisible:
     id: "categories-archived"
+# BACK TO THE TOP FIRST, then down. Restoring happened at the FOOT of the list,
+# where the archived group was, so a bare `scrollUntilVisible ... DOWN` scrolls
+# away from a row that is sitting above it — and spends its whole 20s timeout
+# doing nothing before the list settles back and the failure screenshot shows
+# the element plainly visible. Anchoring on the first heading makes the next
+# scroll start from a known place rather than from wherever the last tap left
+# the offset.
+- scrollUntilVisible:
+    element: "Income categories"
+    direction: UP
 # `scrollUntilVisible` fails the flow if it is not there, which
 # `assertNotVisible` on a long scrolling list could never prove in the other
 # direction.
@@ -293,11 +303,14 @@ appId: com.ahmed.peace
 # Held on the PARENT, whose own records are none: a parent is answerable for
 # its children's too, or the count that refuses would disagree with the list
 # that opens.
-# UP: the list is still where the delete left it, near the foot, and Food sits
-# near the head of the expense section.
+# Anchored, for the same reason as above: the list is wherever the delete left
+# it, and Food sits near the head of the expense section.
+- scrollUntilVisible:
+    element: "Income categories"
+    direction: UP
 - scrollUntilVisible:
     element: "Food"
-    direction: UP
+    direction: DOWN
 - longPressOn: "Food"
 - assertVisible:
     id: "entity-delete-blocked"
