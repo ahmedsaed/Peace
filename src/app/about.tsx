@@ -1,6 +1,7 @@
 import { Image, ScrollView, Text, View } from 'react-native';
 
 import { StackHeader } from '@/components/screen';
+import { UpdateRow } from '@/components/update-row';
 import { Wordmark } from '@/components/wordmark';
 import { buildInfo } from '@/lib/build-info';
 import { formatCommit, formatVersion } from '@/lib/version';
@@ -15,7 +16,16 @@ const FACTS: { label: string; value: string; testID: string }[] = [
   { label: 'Commit', value: formatCommit(buildInfo), testID: 'about-commit' },
   { label: 'Package', value: 'com.ahmed.peace', testID: 'about-package' },
   { label: 'Data', value: 'One SQLite file on this device', testID: 'about-data' },
-  { label: 'Network', value: 'None. Nothing is uploaded.', testID: 'about-network' },
+  // NOT "None", which stopped being true some time ago and is now contradicted
+  // by the button directly beneath it. Rates, this update check, the Drive
+  // backup and the receipt reader all reach out — every one of them only
+  // because it was switched on or asked for, which is the promise worth making
+  // and the one that is actually kept.
+  {
+    label: 'Network',
+    value: 'Only what you switch on. No telemetry.',
+    testID: 'about-network',
+  },
 ];
 
 export default function AboutScreen() {
@@ -50,6 +60,12 @@ export default function AboutScreen() {
             </View>
           ))}
         </View>
+
+        {/* The one thing on this screen that does something. The drawer tells
+            you about a newer build without being asked and says nothing the
+            rest of the time — which is right, and leaves no way to tell "you
+            are up to date" from "the check is broken". */}
+        <UpdateRow />
       </ScrollView>
     </View>
   );

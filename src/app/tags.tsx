@@ -173,6 +173,13 @@ export default function TagsScreen() {
           setActing(null);
           router.push({ pathname: '/search', params: { tagId: item.id } });
         }}
+        // Nothing ever blocks a tag — its links cascade and touch no money — so
+        // this is unreachable. Wired to the same place rather than left to
+        // throw if that ever stops being true.
+        onShowBlockers={(item) => {
+          setActing(null);
+          router.push({ pathname: '/search', params: { tagId: item.id } });
+        }}
         onUpdateBalance={() => {}}
         onEdit={() => {}}
         onRename={(item) => {

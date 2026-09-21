@@ -317,3 +317,52 @@ appId: com.ahmed.peace
     text: "250"
 - assertVisible: "Cilantro flat white"
 - takeScreenshot: 04-search-opens-record
+
+# ===========================================================================
+# A record is a record wherever it was found
+# ===========================================================================
+# Holding a row on this screen used to do NOTHING. `RecordRow` was rendered
+# here with a press handler and nothing else, so the one gesture that works on
+# every other list silently failed on the screen you arrive at when you are
+# hunting for a particular record to act on.
+# The record screen is a FORM, so it closes on its own cancel rather than a
+# back arrow — `nav-back` belongs to a pushed stack screen like search itself.
+- tapOn:
+    id: "record-cancel"
+- assertVisible:
+    id: "search-screen"
+- longPressOn: "Coffee"
+- assertVisible:
+    id: "record-actions"
+# The same sheet the records list opens, with the same actions on it.
+- assertVisible:
+    id: "action-refund"
+- assertVisible:
+    id: "action-duplicate"
+- assertVisible:
+    id: "action-delete"
+- takeScreenshot: 05-search-long-press
+
+# AND ITS DELETE OFFERS THE SAME UNDO. The offer lives in a shared store, so a
+# record removed from here can be put back from here.
+- tapOn:
+    id: "action-delete"
+- assertVisible:
+    id: "snackbar"
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- tapOn:
+    id: "snackbar-action"
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- takeScreenshot: 06-search-delete-undone
+
+# ===========================================================================
+# No notice on an ordinary search
+# ===========================================================================
+# The banner belongs to a REFUSED DELETE and to nothing else. An ordinary
+# search — including "Show records" on an account — has nothing to explain.
+- assertNotVisible:
+    id: "search-notice"

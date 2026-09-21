@@ -100,3 +100,25 @@ export async function fetchLatestRelease(options: {
     clearTimeout(timer);
   }
 }
+
+/**
+ * What to tell someone who ASKED, which is a different sentence per outcome.
+ *
+ * Pure and here rather than inside the row that renders it, because the
+ * three-way distinction is the whole point and the middle case is the one that
+ * gets it wrong: "not newer" is TWO different answers. Being AHEAD of the
+ * newest release is the ordinary state for this app — PR builds are how it
+ * reaches a phone — and a user never told that reads the silence as a broken
+ * check, which is exactly what happened.
+ */
+export function describeUpdate(
+  installed: { version: string; buildNumber: number },
+  release: Release | null
+): string {
+  if (!release) return `You have ${installed.version} (build ${installed.buildNumber}).`;
+  if (updateAvailable(installed.buildNumber, release)) {
+    return `${release.version} (build ${release.buildNumber}) is available.`;
+  }
+  if (release.buildNumber === installed.buildNumber) return 'You are on the newest release.';
+  return `You are ahead of the newest release, ${release.version} (build ${release.buildNumber}).`;
+}

@@ -138,10 +138,23 @@ export default function CategoriesScreen() {
     });
   }
 
+  /** Its records, as an ordinary search — nothing was refused, so no notice. */
   function showRecords(item: EntityItem) {
     const { filter } = checkDeletion(db, { kind: 'category', id: item.id });
     setActing(null);
     if (filter) router.push({ pathname: '/search', params: filter });
+  }
+
+  /** The same list, arrived at because a delete was refused — so it says so. */
+  function showBlockers(item: EntityItem) {
+    const { filter } = checkDeletion(db, { kind: 'category', id: item.id });
+    setActing(null);
+    if (filter) {
+      router.push({
+        pathname: '/search',
+        params: { ...filter, deleting: item.kind, deletingName: item.name },
+      });
+    }
   }
 
   function archive(item: EntityItem) {
@@ -204,6 +217,7 @@ export default function CategoriesScreen() {
         item={acting}
         onClose={() => setActing(null)}
         onShowRecords={showRecords}
+        onShowBlockers={showBlockers}
         onUpdateBalance={() => {}}
         onEdit={(item) => {
           setActing(null);

@@ -55,6 +55,7 @@ export function EntityActions({
   item,
   onClose,
   onShowRecords,
+  onShowBlockers,
   onUpdateBalance,
   onEdit,
   onRename,
@@ -64,6 +65,15 @@ export function EntityActions({
   item: EntityItem | null;
   onClose: () => void;
   onShowRecords: (item: EntityItem) => void;
+  /**
+   * Same destination, different question.
+   *
+   * Browsing an entity's records is an ordinary search; arriving because a
+   * DELETE was refused needs the search to say why and what to do about it.
+   * Two callbacks rather than one with a flag, so a caller cannot send someone
+   * to a bare list under a banner they were never shown.
+   */
+  onShowBlockers: (item: EntityItem) => void;
   onUpdateBalance: (item: EntityItem) => void;
   onEdit: (item: EntityItem) => void;
   onRename: (item: EntityItem) => void;
@@ -94,6 +104,7 @@ export function EntityActions({
             key={item.id}
             item={item}
             onShowRecords={() => onShowRecords(item)}
+            onShowBlockers={() => onShowBlockers(item)}
             onUpdateBalance={() => onUpdateBalance(item)}
             onEdit={() => onEdit(item)}
             onRename={() => onRename(item)}
@@ -109,6 +120,7 @@ export function EntityActions({
 function Body({
   item,
   onShowRecords,
+  onShowBlockers,
   onUpdateBalance,
   onEdit,
   onRename,
@@ -117,6 +129,7 @@ function Body({
 }: {
   item: EntityItem;
   onShowRecords: () => void;
+  onShowBlockers: () => void;
   onUpdateBalance: () => void;
   onEdit: () => void;
   onRename: () => void;
@@ -211,7 +224,7 @@ function Body({
           icon="dots"
           label="Delete"
           hint={deleteHint(item)}
-          onPress={onShowRecords}
+          onPress={onShowBlockers}
           testID="entity-delete-blocked"
           danger
         />

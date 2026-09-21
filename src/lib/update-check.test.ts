@@ -6,6 +6,7 @@
  */
 
 import {
+  describeUpdate,
   fetchLatestRelease,
   parseReleaseTag,
   updateAvailable,
@@ -115,5 +116,41 @@ describe('asking GitHub', () => {
     await expect(
       fetchLatestRelease({ repo: 'a/b', fetchImpl, timeoutMs: 10 })
     ).rejects.toBeDefined();
+  });
+});
+
+/**
+ * The silence that read as a bug.
+ *
+ * The drawer says nothing when there is no newer build, which is right — and
+ * indistinguishable from a check that never ran. Asked directly, every outcome
+ * has to have a sentence, and "not newer" is TWO of them.
+ */
+describe('what to tell someone who asked', () => {
+  const installed = { version: '1.10.0', buildNumber: 164 };
+
+  it('names the release when there is a newer one', () => {
+    expect(
+      describeUpdate(installed, { version: '1.11.0', buildNumber: 170, url: 'x' })
+    ).toBe('1.11.0 (build 170) is available.');
+  });
+
+  it('says so when the installed build IS the newest release', () => {
+    expect(describeUpdate(installed, { version: '1.10.0', buildNumber: 164, url: 'x' })).toBe(
+      'You are on the newest release.'
+    );
+  });
+
+  it('says AHEAD rather than nothing, because that is the normal state here', () => {
+    // PR builds are how this app reaches a phone, so the installed build is
+    // routinely ahead of the newest release. Lumping this in with "up to date"
+    // is what made the feature look broken to somebody who was simply ahead.
+    expect(describeUpdate(installed, { version: '1.9.0', buildNumber: 162, url: 'x' })).toBe(
+      'You are ahead of the newest release, 1.9.0 (build 162).'
+    );
+  });
+
+  it('reports the installed build when nothing has been asked yet', () => {
+    expect(describeUpdate(installed, null)).toBe('You have 1.10.0 (build 164).');
   });
 });

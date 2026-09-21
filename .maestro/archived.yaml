@@ -62,6 +62,11 @@ appId: com.ahmed.peace
     id: "entity-delete-blocked"
 - assertVisible:
     id: "search-screen"
+# ...AND IT SAYS WHY YOU ARE HERE. Arriving because a delete was refused is a
+# different question from browsing, so the search page carries the notice.
+- assertVisible:
+    id: "search-notice"
+- assertVisible: ".*Move these records off Cash first.*"
 # The count on the row and the list that opens come from ONE query, so this is
 # the same "1" the sheet counted with.
 - assertVisible:
@@ -85,6 +90,10 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "search-count"
     text: "1 record"
+# THE SAME LIST, NO BANNER. Nothing was refused, so there is nothing to
+# explain — the notice belongs to the blocked delete and to nothing else.
+- assertNotVisible:
+    id: "search-notice"
 - tapOn:
     id: "nav-back"
 

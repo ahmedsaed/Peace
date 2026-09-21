@@ -88,11 +88,29 @@ export default function AccountsScreen() {
     });
   }
 
+  /**
+   * Its records, as an ordinary search.
+   *
+   * `deleting` is deliberately NOT passed: nothing was refused, so the search
+   * page has nothing to explain and shows no notice.
+   */
   function showRecords(item: EntityItem) {
     const { filter } = checkDeletion(db, { kind: 'account', id: item.id });
     setActing(null);
     // Null only when nothing points at it, and the action is not offered then.
     if (filter) router.push({ pathname: '/search', params: filter });
+  }
+
+  /** The same list, arrived at because a delete was refused — so it says so. */
+  function showBlockers(item: EntityItem) {
+    const { filter } = checkDeletion(db, { kind: 'account', id: item.id });
+    setActing(null);
+    if (filter) {
+      router.push({
+        pathname: '/search',
+        params: { ...filter, deleting: item.kind, deletingName: item.name },
+      });
+    }
   }
 
   function archive(item: EntityItem) {
@@ -184,6 +202,7 @@ export default function AccountsScreen() {
         item={acting}
         onClose={() => setActing(null)}
         onShowRecords={showRecords}
+        onShowBlockers={showBlockers}
         onUpdateBalance={(item) => {
           const row = [...accounts, ...archived].find((a) => a.id === item.id) ?? null;
           setActing(null);
