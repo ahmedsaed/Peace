@@ -203,20 +203,101 @@ appId: com.ahmed.peace
 - takeScreenshot: 04-analysis-filtered
 
 # ===========================================================================
-# The project ends — archive keeps the history and drops the offer
+# The tag screen — the home a tag never had
 # ===========================================================================
+# A tag used to be created in a picker, archived by a long press in that same
+# picker, and brought back only from Settings: three surfaces for one thing,
+# and the only list of them was a chooser that hid whatever had been retired.
+# There is one list now, and it shows what a picker never could.
 - tapOn:
     id: "tab-index"
-- tapOn: "Home"
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-tags"
+- assertVisible:
+    id: "tags-screen"
+# THE REASON THIS SCREEN EXISTS. The usage count is invisible in a picker and
+# is the only thing that says which tags are dead.
+- assertVisible:
+    id: "tag-count-kitchen"
+    text: "2 records"
+- takeScreenshot: 05-tags-screen
+
+# --- its records, from the tag itself ---
+- tapOn:
+    id: "tag-kitchen"
+- assertVisible:
+    id: "entity-actions"
+- tapOn:
+    id: "entity-show-records"
+- assertVisible:
+    id: "search-screen"
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- assertVisible:
+    id: "search-expense"
+    text: "-E£1,500.00"
+- takeScreenshot: 06-tag-records
+- tapOn:
+    id: "nav-back"
+
+# --- renaming, which a tag needs because it has no editor screen ---
+- assertVisible:
+    id: "tags-screen"
+- longPressOn:
+    id: "tag-kitchen"
+- tapOn:
+    id: "entity-rename"
+- assertVisible:
+    id: "tag-rename-sheet"
+- tapOn:
+    id: "tag-rename-input"
+- eraseText
+- inputText: "Kitchen redo"
+- tapOn:
+    id: "tag-rename-save"
+- assertVisible:
+    id: "tags-notice"
+# THE ASSERTION THAT MATTERS for a rename: the records followed it. A rename
+# that only changed the row would be a label detached from its spending.
+- tapOn:
+    id: "tag-count-kitchen-redo"
+- tapOn:
+    id: "entity-show-records"
+- assertVisible:
+    id: "search-count"
+    text: "2 records"
+- tapOn:
+    id: "nav-back"
+
+# ===========================================================================
+# The project ends — archiving keeps the history and drops the offer
+# ===========================================================================
+- longPressOn:
+    id: "tag-kitchen-redo"
+- tapOn:
+    id: "entity-archive"
+- assertVisible:
+    id: "tags-notice"
+# Off the live list and into the group at its foot, which is SHUT.
+- assertVisible:
+    id: "tags-archived"
+- assertVisible:
+    id: "tags-archived-count"
+    text: "1"
+- takeScreenshot: 07-tag-archived
+
+# Off the picker, which is what archiving is for...
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
 - tapOn:
     id: "record-tags"
-- longPressOn:
-    id: "tag-row-kitchen"
-- assertVisible:
-    id: "tag-editing"
-- tapOn:
-    id: "tag-archive"
-# Off the picker...
 - assertVisible:
     id: "tag-empty"
 - tapOn:
@@ -226,47 +307,33 @@ appId: com.ahmed.peace
 
 # ...and still on the records that were part of it. Deleting the tag instead
 # would rewrite history to say the spending was never part of anything.
-- assertVisible: "Cash · “Tiles” · #Kitchen"
-- tapOn:
-    id: "nav-search"
-- tapOn:
-    id: "search-input"
-- inputText: "Kitchen"
-- assertVisible:
-    id: "search-count"
-    text: "2 records"
-- takeScreenshot: 05-archived-still-found
+- assertVisible: "Cash · “Tiles” · #Kitchen redo"
+- takeScreenshot: 08-archived-still-on-records
 
 # ===========================================================================
-# ...and the way back, which did not exist
+# ...and the way back, from the list it left
 # ===========================================================================
-# `setTagArchived` was only ever called with `true` from any screen, so a
-# finished project was finished for good. Settings now offers it again — and
-# the assertion that matters is the PICKER offering it, not the sheet listing
-# it.
-#
-# Leaving the search screen first: it is a stack screen with its own header,
-# so the drawer button that Settings is behind is not on it.
-- tapOn:
-    id: "nav-back"
 - tapOn:
     id: "nav-menu"
 - tapOn:
-    id: "drawer-settings"
-- assertVisible:
-    id: "setting-archived-tags"
-- assertVisible: "1 put away"
+    id: "drawer-tags"
 - tapOn:
-    id: "setting-archived-tags"
+    id: "tags-archived-toggle"
 - assertVisible:
-    id: "sheet-archived-tags"
-- tapOn: "Kitchen"
+    id: "tags-archived-items"
+- longPressOn:
+    id: "tag-kitchen-redo"
 - assertVisible:
-    id: "archive-restored"
-- takeScreenshot: 06-tag-restored
+    id: "entity-archived-chip"
+- tapOn:
+    id: "entity-restore"
+- assertVisible:
+    id: "tags-notice"
+- assertNotVisible:
+    id: "tags-archived"
+- takeScreenshot: 09-tag-restored
 
-# Settings is a stack screen too, for the same reason the search screen was:
-# a back arrow and no tab bar, so the hop to a tab has to pop it first.
+# Back in the list that stopped offering it.
 - tapOn:
     id: "nav-back"
 - tapOn:
@@ -275,55 +342,38 @@ appId: com.ahmed.peace
     id: "fab"
 - tapOn:
     id: "record-tags"
-# Back in the list that stopped offering it — and still carrying the records it
-# never left, which the search above already proved.
 - assertVisible:
-    id: "tag-row-kitchen"
+    id: "tag-row-kitchen-redo"
 - tapOn:
     id: "tag-done"
 - tapOn:
     id: "record-cancel"
-- takeScreenshot: 07-tag-offered-again
 
 # ===========================================================================
 # ...and deleting it, which is not the same thing at all
 # ===========================================================================
-# Archiving keeps the label on its records; deleting takes it off them. The
-# sheet says how many are about to forget BEFORE the second tap, because that
-# is the only moment the number can still change anyone's mind.
-- tapOn:
-    id: "fab"
-- tapOn:
-    id: "record-tags"
-- longPressOn:
-    id: "tag-row-kitchen"
-- tapOn:
-    id: "tag-archive"
-- tapOn:
-    id: "tag-done"
-- tapOn:
-    id: "record-cancel"
-
+# Archiving keeps the label on its records; deleting takes it off them. Nothing
+# BLOCKS a tag — its links cascade and touch no money — so the count is the
+# COST, said before the second tap rather than in the sentence afterwards.
 - tapOn:
     id: "nav-menu"
 - tapOn:
-    id: "drawer-settings"
-- tapOn:
-    id: "setting-archived-tags"
+    id: "drawer-tags"
+- longPressOn:
+    id: "tag-kitchen-redo"
 - assertVisible:
-    id: "sheet-archived-tags"
-# The cost is on the row before it is on the confirmation.
-- assertVisible: "On 2 records"
+    id: "entity-delete"
+- assertVisible: ".*2 records would lose this label.*"
 - tapOn:
-    id: "archive-delete-kitchen"
-- assertVisible: "Delete Kitchen for good?"
+    id: "entity-delete"
+- assertVisible: "Delete Kitchen redo for good?"
 - assertVisible: ".*2 records will lose the label.*"
-- takeScreenshot: 08-tag-delete-armed
+- takeScreenshot: 10-tag-delete-armed
 - tapOn:
-    id: "archive-confirm-kitchen"
+    id: "entity-confirm"
 - assertVisible:
-    id: "archive-restored"
-- assertVisible: "Kitchen deleted, and taken off 2 records."
+    id: "tags-notice"
+- assertVisible: ".*taken off 2 records.*"
 
 # THE ASSERTION THAT MATTERS: the records kept everything a record is, and
 # lost only the label. Deleting a tag must never reach the money.
@@ -331,7 +381,7 @@ appId: com.ahmed.peace
     id: "nav-back"
 - tapOn:
     id: "tab-index"
-- assertNotVisible: "Cash · “Tiles” · #Kitchen"
+- assertNotVisible: "Cash · “Tiles” · #Kitchen redo"
 - assertVisible: ".*Tiles.*"
 - assertVisible: "-E£1,200.00"
-- takeScreenshot: 09-tag-deleted
+- takeScreenshot: 11-tag-deleted

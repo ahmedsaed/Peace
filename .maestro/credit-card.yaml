@@ -89,17 +89,16 @@ appId: com.ahmed.peace
 - takeScreenshot: 02-card-owed
 
 # --- the bank disagrees: correct it ---
-- tapOn: "Kenana"
-# SCROLLED TO, never tapped blind. This form ends with an icon grid that grows
-# every time a glyph is added — eleven new ones pushed "Update balance" under
-# the fold and this flow failed on a button that was rendering perfectly. A card
-# is the tall case: it alone carries a limit and two fee fields.
-- scrollUntilVisible:
-    element:
-      id: "account-reconcile"
-    direction: DOWN
+# HOLD, not tap. "Update balance" used to sit at the foot of the edit form,
+# below an icon grid that grows every time a glyph is added — eleven new ones
+# once pushed it under the fold and this flow failed on a button that was
+# rendering perfectly. It is on the long press now, with nothing above it to
+# scroll past.
+- longPressOn: "Kenana"
+- assertVisible:
+    id: "entity-actions"
 - tapOn:
-    id: "account-reconcile"
+    id: "entity-update-balance"
 - assertVisible:
     id: "reconcile-sheet"
 # Both numbers are offered because banking apps disagree about which one they

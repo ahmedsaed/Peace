@@ -19,6 +19,8 @@ import {
 import {
   buildCategoryTree,
   createCategory,
+  categoryRecordCount,
+  categoryRecordCountDeep,
   deleteCategory,
   getCategory,
   InvariantError,
@@ -559,7 +561,10 @@ describe('category delete', () => {
     seedDefaults(db);
   });
 
-  it('leaves records uncategorised rather than deleting them', () => {
+  it('REFUSES to delete a category that has records', () => {
+    // It used to do this silently, leaving a year of groceries as
+    // "Uncategorised" — the money survives and what it was spent on does not,
+    // which is the one thing that cannot be worked out again afterwards.
     createRecord(db, {
       type: 'expense',
       accountId: CASH,
@@ -567,21 +572,41 @@ describe('category delete', () => {
       amountMinor: 100,
     });
 
-    expect(deleteCategory(db, catId('food'))).toEqual({ orphanedRecords: 1 });
+    expect(() => deleteCategory(db, catId('food'))).toThrow(/has 1 record/i);
+    expect(getCategory(db, catId('food'))).toBeDefined();
     const rows = db.select().from(transactions).all();
     expect(rows).toHaveLength(1);
-    expect(rows[0].categoryId).toBeNull();
+    expect(rows[0].categoryId).toBe(catId('food'));
   });
 
-  it('promotes children instead of deleting them', () => {
+  it("counts a CHILD's records against deleting the parent", () => {
+    // The divergence that made this worth one function rather than two:
+    // "Food" itself has nothing on it, so a shallow count would have let this
+    // through while Settings — which counts the children too — said 1.
+    createRecord(db, {
+      type: 'expense',
+      accountId: CASH,
+      categoryId: catId('groceries'),
+      amountMinor: 100,
+    });
+
+    expect(categoryRecordCount(db, catId('food'))).toBe(0);
+    expect(categoryRecordCountDeep(db, catId('food'))).toBe(1);
+    expect(() => deleteCategory(db, catId('food'))).toThrow(/has 1 record/i);
+  });
+
+  it('promotes childless-of-records children instead of deleting them', () => {
+    // Nothing points at Food or Groceries, so this still goes ahead — and
+    // Groceries survives at top level rather than going with its parent.
     deleteCategory(db, catId('food'));
     const groceries = getCategory(db, catId('groceries'));
     expect(groceries).toBeDefined();
     expect(groceries!.parentId).toBeNull();
   });
 
-  it('reports zero for a category nothing uses', () => {
-    expect(deleteCategory(db, catId('pets'))).toEqual({ orphanedRecords: 0 });
+  it('deletes a category nothing uses', () => {
+    deleteCategory(db, catId('pets'));
+    expect(getCategory(db, catId('pets'))).toBeUndefined();
   });
 });
 

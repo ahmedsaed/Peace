@@ -10,7 +10,7 @@
  */
 import { createTestDb, type TestDb } from '../../test/db';
 import { createAccount, getAccount, listAccountsWithBalance } from './accounts';
-import { archivedName, checkDeletion, deleteArchived } from './archive';
+import { entityName, checkDeletion, deleteEntity } from './archive';
 import { createCategory, getCategory, InvariantError } from './categories';
 import { searchRecords } from './search';
 import { ensureTag, listTags, setRecordTags, tagsForRecord } from './tags';
@@ -66,7 +66,7 @@ describe('an account still holding records', () => {
 
     // `transactions.account_id` CASCADES: without this guard the delete would
     // succeed and quietly take the record with it.
-    expect(() => deleteArchived(db, { kind: 'account', id: 'wallet' })).toThrow(InvariantError);
+    expect(() => deleteEntity(db, { kind: 'account', id: 'wallet' })).toThrow(InvariantError);
     expect(getAccount(db, 'wallet')).toBeDefined();
   });
 
@@ -107,7 +107,7 @@ describe('an account still holding records', () => {
       filter: null,
     });
 
-    deleteArchived(db, { kind: 'account', id: 'wallet' });
+    deleteEntity(db, { kind: 'account', id: 'wallet' });
     expect(listAccountsWithBalance(db, true).map((a) => a.id)).not.toContain('wallet');
   });
 });
@@ -126,14 +126,14 @@ describe('a category still on records', () => {
     expect(check.blocking).toBe(1);
     expect(check.filter).toEqual({ categoryId: 'food' });
     expect(searchRecords(db, q(check.filter!)).matchCount).toBe(1);
-    expect(() => deleteArchived(db, { kind: 'category', id: 'food' })).toThrow(InvariantError);
+    expect(() => deleteEntity(db, { kind: 'category', id: 'food' })).toThrow(InvariantError);
   });
 
   it('deletes one nothing is filed under', () => {
     const db = seed();
     spend(db, 'e1', 'bank', null, 3);
 
-    deleteArchived(db, { kind: 'category', id: 'groceries' });
+    deleteEntity(db, { kind: 'category', id: 'groceries' });
     expect(getCategory(db, 'groceries')).toBeUndefined();
     // Deleting a category leaves its records UNCATEGORISED, which is why one
     // with records is refused above — here there were none to lose.
@@ -163,7 +163,7 @@ describe('a tag is never blocked', () => {
     spend(db, 'e1', 'bank', 'groceries', 3);
     setRecordTags(db, 'e1', [tag.id]);
 
-    deleteArchived(db, { kind: 'tag', id: tag.id });
+    deleteEntity(db, { kind: 'tag', id: tag.id });
 
     expect(listTags(db, { includeArchived: true })).toEqual([]);
     expect(tagsForRecord(db, 'e1')).toEqual([]);
@@ -178,9 +178,9 @@ describe('naming what is about to go', () => {
     const db = seed();
     const tag = ensureTag(db, 'Kitchen');
 
-    expect(archivedName(db, { kind: 'account', id: 'wallet' })).toBe('Old wallet');
-    expect(archivedName(db, { kind: 'category', id: 'groceries' })).toBe('Groceries');
-    expect(archivedName(db, { kind: 'tag', id: tag.id })).toBe('Kitchen');
-    expect(archivedName(db, { kind: 'account', id: 'nope' })).toBeNull();
+    expect(entityName(db, { kind: 'account', id: 'wallet' })).toBe('Old wallet');
+    expect(entityName(db, { kind: 'category', id: 'groceries' })).toBe('Groceries');
+    expect(entityName(db, { kind: 'tag', id: tag.id })).toBe('Kitchen');
+    expect(entityName(db, { kind: 'account', id: 'nope' })).toBeNull();
   });
 });

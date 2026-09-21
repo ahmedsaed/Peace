@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   ColorPicker,
-  DangerButton,
   Field,
   FormHeader,
   IconPicker,
@@ -16,18 +15,12 @@ import { Icon } from '@/components/icon';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
-import {
-  createAccount,
-  deleteAccount,
-  getAccount,
-  updateAccount,
-} from '@/db/repo/accounts';
+import { createAccount, getAccount, updateAccount } from '@/db/repo/accounts';
 import { InvariantError } from '@/db/repo/categories';
 import type { Account } from '@/db/schema';
 import { parseAmountToMinor } from '@/lib/money';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
-import { ReconcileSheet } from '@/components/reconcile-sheet';
-import { accountBalance, reconcileAccount } from '@/db/repo/adjust';
+import { accountBalance } from '@/db/repo/adjust';
 import { bpToPercent, hasCardProfile, isLiability, percentToBp } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
@@ -71,14 +64,11 @@ export default function AccountScreen() {
   const [cashFee, setCashFee] = useState(bpToPercent(existing?.cashFeeBp ?? null));
   const [icon, setIcon] = useState(existing?.icon ?? 'wallet');
   const [color, setColor] = useState(existing?.color ?? '#6B5B4A');
-  const [archived, setArchived] = useState(existing?.archived ?? false);
-  const [sheet, setSheet] = useState<'currency' | 'reconcile' | null>(null);
+  const [sheet, setSheet] = useState<'currency' | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Re-read after a correction rather than kept in sync by hand: the balance is
   // derived, and a copy of a derived number is a copy that can be wrong.
-  const [balanceNow, setBalanceNow] = useState(() =>
-    existing ? accountBalance(db, existing.id) : 0
-  );
+  const balanceNow = existing ? accountBalance(db, existing.id) : 0;
 
   // A card is set up with its LIMIT, not a balance. Whatever is already owed
   // arrives through "Update balance" as a dated adjustment — visible in the
@@ -123,23 +113,11 @@ export default function AccountScreen() {
         icon,
         color,
       };
-      if (existing) updateAccount(db, existing.id, { ...patch, archived });
+      if (existing) updateAccount(db, existing.id, patch);
       else createAccount(db, patch);
       router.back();
     } catch (e) {
       setError(e instanceof InvariantError ? e.message : 'Could not save this account.');
-    }
-  }
-
-  function onDelete() {
-    if (!existing) return;
-    try {
-      deleteAccount(db, existing.id);
-      router.back();
-    } catch (e) {
-      // The guard against deleting an account with history explains itself —
-      // show it verbatim rather than a generic failure.
-      setError(e instanceof InvariantError ? e.message : 'Could not delete this account.');
     }
   }
 
@@ -251,57 +229,23 @@ export default function AccountScreen() {
           <IconPicker value={icon} color={color} onChange={setIcon} />
         </Field>
 
-        {existing ? (
-          <Field label="Archived">
-            {/* Archiving is the safe way to retire an account: the history stays,
-                and it stops appearing in pickers. */}
-            <Pressable
-              onPress={() => setArchived((a) => !a)}
-              testID="account-archived"
-              accessibilityRole="switch"
-              accessibilityState={{ checked: archived }}
-              className="flex-row items-center justify-between rounded-lg bg-surface px-4 py-3 active:opacity-70">
-              <Text className="text-sm text-ink">
-                {archived ? 'Hidden from pickers' : 'Active'}
-              </Text>
-              <View
-                className={`h-6 w-11 justify-center rounded-full px-0.5 ${
-                  archived ? 'bg-accent' : 'bg-line'
-                }`}>
-                <View className={`h-5 w-5 rounded-full bg-ink ${archived ? 'self-end' : ''}`} />
-              </View>
-            </Pressable>
-          </Field>
-        ) : null}
-
         {error ? (
           <Text className="mb-4 text-sm text-expense" testID="account-error">
             {error}
           </Text>
         ) : null}
 
-        {/* The drift fix. A card's balance is derived, so there is nothing to
-            edit — instead you say what the bank shows and Peace writes a dated
-            correction for the difference. */}
-        {existing ? (
-          <Pressable
-            onPress={() => setSheet('reconcile')}
-            testID="account-reconcile"
-            className="mb-3 items-center rounded-lg bg-raised py-3 active:opacity-70">
-            <Text className="text-sm font-semibold text-ink">Update balance</Text>
-          </Pressable>
-        ) : null}
-
-        {existing ? (
-          <DangerButton label="Delete account" onPress={onDelete} testID="account-delete" />
-        ) : null}
-
+        {/* THIS FORM ONLY EDITS. Correcting the balance, putting the account
+            away and deleting it all used to live under here, which meant
+            opening a thing to change it in order to remove it — and put Delete
+            directly beneath Save. They are on the long press now, beside the
+            records they affect, exactly as a record's own actions are. */}
         {existing ? (
           <Text className="mt-3 text-xs leading-5 text-muted">
             {liability
               ? `Currently ${money(Math.abs(balanceNow), existing.currency)} ${
                   balanceNow <= 0 ? 'owed' : 'in credit'
-                }, from every record on this card. Use "Update balance" when the bank disagrees.`
+                }, from every record on this card. Hold it in the Accounts list to correct it.`
               : `Current balance ${money(
                   existing.openingBalance,
                   existing.currency
@@ -309,23 +253,6 @@ export default function AccountScreen() {
           </Text>
         ) : null}
       </ScrollView>
-
-      {existing ? (
-        <ReconcileSheet
-          visible={sheet === 'reconcile'}
-          accountName={existing.name}
-          accountType={existing.type}
-          currency={existing.currency}
-          currentMinor={balanceNow}
-          creditLimitMinor={existing.creditLimit}
-          onClose={() => setSheet(null)}
-          onConfirm={(targetMinor) => {
-            reconcileAccount(db, existing.id, targetMinor);
-            setBalanceNow(accountBalance(db, existing.id));
-            setSheet(null);
-          }}
-        />
-      ) : null}
 
       <PickerSheet
         visible={sheet === 'currency'}

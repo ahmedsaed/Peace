@@ -8,13 +8,18 @@ import { useKeyboardHeight } from '@/lib/layout';
 import { isNewTagName, tagKey, tagNameProblem } from '@/lib/tag';
 
 /**
- * Choosing labels, and managing them, in one sheet.
+ * Choosing labels. ONLY choosing them.
  *
- * MANAGEMENT IS INLINE, not a second sheet. A modal over a modal is unreliable
- * on Android — the same reason the search filters are a panel rather than a
- * sheet — so long-pressing a row expands it in place instead of opening
- * anything. Tags have to be renameable and archivable somewhere, and a screen
- * of their own would duplicate a picker that already lists every one of them.
+ * Renaming and archiving used to be here, on a long press that expanded the row
+ * in place — which made this the one picker in the app that was also a manager,
+ * and made a long press mean something different here than in every list.
+ * Worse, it was half a home: a tag could be retired from this sheet and only
+ * ever brought back from a Settings screen, so the way out did not live where
+ * the way in was. Tags have their own screen now, which can show the thing a
+ * picker never could — how much each one is actually used.
+ *
+ * CREATION stays, because this is where the inputs are: a tag is made while
+ * labelling a record, not on a form somewhere else.
  *
  * Multi-select, so it closes on Done rather than on the first tap: unlike an
  * account or a category, the answer is a SET, and a sheet that closed after one
@@ -26,8 +31,6 @@ export function TagSheet({
   selectedIds,
   onToggle,
   onCreate,
-  onRename,
-  onArchive,
   onClose,
   testID = 'tag-sheet',
 }: {
@@ -37,16 +40,11 @@ export function TagSheet({
   onToggle: (id: string) => void;
   /** Omitted where tags are being FILTERED by rather than assigned. */
   onCreate?: (name: string) => void;
-  onRename?: (id: string, name: string) => void;
-  onArchive?: (id: string) => void;
   onClose: () => void;
   testID?: string;
 }) {
   const keyboardHeight = useKeyboardHeight();
   const [draft, setDraft] = useState('');
-  /** The row expanded for renaming, if any. */
-  const [editing, setEditing] = useState<Tag | null>(null);
-  const [editDraft, setEditDraft] = useState('');
 
   const needle = tagKey(draft);
   const shown = useMemo(
@@ -57,7 +55,6 @@ export function TagSheet({
 
   function close() {
     setDraft('');
-    setEditing(null);
     onClose();
   }
 
@@ -116,56 +113,10 @@ export function TagSheet({
             </Pressable>
           ) : null}
 
-          {shown.map((tag) =>
-            editing?.id === tag.id ? (
-              <View key={tag.id} className="border-b border-line px-5 py-3" testID="tag-editing">
-                <TextInput
-                  value={editDraft}
-                  onChangeText={setEditDraft}
-                  autoFocus
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  testID="tag-rename-input"
-                  className="rounded-lg bg-raised px-3 py-2.5 text-sm text-ink"
-                />
-                <View className="mt-2 flex-row items-center gap-2">
-                  <SmallButton label="Cancel" onPress={() => setEditing(null)} testID="tag-cancel" />
-                  <View className="flex-1" />
-                  {onArchive ? (
-                    // Not "Delete". A finished project's spending was still part
-                    // of it, and removing the tag would rewrite that.
-                    <SmallButton
-                      label="Archive"
-                      onPress={() => {
-                        onArchive(tag.id);
-                        setEditing(null);
-                      }}
-                      testID="tag-archive"
-                    />
-                  ) : null}
-                  <SmallButton
-                    label="Rename"
-                    primary
-                    onPress={() => {
-                      onRename?.(tag.id, editDraft);
-                      setEditing(null);
-                    }}
-                    testID="tag-rename"
-                  />
-                </View>
-              </View>
-            ) : (
+          {shown.map((tag) => (
               <Pressable
                 key={tag.id}
                 onPress={() => onToggle(tag.id)}
-                onLongPress={
-                  onRename
-                    ? () => {
-                        setEditing(tag);
-                        setEditDraft(tag.name);
-                      }
-                    : undefined
-                }
                 testID={`tag-row-${tag.normalised.replace(/[^a-z0-9]+/g, '-')}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: selectedIds.includes(tag.id) }}
@@ -187,8 +138,7 @@ export function TagSheet({
                   <Text className="text-base text-accent">✓</Text>
                 ) : null}
               </Pressable>
-            )
-          )}
+          ))}
 
           {shown.length === 0 && !canCreate ? (
             <Text className="px-5 py-6 text-center text-xs text-muted" testID="tag-empty">
@@ -199,37 +149,13 @@ export function TagSheet({
           ) : null}
         </ScrollView>
 
-        {onRename ? (
+        {onCreate ? (
           <Text className="px-5 pt-3 text-[11px] text-muted">
-            Hold a tag to rename or archive it. Archiving keeps it on its records.
+            Renaming and putting a tag away live in the menu, under Tags.
           </Text>
         ) : null}
       </View>
     </Modal>
-  );
-}
-
-function SmallButton({
-  label,
-  onPress,
-  testID,
-  primary = false,
-}: {
-  label: string;
-  onPress: () => void;
-  testID: string;
-  primary?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      testID={testID}
-      accessibilityRole="button"
-      className={`rounded-lg px-3 py-2 ${primary ? 'bg-accent' : 'bg-raised'}`}>
-      <Text className={`text-xs font-semibold ${primary ? 'text-accent-ink' : 'text-ink'}`}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 

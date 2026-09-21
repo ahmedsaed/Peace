@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import * as schema from '../schema';
@@ -246,20 +246,67 @@ export function categoryRecordCount(db: Db, id: string): number {
 }
 
 /**
- * Delete a category.
+ * Records this category is answerable for: its own, AND its children's.
  *
- * Unlike accounts, this is SAFE by construction: `transactions.category_id` is
- * SET NULL, so records survive uncategorised, and `categories.parent_id` is also
- * SET NULL, so children are promoted to top level rather than deleted. Losing a
- * label should never lose the money or the sub-categories underneath it.
+ * A PARENT MATCHES ITS CHILDREN, exactly as `searchRecords` does for the same
+ * id — deleting "Food" is a question about every record under "Groceries" too,
+ * because they are what the delete would leave without a category. The count
+ * that refuses the delete, the number shown on the button, and the list the
+ * user is then sent to all come from this one predicate; counting one way and
+ * filtering another is how a screen ends up saying "4 records" over a list of
+ * three.
  *
- * Returns how many records were left uncategorised, so the caller can say so.
+ * One level is all the schema allows, so there is no recursion to write.
  */
-export function deleteCategory(db: Db, id: string): { orphanedRecords: number } {
+export function categoryRecordCountDeep(db: Db, id: string): number {
+  return db
+    .select()
+    .from(transactions)
+    .where(
+      sql`${transactions.categoryId} in (
+        select ${categories.id} from ${categories}
+        where ${categories.id} = ${id} or ${categories.parentId} = ${id}
+      )`
+    )
+    .all().length;
+}
+
+/**
+ * Delete a category, or refuse with the count that says why.
+ *
+ * This USED to delete unconditionally, on the grounds that it was "safe by
+ * construction": `transactions.category_id` is SET NULL, so the money survives
+ * and only the label goes. That reasoning was wrong in the way that matters.
+ * The money surviving is not the point — what the money was SPENT ON is the
+ * thing a ledger exists to remember, and it cannot be reconstructed afterwards
+ * from an amount and a date. A year of groceries silently becoming
+ * "Uncategorised" is a worse outcome than any refusal.
+ *
+ * It was also the second of two answers the app gave to the same question:
+ * Settings refused this delete and handed over the list, while the editor did
+ * it without comment. One entity, one word "Delete", two opposite behaviours.
+ * The guard belongs HERE, beside `deleteAccount`'s, so no caller can miss it.
+ *
+ * `parent_id` is still SET NULL, so a childless-of-records parent leaves its
+ * sub-categories promoted rather than deleted — nothing is lost there, which
+ * is why it is allowed to proceed.
+ *
+ * Returns nothing. It used to report how many records it had orphaned, which
+ * is now always zero by construction — a count that can only ever be 0 is a
+ * field waiting to be believed.
+ */
+export function deleteCategory(db: Db, id: string): void {
   const existing = getCategory(db, id);
   if (!existing) throw new InvariantError(`Category "${id}" does not exist.`);
 
-  const orphanedRecords = categoryRecordCount(db, id);
+  const blocking = categoryRecordCountDeep(db, id);
+  if (blocking > 0) {
+    throw new InvariantError(
+      `"${existing.name}" has ${blocking} record${blocking === 1 ? '' : 's'}. ` +
+        'Give them another category first — deleting would leave them with none, ' +
+        'and what they were spent on cannot be worked out again.'
+    );
+  }
+
   db.delete(categories).where(eq(categories.id, id)).run();
-  return { orphanedRecords };
 }

@@ -31,9 +31,7 @@ import { InvariantError, listCategoryTree } from '@/db/repo/categories';
 import {
   ensureTag,
   listTags,
-  renameTag,
   setRecordTags,
-  setTagArchived,
   tagsForRecord,
 } from '@/db/repo/tags';
 import { describeRepeat, RepeatSheet, type Repeat } from '@/components/repeat-sheet';
@@ -1605,22 +1603,6 @@ export default function RecordScreen() {
           const tag = ensureTag(db, name);
           setAllTags(listTags(db));
           setTagIds((current) => (current.includes(tag.id) ? current : [...current, tag.id]));
-        }}
-        onRename={(id, name) => {
-          try {
-            renameTag(db, id, name);
-            setAllTags(listTags(db));
-          } catch (err) {
-            setError(err instanceof InvariantError ? err.message : 'Could not rename that tag.');
-          }
-        }}
-        onArchive={(id) => {
-          setTagArchived(db, id, true);
-          setAllTags(listTags(db));
-          // Off the picker AND off this record: an archived tag the form still
-          // carries would be saved onto it while no longer being offerable,
-          // which is a state no screen could explain.
-          setTagIds((current) => current.filter((t) => t !== id));
         }}
         onClose={() => setTagSheet(false)}
       />

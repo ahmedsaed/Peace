@@ -57,8 +57,9 @@ export default function SearchScreen() {
   const { height } = useWindowDimensions();
 
   /**
-   * Opened with a filter already set — from Settings, where deleting an
-   * archived account or category sends you here to move what is in the way.
+   * Opened with a filter already set — by "Show records" on any account,
+   * category or tag, and by the blocked delete that sends you here to move
+   * what is in the way.
    *
    * The params carry the SAME filter `checkDeletion` counted with, so the
    * number on that row and this list cannot disagree about how much work is
@@ -70,6 +71,8 @@ export default function SearchScreen() {
     accountId?: string;
     counterAccountId?: string;
     categoryId?: string;
+    /** A single tag, from the Tags list. The filter itself holds many. */
+    tagId?: string;
     deleting?: string;
     deletingName?: string;
   }>();
@@ -86,6 +89,7 @@ export default function SearchScreen() {
     accountId: params.accountId ?? null,
     counterAccountId: params.counterAccountId ?? null,
     categoryId: params.categoryId ?? null,
+    tagIds: params.tagId ? [params.tagId] : [],
   }));
   const [outcome, setOutcome] = useState<SearchOutcome | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);

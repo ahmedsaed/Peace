@@ -1,17 +1,16 @@
 appId: com.ahmed.peace
 ---
-# Putting things away, and getting them back.
+# Putting things away, and getting them back — from the list it left.
 #
-# Archiving was a one-way door: the toggle that undoes it lives in an editor
-# you reach by tapping the thing in a list, and every one of those lists hides
-# what is archived. So the point of this flow is NOT that a settings row
-# renders — it is that something which has VANISHED from its own screen can be
-# brought back from Settings and is on that screen again afterwards. Asserting
-# only that the sheet listed it would pass just as well if the restore wrote
-# nothing.
+# Archiving used to be a one-way door dressed as five different controls: a
+# switch in an editor, a dimmed group on one tab, nothing at all on another,
+# three count rows in Settings opening a modal, and an inline button in the tag
+# picker. The way back lived in Settings, which is precisely where the thing
+# ISN'T. Now every list carries its own archive at its foot and one sheet does
+# the work everywhere, so this flow's job is to prove the round trip happens
+# entirely within the list the thing belongs to.
 #
-# Accounts and categories here; the tag half lives at the foot of tags.yaml,
-# where a tag has already been archived for its own reasons.
+# Tags are the same story on their own screen; that half lives in tags.yaml.
 - launchApp:
     clearState: true
 
@@ -41,35 +40,82 @@ appId: com.ahmed.peace
     text: "-E£9.00"
 - assertVisible: "Cash"
 
-# --- put it away ---
-- tapOn: "Cash"
-- assertVisible: "Edit account"
-# The toggle sits below the icon grid, which grows as glyphs are added — the
-# same scroll every other flow that reaches the foot of this form needs.
-- scrollUntilVisible:
-    element:
-      id: "account-archived"
-    direction: DOWN
+# ===========================================================================
+# What a long press offers, and what it refuses
+# ===========================================================================
+- longPressOn: "Cash"
+- assertVisible:
+    id: "entity-actions"
+# The balance is on the sheet, so the thing being acted on is named by more
+# than a word that might match two accounts.
+- assertVisible:
+    id: "entity-detail"
+- takeScreenshot: 01-account-actions
+
+# DELETE IS A DESTINATION, NOT A SENTENCE. Cash carries the E£9.00 record, so
+# the row counts what is in the way and going through it lands on exactly those
+# records. A dead "you cannot delete this" is how people learn to stop pressing
+# things.
+- assertVisible:
+    id: "entity-delete-blocked"
 - tapOn:
-    id: "account-archived"
-- assertVisible: "Hidden from pickers"
+    id: "entity-delete-blocked"
+- assertVisible:
+    id: "search-screen"
+# The count on the row and the list that opens come from ONE query, so this is
+# the same "1" the sheet counted with.
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- takeScreenshot: 02-blocked-by-records
 - tapOn:
-    id: "form-save"
+    id: "nav-back"
+
+# --- its records, without having to be refused first ---
+# The action the app never had: the filtered list existed only as the
+# consequence of a blocked delete, so "what is actually on this account" had no
+# answer anywhere in the UI.
+- assertVisible:
+    id: "accounts-screen"
+- longPressOn: "Cash"
+- tapOn:
+    id: "entity-show-records"
+- assertVisible:
+    id: "search-screen"
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- tapOn:
+    id: "nav-back"
+
+# ===========================================================================
+# Put it away, from the list
+# ===========================================================================
+- longPressOn: "Cash"
+- tapOn:
+    id: "entity-archive"
+- assertVisible:
+    id: "accounts-notice"
 
 # THE TOTAL DOES NOT MOVE. Money in an archived account has not been spent —
 # a wallet in a drawer is still yours. This used to fall to E£0.00 here while
 # the home screen's "Now" went on saying -E£9.00, two screens disagreeing by
 # exactly the archived balance with nothing on either to explain it.
 - assertVisible:
-    id: "accounts-screen"
-- assertVisible:
     id: "accounts-total"
     text: "-E£9.00"
-# ...and the list says where that money is, rather than counting an account it
-# never mentions.
+# ...and the list accounts for that money without showing the row: the group is
+# SHUT, and its header carries the balance. A figure that includes money the
+# screen never mentions is a screen disagreeing with itself.
 - assertVisible:
     id: "accounts-archived"
-- takeScreenshot: 01-account-archived
+- assertVisible:
+    id: "accounts-archived-count"
+    text: "1"
+- assertVisible:
+    id: "accounts-archived-summary"
+    text: "-E£9.00"
+- takeScreenshot: 03-account-archived
 
 # Off the pickers, which is what archiving is actually for.
 - tapOn:
@@ -86,86 +132,36 @@ appId: com.ahmed.peace
 - tapOn:
     id: "record-cancel"
 
-# --- find it in Settings ---
-- tapOn:
-    id: "nav-menu"
-- tapOn:
-    id: "drawer-settings"
-- assertVisible:
-    id: "settings-screen"
-- assertVisible:
-    id: "setting-archived-accounts"
-# The row counts what is waiting, so an empty archive and a broken query do not
-# look the same from here.
-- assertVisible: "1 put away"
-
-- tapOn:
-    id: "setting-archived-accounts"
-- assertVisible:
-    id: "sheet-archived-accounts"
-- assertVisible: "Cash"
-- takeScreenshot: 02-archived-listed
-
-# --- what deleting it would cost, before it is offered ---
-# Cash carries the E£9.00 record, so the row offers the COUNT rather than a
-# delete button: tapping it is a question, and the answer is the search page
-# filtered to exactly those records. A dead "you cannot delete this" with no
-# way to see what is holding it is how people learn to stop pressing things.
-- assertVisible:
-    id: "archive-move-seed-acct-cash"
-- tapOn:
-    id: "archive-move-seed-acct-cash"
-- assertVisible:
-    id: "search-screen"
-- assertVisible:
-    id: "search-notice"
-# The count on the row and the list that opens come from one query, so this is
-# the same "1" the sheet printed a moment ago.
-- assertVisible:
-    id: "search-count"
-    text: "1 record"
-- takeScreenshot: 03-blocked-by-records
-
-- tapOn:
-    id: "nav-back"
-- assertVisible:
-    id: "settings-screen"
-- tapOn:
-    id: "setting-archived-accounts"
-- assertVisible:
-    id: "sheet-archived-accounts"
-
-# --- bring it back ---
-- tapOn: "Cash"
-- assertVisible:
-    id: "archive-restored"
-# Nothing is put away any more. Asserted as the ABSENCE of a count rather than
-# the presence of "None": all three rows in this section read "None" when they
-# are empty, so a "None" is visible here whether or not the account came back.
-- assertNotVisible: "1 put away"
-- takeScreenshot: 04-account-restored
-
-# THE ASSERTION THAT MATTERS. On a different screen, the account is listed
-# again — and it is offered by the record screen's account picker, which is the
-# thing archiving actually took away.
-#
-# Settings is PUSHED OVER the tabs, so it carries a back arrow and no tab bar:
-# every hop from here to a tab has to pop the stack first. Tapping `tab-accounts`
-# straight from Settings fails on a missing element, not on a wrong screen.
-- tapOn:
-    id: "nav-back"
+# ===========================================================================
+# ...and bring it back, from the same list
+# ===========================================================================
 - tapOn:
     id: "tab-accounts"
+# Shut by default — the point of archiving is that it stops being in the way —
+# so the row has to be asked for before it can be held.
+- tapOn:
+    id: "accounts-archived-toggle"
 - assertVisible:
-    id: "accounts-screen"
-- assertVisible: "Cash"
-# The Archived group is gone, which is the assertion that means something now
-# that an archived account is ON this screen rather than missing from it.
+    id: "accounts-archived-items"
+- longPressOn: "Cash"
+# The sheet says what state the thing is in, so the action makes sense on its
+# own rather than depending on which group the row was dragged from.
+- assertVisible:
+    id: "entity-archived-chip"
+- tapOn:
+    id: "entity-restore"
+- assertVisible:
+    id: "accounts-notice"
+
+# THE ASSERTION THAT MATTERS. The account is back in the list proper, the
+# archived group is gone entirely, and the picker offers it again — which is
+# the thing archiving actually took away.
 - assertNotVisible:
     id: "accounts-archived"
 - assertVisible:
     id: "accounts-total"
     text: "-E£9.00"
+- takeScreenshot: 04-account-restored
 
 - tapOn:
     id: "tab-index"
@@ -180,13 +176,12 @@ appId: com.ahmed.peace
     id: "picker-close"
 - tapOn:
     id: "record-cancel"
-- takeScreenshot: 05-back-in-the-picker
 
 # ===========================================================================
 # The same round trip for a category
 # ===========================================================================
-# A category could not be archived at all until this change — the column was
-# read by every picker and written by nothing.
+# This tab had NO archived surface at all: a category put away simply vanished
+# from it, and the only way back was a screen in the menu.
 - tapOn:
     id: "tab-categories"
 - assertVisible:
@@ -194,98 +189,118 @@ appId: com.ahmed.peace
 - scrollUntilVisible:
     element: "Pets"
     direction: DOWN
-- tapOn: "Pets"
-- assertVisible: "Edit category"
-- scrollUntilVisible:
-    element:
-      id: "category-archived"
-    direction: DOWN
-- tapOn:
-    id: "category-archived"
-- assertVisible: "Hidden from pickers"
-- tapOn:
-    id: "form-save"
+- longPressOn: "Pets"
 - assertVisible:
-    id: "categories-screen"
-- takeScreenshot: 06-category-archived
+    id: "entity-actions"
+- tapOn:
+    id: "entity-archive"
+- assertVisible:
+    id: "categories-notice"
+- takeScreenshot: 05-category-archived
 
-- tapOn:
-    id: "nav-menu"
-- tapOn:
-    id: "drawer-settings"
+# Gone from its own list...
 - assertVisible:
-    id: "setting-archived-categories"
-- assertVisible: "1 put away"
-- tapOn:
-    id: "setting-archived-categories"
+    id: "categories-archived"
 - assertVisible:
-    id: "sheet-archived-categories"
-- tapOn: "Pets"
-- assertVisible:
-    id: "archive-restored"
+    id: "categories-archived-count"
+    text: "1"
 
-# Back on the tab it vanished from — off the Settings stack first, as above.
+# ...and back from the foot of that same list.
+- tapOn:
+    id: "categories-archived-toggle"
+- assertVisible:
+    id: "categories-archived-items"
+- longPressOn: "Pets"
+- tapOn:
+    id: "entity-restore"
+- assertVisible:
+    id: "categories-notice"
+- assertNotVisible:
+    id: "categories-archived"
 # `scrollUntilVisible` fails the flow if it is not there, which
 # `assertNotVisible` on a long scrolling list could never prove in the other
 # direction.
-- tapOn:
-    id: "nav-back"
-- tapOn:
-    id: "tab-categories"
 - scrollUntilVisible:
     element: "Pets"
     direction: DOWN
-- takeScreenshot: 07-category-restored
+- takeScreenshot: 06-category-restored
 
 # ===========================================================================
 # Deleting one that nothing points at
 # ===========================================================================
-# Baby has no records, so the row offers a delete rather than a count — and it
+# Baby has no records, so its delete is free rather than blocked — and it still
 # takes a second tap that names what is about to go, because this is the one
 # action here that cannot be undone.
 - scrollUntilVisible:
     element: "Baby"
     direction: DOWN
-- tapOn: "Baby"
-- assertVisible: "Edit category"
-- scrollUntilVisible:
-    element:
-      id: "category-archived"
-    direction: DOWN
-- tapOn:
-    id: "category-archived"
-- tapOn:
-    id: "form-save"
-
-- tapOn:
-    id: "nav-menu"
-- tapOn:
-    id: "drawer-settings"
-- tapOn:
-    id: "setting-archived-categories"
+- longPressOn: "Baby"
 - assertVisible:
-    id: "sheet-archived-categories"
+    id: "entity-actions"
+- assertVisible:
+    id: "entity-delete"
 - tapOn:
-    id: "archive-delete-seed-cat-baby"
-# Armed, not done: the row asks before it goes.
+    id: "entity-delete"
+# Armed, not done.
 - assertVisible: "Delete Baby for good?"
-- takeScreenshot: 08-delete-armed
+- takeScreenshot: 07-delete-armed
+# The way out of the confirmation, which must not delete anything.
 - tapOn:
-    id: "archive-confirm-seed-cat-baby"
+    id: "entity-cancel"
 - assertVisible:
-    id: "archive-restored"
-- assertVisible: "Baby deleted."
+    id: "entity-delete"
+- tapOn:
+    id: "entity-delete"
+- tapOn:
+    id: "entity-confirm"
+- assertVisible:
+    id: "categories-notice"
 
-# Gone from the archive it was in, and gone from the categories tab.
-- assertVisible:
-    id: "setting-archived-categories"
-- assertNotVisible:
-    id: "sheet-archived-categories"
-- tapOn:
-    id: "nav-back"
-- tapOn:
-    id: "tab-categories"
+# Gone from the list, and no archive left behind: deleting is not archiving.
 - assertVisible:
     id: "categories-screen"
 - assertNotVisible: "Baby"
-- takeScreenshot: 09-category-deleted
+- assertNotVisible:
+    id: "categories-archived"
+- takeScreenshot: 08-category-deleted
+
+# ===========================================================================
+# A category with records cannot be deleted at all
+# ===========================================================================
+# THE BUG THIS REPLACES: the editor's "Delete category" went ahead and left
+# every record on it reading "Uncategorised" — the money survived and what it
+# was spent on did not — while Settings refused the very same delete. One
+# entity, one word, two opposite behaviours, and the lossy one was the only one
+# a user would ever find.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "pick-category"
+- tapOn: "Groceries"
+- tapOn:
+    id: "record-save"
+
+- tapOn:
+    id: "tab-categories"
+# Held on the PARENT, whose own records are none: a parent is answerable for
+# its children's too, or the count that refuses would disagree with the list
+# that opens.
+- scrollUntilVisible:
+    element: "Food"
+    direction: DOWN
+- longPressOn: "Food"
+- assertVisible:
+    id: "entity-delete-blocked"
+- assertVisible: ".*1 record must move first.*"
+- tapOn:
+    id: "entity-delete-blocked"
+- assertVisible:
+    id: "search-screen"
+- assertVisible:
+    id: "search-count"
+    text: "1 record"
+- takeScreenshot: 09-category-delete-blocked

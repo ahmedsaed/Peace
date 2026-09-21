@@ -1,11 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   ColorPicker,
-  DangerButton,
   Field,
   FormHeader,
   IconPicker,
@@ -16,7 +15,6 @@ import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import { db } from '@/db/client';
 import {
   createCategory,
-  deleteCategory,
   getCategory,
   InvariantError,
   listTopLevel,
@@ -44,7 +42,6 @@ export default function CategoryScreen() {
   const [parentId, setParentId] = useState<string | null>(existing?.parentId ?? null);
   const [icon, setIcon] = useState(existing?.icon ?? 'dots');
   const [color, setColor] = useState(existing?.color ?? '#6B5B4A');
-  const [archived, setArchived] = useState(existing?.archived ?? false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +58,7 @@ export default function CategoryScreen() {
     if (!canSave) return;
     try {
       if (existing) {
-        updateCategory(db, existing.id, { name, kind, parentId, icon, color, archived });
+        updateCategory(db, existing.id, { name, kind, parentId, icon, color });
       } else {
         createCategory(db, { id: newId(), name, kind, parentId, icon, color });
       }
@@ -69,18 +66,6 @@ export default function CategoryScreen() {
     } catch (e) {
       // The two-tier and matching-kind rules explain themselves — show them.
       setError(e instanceof InvariantError ? e.message : 'Could not save this category.');
-    }
-  }
-
-  function onDelete() {
-    if (!existing) return;
-    try {
-      // Safe by construction: records survive uncategorised and children are
-      // promoted rather than deleted.
-      deleteCategory(db, existing.id);
-      router.back();
-    } catch (e) {
-      setError(e instanceof InvariantError ? e.message : 'Could not delete this category.');
     }
   }
 
@@ -153,43 +138,16 @@ export default function CategoryScreen() {
           </Text>
         ) : null}
 
+        {/* THIS FORM ONLY EDITS. Putting a category away and deleting it are
+            on the long press in the Categories list, beside the records they
+            affect. The delete that used to sit here was the worse half of two
+            answers to one question: Settings refused it and handed over the
+            records, while this button went ahead and left a year of groceries
+            reading "Uncategorised". */}
         {existing ? (
-          <Field label="Archived">
-            {/* The way to retire a category you still want on old records.
-                Deleting keeps the money too, but the records come back
-                UNCATEGORISED — the history stops saying what it was spent on,
-                which is the part you cannot reconstruct later. */}
-            <Pressable
-              onPress={() => setArchived((a) => !a)}
-              testID="category-archived"
-              accessibilityRole="switch"
-              accessibilityState={{ checked: archived }}
-              className="flex-row items-center justify-between rounded-lg bg-surface px-4 py-3 active:opacity-70">
-              <Text className="text-sm text-ink">
-                {archived ? 'Hidden from pickers' : 'Active'}
-              </Text>
-              <View
-                className={`h-6 w-11 justify-center rounded-full px-0.5 ${
-                  archived ? 'bg-accent' : 'bg-line'
-                }`}>
-                <View className={`h-5 w-5 rounded-full bg-ink ${archived ? 'self-end' : ''}`} />
-              </View>
-            </Pressable>
-            <Text className="mt-1.5 text-xs text-muted">
-              Records keep it. Sub-categories are put away with their parent, and Settings brings
-              any of them back.
-            </Text>
-          </Field>
-        ) : null}
-
-        {existing ? (
-          <>
-            <DangerButton label="Delete category" onPress={onDelete} testID="category-delete" />
-            <Text className="mt-3 text-xs text-muted">
-              Records keep their money and become uncategorised. Sub-categories move up a level
-              rather than being deleted.
-            </Text>
-          </>
+          <Text className="mt-3 text-xs leading-5 text-muted">
+            Hold this category in the list to see its records, put it away, or delete it.
+          </Text>
         ) : null}
       </ScrollView>
 
