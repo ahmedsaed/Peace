@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArchivedGroup } from '@/components/archived-group';
 import { EntityActions, type EntityItem } from '@/components/entity-actions';
+import { Snackbar } from '@/components/snackbar';
 import { Icon } from '@/components/icon';
 import { StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
@@ -38,14 +39,24 @@ import { idSlug } from '@/lib/slug';
  * the disease this whole redesign exists to cure.
  */
 export default function TagsScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [tags, setTags] = useState<Tag[]>([]);
   const [usage, setUsage] = useState<Map<string, number>>(new Map());
   const [acting, setActing] = useState<EntityItem | null>(null);
   const [renaming, setRenaming] = useState<EntityItem | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
+  /**
+   * What just happened, shown over the list rather than at the top of it.
+   *
+   * It was a line of text above the rows, which meant a message about the
+   * tag you had just scrolled down to and held was rendered off-screen
+   * above you — a screen answering a question where you were not looking. The
+   * snackbar is pinned, so the answer arrives where the action did. `token`
+   * restarts its timer, or a second message inherits the first's countdown.
+   */
+  const [said, setSaid] = useState<{ text: string; bad: boolean; token: number } | null>(null);
+  const say = useCallback((text: string, bad = false) => {
+    setSaid({ text, bad, token: Date.now() });
+  }, []);
 
   const reload = useCallback(() => {
     const all = listTags(db, { includeArchived: true });
@@ -64,8 +75,7 @@ export default function TagsScreen() {
 
   function hold(tag: Tag) {
     const { blocking, records } = checkDeletion(db, { kind: 'tag', id: tag.id });
-    setNotice(null);
-    setProblem(null);
+    setSaid(null);
     setActing({
       kind: 'tag',
       id: tag.id,
@@ -82,44 +92,33 @@ export default function TagsScreen() {
   function archive(item: EntityItem) {
     setTagArchived(db, item.id, !item.archived);
     setActing(null);
-    setNotice(item.archived ? `${item.name} is back.` : `${item.name} is put away.`);
+    say(item.archived ? `${item.name} is back.` : `${item.name} is put away.`);
     reload();
   }
 
   function remove(item: EntityItem) {
     try {
       deleteEntity(db, { kind: 'tag', id: item.id });
-      setNotice(
+      say(
         item.records > 0
           ? `${item.name} deleted, and taken off ${recordCount(item.records)}.`
           : `${item.name} deleted.`
       );
     } catch (error) {
-      setProblem(error instanceof InvariantError ? error.message : `Could not delete ${item.name}.`);
+      say(
+        error instanceof InvariantError ? error.message : `Could not delete ${item.name}.`,
+        true
+      );
     }
     setActing(null);
     reload();
   }
 
   return (
-    <View
-      className="flex-1 bg-ground"
-      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
-      testID="tags-screen">
+    <View className="flex-1 bg-ground" testID="tags-screen">
       <StackHeader title="Tags" />
 
       <ScrollView contentContainerClassName="px-4 pb-8 pt-2">
-        {notice ? (
-          <Text className="pb-2 text-xs text-muted" testID="tags-notice">
-            {notice}
-          </Text>
-        ) : null}
-        {problem ? (
-          <Text className="pb-2 text-xs text-expense" testID="tags-problem">
-            {problem}
-          </Text>
-        ) : null}
-
         {active.length === 0 && archived.length === 0 ? (
           <Text className="px-1 pt-6 text-sm leading-6 text-muted" testID="tags-empty">
             No tags yet. Add one while labelling a record — the tag field on the record screen
@@ -192,15 +191,28 @@ export default function TagsScreen() {
           onRename={(next) => {
             try {
               renameTag(db, renaming.id, next);
-              setNotice(`Renamed to ${next.trim()}.`);
+              say(`Renamed to ${next.trim()}.`);
             } catch (error) {
-              setProblem(
-                error instanceof InvariantError ? error.message : 'Could not rename that tag.'
+              say(
+                error instanceof InvariantError ? error.message : 'Could not rename that tag.',
+                true
               );
             }
             setRenaming(null);
             reload();
           }}
+        />
+      ) : null}
+
+      {/* Pinned, so the answer arrives where the action did rather than at the
+          top of a list the user has scrolled away from. */}
+      {said ? (
+        <Snackbar
+          message={said.text}
+          token={said.token}
+          onDismiss={() => setSaid(null)}
+          durationMs={said.bad ? 12000 : 5000}
+          testID="tags-notice"
         />
       ) : null}
     </View>

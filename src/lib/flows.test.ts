@@ -22,7 +22,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { accountId, catId } from '../db/seed';
 import { tagKey } from './tag';
 import { idSlug } from './slug';
 

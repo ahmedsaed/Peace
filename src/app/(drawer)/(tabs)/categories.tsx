@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ArchivedGroup } from '@/components/archived-group';
 import { EntityActions, type EntityItem } from '@/components/entity-actions';
+import { Snackbar } from '@/components/snackbar';
 import { Icon } from '@/components/icon';
 import { Fab, Screen } from '@/components/screen';
 import { db } from '@/db/client';
@@ -92,8 +93,19 @@ export default function CategoriesScreen() {
   const [income, setIncome] = useState<CategoryNode[]>([]);
   const [archived, setArchived] = useState<Category[]>([]);
   const [acting, setActing] = useState<EntityItem | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
+  /**
+   * What just happened, shown over the list rather than at the top of it.
+   *
+   * It was a line of text above the rows, which meant a message about the
+   * category you had just scrolled down to and held was rendered off-screen
+   * above you — a screen answering a question where you were not looking. The
+   * snackbar is pinned, so the answer arrives where the action did. `token`
+   * restarts its timer, or a second message inherits the first's countdown.
+   */
+  const [said, setSaid] = useState<{ text: string; bad: boolean; token: number } | null>(null);
+  const say = useCallback((text: string, bad = false) => {
+    setSaid({ text, bad, token: Date.now() });
+  }, []);
 
   const reload = useCallback(() => {
     setExpense(listCategoryTree(db, 'expense'));
@@ -111,8 +123,7 @@ export default function CategoriesScreen() {
 
   function hold(category: Category) {
     const { blocking, records } = checkDeletion(db, { kind: 'category', id: category.id });
-    setNotice(null);
-    setProblem(null);
+    setSaid(null);
     setActing({
       kind: 'category',
       id: category.id,
@@ -138,16 +149,19 @@ export default function CategoriesScreen() {
     // `updateCategory`, so nothing here has to remember them.
     updateCategory(db, item.id, { archived: !item.archived });
     setActing(null);
-    setNotice(item.archived ? `${item.name} is back.` : `${item.name} is put away.`);
+    say(item.archived ? `${item.name} is back.` : `${item.name} is put away.`);
     reload();
   }
 
   function remove(item: EntityItem) {
     try {
       deleteEntity(db, { kind: 'category', id: item.id });
-      setNotice(`${item.name} deleted.`);
+      say(`${item.name} deleted.`);
     } catch (error) {
-      setProblem(error instanceof InvariantError ? error.message : `Could not delete ${item.name}.`);
+      say(
+        error instanceof InvariantError ? error.message : `Could not delete ${item.name}.`,
+        true
+      );
     }
     setActing(null);
     reload();
@@ -160,17 +174,6 @@ export default function CategoriesScreen() {
           so leading with it keeps both sections reachable — putting ~26 expense
           rows first buries income below the fold entirely. */}
       <ScrollView contentContainerClassName="px-4 pt-4 pb-8">
-        {notice ? (
-          <Text className="pb-2 text-xs text-muted" testID="categories-notice">
-            {notice}
-          </Text>
-        ) : null}
-        {problem ? (
-          <Text className="pb-2 text-xs text-expense" testID="categories-problem">
-            {problem}
-          </Text>
-        ) : null}
-
         <Section title="Income categories" nodes={income} onOpen={open} onHold={hold} />
         <Section title="Expense categories" nodes={expense} onOpen={open} onHold={hold} />
 
@@ -211,7 +214,24 @@ export default function CategoriesScreen() {
         onDelete={remove}
       />
 
-      <Fab onPress={() => router.push('/category')} testID="fab-category" />
+
+      {/* Pinned, so the answer arrives where the action did rather than at the
+          top of a list the user has scrolled away from. */}
+      {said ? (
+        <Snackbar
+          message={said.text}
+          token={said.token}
+          onDismiss={() => setSaid(null)}
+          durationMs={said.bad ? 12000 : 5000}
+          testID="categories-notice"
+        />
+      ) : null}
+
+      <Fab onPress={() => router.push('/category')} testID="fab-category"
+        // Lifted clear of the snackbar, exactly as the records list does:
+        // otherwise the message — and on that screen its Undo — sits under it.
+        raised={!!said}
+      />
     </Screen>
   );
 }

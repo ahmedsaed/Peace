@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ArchivedGroup } from '@/components/archived-group';
 import { EntityActions, type EntityItem } from '@/components/entity-actions';
+import { Snackbar } from '@/components/snackbar';
 import { Icon } from '@/components/icon';
 import { ReconcileSheet } from '@/components/reconcile-sheet';
 import { Fab, Screen } from '@/components/screen';
@@ -32,8 +33,19 @@ export default function AccountsScreen() {
   const [acting, setActing] = useState<EntityItem | null>(null);
   /** The account whose balance is being corrected, held apart from the sheet. */
   const [reconciling, setReconciling] = useState<Row | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
+  /**
+   * What just happened, shown over the list rather than at the top of it.
+   *
+   * It was a line of text above the rows, which meant a message about the
+   * account you had just scrolled down to and held was rendered off-screen
+   * above you — a screen answering a question where you were not looking. The
+   * snackbar is pinned, so the answer arrives where the action did. `token`
+   * restarts its timer, or a second message inherits the first's countdown.
+   */
+  const [said, setSaid] = useState<{ text: string; bad: boolean; token: number } | null>(null);
+  const say = useCallback((text: string, bad = false) => {
+    setSaid({ text, bad, token: Date.now() });
+  }, []);
   const homeCurrency = useSetting('homeCurrency');
 
   const reload = useCallback(() => {
@@ -58,15 +70,17 @@ export default function AccountsScreen() {
    */
   function open(account: Row) {
     const { blocking, records } = checkDeletion(db, { kind: 'account', id: account.id });
-    setNotice(null);
-    setProblem(null);
+    setSaid(null);
     setActing({
       kind: 'account',
       id: account.id,
       name: account.name,
       icon: account.icon,
       color: account.color,
-      detail: `${account.type} · ${money(account.balanceMinor, account.currency)}`,
+      // Capitalised HERE rather than with a `capitalize` class on the sheet:
+      // that detail line also carries "On 2 records" for a tag, which CSS
+      // would turn into "On 2 Records".
+      detail: `${capitalise(account.type)} · ${money(account.balanceMinor, account.currency)}`,
       archived: account.archived,
       records,
       blocking,
@@ -84,18 +98,21 @@ export default function AccountsScreen() {
   function archive(item: EntityItem) {
     updateAccount(db, item.id, { archived: !item.archived });
     setActing(null);
-    setNotice(item.archived ? `${item.name} is back.` : `${item.name} is put away.`);
+    say(item.archived ? `${item.name} is back.` : `${item.name} is put away.`);
     reload();
   }
 
   function remove(item: EntityItem) {
     try {
       deleteEntity(db, { kind: 'account', id: item.id });
-      setNotice(`${item.name} deleted.`);
+      say(`${item.name} deleted.`);
     } catch (error) {
       // The repository refuses rather than trusting a screen, so a caught error
       // here is better than a crash on a ledger that changed underneath.
-      setProblem(error instanceof InvariantError ? error.message : `Could not delete ${item.name}.`);
+      say(
+        error instanceof InvariantError ? error.message : `Could not delete ${item.name}.`,
+        true
+      );
     }
     setActing(null);
     reload();
@@ -129,17 +146,6 @@ export default function AccountsScreen() {
       </View>
 
       <ScrollView contentContainerClassName="p-4 gap-3">
-        {notice ? (
-          <Text className="px-1 text-xs text-muted" testID="accounts-notice">
-            {notice}
-          </Text>
-        ) : null}
-        {problem ? (
-          <Text className="px-1 text-xs text-expense" testID="accounts-problem">
-            {problem}
-          </Text>
-        ) : null}
-
         {accounts.map((account) => (
           <AccountRow
             key={account.id}
@@ -211,12 +217,34 @@ export default function AccountsScreen() {
         />
       ) : null}
 
-      <Fab onPress={() => router.push('/account')} testID="fab-account" />
+
+      {/* Pinned, so the answer arrives where the action did rather than at the
+          top of a list the user has scrolled away from. */}
+      {said ? (
+        <Snackbar
+          message={said.text}
+          token={said.token}
+          onDismiss={() => setSaid(null)}
+          durationMs={said.bad ? 12000 : 5000}
+          testID="accounts-notice"
+        />
+      ) : null}
+
+      <Fab onPress={() => router.push('/account')} testID="fab-account"
+        // Lifted clear of the snackbar, exactly as the records list does:
+        // otherwise the message — and on that screen its Undo — sits under it.
+        raised={!!said}
+      />
     </Screen>
   );
 }
 
 type Row = ReturnType<typeof listAccountsWithBalance>[number];
+
+/** "cash" is how the type is stored; "Cash" is how a sentence starts. */
+function capitalise(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
 
 /**
  * What is still sitting in the archive.

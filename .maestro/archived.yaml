@@ -198,9 +198,13 @@ appId: com.ahmed.peace
     id: "categories-notice"
 - takeScreenshot: 05-category-archived
 
-# Gone from its own list...
-- assertVisible:
-    id: "categories-archived"
+# Gone from its own list, and accounted for at the foot of it. The categories
+# list is long — two sections and ~30 rows — so the group has to be scrolled to
+# rather than asserted blind.
+- scrollUntilVisible:
+    element:
+      id: "categories-archived"
+    direction: DOWN
 - assertVisible:
     id: "categories-archived-count"
     text: "1"
@@ -289,9 +293,11 @@ appId: com.ahmed.peace
 # Held on the PARENT, whose own records are none: a parent is answerable for
 # its children's too, or the count that refuses would disagree with the list
 # that opens.
+# UP: the list is still where the delete left it, near the foot, and Food sits
+# near the head of the expense section.
 - scrollUntilVisible:
     element: "Food"
-    direction: DOWN
+    direction: UP
 - longPressOn: "Food"
 - assertVisible:
     id: "entity-delete-blocked"

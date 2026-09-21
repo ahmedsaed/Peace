@@ -396,8 +396,11 @@ app ignoring input. `pkill -f GradleDaemon`.
   a toggle in an editor you reach by tapping the thing in a list — and every one of those lists
   hides what is archived, so the switch that undoes it sat behind a row that no longer existed. An
   archived account holding money was at least an untappable line in the Now breakdown; one at zero
-  appeared on no screen at all. The way out cannot live where the state removed it from, which is
-  why Settings has an **Archived** section for all three rather than each list carrying its own.
+  appeared on no screen at all. The first fix put an **Archived** section in Settings — which made
+  the way out live in the one place the thing ISN'T, and cost a second vocabulary for archiving on
+  top of the four that already existed. Each list now carries its own archive, collapsed, at its
+  foot: the way back lives where the thing left from, so Settings needs no opinion about it and
+  tags got a list of their own (`/tags`) rather than half a home in a picker.
   **The tell is a writer with one caller**: `setTagArchived` was only ever called with `true`, and
   `categories.archived` was READ by every picker and written by nothing — a filter with no way to
   set it is a feature that exists only in the schema. Grep a boolean setter for its callers before
@@ -406,11 +409,18 @@ app ignoring input. `pkill -f GradleDaemon`.
 - **A refusal has to hand over the list.** An archived account or category can only be deleted
   once nothing points at it, and for good reason: `transactions.account_id` CASCADES, so deleting
   an account with history takes every record on it — a month that suddenly balances differently
-  with nothing to say why — and `deleteCategory` leaves its records UNCATEGORISED, which loses
-  what the money went on and cannot be reconstructed. But "you cannot delete this" is a dead end,
-  so the row carries the COUNT instead of a dead button, and tapping it opens search filtered to
-  exactly those records with a notice saying what to do. **The count and the list must come from
-  one query** — `checkDeletion` returns the filter it counted with and the screen hands that same
+  with nothing to say why — and `category_id` is SET NULL, which loses what the money went on and
+  cannot be reconstructed. But "you cannot delete this" is a dead end, so **a refusal is never a
+  sentence, it is always a destination**: the Delete row carries the COUNT instead of a dead
+  button, and pressing it opens search filtered to exactly those records. The app never names a
+  number it will not show you. **BOTH GUARDS LIVE IN THE REPOSITORY.** `deleteCategory` used to
+  delete unconditionally — "safe by construction", since the money survives — while Settings
+  refused the very same delete and handed over the list: one entity, one word, two opposite
+  behaviours, and the lossy one was the only one a user would find. It now refuses like
+  `deleteAccount` does, counting through `categoryRecordCountDeep`, which is also what
+  `checkDeletion` calls: a parent is answerable for its CHILDREN's records too, and a shallow
+  count would wave through a "Food" holding a year of "Groceries". **The count and the list must
+  come from one query** — `checkDeletion` returns the filter it counted with and the screen hands that same
   filter to the search page, or the sheet says 4 over a list of 3 and somebody goes looking for a
   record that is not there. The one place they cannot agree by construction: search lists a
   transfer ONCE, as the leg the money left on, so an account that has only ever RECEIVED transfers
@@ -419,6 +429,24 @@ app ignoring input. `pkill -f GradleDaemon`.
   refuse on. A TAG is the deliberate exception: its links cascade and touch no money, so nothing
   blocks it and the count becomes the COST, said before the second tap rather than in the sentence
   afterwards.
+- **Editing is a form; everything else is a long press.** Archiving, correcting a balance and
+  deleting all used to live at the foot of the entity editor, which meant opening a thing to
+  change it in order to remove it, and put Delete directly beneath Save. They are on one sheet
+  now — `entity-actions.tsx`, modelled on the `RecordActions` records have used all along, with
+  the per-kind rules in `lib/entity-actions.ts` so they are not written out at three call sites.
+  Two side effects worth knowing: the flows that used to `scrollUntilVisible` past an icon grid
+  that grows with every new glyph no longer have anything to scroll past, and a screen that shows
+  a snackbar needs `raised={!!said}` on its FAB or the message sits under it.
+- **A message belongs where the action was, not at the top of the list.** Archiving a category you
+  had scrolled down to and held rendered its confirmation off-screen above you — a screen
+  answering a question where nobody was looking. `Snackbar` is pinned, so it arrives where the tap
+  did; it takes a `testID` per screen so a flow can tell two of them apart.
+- **`flows.test.ts` is blind to an id that collides with a template's prefix.** A row keyed
+  `account-${account.id}` becomes the pattern `^account-.+$`, which happily matches
+  `account-archived` and `account-delete` — so when those testIDs were deleted from the app, every
+  flow still naming them passed the validator and failed only on a device. The test is doing what
+  it was designed to do; the limit is structural. When you remove a literal testID that shares a
+  prefix with a data-driven one, only an E2E run can tell you the flows are still honest.
 - **Archiving travels along the category tree, and it has to go both ways.** A live category has a
   live parent: archive "Food" and leave "Groceries" behind, and `buildCategoryTree` promotes the
   child to top level — a sub-category silently becoming a heading, which reads as a bug in the
@@ -688,7 +716,8 @@ app ignoring input. `pkill -f GradleDaemon`.
 ## Layout
 
 ```
-src/app/         Expo Router routes (file-based)
+src/app/         Expo Router routes (file-based) — tabs under (drawer)/(tabs),
+                 stack screens (settings, tags, recurring, search) at the top level
 src/components/  shared UI
 src/db/          drizzle schema, client, migration provider
 src/lib/         pure logic — this is where unit tests live
