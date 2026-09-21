@@ -1,0 +1,141 @@
+appId: com.ahmed.peace
+---
+# The nightly reminder, and the one thing about it worth asserting on a device.
+#
+# WHAT THIS FLOW IS FOR: the line under the switch is read back from ANDROID —
+# `getAllScheduledNotificationsAsync` — not from the setting above it. So
+# asserting it is asserting that the OS is genuinely holding alarms for this
+# app. A switch that flips and a schedule that exists are two different claims,
+# and only the second one makes a notification arrive.
+#
+# There is no second screen to check this on, which every other settings flow
+# uses as its proof. The readback is the substitute, and it is a stronger one:
+# it cannot pass by the app agreeing with itself.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "settings-screen"
+
+- scrollUntilVisible:
+    element:
+      id: "reminder-card"
+    direction: DOWN
+
+# OFF by default, and nothing is claimed about a schedule while it is off. An
+# expense tracker that starts talking before it is asked gets uninstalled.
+- assertNotVisible:
+    id: "reminder-next"
+- takeScreenshot: 01-reminder-off
+
+- tapOn:
+    id: "reminder-toggle"
+
+# Android 13+ asks for POST_NOTIFICATIONS the first time. This is the SYSTEM
+# dialog, so it is matched by text rather than by id.
+#
+# WAITED FOR, not sampled. `requestPermissionsAsync` is asynchronous: a single
+# `when: visible` check runs before the dialog has been put up, finds nothing,
+# and then every assertion after it fails against a screen that is covered.
+#
+# OPTIONAL BECAUSE IT NEVER FIRES HERE. Maestro's `launchApp` grants runtime
+# permissions itself, so on any emulator run the app already holds
+# POST_NOTIFICATIONS and no dialog appears. These two lines exist for a real
+# phone, and a green run of this flow is NOT evidence that the refusal path
+# works — see AGENTS.md for how to actually exercise a denied permission.
+- extendedWaitUntil:
+    visible: "Allow"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+
+# The card only grows these once the permission is actually in hand, so waiting
+# on the row is also waiting for the grant to have been processed.
+- extendedWaitUntil:
+    visible:
+      id: "reminder-time"
+    timeout: 20000
+
+# The default hour, shown through the same clock the record screen uses.
+#
+# Matched against the accessibility LABEL ("Reminder time, 9:00 PM"), not the
+# bare value: the testID is on the pressable and the text sits in a child, so
+# an exact `text: "9:00 PM"` beside the id matches no single node. Keeping the
+# id in the selector is still worth it — a loose text match would pass on any
+# "9:00 PM" anywhere on the screen.
+- assertVisible:
+    id: "reminder-time"
+    text: ".*9:00 PM.*"
+
+# THE ASSERTION THAT MATTERS. Android has been asked what it is holding and has
+# named a time. "Nothing scheduled" is the other thing this line can say, and it
+# is what a dropped or refused schedule produces.
+- assertVisible:
+    id: "reminder-next"
+    text: ".*Next reminder.*"
+- takeScreenshot: 02-reminder-armed
+
+# --- whether quiet days are skipped is the user's call ---
+#
+# The default skips them. The hint under the switch is the only place the app
+# states which behaviour is in force, so it has to change with the switch — a
+# control whose description does not move is indistinguishable from one that
+# does nothing.
+- assertVisible: ".*Stays quiet when you have already recorded something.*"
+- tapOn:
+    id: "reminder-quiet-toggle"
+- assertVisible: ".*Asks every day, however much you have already recorded.*"
+- takeScreenshot: 03-reminder-every-day
+
+# And it is a real setting, not a toggle that forgets: it survives the restart
+# below along with the schedule.
+
+# --- and it survives the process dying ---
+#
+# Not decoration: the window is laid down by JS on launch, so a schedule that
+# only existed because this screen was open would pass every assertion above and
+# post nothing on a phone that had been in a pocket since morning.
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- scrollUntilVisible:
+    element:
+      id: "reminder-card"
+    direction: DOWN
+
+- assertVisible:
+    id: "reminder-next"
+    text: ".*Next reminder.*"
+- assertVisible: ".*Asks every day, however much you have already recorded.*"
+- takeScreenshot: 04-reminder-survives-restart
+
+# --- and turning it off takes the schedule away ---
+#
+# A state you can enter from the UI must be one you can leave from it, and the
+# leaving has to reach Android rather than only the setting: fourteen alarms
+# left armed behind an "off" switch would go on firing for a fortnight.
+- tapOn:
+    id: "reminder-toggle"
+- assertNotVisible:
+    id: "reminder-next"
+- assertNotVisible:
+    id: "reminder-time"
+- takeScreenshot: 05-reminder-off-again

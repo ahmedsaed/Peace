@@ -151,14 +151,31 @@ const background = svg('', GROUND);
  * and the clasp button out as holes.
  */
 const GAP = 16;
-const monochrome = svg(
-  `<defs>
+
+/**
+ * The alpha-only silhouette, at a given scale and gap.
+ *
+ * Shared by the themed launcher icon and the notification icon because they are
+ * the same problem at two sizes: Android throws the COLOUR away and keeps only
+ * this image's alpha, so the shapes have to be separated by transparent gaps
+ * rather than by colour. Flattened to one silhouette, the cards and the clasp
+ * merge into an unreadable blob. The mask paints a gap around every shape
+ * before filling it, and knocks the sprout and the clasp button out as holes.
+ *
+ * `gap` is a parameter and not a constant for exactly the reason the glyph rule
+ * in AGENTS.md exists: a gap is measured in the FINAL pixels, not in these
+ * coordinates. 16 units survives a 48dp launcher tile and closes up completely
+ * in a 24dp status bar, so the smaller icon needs the wider gap.
+ */
+const silhouette = (scale, gap) =>
+  svg(
+    `<defs>
     <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="${S}" height="${S}">
-      <g transform="translate(512 512) scale(${SAFE_SCALE}) translate(${-BBOX.cx} ${-BBOX.cy})">
+      <g transform="translate(512 512) scale(${scale}) translate(${-BBOX.cx} ${-BBOX.cy})">
         ${SHAPES.map((s, i) =>
           [
             // The first shape has nothing in front of it to separate from.
-            i === 0 ? '' : draw(grow(s, GAP), '#000'),
+            i === 0 ? '' : draw(grow(s, gap), '#000'),
             draw(s, s.hole ? '#000' : '#fff'),
           ]
             .filter(Boolean)
@@ -169,7 +186,26 @@ const monochrome = svg(
     </mask>
   </defs>
   <rect width="${S}" height="${S}" fill="#fff" mask="url(#m)"/>`
-);
+  );
+
+/** Themed launcher icon (Android 13+), inside the adaptive safe circle. */
+const monochrome = silhouette(SAFE_SCALE, GAP);
+
+/**
+ * Status bar / notification icon.
+ *
+ * NOT the monochrome launcher layer, though it is tempting: that one is scaled
+ * to sit inside the adaptive icon's guaranteed-visible circle, so it fills a
+ * little over half its canvas. There is no mask here to hide from — Android
+ * draws this at 24dp and adds its own padding — so art sized for the circle
+ * arrives as a speck with empty space around it.
+ *
+ * NOTIF_GAP is more than double GAP for the same reason: at 24dp a 16-unit gap
+ * is a third of a pixel and the wallet closes into a blob.
+ */
+const NOTIF_GAP = 36;
+const NOTIF_SCALE = 1.34;
+const notification = silhouette(NOTIF_SCALE, NOTIF_GAP);
 
 /**
  * Legacy square icon (pre-adaptive launchers, web, stores). Only rounded
@@ -186,6 +222,7 @@ const layers = [
   ['peace-icon-foreground', foreground, `${IMAGES}/android-icon-foreground.png`],
   ['peace-icon-background', background, `${IMAGES}/android-icon-background.png`],
   ['peace-icon-monochrome', monochrome, `${IMAGES}/android-icon-monochrome.png`],
+  ['peace-icon-notification', notification, `${IMAGES}/notification-icon.png`],
   ['peace-icon', legacy, `${IMAGES}/icon.png`],
   ['peace-splash', splash, `${IMAGES}/splash-icon.png`],
 ];

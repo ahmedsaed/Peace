@@ -331,3 +331,35 @@ export function groupByDay(rows: RecordRow[]): DayGroup[] {
 
   return groups;
 }
+
+/**
+ * Has anything been written to the ledger on `day`?
+ *
+ * Asked by the reminder, to stay quiet on a day somebody has already shown up.
+ *
+ * `createdAt`, NOT `occurredAt` — the two answer different questions and only
+ * one of them is the right one here. Logging yesterday's lunch this morning is
+ * showing up today; back-filling a record dated today from a receipt found next
+ * week is not. The reminder is about the habit, so it asks when the row was
+ * WRITTEN.
+ *
+ * Day bounds are computed in JS for the same reason every other bucketing in
+ * this app is: SQLite's `localtime` reads the process timezone, so the same
+ * database would answer differently on a phone set to Cairo and on CI set to
+ * UTC — and an 11pm record would fall on the wrong day.
+ */
+export function wroteAnythingOn(db: Db, day: Date): boolean {
+  const start = new Date(day);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+
+  const [row] = db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(and(gte(transactions.createdAt, start), lt(transactions.createdAt, end)))
+    .limit(1)
+    .all();
+
+  return row !== undefined;
+}

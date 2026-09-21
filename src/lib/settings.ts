@@ -134,6 +134,43 @@ export const SETTING_DEFAULTS = {
    * promise the stronger thing.
    */
   hideAmounts: false as boolean,
+
+  /**
+   * The nightly nudge to write down what the day cost. OFF until asked for.
+   *
+   * Off by default is not timidity: a notification is the one thing an app can
+   * do to somebody who is not looking at it, and an expense tracker that starts
+   * talking uninvited gets uninstalled rather than muted.
+   *
+   * These three are settings rather than secrets and SHOULD travel in a backup
+   * — a restored ledger that still reminds you at nine is right. What does not
+   * travel is the Android permission, which belongs to the install; see
+   * `state/reminders.ts` for why the switch reads the OS back instead of
+   * trusting this flag.
+   */
+  remindersOn: false as boolean,
+  /**
+   * When to ask, in local wall-clock time. 21:00 — late enough that the day is
+   * mostly spent, early enough not to be a sleep interruption.
+   *
+   * Two numbers rather than a "21:00" string so nothing has to parse a clock,
+   * and so a malformed value cannot survive the codec: a number key rejects a
+   * string outright and falls back to the default.
+   */
+  reminderHour: 21 as number,
+  reminderMinute: 0 as number,
+  /**
+   * Ask even on a day already dealt with.
+   *
+   * The default skips those, on the reasoning that nagging somebody who has
+   * already done the thing is how a reminder gets switched off. But that reads
+   * the notification as "you have not logged anything", and for somebody
+   * building the habit it is the opposite — a fixed daily cue, whose whole
+   * value is that it does NOT disappear on the days it is working. Neither
+   * reading is wrong, which is why this is a switch rather than a decision made
+   * here.
+   */
+  remindOnQuietDays: false as boolean,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

@@ -9,6 +9,7 @@ import palette from '@/constants/palette';
 import { DatabaseProvider } from '@/db/provider';
 import { BankCatchUp } from '@/state/bank';
 import { DriveCatchUp } from '@/state/drive';
+import { ReminderSchedule } from '@/state/reminders';
 
 import '@/global.css';
 
@@ -56,6 +57,11 @@ export default function RootLayout() {
               was closed, and reads it. Renders nothing, blocks nothing, and
               swallows every failure — a message left unread is read next time. */}
           <BankCatchUp />
+          {/* Re-arms the nightly reminder with what is waiting right now. The
+              counts are frozen when a notification is SCHEDULED — no JS runs
+              when one fires — so every return to the foreground lays the
+              window down again. Renders nothing and swallows every failure. */}
+          <ReminderSchedule />
           <Stack
             screenOptions={{
               headerShown: false,
