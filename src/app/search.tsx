@@ -303,13 +303,16 @@ export default function SearchScreen() {
           <Text className="text-sm text-ink">
             Move these records off {params.deletingName ?? 'it'} first.
           </Text>
+          {/* WHAT TO DO, AND NOTHING ELSE. This used to spend two lines warning
+              that deleting would take the records with it, or leave them with
+              no account at all — describing a consequence the app refuses to
+              let happen. Explaining an outcome that cannot occur is not a
+              safeguard, it is noise in front of the one instruction that
+              matters. */}
           <Text className="pt-1 text-xs leading-4 text-muted">
             Open each one and give it another{' '}
-            {params.deleting === 'account' ? 'account' : 'category'}. Deleting with records still
-            on it would take them with it — or leave them with no{' '}
-            {params.deleting === 'account' ? 'account' : 'category'} at all. Hold{' '}
-            {params.deletingName ?? 'it'} in the list again once this is empty and the delete will
-            be there.
+            {params.deleting === 'account' ? 'account' : 'category'}. Once this list is empty, you
+            can delete the {params.deleting === 'account' ? 'account' : 'category'}.
           </Text>
         </View>
       ) : null}

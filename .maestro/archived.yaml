@@ -67,6 +67,8 @@ appId: com.ahmed.peace
 - assertVisible:
     id: "search-notice"
 - assertVisible: ".*Move these records off Cash first.*"
+# The instruction, and no warning about a delete that cannot happen.
+- assertVisible: ".*Once this list is empty, you can delete the account.*"
 # The count on the row and the list that opens come from ONE query, so this is
 # the same "1" the sheet counted with.
 - assertVisible:
