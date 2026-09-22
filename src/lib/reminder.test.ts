@@ -22,17 +22,23 @@ const subject = (over: Partial<ReminderSubject> = {}): ReminderSubject => ({
 
 describe('what the reminder says', () => {
   it('leads with work waiting rather than with the question', () => {
-    // Somebody with unread bank messages should be told that, not asked how
-    // their day went — the app has already done half that work.
-    expect(reminderBody(subject({ waiting: 4 }))).toBe('4 bank messages waiting to be read.');
+    // Somebody with bank messages sitting unanswered should be told that, not
+    // asked how their day went — the app has already done half that work.
+    //
+    // APPROVE is the person's verb, and the app's own: a capture is "offered as
+    // a record to approve" and stays out of every total "until you approve it".
+    // READING is what the model does to a message, which is why the Settings
+    // counter still says "waiting to be read" — a different number about a
+    // different actor, and the two must not borrow each other's word.
+    expect(reminderBody(subject({ waiting: 4 }))).toBe('4 bank messages waiting to be approved.');
     expect(reminderBody(subject({ due: 2 }))).toBe('2 repeats due today.');
     expect(reminderBody(subject({ waiting: 3, due: 1 }))).toBe(
-      '3 bank messages to read and 1 repeat due.'
+      '3 bank messages to approve and 1 repeat due.'
     );
   });
 
   it('counts in the singular when there is one of something', () => {
-    expect(reminderBody(subject({ waiting: 1 }))).toBe('1 bank message waiting to be read.');
+    expect(reminderBody(subject({ waiting: 1 }))).toBe('1 bank message waiting to be approved.');
     expect(reminderBody(subject({ due: 1 }))).toBe('1 repeat due today.');
   });
 
@@ -110,7 +116,7 @@ describe('the schedule handed to Android', () => {
     // A snapshot taken tonight says nothing true about a Thursday nine days
     // out, so every entry past the first names no number at all.
     const plan = planReminders(subject({ waiting: 3 }), NINE_PM, at('2026-09-22T18:00:00'));
-    expect(plan[0].body).toBe('3 bank messages waiting to be read.');
+    expect(plan[0].body).toBe('3 bank messages waiting to be approved.');
     expect(plan.slice(1).every((entry) => entry.body === GENERIC_BODY)).toBe(true);
   });
 

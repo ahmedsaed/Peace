@@ -85,16 +85,25 @@ function plural(n: number, noun: string): string {
  *
  * The counts come first because they are WORK WAITING — something the app has
  * already done half of and needs a decision on — where the bare nudge is only a
- * question. Somebody with four unread bank messages should be told that, not
- * asked how their day went.
+ * question. Somebody with four bank messages sitting unanswered should be told
+ * that, not asked how their day went.
+ *
+ * APPROVED, not read, and the distinction is the app's own. Reading is what the
+ * model does to a captured message; APPROVING is what the person does, and it
+ * is the word every other surface already uses — a capture is "offered as a
+ * record to approve" and sits in no total "until you approve it". The
+ * notification asks for the person's action, so it has to name the person's
+ * verb. Settings still says "waiting to be read" over its own counter, and
+ * correctly: that one counts messages the model has NOT yet read, which is a
+ * different number about a different actor.
  */
 export function reminderBody(subject: ReminderSubject): string {
   const { waiting, due } = subject;
 
   if (waiting > 0 && due > 0) {
-    return `${plural(waiting, 'bank message')} to read and ${plural(due, 'repeat')} due.`;
+    return `${plural(waiting, 'bank message')} to approve and ${plural(due, 'repeat')} due.`;
   }
-  if (waiting > 0) return `${plural(waiting, 'bank message')} waiting to be read.`;
+  if (waiting > 0) return `${plural(waiting, 'bank message')} waiting to be approved.`;
   if (due > 0) return `${plural(due, 'repeat')} due today.`;
 
   return subject.recordedToday ? GENERIC_BODY : 'Nothing recorded yet today.';
