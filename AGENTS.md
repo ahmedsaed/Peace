@@ -524,6 +524,56 @@ app ignoring input. `pkill -f GradleDaemon`.
   this is an expense tracker and it gets opened. Ask to be woken roughly twice a day and do nothing
   unless a backup is owed: the OS gives no guarantee about *when*, so frequent cheap no-ops converge
   far better than one weekly request that gets missed.
+- **A scheduled notification says what it knew when it was ARMED, not when it fires.** No
+  JavaScript runs at fire time — the content is frozen into AlarmManager — so "3 bank messages
+  waiting" is a snapshot. The reminder is safe to word with real numbers anyway, because of an
+  asymmetry worth checking before you rely on it: every path that LOWERS a count (reading a
+  message, settling a repeat, writing a record) goes through the UI and re-arms, while the things
+  that RAISE one (a bank alert at 2am, midnight making another occurrence due) need no app at all.
+  So it can only ever under-report. Work out which direction your staleness runs before putting a
+  number in something you cannot take back. And no push service is involved in any of this: local
+  notifications are the OS's, not a server's, which is the only reason a local-first app can have
+  them.
+- **A repeating `DAILY` trigger cannot sit one day out.** It fires at the next occurrence of its
+  time, so "skip tonight, we already recorded" is unsayable — the only way to suppress one
+  occurrence is to own each one. (Whether that skip happens at all is a SETTING, not a decision
+  made in code: skipping reads the notification as "you have not logged anything", while somebody
+  building a habit wants a fixed daily cue whose whole value is that it does not vanish on the days
+  it is working. When a default encodes an assumption about what a feature is FOR, check whether
+  the opposite reading is also reasonable before hard-coding it.) `lib/reminder.ts` lays a rolling 14-day window of one-shot `DATE`
+  triggers and rebuilds it from scratch on every launch and foreground; patching the window instead
+  is a diff nobody can hold in their head whose failure is one stale entry among thirteen fresh
+  ones, invisible until it fires. The cost is honest and bounded: an app unopened for a fortnight
+  stops reminding, which is the same catch-up story as the Drive backup and is reported by the
+  readback below rather than hidden.
+- **A switch that means "notifications will arrive" may only be ON when they can.** `POST_NOTIFICATIONS`
+  is a runtime permission, revocable three screens deep in system settings, and a force-stop or an
+  OEM battery manager drops the alarms without touching a single setting in this app — so the
+  stored flag is an intention and nothing more. Refusing the permission turns the switch back OFF
+  rather than leaving it on above a warning, and the settings card reads the schedule back from
+  Android (`getAllScheduledNotificationsAsync`) instead of describing its own state. "The switch
+  says on and nothing ever arrives" is the one failure this feature is most prone to, and a
+  readback is the only thing that can see it. The E2E flow asserts that line for the same reason:
+  there is no second screen to prove it on, and a readback cannot pass by the app agreeing with
+  itself. Exact alarms need no chasing — expo-notifications uses `setExactAndAllowWhileIdle` when
+  `canScheduleExactAlarms()` allows and `setAndAllowWhileIdle` otherwise, so the degradation is
+  lateness, not silence.
+- **Maestro's `launchApp` GRANTS runtime permissions, so a flow can never see the denied state.**
+  The reminders flow carries an optional tap on the system "Allow" dialog and it has never once
+  fired on the emulator — Maestro had already granted `POST_NOTIFICATIONS` before the app drew. The
+  branch is still right for a real phone, but nothing in a green suite is evidence that the refusal
+  path works. Worse, it silently undoes an `adb shell pm revoke` performed between steps, which is
+  how a self-heal test can appear to fail while the code is correct. To exercise a denied
+  permission: `pm revoke`, launch with `adb shell monkey` or `am start`, and drive the already-open
+  app with a flow that has NO `launchApp` in it.
+- **The monochrome launcher layer is not a notification icon.** It is scaled to sit inside the
+  adaptive icon's guaranteed-visible circle, so it fills a little over half its canvas — and a
+  status bar icon has no mask to hide from, arriving as a speck with empty space around it. The
+  gap between shapes is the other half: Android keeps only the ALPHA, so the separation that makes
+  a wallet read as a wallet is measured in FINAL pixels, and 16 units that survive a 48dp tile
+  close into a blob at 24dp. `scripts/make-icons.mjs` takes scale and gap as parameters for exactly
+  this, and the answer came from `convert`-ing the PNG to 24px and looking at it — same rule as
+  every other glyph here.
 - **A surviving mutant is a question, not a verdict.** `shouldBackUp` had an explicit
   `cadence === 'off'` guard that no test could kill — because `backupDue` already owned that rule.
   The line was dead, not the test weak. Deleting it put the rule back in one place, where mutating

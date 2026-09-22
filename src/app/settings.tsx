@@ -6,6 +6,7 @@ import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import { BankMessagesCard } from '@/components/bank-card';
+import { ReminderCard } from '@/components/reminder-card';
 import { ReceiptsCard } from '@/components/receipts-card';
 import { GeminiKeyCard } from '@/components/gemini-key';
 import { StackHeader } from '@/components/screen';
@@ -113,6 +114,17 @@ export default function SettingsScreen() {
             last
           />
         </Section>
+
+        {/* Between Reporting and the AI cards because that is the boundary it
+            sits on: everything above changes what the app SHOWS when you open
+            it, and everything below is the app doing something while you are
+            not looking. A reminder is the first of those you meet. */}
+        <View className="pt-6">
+          <Text className="mb-2 px-1 text-[10px] uppercase tracking-widest text-muted">
+            Reminders
+          </Text>
+          <ReminderCard />
+        </View>
 
         {/* Its own section, because the key is not a receipt setting: both
             reading features run on it, and burying it under one of them is what

@@ -3,7 +3,13 @@
  */
 import { createTestDb, type TestDb } from '../../test/db';
 import { accountId, catId, seedDefaults } from '../seed';
-import { groupByDay, listRecordsForPeriod, periodSummary, type RecordRow } from './records';
+import {
+  groupByDay,
+  listRecordsForPeriod,
+  periodSummary,
+  wroteAnythingOn,
+  type RecordRow,
+} from './records';
 import { createRecord, createTransfer } from './transactions';
 import { addAttachment } from './attachments';
 
@@ -436,5 +442,43 @@ describe('groupByDay', () => {
     // 23:30 and 00:30 are different days however the timezone is offset.
     const groups = groupByDay([row(6, 0), row(5, 23)]);
     expect(groups).toHaveLength(2);
+  });
+});
+
+describe('wroteAnythingOn', () => {
+  let db: TestDb;
+  beforeEach(() => {
+    db = createTestDb().db;
+    seedDefaults(db);
+  });
+
+  it('is false on a ledger nothing has been added to', () => {
+    expect(wroteAnythingOn(db, new Date())).toBe(false);
+  });
+
+  it('is true once something has been written today', () => {
+    createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 100, occurredAt: new Date() });
+    expect(wroteAnythingOn(db, new Date())).toBe(true);
+  });
+
+  it('asks when the row was WRITTEN, not what day it is about', () => {
+    // Logging last Tuesday's lunch this morning is showing up today. Reading
+    // `occurredAt` instead would call that an empty day and nag somebody who
+    // had just done the thing the reminder is asking for.
+    createRecord(db, {
+      type: 'expense',
+      accountId: CASH,
+      amountMinor: 100,
+      occurredAt: new Date(2026, 0, 6, 13, 0),
+    });
+    expect(wroteAnythingOn(db, new Date())).toBe(true);
+    expect(wroteAnythingOn(db, new Date(2026, 0, 6))).toBe(false);
+  });
+
+  it('does not count a record written on another day', () => {
+    createRecord(db, { type: 'expense', accountId: CASH, amountMinor: 100, occurredAt: new Date() });
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    expect(wroteAnythingOn(db, tomorrow)).toBe(false);
   });
 });

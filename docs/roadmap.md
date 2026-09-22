@@ -318,8 +318,14 @@ and dismissed from `recurring_skips`. A proposal is anything in range that appea
 A monthly rule anchored to the 31st must fire on 28 February and then on **31 March**; deriving
 each date from the previous one lets February poison every month after it.
 
-Reminders and budget due dates were dropped — a due row in the list is the reminder, and it is
-already the first thing on the screen.
+Budget due dates were dropped. Reminders were dropped too, on the reasoning that *a due row in the
+list is the reminder, and it is already the first thing on the screen* — and that reasoning turned
+out to hold only for somebody who opens the app. A due row nobody looks at is not a reminder; it is
+a record of the thing that was supposed to prompt them. Reminders shipped later as a nightly local
+notification that names what is waiting, and the earlier argument survives inside it: the
+notification's whole job is to get the app opened so that the due row can do its work, which is why
+it stays quiet on a day already dealt with and why tapping it goes nowhere special. See
+`lib/reminder.ts`.
 
 ---
 

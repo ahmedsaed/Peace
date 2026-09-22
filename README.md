@@ -110,6 +110,7 @@ And it stays on your phone. That is the part most of the alternatives get wrong.
 **Also in the drawer**
 - Recurring payments — set while entering the record, then proposed each month for you to approve, edit or dismiss
 - Portfolio rebalancing, deliberately not wired into the ledger, which never tells you to sell
+- An optional nightly reminder that names what is actually waiting — bank messages to read, repeats due — and by default stays quiet on days you have already recorded something — switchable, if you would rather be asked every day regardless. Scheduled on the phone by Android; no push service, no server, nothing leaves the device
 
 ## Private by default
 
