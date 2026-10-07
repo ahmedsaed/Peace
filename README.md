@@ -100,6 +100,14 @@ And it stays on your phone. That is the part most of the alternatives get wrong.
 - Cash out of an ATM is recognised as a **transfer**, not an expense, so it isn't counted twice
 - The finance half of each prompt is yours to edit — "the card ending 0042 is Kenana" resolves against your real accounts
 
+**Penny, the assistant** *(optional, off until you switch it on, on your own Gemini key)*
+- Ask in plain words — *"How much did fuel cost me in December?"*, *"How does my coffee compare month to month?"* — and get answers worked out from your ledger, never estimated
+- Charts it draws from the same totals every screen uses; tap a bar to see the records inside it, save it as an image or a CSV
+- Reports as PDFs: a verdict, takeaways, the change from last period, and charts — saved to a folder you pick
+- Hand it a receipt photo or a PDF invoice and ask about it, or have it logged with the file attached
+- It can add, edit and delete records, categories, tags, accounts, budgets and recurring payments — **each change is a card you approve first**, and deletes ask twice and can be undone
+- Every amount it mentions is cited from your data and drawn by the app, so hiding amounts hides its answers too
+
 **Keeping it**
 - Receipts and PDF invoices attached to records, content-addressed and carried inside the backup
 - Backups are a plain zip: `peace.db` beside an `attachments/` folder — unzip it anywhere and your data is there without this app
@@ -120,7 +128,7 @@ switch them on, one happens only when you tap a button, and one is a once-a-day 
 | Talks to | When | Default |
 |---|---|---|
 | `api.frankfurter.dev` | you tap to fetch an exchange rate | never load-bearing — the field stays manual if it fails |
-| `generativelanguage.googleapis.com` | reading a receipt or a bank message | **off** — needs your own Gemini key |
+| `generativelanguage.googleapis.com` | reading a receipt or a bank message, and asking Penny — which sends your question and what it reads from the ledger to answer it | **off** — needs your own Gemini key, and Penny has its own switch |
 | `googleapis.com/drive` | backup to Drive's private app folder | **off** — needs you to connect it |
 | `api.github.com` | checking once a day whether a newer build exists | one quiet line in the drawer, nothing when it fails |
 
