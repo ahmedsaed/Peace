@@ -18,13 +18,17 @@ export type Item =
   | { type: 'user'; key: string; text: string; at: Date }
   | { type: 'reply'; key: string; text: string; figures: Record<string, Figure> }
   | { type: 'activity'; key: string; labels: string[] }
-  | { type: 'proposal'; key: string; seq: number; proposal: Proposal }
+  | { type: 'proposal'; key: string; seq: number; proposal: Proposal; expired: boolean }
   | { type: 'display'; key: string; display: Display }
   | { type: 'divider'; key: string; at: Date }
   | { type: 'error'; key: string; message: string; retryable: boolean };
 
 export function toItems(rows: StoredRow[]): Item[] {
   const items: Item[] = [];
+  // A card left undecided when the conversation was reset belongs to a turn
+  // nothing will ever resume. Approving it would change the ledger with no
+  // model to tell and no reply to explain it, so it is shown as expired.
+  const lastDivider = rows.reduce((seq, row) => (row.kind === 'divider' ? row.seq : seq), -1);
 
   rows.forEach((row) => {
     const key = String(row.seq);
@@ -45,7 +49,13 @@ export function toItems(rows: StoredRow[]): Item[] {
         // the model's next words explain it.
         for (const proposal of meta.proposals ?? []) {
           if (proposal.preview.title === '') continue;
-          items.push({ type: 'proposal', key: `${key}:p${proposal.index}`, seq: row.seq, proposal });
+          items.push({
+            type: 'proposal',
+            key: `${key}:p${proposal.index}`,
+            seq: row.seq,
+            proposal,
+            expired: proposal.status === 'pending' && row.seq < lastDivider,
+          });
         }
         break;
       }

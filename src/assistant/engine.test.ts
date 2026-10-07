@@ -183,6 +183,17 @@ describe('a write', () => {
     expect(decide(d, model.seq, 0, true)).toEqual({ complete: true });
   });
 
+  it('refuses a proposal left pending across a reset', async () => {
+    const { step } = scripted([deleteShoes(ledger.ids)]);
+    const d = deps(step);
+    ask(d, 'delete the shoes');
+    await run(d);
+    const model = sessionMessages(ledger.db, 50).find((r) => r.kind === 'model')!;
+    reset(d);
+    expect(decide(d, model.seq, 0, true).error).toMatch(/reset/);
+    expect(getRecord(ledger.db, ledger.ids.shoes)).toBeDefined();
+  });
+
   it('runs the reads in a mixed batch only once every write is decided', async () => {
     const before = ledger.db.select().from(transactions).all().length;
     const { step, requests } = scripted([

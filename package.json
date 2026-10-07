@@ -87,7 +87,8 @@
     "apk:emu": "PEACE_ABI=x86_64 npm run apk",
     "verify:lock": "bash scripts/verify-lock.sh",
     "shots": "bash scripts/demo-shots.sh",
-    "e2e:fast": "maestro test .maestro/ --include-tags=core"
+    "e2e:fast": "maestro test .maestro/ --include-tags=core",
+    "e2e:live": "bash scripts/e2e-live.sh"
   },
   "private": true,
   "engines": {

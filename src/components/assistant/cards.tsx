@@ -22,18 +22,21 @@ import { useMoney } from '@/state/money';
 export function ProposalCard({
   proposal,
   disabled,
+  expired,
   onDecide,
   testID,
 }: {
   proposal: Proposal;
   disabled: boolean;
+  /** Left undecided before a reset — see `toItems`. */
+  expired: boolean;
   onDecide: (approve: boolean) => void;
   testID: string;
 }) {
   const money = useMoney();
   const [armed, setArmed] = useState(false);
   const { preview, status } = proposal;
-  const pending = status === 'pending';
+  const pending = status === 'pending' && !expired;
 
   const outcome =
     status === 'approved'
@@ -42,7 +45,9 @@ export function ProposalCard({
         ? { text: 'Declined', tone: 'text-muted' }
         : status === 'failed'
           ? { text: proposal.error ?? 'Could not be applied', tone: 'text-expense' }
-          : null;
+          : expired
+            ? { text: 'Not answered before the conversation was reset — nothing was changed', tone: 'text-muted' }
+            : null;
 
   return (
     <View

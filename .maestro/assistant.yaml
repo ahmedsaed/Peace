@@ -1,0 +1,100 @@
+appId: com.ahmed.peace
+---
+# The assistant WITHOUT a key — the half every user meets first.
+#
+# What a conversation looks like needs a live Gemini key and is covered by
+# `.maestro/live/assistant-live.yaml` (`npm run e2e:live`). This flow covers
+# what must hold for everybody, key or not:
+#
+#   it is OFF by default, and while it is off nothing anywhere leads to it;
+#   the switch sits beside the sentence saying what goes to Google;
+#   switching it on puts it in the drawer and in every tab's header;
+#   without a key the screen says so instead of offering a chat that cannot
+#     answer; and switching it off takes every way in away again.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- off by default: no door anywhere ---
+- assertNotVisible:
+    id: "nav-assistant"
+- tapOn:
+    id: "nav-menu"
+- assertVisible:
+    id: "drawer-settings"
+- assertNotVisible:
+    id: "drawer-assistant"
+- tapOn:
+    id: "drawer-settings"
+
+- scrollUntilVisible:
+    element:
+      id: "assistant-enabled"
+    direction: DOWN
+# The consent is the switch, so the sentence it consents to has to be there,
+# and has to name where the data goes.
+- assertVisible:
+    id: "assistant-privacy"
+- assertVisible: ".*Google.*Gemini.*"
+- takeScreenshot: 01-assistant-off
+
+# --- on: the row says what is missing ---
+- tapOn:
+    id: "assistant-enabled"
+- scrollUntilVisible:
+    element:
+      id: "assistant-needs-key"
+    direction: DOWN
+# No model row without a key: a control for something that cannot run.
+- assertNotVisible:
+    id: "assistant-model-edit"
+- takeScreenshot: 02-assistant-on-no-key
+
+# --- the setting is read on OTHER screens: the header and the drawer ---
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "nav-assistant"
+- tapOn:
+    id: "nav-menu"
+- assertVisible:
+    id: "drawer-assistant"
+- tapOn:
+    id: "drawer-assistant"
+- assertVisible:
+    id: "assistant-screen"
+# Without a key there is no composer to type into — only the way to fix it.
+- assertVisible:
+    id: "assistant-gate-no-key"
+- assertNotVisible:
+    id: "assistant-input"
+- takeScreenshot: 03-assistant-gate
+- tapOn:
+    id: "assistant-open-settings"
+- assertVisible:
+    id: "settings-screen"
+
+# --- off again: every way in is gone ---
+- scrollUntilVisible:
+    element:
+      id: "assistant-enabled"
+    direction: DOWN
+- tapOn:
+    id: "assistant-enabled"
+- assertNotVisible:
+    id: "assistant-needs-key"
+- tapOn:
+    id: "nav-back"
+# Back on the assistant screen we came from, which now says it is off.
+- assertVisible:
+    id: "assistant-gate-off"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "home-screen"
+- assertNotVisible:
+    id: "nav-assistant"

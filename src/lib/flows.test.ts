@@ -23,7 +23,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { tagKey } from './tag';
+import { testIdSlug } from './id';
 import { idSlug } from './slug';
+import { catId } from '../db/seed';
 
 const ROOT = path.resolve(__dirname, '../..');
 const FLOWS = path.join(ROOT, '.maestro');
@@ -100,8 +102,9 @@ const once = base.flatMap((id) => [...suffixes].map((suffix) => `${id}${suffix}`
 for (const id of once) literalIds.add(id);
 for (const id of once) for (const suffix of suffixes) literalIds.add(`${id}${suffix}`);
 
-const flowFiles = fs
-  .readdirSync(FLOWS)
+// Recursive: the flows that need a live key live in `live/`, with their shared
+// setup in `live/common/`, and an id they name is as checkable as any other.
+const flowFiles = (fs.readdirSync(FLOWS, { recursive: true }) as string[])
   .filter((f) => f.endsWith('.yaml'))
   .sort();
 
@@ -205,6 +208,10 @@ describe('the keys the flows hardcode', () => {
       `tag-${idSlug(tagKey('Kitchen redo'))}`,
       `tag-count-${idSlug(tagKey('Kitchen redo'))}`,
       `tag-row-${idSlug(tagKey('Kitchen redo'))}`,
+      // The assistant's category slices are keyed by category id through the
+      // SAME slug the chart uses (`testIdSlug`, not `idSlug` — the two differ
+      // on case), and Fuel's spending lands on its parent, Car.
+      `assistant-slice-${testIdSlug(catId('car'))}`,
     ]) {
       expect([...ids]).toContain(id);
     }

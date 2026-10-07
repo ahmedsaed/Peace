@@ -158,6 +158,23 @@ describe('toItems', () => {
     expect(items.map((i) => i.type)).toEqual(['user', 'reply', 'activity', 'proposal', 'display', 'divider']);
   });
 
+  it('expires a card left pending across a reset, so it cannot change the ledger unannounced', () => {
+    const pending = {
+      index: 0,
+      call: { name: 'create_tag' },
+      status: 'pending',
+      preview: { title: 'Add?', lines: [], danger: false, confirmLabel: 'Add' },
+    };
+    const items = toItems([
+      row(1, 'user', { role: 'user', parts: [{ text: 'tag' }] }),
+      row(2, 'model', { role: 'model', parts: [{ functionCall: { name: 'create_tag' } }] }, { proposals: [pending] }),
+      row(3, 'divider', null),
+    ]);
+    expect(items.find((i) => i.type === 'proposal')).toEqual(expect.objectContaining({ expired: true }));
+    const live = toItems([row(2, 'model', { role: 'model', parts: [] }, { proposals: [pending] })]);
+    expect(live.find((i) => i.type === 'proposal')).toEqual(expect.objectContaining({ expired: false }));
+  });
+
   it('offers a retry only when the last thing that happened was a retryable failure', () => {
     const failed = [row(1, 'user', { role: 'user', parts: [{ text: 'q' }] }), row(2, 'error', null, { message: 'x', retryable: true })];
     expect(canRetry(failed)).toBe(true);

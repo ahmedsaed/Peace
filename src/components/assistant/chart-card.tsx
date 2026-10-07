@@ -240,7 +240,7 @@ function XyChart({
             key={point.key}
             onPress={() => onDrill(point)}
             style={{ width: slot, height: '100%' }}
-            testID={`${testID}-bar-${testIdSlug(point.key)}`}
+            testID={`assistant-bar-${testIdSlug(point.key)}`}
             accessibilityRole="button"
             accessibilityLabel={`${point.label}, ${money(point.valueMinor, chart.currency)}`}
           />
@@ -287,7 +287,7 @@ function DonutChart({
               // mix with nothing to say which part of the ring it is.
               disabled={!point}
               onPress={() => point && onDrill(point)}
-              testID={`${testID}-slice-${testIdSlug(slice.id)}`}
+              testID={`assistant-slice-${testIdSlug(slice.id)}`}
               accessibilityRole="button"
               className="flex-row items-center gap-2.5 py-1.5 active:opacity-70">
               <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: slice.color }} />

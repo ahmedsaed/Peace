@@ -238,6 +238,16 @@ describe('the other reads', () => {
     // The cited figure travels with the report, so the PDF can render it later.
     expect(Object.values(report.figures)).toEqual([{ minor: 65000, currency: 'EGP' }]);
   });
+
+  it('lets a report section chart a longer span than the report', () => {
+    const { display } = read('make_report', {
+      title: 'October',
+      month: '2026-10',
+      sections: [{ heading: 'Trend', body: '', chart: { measure: 'expense', group_by: 'month', from: '2026-08', to: '2026-10' } }],
+    });
+    if (display?.kind !== 'report') throw new Error('no report');
+    expect(display.report.sections[0].chart?.points.map((p) => p.key)).toEqual(['2026-08', '2026-09', '2026-10']);
+  });
 });
 
 describe('writes', () => {

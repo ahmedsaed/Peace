@@ -18,6 +18,7 @@ import { db } from '@/db/client';
 import type { RecordRow } from '@/db/repo/records';
 import { searchRecords } from '@/db/repo/search';
 import { EMPTY_QUERY } from '@/lib/search-query';
+import { useKeyboardOverlap } from '@/lib/layout';
 import { getGeminiKey } from '@/lib/secrets';
 import { useAssistantStore } from '@/state/assistant';
 import { useMoney } from '@/state/money';
@@ -46,6 +47,14 @@ type Drill = { title: string; subtitle?: string; rows: RecordRow[] };
 
 export default function AssistantScreen() {
   const insets = useSafeAreaInsets();
+  /**
+   * LIFTED BY HAND. The manifest says `adjustResize`, and on an edge-to-edge
+   * Android it no longer shrinks the window — the keyboard simply draws over
+   * the bottom of the screen, which is where a composer lives. The first run on
+   * a device typed a question into an input nobody could see. Padded by the
+   * keyboard's overlap — see `keyboardOverlap` for why not its height.
+   */
+  const keyboard = useKeyboardOverlap();
   const enabled = useSetting('assistantEnabled');
   const homeCurrency = useSetting('homeCurrency');
   const money = useMoney();
@@ -116,7 +125,7 @@ export default function AssistantScreen() {
   }
 
   return (
-    <View className="flex-1 bg-ground" testID="assistant-screen">
+    <View className="flex-1 bg-ground" style={{ paddingBottom: keyboard }} testID="assistant-screen">
       <StackHeader
         title="Assistant"
         right={
@@ -177,7 +186,7 @@ export default function AssistantScreen() {
 
       <View
         className="flex-row items-end gap-2 border-t border-line bg-surface px-3 pt-2"
-        style={{ paddingBottom: Math.max(insets.bottom, 8) }}>
+        style={{ paddingBottom: keyboard > 0 ? 8 : Math.max(insets.bottom, 8) }}>
         <TextInput
           value={draft}
           onChangeText={setDraft}
@@ -213,7 +222,10 @@ export default function AssistantScreen() {
       </View>
 
       {pendingUndo ? (
-        <View className="absolute bottom-20 left-0 right-0">
+        // Above the composer AND the keyboard: absolute positioning ignores the
+        // padding that lifts everything else, so the offer of the only way
+        // back from a deletion would otherwise sit under the keys.
+        <View className="absolute left-0 right-0" style={{ bottom: keyboard + 72 }}>
           <Snackbar
             message={pendingUndo.message}
             actionLabel="Undo"
@@ -320,6 +332,7 @@ function ItemView({
           <ProposalCard
             proposal={item.proposal}
             disabled={busy}
+            expired={item.expired}
             onDecide={(approve) => onDecide(item.seq, item.proposal.index, approve)}
             testID={`assistant-proposal-${item.proposal.call.name.replace(/_/g, '-')}`}
           />

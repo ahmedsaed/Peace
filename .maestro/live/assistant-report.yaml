@@ -1,0 +1,98 @@
+appId: com.ahmed.peace
+tags:
+  - live
+---
+# The assistant's outputs that leave the app: a bar chart's CSV and image, and
+# a PDF report. What is asserted is that each reaches the share sheet without
+# the card reporting a failure — the bytes themselves are checked by the size
+# guard in `assistant/export.ts`, which throws on an empty file.
+- runFlow: common/setup.yaml
+
+- tapOn:
+    id: "assistant-input"
+- inputText: "Add an expense of 120 for Coffee, paid from Cash, today"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-create-record-approve"
+    timeout: 120000
+- tapOn:
+    id: "assistant-proposal-create-record-approve"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+
+# --- a bar chart over months, its export buttons ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "Show my coffee spending for the last 3 months as a bar chart"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-chart"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "assistant-chart-export-csv"
+    direction: UP
+- takeScreenshot: 01-bar-chart
+- tapOn:
+    id: "assistant-chart-export-csv"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-screen"
+    timeout: 15000
+- takeScreenshot: 02-csv-share-sheet
+- back
+- assertVisible:
+    id: "assistant-screen"
+- tapOn:
+    id: "assistant-chart-export-image"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-screen"
+    timeout: 15000
+- back
+- assertNotVisible: "Could not export the chart."
+
+# --- a report, as a PDF ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "Write a short report on this month's spending"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-report"
+    timeout: 180000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "assistant-report-share"
+    direction: UP
+- takeScreenshot: 03-report-card
+- tapOn:
+    id: "assistant-report-share"
+# The share sheet replacing the screen is the PDF having been written,
+# moved and size-checked — any failure leaves the card saying so instead.
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-screen"
+    timeout: 30000
+- takeScreenshot: 04-pdf-share-sheet
+- back
+- assertVisible:
+    id: "assistant-report"
+- assertNotVisible: "Could not make the PDF."

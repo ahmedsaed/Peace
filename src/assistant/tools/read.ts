@@ -512,9 +512,11 @@ const makeReport: ReadTool = {
               },
               chart: {
                 type: 'object',
-                description: 'Optional chart, same fields as show_chart minus the span (the report span is used).',
+                description:
+                  'Optional chart, same fields as show_chart. Its span defaults to the report span; give it its own (e.g. six months) for a trend.',
                 properties: {
                   title: { type: 'string' },
+                  ...SPAN_PROPS,
                   chart: { type: 'string', enum: ['bar', 'line', 'donut'] },
                   measure: MEASURE_PROP,
                   group_by: GROUP_PROP,
@@ -550,7 +552,11 @@ const makeReport: ReadTool = {
       const chartArgs = section.chart as Args | undefined;
       if (!chartArgs || typeof chartArgs !== 'object') return { heading, body };
       try {
-        const merged = { ...chartArgs, ...spanArgs };
+        // The section's own span wins: "how spending has moved" in a report on
+        // one month needs the months before it, and overwriting that with the
+        // report's span drew a trend chart with a single bar in it.
+        const ownSpan = ['month', 'from', 'to'].some((k) => chartArgs[k] !== undefined && chartArgs[k] !== '');
+        const merged = ownSpan ? { ...chartArgs } : { ...chartArgs, ...spanArgs };
         const summary = summarise(merged, ctx);
         if (summary.groupBy === 'none') return { heading, body };
         return { heading, body, chart: chartFrom(merged, ctx, summary, optString(chartArgs, 'title') ?? heading) };

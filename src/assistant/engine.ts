@@ -2,6 +2,7 @@ import { accounts, categories, tags } from '../db/schema';
 import {
   appendMessage,
   getMessage,
+  messagesAfter,
   sessionMessages,
   updateMessageMeta,
   type StoredRow,
@@ -293,6 +294,11 @@ export function decide(
   // Already decided — a double tap, or a second device. Do nothing twice.
   if (!proposal || proposal.status !== 'pending') {
     return { complete: !meta.proposals?.some((p) => p.status === 'pending') };
+  }
+  // Left behind by a reset. The screen shows it as expired; this is the same
+  // rule where it cannot be skipped by a screen that forgot to.
+  if (messagesAfter(deps.db, seq).some((r) => r.kind === 'divider')) {
+    return { complete: false, error: 'That was asked before the conversation was reset.' };
   }
 
   let undo: Undo | undefined;
