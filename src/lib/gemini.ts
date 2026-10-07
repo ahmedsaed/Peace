@@ -184,8 +184,17 @@ export function isTransientStatus(status: number, body: unknown): boolean {
   return status === 429 || status >= 500;
 }
 
-/** HTTP failures, in words that name the thing the user can actually change. */
-export function describeFailure(status: number, body: unknown): string {
+/**
+ * HTTP failures, in words that name the thing the user can actually change.
+ *
+ * `meanwhile` is what to do while Gemini is down, which depends on who is
+ * asking: a record can be typed by hand, a question can only be asked again.
+ */
+export function describeFailure(
+  status: number,
+  body: unknown,
+  meanwhile = 'Enter the record by hand.'
+): string {
   switch (reasonOf(body)) {
     case 'API_KEY_INVALID':
     case 'API_KEY_SERVICE_BLOCKED':
@@ -205,7 +214,7 @@ export function describeFailure(status: number, body: unknown): string {
   }
   if (status === 404) return 'That Gemini model does not exist. Check the name in Settings.';
   if (status === 429) return 'Gemini is rate-limiting this key. Try again in a minute.';
-  if (status >= 500) return 'Gemini is unavailable right now. Enter the record by hand.';
+  if (status >= 500) return `Gemini is unavailable right now. ${meanwhile}`;
 
   /**
    * A 400 with no reason we recognise. Google's own sentence is far more useful
@@ -331,20 +340,36 @@ export type ReadOptions = {
  * console line — and this app writes the URL to the console on failure.
  */
 /**
- * One request, whatever is being read.
+ * One request, whatever is being asked.
  *
  * The transport, the timeout, the header the key travels in and the mapping of
- * every failure into a sentence are identical for a photographed receipt and a
- * bank message — only the parts and the schema differ. Two copies of this would
- * be two places for the error handling to drift, and the error handling is the
- * part that took a device run against the real API to get right.
+ * every failure into a sentence are identical for a photographed receipt, a
+ * bank message and a turn of the assistant's conversation — only the body
+ * differs. Three copies of this would be three places for the error handling
+ * to drift, and the error handling is the part that took a device run against
+ * the real API to get right.
+ *
+ * Returns the parsed envelope of a 2xx reply; everything else throws a
+ * `GeminiError` carrying a sentence for the screen.
  */
-async function generateJson(
+export async function postGenerate(
   apiKey: string,
   model: string,
-  parts: unknown[],
-  responseSchema: unknown,
-  { timeoutMs, fetchImpl, label }: { timeoutMs: number; fetchImpl: typeof fetch; label: string }
+  body: unknown,
+  {
+    timeoutMs,
+    fetchImpl,
+    label,
+    meanwhile = 'Enter the record by hand.',
+    signal,
+  }: {
+    timeoutMs: number;
+    fetchImpl: typeof fetch;
+    label: string;
+    meanwhile?: string;
+    /** Lets a caller stop waiting — the assistant's Stop button. */
+    signal?: AbortSignal;
+  }
 ): Promise<unknown> {
   if (apiKey.trim() === '') {
     throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
@@ -352,6 +377,8 @@ async function generateJson(
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort);
 
   try {
     const response = await fetchImpl(endpoint(model), {
@@ -360,16 +387,7 @@ async function generateJson(
         'content-type': 'application/json',
         'x-goog-api-key': apiKey.trim(),
       },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema,
-          // One right answer. The same input read twice must not give two
-          // different amounts.
-          temperature: 0,
-        },
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 
@@ -377,16 +395,18 @@ async function generateJson(
       // The body carries the reason the status cannot. Its own parsing must not
       // throw over the top of the real failure, so a body that will not read
       // simply leaves the status to speak for itself.
-      const body = await response.json().catch(() => null);
+      const errorBody = await response.json().catch(() => null);
       throw new GeminiError(
-        describeFailure(response.status, body),
-        isTransientStatus(response.status, body)
+        describeFailure(response.status, errorBody, meanwhile),
+        isTransientStatus(response.status, errorBody)
       );
     }
 
-    return extractJson(await response.json());
+    return await response.json();
   } catch (error) {
     if (error instanceof GeminiError) throw error;
+
+    if (signal?.aborted) throw new GeminiError('Stopped.', true);
 
     /**
      * Offline, DNS failure, timeout, malformed JSON — all the same to the USER,
@@ -397,8 +417,7 @@ async function generateJson(
      * that plainly had a working network.
      *
      * The URL is logged; the key is not, because it is in a header.
-     */
-    /**
+     *
      * TRANSIENT BY DEFINITION. Offline, a dead signal, a stalled connection that
      * hit the timeout — every one of these is a thing that is true now and may
      * not be in a minute. This is also what an overloaded model looks like when
@@ -406,10 +425,37 @@ async function generateJson(
      * usually presents.
      */
     console.warn(`[gemini] ${label} failed`, endpoint(model), error);
-    throw new GeminiError('Could not reach Gemini. Enter the record by hand.', true);
+    throw new GeminiError(`Could not reach Gemini. ${meanwhile}`, true);
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
+}
+
+/** A structured-output request: one prompt in, one JSON object out. */
+async function generateJson(
+  apiKey: string,
+  model: string,
+  parts: unknown[],
+  responseSchema: unknown,
+  { timeoutMs, fetchImpl, label }: { timeoutMs: number; fetchImpl: typeof fetch; label: string }
+): Promise<unknown> {
+  const body = await postGenerate(
+    apiKey,
+    model,
+    {
+      contents: [{ parts }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema,
+        // One right answer. The same input read twice must not give two
+        // different amounts.
+        temperature: 0,
+      },
+    },
+    { timeoutMs, fetchImpl, label }
+  );
+  return extractJson(body);
 }
 
 export async function readReceipt(

@@ -80,6 +80,11 @@ export const BACKUP_TABLES = [
   // own there, since they move no figure at all.
   { name: 'tags', required: false },
   { name: 'transaction_tags', required: false },
+  // The assistant's conversation. Restored with everything else: it is the
+  // user's own history, and the figures it cites are stored inside it, so a
+  // restored chat still shows the amounts it showed. It points at nothing, so
+  // order does not matter.
+  { name: 'chat_messages', required: false },
 ] as const;
 
 export type RestoreTable = (typeof BACKUP_TABLES)[number]['name'];

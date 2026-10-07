@@ -746,6 +746,39 @@ export const transactionTags = sqliteTable(
 );
 
 // ---------------------------------------------------------------------------
+// The assistant's conversation
+// ---------------------------------------------------------------------------
+
+/**
+ * ONE ongoing conversation, stored as the turns Gemini itself exchanged.
+ *
+ * `content` is the exact `Content` object sent or received — role and parts —
+ * and is replayed VERBATIM on the next request. Newer models attach a
+ * `thoughtSignature` to the parts that carry a function call and reject a
+ * history that comes back without it, so the parts are never rebuilt from
+ * what the screen shows; the screen is derived from them instead.
+ *
+ * `meta` is what this app knows about a turn that Gemini does not: the figures
+ * a reply cites, the charts a tool drew, the writes waiting for approval. It
+ * never goes to the model.
+ *
+ * A `divider` row is the reset. Nothing is deleted — the screen shows the whole
+ * history, and only the rows after the last divider are sent as context.
+ *
+ * `seq` is the order and the page cursor: older pages are `seq < oldest`, which
+ * the primary key answers without an index of its own.
+ */
+export const chatMessages = sqliteTable('chat_messages', {
+  seq: integer('seq').primaryKey({ autoIncrement: true }),
+  kind: text('kind', { enum: ['user', 'model', 'tools', 'divider', 'error'] }).notNull(),
+  /** JSON `Content`. Null for dividers and errors, which never reach the model. */
+  content: text('content'),
+  /** JSON, see `src/assistant/rows.ts`. */
+  meta: text('meta'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+});
+
+// ---------------------------------------------------------------------------
 
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
@@ -769,3 +802,5 @@ export type BankCapture = typeof bankCaptures.$inferSelect;
 export type NewBankCapture = typeof bankCaptures.$inferInsert;
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
+export type ChatMessageRow = typeof chatMessages.$inferSelect;
+export type NewChatMessageRow = typeof chatMessages.$inferInsert;
