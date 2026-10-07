@@ -93,10 +93,10 @@ export default function AssistantScreen() {
   const items = useMemo(() => toItems(rows).reverse(), [rows]);
   const retryable = canRetry(rows);
   const empty = sessionIsEmpty(rows);
-  const waiting = rows.some(
-    (row) =>
-      row.kind === 'model' &&
-      ((row.meta as { proposals?: { status: string }[] } | null)?.proposals ?? []).some((p) => p.status === 'pending')
+  // From the items rather than the rows, so a card expired by a reset does
+  // not leave the composer asking for an answer nothing will act on.
+  const waiting = items.some(
+    (item) => item.type === 'proposal' && item.proposal.status === 'pending' && !item.expired
   );
 
   const submit = (text: string) => {
