@@ -107,8 +107,13 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
         ),
       loadAttachment: (fileName) => attachmentAsBase64(fileName),
       onRow: (row) => {
+        // What is happening NOW, read from the row just written. A model row
+        // with calls means those tools are running; once their answers are in
+        // (a tools row) the wait is Penny thinking about them — showing the last
+        // tool's name there left "Writing a report…" on screen while the reply
+        // was being written.
         const activity =
-          row.kind === 'model' ? ((row.meta as ModelMeta | null)?.activity?.join(' · ') ?? null) : get().activity;
+          row.kind === 'model' ? ((row.meta as ModelMeta | null)?.activity?.join(' · ') ?? null) : null;
         // The row now holds what was streaming, so the draft bubble goes.
         set((state) => ({ rows: upsert(state.rows, row), activity: activity ?? 'Penny is thinking', streaming: null }));
       },

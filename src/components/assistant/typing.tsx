@@ -1,83 +1,59 @@
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Text, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import palette from '@/constants/palette';
 
 /**
- * Three dots that pulse in turn, beside what the assistant is doing.
+ * Penny's coin — the one sign that Penny is working.
  *
- * A spinner says "busy"; this says "someone is working on your answer", which
- * is the thing to communicate during the seconds a tool round trip takes. The
- * label underneath is the honest part — "Adding up", "Drawing a chart" — and
- * the dots only say it has not stalled.
+ * A coin rather than three dots, because Penny is named for one and the dots
+ * are every chat app's. It FADES rather than spins: a slow breath beside text
+ * that is being read is calm, and a spinning thing pulls the eye off the words.
  *
- * The native driver, so the animation keeps moving while JavaScript is busy
- * rendering a chart that just arrived.
+ * Drawn here rather than in the icon map: the icons are one-colour paths, and a
+ * coin needs its rim and its shine to read as a coin at 14px instead of a dot.
+ *
+ * The native driver, so it keeps breathing while JavaScript is busy rendering
+ * a chart that just arrived.
  */
-export function TypingIndicator({ label, testID }: { label: string; testID?: string }) {
+export function Coin({ size = 14 }: { size?: number }) {
   // State, not a ref: created once, and readable during render without the
   // compiler objecting — an Animated.Value is never replaced, only driven.
-  const [dots] = useState(() => [0, 1, 2].map(() => new Animated.Value(0.3)));
+  const [opacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.stagger(
-        160,
-        dots.map((dot) =>
-          Animated.sequence([
-            Animated.timing(dot, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-            Animated.timing(dot, { toValue: 0.3, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-          ])
-        )
-      )
+    const breathe = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.3, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
     );
-    pulse.start();
-    return () => pulse.stop();
-  }, [dots]);
+    breathe.start();
+    return () => breathe.stop();
+  }, [opacity]);
 
   return (
+    <Animated.View style={{ width: size, height: size, opacity }} testID="penny-coin">
+      <Svg width={size} height={size} viewBox="0 0 24 24">
+        <Circle cx={12} cy={12} r={11} fill={palette.accent} />
+        {/* The rim: a ring a shade darker, which is what makes it a coin. */}
+        <Circle cx={12} cy={12} r={8} fill="none" stroke={palette['accent-ink']} strokeOpacity={0.35} strokeWidth={2} />
+        {/* A glint, top left, so it reads as metal rather than a button. */}
+        <Path d="M7.5 9.5a5 5 0 0 1 3-3" stroke="#FFFFFF" strokeOpacity={0.7} strokeWidth={1.8} strokeLinecap="round" fill="none" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** The coin beside what Penny is doing — "Adding up", "Drawing a chart". */
+export function TypingIndicator({ label, testID }: { label: string; testID?: string }) {
+  return (
     <View className="flex-row items-center gap-2.5" testID={testID} accessibilityLabel={label}>
-      <View className="flex-row gap-1">
-        {dots.map((dot, i) => (
-          <Animated.View
-            key={i}
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: palette.accent,
-              opacity: dot,
-              transform: [{ scale: dot.interpolate({ inputRange: [0.3, 1], outputRange: [0.8, 1.15] }) }],
-            }}
-          />
-        ))}
-      </View>
+      <Coin />
       <Text className="flex-1 text-xs text-muted" numberOfLines={1}>
         {label}
       </Text>
     </View>
-  );
-}
-
-/**
- * The block caret at the end of a reply that is still arriving. Blinks slowly
- * — a fast blink beside moving text reads as a fault rather than as typing.
- */
-export function Caret() {
-  const [opacity] = useState(() => new Animated.Value(1));
-  useEffect(() => {
-    const blink = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.15, duration: 450, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 1, duration: 450, useNativeDriver: true }),
-      ])
-    );
-    blink.start();
-    return () => blink.stop();
-  }, [opacity]);
-  return (
-    <Animated.View
-      style={{ width: 8, height: 16, marginTop: 4, borderRadius: 1, backgroundColor: palette.accent, opacity }}
-    />
   );
 }

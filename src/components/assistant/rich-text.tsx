@@ -19,10 +19,17 @@ export function RichText({
   text,
   figures,
   testID,
+  trailing,
 }: {
   text: string;
   figures: Record<string, Figure>;
   testID?: string;
+  /**
+   * Drawn INSIDE the last line, right after the last word — Penny's coin while
+   * a reply is still arriving, so it moves along with the text like a cursor
+   * instead of sitting on a line of its own beneath it.
+   */
+  trailing?: React.ReactNode;
 }) {
   const money = useMoney();
   const hidden = useAmountsHidden();
@@ -46,19 +53,33 @@ export function RichText({
     );
   };
 
+  const blocks = parseBlocks(text);
+  const tail = (i: number) =>
+    trailing && i === blocks.length - 1 ? (
+      <>
+        {' '}
+        {trailing}
+      </>
+    ) : null;
+
   return (
     <View className="gap-1.5" testID={testID}>
-      {parseBlocks(text).map((block, i) =>
+      {blocks.length === 0 && trailing ? <View className="py-1">{trailing}</View> : null}
+      {blocks.map((block, i) =>
         block.kind === 'bullet' ? (
           <View key={i} className="flex-row gap-2 pl-1">
             <Text className="text-[15px] leading-[22px] text-muted">{block.marker}</Text>
-            <Text className="flex-1 text-[15px] leading-[22px] text-ink">{block.inlines.map(render)}</Text>
+            <Text className="flex-1 text-[15px] leading-[22px] text-ink">
+              {block.inlines.map(render)}
+              {tail(i)}
+            </Text>
           </View>
         ) : (
           <Text
             key={i}
             className={`text-[15px] leading-[22px] text-ink ${block.kind === 'heading' ? 'font-semibold' : ''}`}>
             {block.inlines.map(render)}
+            {tail(i)}
           </Text>
         )
       )}

@@ -14,7 +14,7 @@ import { AttachMenu, MessageFiles, PendingFiles } from '@/components/assistant/f
 import { AttachmentViewer } from '@/components/attachment-viewer';
 import { RecordsSheet } from '@/components/assistant/records-sheet';
 import { RichText } from '@/components/assistant/rich-text';
-import { Caret, TypingIndicator } from '@/components/assistant/typing';
+import { Coin, TypingIndicator } from '@/components/assistant/typing';
 import { Icon } from '@/components/icon';
 import { HeaderButton, StackHeader } from '@/components/screen';
 import { Snackbar } from '@/components/snackbar';
@@ -200,8 +200,7 @@ export default function AssistantScreen() {
           <View>
             {streaming ? (
               <View className="my-1.5" testID="assistant-streaming">
-                <RichText text={streamingVisible(streaming)} figures={known} />
-                <Caret />
+                <RichText text={streamingVisible(streaming)} figures={known} trailing={<Coin />} />
               </View>
             ) : null}
             {busy ? (
