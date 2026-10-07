@@ -88,7 +88,8 @@
     "verify:lock": "bash scripts/verify-lock.sh",
     "shots": "bash scripts/demo-shots.sh",
     "e2e:fast": "maestro test .maestro/ --include-tags=core",
-    "e2e:live": "bash scripts/e2e-live.sh"
+    "e2e:live": "bash scripts/e2e-live.sh",
+    "demo:ledger": "bash scripts/demo-ledger.sh"
   },
   "private": true,
   "engines": {
