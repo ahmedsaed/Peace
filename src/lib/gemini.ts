@@ -42,11 +42,32 @@ export const READ_TIMEOUT_MS = 30_000;
  */
 export class GeminiError extends Error {
   readonly transient: boolean;
+  /** How long Google asked us to wait before trying again, when it said. */
+  readonly retryAfterMs: number | null;
 
-  constructor(message: string, transient = false) {
+  constructor(message: string, transient = false, retryAfterMs: number | null = null) {
     super(message);
     this.transient = transient;
+    this.retryAfterMs = retryAfterMs;
   }
+}
+
+/**
+ * The wait Google asks for, from `error.details[].retryDelay` ("23s", "1.5s").
+ *
+ * A rate-limited reply often says exactly when the quota frees up; retrying
+ * sooner just spends another request on another refusal.
+ */
+export function retryDelayOf(body: unknown): number | null {
+  const details = (body as { error?: { details?: unknown } } | null)?.error?.details;
+  if (!Array.isArray(details)) return null;
+  for (const detail of details) {
+    const delay = (detail as { retryDelay?: unknown })?.retryDelay;
+    if (typeof delay !== 'string') continue;
+    const match = /^(\d+(?:\.\d+)?)s$/.exec(delay.trim());
+    if (match) return Math.round(Number(match[1]) * 1000);
+  }
+  return null;
 }
 
 export function endpoint(model: string, method: 'generateContent' | 'streamGenerateContent' = 'generateContent'): string {
@@ -402,7 +423,8 @@ export async function postGenerate(
       const errorBody = await response.json().catch(() => null);
       throw new GeminiError(
         describeFailure(response.status, errorBody, meanwhile),
-        isTransientStatus(response.status, errorBody)
+        isTransientStatus(response.status, errorBody),
+        retryDelayOf(errorBody)
       );
     }
 
@@ -498,7 +520,8 @@ export async function postStream(
       const errorBody = await response.json().catch(() => null);
       throw new GeminiError(
         describeFailure(response.status, errorBody, meanwhile),
-        isTransientStatus(response.status, errorBody)
+        isTransientStatus(response.status, errorBody),
+        retryDelayOf(errorBody)
       );
     }
     if (!response.body) throw new Error('the response has no readable body');

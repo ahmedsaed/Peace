@@ -34,7 +34,7 @@ export function RichText({
         <Text key={i} className="font-semibold text-ink" testID={figure ? `figure-${inline.ref}` : undefined}>
           {/* A ref that resolves to nothing is shown as a gap, never as the raw
               token and never as a guess. */}
-          {figure ? money(figure.minor, figure.currency) : '—'}
+          {figure ? money(inline.abs ? Math.abs(figure.minor) : figure.minor, figure.currency) : '—'}
         </Text>
       );
     }

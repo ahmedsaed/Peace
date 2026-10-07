@@ -2,6 +2,7 @@ import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import type * as schema from '../../db/schema';
 import type { GroupBy, Measure } from '../aggregate';
+import type { ChatAttachment } from '../attachments';
 import type { Figure, FigureBook } from '../figures';
 import type { FunctionDeclaration } from '../gemini-chat';
 
@@ -12,6 +13,8 @@ export type ToolContext = {
   homeCurrency: string;
   now: Date;
   figures: FigureBook;
+  /** Files attached in this conversation, by the ids the model was given. */
+  attachments: ChatAttachment[];
 };
 
 export type Args = Record<string, unknown>;
@@ -59,20 +62,32 @@ export type ChartSpec = {
   filter: StoredFilter;
 };
 
+/** One key figure called out in a section — a tile, not a sentence. */
+export type ReportHighlight = { label: string; value: string; detail?: string };
+
 export type ReportSection = {
   heading: string;
   /** Markdown-ish prose with cite tokens. */
   body: string;
+  highlights?: ReportHighlight[];
   chart?: ChartSpec;
 };
+
+export type ReportTotals = { incomeMinor: number; expenseMinor: number; netMinor: number };
 
 export type ReportSpec = {
   title: string;
   rangeLabel: string;
   currency: string;
   generatedAt: number;
-  summary: { incomeMinor: number; expenseMinor: number; netMinor: number; unvaluedCount: number };
-  topCategories: { label: string; valueMinor: number; percent: number }[];
+  /** The model's opening paragraph — the answer before the detail. */
+  overview?: string;
+  /** Three or so one-line conclusions, for the cover. */
+  takeaways?: string[];
+  summary: ReportTotals & { unvaluedCount: number };
+  /** The same totals for the span just before, when there is one to compare with. */
+  previous?: ReportTotals & { label: string };
+  topCategories: { label: string; valueMinor: number; percent: number; previousMinor?: number }[];
   sections: ReportSection[];
   /** Every figure the prose cites, resolved when the report was written. */
   figures: Record<string, Figure>;

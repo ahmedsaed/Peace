@@ -125,6 +125,10 @@ const CHROME_PATHS = {
   // "another conversation" and nothing else in the app claims it. The plus is
   // a cut-out, wound against the bubble so the default fill rule leaves it
   // empty; rasterised at 22px, its 2.4-unit arms stay open.
+  // Adds a file to the next message. A plain plus, the same 2.4-unit arms as
+  // the one cut into `chat-new`, centred on 12,12 — an action, not a thing, so
+  // it reads as "add" rather than as a picture of a document or a folder.
+  plus: 'M10.8 4h2.4v6.8H20v2.4h-6.8V20h-2.4v-6.8H4v-2.4h6.8V4z',
   'chat-new':
     'M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-4 4v-4H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm5.8 2.5v3.3H7.5v2.4h3.3v3.3h2.4v-3.3h3.3V8.8h-3.3V5.5z',
   stop: 'M6 6h12v12H6z',

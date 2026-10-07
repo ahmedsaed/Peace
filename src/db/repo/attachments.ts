@@ -13,12 +13,12 @@
  * nothing", and it is the only thing allowed to decide a file can go.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { newId } from '../../lib/id';
 import * as schema from '../schema';
-import { attachments } from '../schema';
+import { attachments, chatMessages } from '../schema';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -127,11 +127,35 @@ export function syncAttachments(
   return { added, removed };
 }
 
-/** Every file the database still expects to find on disk. */
+/**
+ * Every file the database still expects to find on disk.
+ *
+ * The LEDGER and the CONVERSATION both. A receipt shared with the assistant
+ * lives in the same folder as a record's, and is often not on any record yet
+ * — asked about, not logged. Answering from the attachments table alone would
+ * have the launch sweep delete it as an orphan and the backup leave it out,
+ * while the chat still showed its thumbnail. Same rule as above: ask
+ * everything that can refer to a file, never keep a tally.
+ */
 export function referencedFiles(db: Db): Set<string> {
-  return new Set(
+  const names = new Set(
     db.selectDistinct({ fileName: attachments.fileName }).from(attachments).all().map((r) => r.fileName)
   );
+  const rows = db
+    .select({ meta: chatMessages.meta })
+    .from(chatMessages)
+    .where(and(eq(chatMessages.kind, 'user'), like(chatMessages.meta, '%"attachments"%')))
+    .all();
+  for (const row of rows) {
+    try {
+      const list = (JSON.parse(row.meta ?? 'null') as { attachments?: { fileName?: unknown }[] } | null)?.attachments;
+      for (const entry of list ?? []) if (typeof entry.fileName === 'string') names.add(entry.fileName);
+    } catch {
+      // An unreadable row refers to nothing it can prove; the files it might
+      // have named are still referenced by anything else that names them.
+    }
+  }
+  return names;
 }
 
 /**

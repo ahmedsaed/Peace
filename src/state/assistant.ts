@@ -2,6 +2,7 @@ import { fetch as streamingFetch } from 'expo/fetch';
 import { create } from 'zustand';
 
 import { chatStepStreaming } from '@/assistant/gemini-chat';
+import { withRetries } from '@/assistant/retry';
 import {
   ask,
   decide as decideProposal,
@@ -12,6 +13,7 @@ import {
   type ModelMeta,
 } from '@/assistant/engine';
 import { undoWrite, type Undo } from '@/assistant/tools';
+import { attachmentAsBase64, type StagedAttachment } from '@/db/attachments';
 import { db } from '@/db/client';
 import { latestMessages, messagesBefore, type StoredRow } from '@/db/repo/chat';
 import { GeminiError } from '@/lib/gemini';
@@ -51,7 +53,7 @@ type AssistantStore = {
   pendingUndo: PendingUndo | null;
   load: () => void;
   loadOlder: () => void;
-  send: (text: string) => Promise<void>;
+  send: (text: string, files?: StagedAttachment[]) => Promise<void>;
   retry: () => Promise<void>;
   stop: () => void;
   decide: (seq: number, index: number, approve: boolean) => Promise<void>;
@@ -83,12 +85,27 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
        * words go to `streaming` as they arrive; the finished turn still comes
        * back whole and is stored exactly as the unstreamed path stores it.
        */
+      /**
+       * Retried on what passes — a rate limit, a busy model, a dropped line —
+       * and said out loud while it waits, so a pause reads as "waiting on
+       * Gemini" and not as the app hanging. See `assistant/retry.ts`.
+       */
       step: (request) =>
-        chatStepStreaming(apiKey, settings.assistantModel, request, {
-          signal,
-          fetchImpl: streamingFetch as unknown as typeof fetch,
-          onText: (soFar) => set({ streaming: soFar }),
-        }),
+        withRetries(
+          () =>
+            chatStepStreaming(apiKey, settings.assistantModel, request, {
+              signal,
+              fetchImpl: streamingFetch as unknown as typeof fetch,
+              onText: (soFar) => set({ streaming: soFar }),
+            }),
+          {
+            signal,
+            onRetry: ({ waitMs }) =>
+              // Whatever streamed before the failure is thrown away with it.
+              set({ streaming: null, activity: `Gemini is busy — trying again in ${Math.round(waitMs / 1000)}s` }),
+          }
+        ),
+      loadAttachment: (fileName) => attachmentAsBase64(fileName),
       onRow: (row) => {
         const activity =
           row.kind === 'model' ? ((row.meta as ModelMeta | null)?.activity?.join(' · ') ?? null) : get().activity;
@@ -149,10 +166,10 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
       set({ rows: [...older, ...rows], hasOlder: older.length === PAGE });
     },
 
-    send: async (text) => {
+    send: async (text, files = []) => {
       const trimmed = text.trim();
-      if (trimmed === '' || get().busy) return;
-      const row = ask({ db, now: () => new Date() }, trimmed);
+      if ((trimmed === '' && files.length === 0) || get().busy) return;
+      const row = ask({ db, now: () => new Date() }, trimmed, files);
       set((state) => ({ rows: upsert(state.rows, row) }));
       await drive();
     },

@@ -96,6 +96,15 @@ export const SETTING_DEFAULTS = {
    * the first and may fumble the second — so they are chosen apart.
    */
   assistantModel: 'gemini-flash-latest' as string,
+  /**
+   * The folder reports were last saved to, as a Storage Access Framework uri.
+   *
+   * Remembered so "Save" is one tap after the first time. Android keeps the
+   * grant across launches; if it has been revoked, or the folder is gone, the
+   * save asks again rather than failing. Not a control in Settings — it is
+   * changed by saving somewhere else.
+   */
+  reportFolderUri: '' as string,
 
   /**
    * The newest release seen on GitHub, and when it was last looked for.

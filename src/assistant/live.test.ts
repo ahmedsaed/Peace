@@ -16,11 +16,13 @@
  * The key is read from a FILE, never from this repository, and never logged.
  */
 import fs from 'node:fs';
+import path from 'node:path';
 import https from 'node:https';
 import { Readable } from 'node:stream';
 
 import { sessionMessages } from '../db/repo/chat';
 import { getRecord } from '../db/repo/transactions';
+import type { ChatAttachment } from './attachments';
 import { ask, decide, run, type Deps, type ModelMeta, type ToolsMeta } from './engine';
 import { callsOf, chatStepStreaming, type Content } from './gemini-chat';
 import { buildLedger, NOW, type Ledger } from './test-ledger';
@@ -72,6 +74,7 @@ beforeEach(() => {
     db: ledger.db,
     homeCurrency: 'EGP',
     now: () => NOW,
+    loadAttachment: async (fileName) => fs.readFileSync(path.join(__dirname, '__fixtures__', fileName)).toString('base64'),
     step: (request) =>
       chatStepStreaming(key, model, request, { fetchImpl: nodeFetch, onText: (t) => (streamed += t.length > 0 ? 1 : 0) }),
   };
@@ -118,9 +121,15 @@ afterEach(() => {
   console.log(lines.join('\n'));
 });
 
-async function turn(text: string) {
-  ask(deps, text);
+async function turn(text: string, files: Omit<ChatAttachment, 'id'>[] = []) {
+  ask(deps, text, files);
   return run(deps);
+}
+
+/** A fixture file, as the chat would hold it — its bytes read from the fixtures folder. */
+function fixture(name: string, mimeType: string): Omit<ChatAttachment, 'id'> {
+  const bytes = fs.readFileSync(path.join(__dirname, '__fixtures__', name));
+  return { fileName: name, originalName: name, mimeType, byteSize: bytes.length, sha256: name, width: null, height: null };
 }
 
 live(`the assistant on ${model}`, () => {
@@ -173,6 +182,29 @@ live(`the assistant on ${model}`, () => {
     expect(decide(deps, row.seq, proposal.index, true).complete).toBe(true);
     expect(await run(deps)).toBe('done');
     expect(getRecord(ledger.db, ledger.ids.shoes)).toBeUndefined();
+  });
+
+  it('reads a photographed receipt and proposes it, keeping the photo with the record', async () => {
+    expect(await turn('Log this receipt, paid from Bank', [fixture('receipt.jpg', 'image/jpeg')])).toBe('awaiting');
+    const row = sessionMessages(ledger.db, 200).filter((r) => r.kind === 'model').at(-1)!;
+    const proposal = (row.meta as ModelMeta).proposals!.find((p) => p.status === 'pending')!;
+    expect(proposal.call.name).toBe('create_record');
+    const args = proposal.call.args!;
+    // The total actually paid, service charge included — not the subtotal.
+    expect(Number(args.amount)).toBeCloseTo(240.8, 2);
+    expect(args.date).toBe('2026-10-05');
+    expect(args.attachments).toEqual([expect.stringMatching(/^file\d+-1$/)]);
+
+    decide(deps, row.seq, proposal.index, true);
+    await run(deps);
+    expect(ledger.db.query.attachments.findMany().sync().map((a) => a.fileName)).toEqual(['receipt.jpg']);
+  });
+
+  it('answers a question about a PDF invoice without logging anything', async () => {
+    expect(await turn('What is this invoice for, and how much?', [fixture('invoice.pdf', 'application/pdf')])).toBe('done');
+    expect(lastReply()).toMatch(/internet/i);
+    expect(lastReply()).toMatch(/706\.80/);
+    expect(calls().filter((c) => c.name.startsWith('create_'))).toEqual([]);
   });
 
   it('takes no for an answer', async () => {

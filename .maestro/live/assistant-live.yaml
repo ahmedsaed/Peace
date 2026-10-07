@@ -85,6 +85,11 @@ tags:
 - takeScreenshot: 05-drill
 - tapOn:
     id: "assistant-records-close"
+# A tap while the sheet is still sliding away lands on its backdrop.
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-records-sheet"
+    timeout: 5000
 
 # --- hiding amounts reaches the assistant's figures too ---
 # Opened from Settings, so it takes two steps back to reach a tab header.
@@ -145,6 +150,45 @@ tags:
 - assertVisible:
     id: "home-screen"
 - assertVisible: "Fuel"
+
+# --- a receipt, attached from Files and logged with its photo ---
+# e2e-live.sh pushes the fixture receipt to the device's Download folder.
+- tapOn:
+    id: "assistant-attach"
+- assertVisible:
+    id: "assistant-attach-menu"
+- tapOn:
+    id: "assistant-attach-files"
+- extendedWaitUntil:
+    visible: "peace-receipt.jpg"
+    timeout: 15000
+- tapOn: "peace-receipt.jpg"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-pending-file"
+    timeout: 15000
+- tapOn:
+    id: "assistant-input"
+- inputText: "Log this receipt, paid from Bank"
+- tapOn:
+    id: "assistant-send"
+- assertVisible:
+    id: "assistant-message-files"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-create-record-approve"
+    timeout: 120000
+# The card names the file it will keep with the record, and the total actually
+# paid — the service charge included.
+- assertVisible: "Attached"
+- assertVisible: ".*E£240\\.80.*"
+- takeScreenshot: 09-receipt-proposal
+- tapOn:
+    id: "assistant-proposal-create-record-approve"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
 
 # --- reset is a divider, not a deletion ---
 - tapOn:

@@ -20,6 +20,8 @@ export type Part = {
   thoughtSignature?: string;
   functionCall?: FunctionCall;
   functionResponse?: FunctionResponse;
+  /** A file's bytes, base64 — a receipt photo or a PDF the user attached. */
+  inlineData?: { mimeType: string; data: string };
 };
 
 export type Content = { role: 'user' | 'model'; parts: Part[] };

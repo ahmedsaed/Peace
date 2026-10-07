@@ -1,6 +1,7 @@
 import { eq, inArray } from 'drizzle-orm';
 
 import { createAccount, updateAccount } from '../../db/repo/accounts';
+import { addAttachment } from '../../db/repo/attachments';
 import { checkDeletion, deleteEntity, type EntityTarget } from '../../db/repo/archive';
 import { assertBudgetable, setBudget } from '../../db/repo/budgets';
 import { createCategory, updateCategory } from '../../db/repo/categories';
@@ -20,6 +21,7 @@ import { newId } from '../../lib/id';
 import { formatPeriod } from '../../lib/period';
 import { describeRecurrence } from '../../lib/recurrence';
 import { cleanTagName, tagKey } from '../../lib/tag';
+import type { ChatAttachment } from '../attachments';
 import { resolveSpan, ToolInputError, ymd } from '../dates';
 import {
   amountMinor,
@@ -92,6 +94,42 @@ const recordLine = (row: Transaction, label?: string): PreviewLine => ({
   figure: { minor: row.transferPairId ? Math.abs(row.amountMinor) : row.amountMinor, currency: row.currency },
 });
 
+/**
+ * Files from the conversation, by the ids the model was shown.
+ *
+ * An unknown id is refused rather than skipped: a record saved without the
+ * receipt the user just photographed for it looks complete and is not.
+ */
+function attachmentsArg(args: Args, name: string, ctx: ToolContext): ChatAttachment[] {
+  const ids = optStringList(args, name) ?? [];
+  return [...new Set(ids)].map((id) => {
+    const found = ctx.attachments.find((a) => a.id === id || a.fileName === id);
+    if (!found) {
+      const known = ctx.attachments.map((a) => a.id).join(', ');
+      throw new ToolInputError(`No file "${id}" was attached in this conversation.${known ? ` Attached: ${known}.` : ''}`);
+    }
+    return found;
+  });
+}
+
+const fileLabel = (a: ChatAttachment) => a.originalName ?? (a.mimeType.startsWith('image/') ? 'Photo' : 'Document');
+
+/** Keep files with a record — the same row a receipt added on the record screen gets. */
+function keepFiles(db: Db, transactionId: string, files: ChatAttachment[]): void {
+  for (const file of files) {
+    addAttachment(db, {
+      transactionId,
+      fileName: file.fileName,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      byteSize: file.byteSize,
+      sha256: file.sha256,
+      width: file.width,
+      height: file.height,
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Records
 // ---------------------------------------------------------------------------
@@ -105,6 +143,7 @@ type NewRecordPlan = {
   occurredAt: Date;
   note: string | null;
   tagNames: string[];
+  files: ChatAttachment[];
 };
 
 function planRecord(args: Args, ctx: ToolContext): NewRecordPlan {
@@ -132,6 +171,7 @@ function planRecord(args: Args, ctx: ToolContext): NewRecordPlan {
     occurredAt: dateArg(args, 'date', ctx) ?? new Date(ctx.now),
     note: optString(args, 'note') ?? null,
     tagNames: (optStringList(args, 'tags') ?? []).map(cleanTagName).filter((n) => n !== ''),
+    files: attachmentsArg(args, 'attachments', ctx),
   };
 }
 
@@ -157,6 +197,11 @@ const createRecordTool: WriteTool = {
         date: { type: 'string', description: 'YYYY-MM-DD. Defaults to now.' },
         note: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Tag names; new ones are created.' },
+        attachments: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Ids of files the user attached in this conversation (e.g. "file12-1") to keep with the record — the receipt or invoice it came from.',
+        },
       },
       required: ['type', 'amount', 'account'],
     },
@@ -183,6 +228,7 @@ const createRecordTool: WriteTool = {
             },
           ]
         : []),
+      ...(plan.files.length > 0 ? [{ label: 'Attached', value: plan.files.map(fileLabel).join(', ') }] : []),
     ];
     const noun = plan.type === 'transfer' ? 'transfer' : plan.type;
     return { title: `Add this ${noun}?`, lines, danger: false, confirmLabel: 'Add' };
@@ -217,8 +263,9 @@ const createRecordTool: WriteTool = {
       if (plan.tagNames.length > 0) {
         setRecordTags(db, id, plan.tagNames.map((name) => ensureTag(db, name).id));
       }
+      keepFiles(db, id, plan.files);
     });
-    return { response: { created: true, id } };
+    return { response: { created: true, id, ...(plan.files.length > 0 ? { attached: plan.files.length } : {}) } };
   },
 };
 
@@ -255,6 +302,7 @@ type UpdatePlan = {
   amountMinor: number | undefined;
   addTags: string[];
   removeTagIds: string[];
+  files: ChatAttachment[];
 };
 
 function planUpdate(args: Args, ctx: ToolContext): UpdatePlan {
@@ -270,6 +318,7 @@ function planUpdate(args: Args, ctx: ToolContext): UpdatePlan {
   const occurredAt = dateArg(args, 'date', ctx);
   const addTags = (optStringList(args, 'add_tags') ?? []).map(cleanTagName).filter((n) => n !== '');
   const removeTagIds = (optStringList(args, 'remove_tags') ?? []).map((ref) => resolveTag(ctx.db, ref).id);
+  const files = attachmentsArg(args, 'add_attachments', ctx);
 
   let amount: number | undefined;
   if (args.amount !== undefined && args.amount !== null) {
@@ -302,12 +351,13 @@ function planUpdate(args: Args, ctx: ToolContext): UpdatePlan {
     !occurredAt &&
     amount === undefined &&
     addTags.length === 0 &&
-    removeTagIds.length === 0
+    removeTagIds.length === 0 &&
+    files.length === 0
   ) {
-    throw new ToolInputError('Nothing to change. Pass at least one of category, account, note, date, amount, add_tags, remove_tags.');
+    throw new ToolInputError('Nothing to change. Pass at least one of category, account, note, date, amount, add_tags, remove_tags, add_attachments.');
   }
 
-  return { rows, category, account, note, occurredAt, amountMinor: amount, addTags, removeTagIds };
+  return { rows, category, account, note, occurredAt, amountMinor: amount, addTags, removeTagIds, files };
 }
 
 const SAMPLE = 5;
@@ -330,6 +380,11 @@ const updateRecordsTool: WriteTool = {
         amount: { type: 'number', description: 'Unsigned, single record only.' },
         add_tags: { type: 'array', items: { type: 'string' } },
         remove_tags: { type: 'array', items: { type: 'string' } },
+        add_attachments: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Ids of files attached in this conversation to keep with these records.',
+        },
       },
       required: ['ids'],
     },
@@ -351,6 +406,7 @@ const updateRecordsTool: WriteTool = {
       const names = ctx.db.select().from(tags).where(inArray(tags.id, plan.removeTagIds)).all().map((t) => t.name);
       lines.push({ label: 'Remove tags', value: names.join(', ') });
     }
+    if (plan.files.length > 0) lines.push({ label: 'Attach', value: plan.files.map(fileLabel).join(', ') });
     lines.push(...plan.rows.slice(0, SAMPLE).map((row) => recordLine(row)));
     if (plan.rows.length > SAMPLE) lines.push({ label: `…and ${plan.rows.length - SAMPLE} more` });
 
@@ -393,6 +449,7 @@ const updateRecordsTool: WriteTool = {
           const next = [...current, ...added].filter((id) => !plan.removeTagIds.includes(id));
           setRecordTags(db, row.id, next);
         }
+        keepFiles(db, row.id, plan.files);
       }
     });
     return { response: { updated: plan.rows.length } };

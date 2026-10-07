@@ -14,7 +14,7 @@ import { splitFigures } from './figures';
 
 export type Inline =
   | { kind: 'text'; text: string; bold: boolean }
-  | { kind: 'figure'; ref: string; bold: boolean };
+  | { kind: 'figure'; ref: string; bold: boolean; abs: boolean };
 
 export type Block = { kind: 'paragraph' | 'bullet' | 'heading'; inlines: Inline[]; marker?: string };
 
@@ -26,7 +26,7 @@ function inlines(text: string): Inline[] {
     const bold = run.startsWith('**') && run.endsWith('**') && run.length > 4;
     const body = bold ? run.slice(2, -2) : run;
     for (const segment of splitFigures(body)) {
-      if (segment.kind === 'figure') out.push({ kind: 'figure', ref: segment.ref, bold });
+      if (segment.kind === 'figure') out.push({ kind: 'figure', ref: segment.ref, bold, abs: segment.abs });
       // A stray single asterisk pair the model meant as italics is dropped
       // rather than shown as punctuation.
       else out.push({ kind: 'text', text: segment.text.replace(/(^|\s)\*(\S[^*]*\S|\S)\*(?=\s|$|[.,;:!?])/g, '$1$2'), bold });

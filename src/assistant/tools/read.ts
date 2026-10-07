@@ -11,7 +11,7 @@ import { formatPeriod } from '../../lib/period';
 import { describeRecurrence } from '../../lib/recurrence';
 import { EMPTY_QUERY, type SearchQuery } from '../../lib/search-query';
 import { aggregate, GROUP_BYS, MEASURES, type Aggregate, type GroupBy, type Measure } from '../aggregate';
-import { resolveSpan, ToolInputError, ymd, type Span } from '../dates';
+import { resolveSpan, spanLabel, ToolInputError, ymd, type Span } from '../dates';
 import { citedFigures } from '../figures';
 import type { Schema } from '../gemini-chat';
 import {
@@ -19,6 +19,7 @@ import {
   optEnum,
   optInt,
   optString,
+  optStringList,
   reqEnum,
   reqString,
   resolveAccount,
@@ -488,27 +489,91 @@ const getBudgets: ReadTool = {
   },
 };
 
+/**
+ * The span just before `span`, the same length, for "compared with last
+ * month". Whole months step back in months — February is not 31 days — and
+ * anything else steps back by its length in days. An open span has nothing
+ * before it to compare with.
+ */
+export function previousSpan(span: Span): Span | null {
+  if (!span.start || !span.end) return null;
+  const s = span.start;
+  const e = span.end;
+  if (s.getDate() === 1 && e.getDate() === 1) {
+    const months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+    if (months > 0) {
+      const start = new Date(s.getFullYear(), s.getMonth() - months, 1);
+      return { start, end: s, label: spanLabel(start, s) };
+    }
+  }
+  const days = Math.round((e.getTime() - s.getTime()) / 86_400_000);
+  const start = new Date(s.getFullYear(), s.getMonth(), s.getDate() - days);
+  return { start, end: s, label: spanLabel(start, s) };
+}
+
+/**
+ * How to write a report, handed to the model in the tool's own description so
+ * it is in view at the moment it decides what to write.
+ *
+ * The first version said only "you write the sections", and the reports read
+ * like a database dump in paragraphs: "Clothing: X. Food: Y." A report is worth
+ * opening when it says what HAPPENED and what to DO, so that is what this asks
+ * for, with an outline to fall back on and the comparisons gathered first —
+ * an insight needs something to be compared with.
+ */
+const REPORT_GUIDE = `Produce a PDF report the user can save. The app draws the cover (title, period, income/spending/net with the change from the previous period, top categories); you write the overview, takeaways and sections.
+
+BEFORE CALLING: gather the figures with summarize (this period AND the previous one, by category and by month), find_records for the largest or unusual items, and get_budgets if budgets exist. Cite every amount with its {{token}}.
+
+WRITE IT LIKE A SHARP, FRIENDLY ACCOUNTANT'S BRIEFING:
+- overview: 2-3 sentences that answer "how did this period go, and why" — the verdict first.
+- takeaways: 3 short lines, each a conclusion with its figure ("Dining out rose to {{t}} — the biggest change").
+- sections: 3-6. A good default outline:
+  1. Where the money went — category donut, and what dominates.
+  2. What changed — compare with the previous period; a 6-month bar chart for the trend.
+  3. Notable spending — the largest or unusual records, named.
+  4. Budgets — over/under, only if budgets exist.
+  5. What to do next — 2-4 concrete, specific suggestions tied to the numbers.
+- Headings state the insight ("Dining out doubled"), not the topic ("Restaurants").
+- highlights: 2-4 key figures per section where they help (label + cited value + short detail).
+- Short paragraphs and "- " bullets. No filler, no repeating the cover's numbers without saying what they mean.
+- Spending figures are negative in record lists and changes; write {{token|abs}} where the sentence already says the direction ("cut by", "over by", "spent").`;
+
 const makeReport: ReadTool = {
   kind: 'read',
   activity: 'Writing a report',
   declaration: {
     name: 'make_report',
-    description:
-      'Produce a PDF report the user can open and share. The app adds a header with income, spending, net and top categories for the span; you write the sections. Gather the figures with summarize/find_records FIRST, then cite them in section bodies with their {{tokens}}. A section may carry a chart, computed by the app.',
+    description: REPORT_GUIDE,
     parameters: {
       type: 'object',
       properties: {
-        title: { type: 'string' },
+        title: { type: 'string', description: 'Specific: "September 2026 — a costly month for the car", not "Report".' },
         ...SPAN_PROPS,
+        overview: { type: 'string', description: 'The 2-3 sentence verdict, with cited amounts.' },
+        takeaways: { type: 'array', items: { type: 'string' }, description: 'Three one-line conclusions with cited amounts.' },
         sections: {
           type: 'array',
           items: {
             type: 'object',
             properties: {
-              heading: { type: 'string' },
+              heading: { type: 'string', description: 'The insight, not the topic.' },
               body: {
                 type: 'string',
                 description: 'Paragraphs and "- " bullet lines. **bold** is allowed. Cite amounts with tokens.',
+              },
+              highlights: {
+                type: 'array',
+                description: 'Up to 4 key figures shown as tiles.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string', description: 'What the figure is, 1-4 words.' },
+                    value: { type: 'string', description: 'A cite token, e.g. {{t3f2}}, or a short percentage like "+42%".' },
+                    detail: { type: 'string', description: 'Optional context, a few words.' },
+                  },
+                  required: ['label', 'value'],
+                },
               },
               chart: {
                 type: 'object',
@@ -528,7 +593,7 @@ const makeReport: ReadTool = {
           },
         },
       },
-      required: ['title', 'sections'],
+      required: ['title', 'overview', 'sections'],
     },
   },
   run(args, ctx) {
@@ -539,18 +604,36 @@ const makeReport: ReadTool = {
     if (raw.length > 12) throw new ToolInputError('A report has at most 12 sections.');
 
     const spanArgs = { month: args.month, from: args.from, to: args.to };
-    const facts = ledgerFacts(ctx.db, { start: span.start, end: span.end }, ctx.homeCurrency);
-    const income = aggregate(facts, { measure: 'income', groupBy: 'none' });
-    const expense = aggregate(facts, { measure: 'expense', groupBy: 'category' });
-    const top = expense.buckets.slice(0, 8);
-    const percents = sharePercents(expense.buckets.map((b) => Math.max(0, b.valueMinor)));
+    const totalsFor = (s: Span) => {
+      const facts = ledgerFacts(ctx.db, { start: s.start, end: s.end }, ctx.homeCurrency);
+      const income = aggregate(facts, { measure: 'income', groupBy: 'none' });
+      const expense = aggregate(facts, { measure: 'expense', groupBy: 'category' });
+      return { income, expense };
+    };
+    const now = totalsFor(span);
+    const before = previousSpan(span);
+    const then = before ? totalsFor(before) : null;
+    const top = now.expense.buckets.slice(0, 8);
+    const percents = sharePercents(now.expense.buckets.map((b) => Math.max(0, b.valueMinor)));
+    const previousByKey = new Map(then?.expense.buckets.map((b) => [b.key, b.valueMinor]) ?? []);
 
     const sections: ReportSection[] = raw.map((entry, i) => {
       const section = (entry ?? {}) as Args;
       const heading = reqString(section, 'heading');
       const body = optString(section, 'body') ?? '';
+      const highlights = (Array.isArray(section.highlights) ? section.highlights : [])
+        .slice(0, 4)
+        .flatMap((h) => {
+          const item = (h ?? {}) as Args;
+          const label = optString(item, 'label');
+          const value = optString(item, 'value');
+          if (!label || !value) return [];
+          const detail = optString(item, 'detail');
+          return [{ label, value, ...(detail ? { detail } : {}) }];
+        });
+      const base = { heading, body, ...(highlights.length > 0 ? { highlights } : {}) };
       const chartArgs = section.chart as Args | undefined;
-      if (!chartArgs || typeof chartArgs !== 'object') return { heading, body };
+      if (!chartArgs || typeof chartArgs !== 'object') return base;
       try {
         // The section's own span wins: "how spending has moved" in a report on
         // one month needs the months before it, and overwriting that with the
@@ -558,15 +641,25 @@ const makeReport: ReadTool = {
         const ownSpan = ['month', 'from', 'to'].some((k) => chartArgs[k] !== undefined && chartArgs[k] !== '');
         const merged = ownSpan ? { ...chartArgs } : { ...chartArgs, ...spanArgs };
         const summary = summarise(merged, ctx);
-        if (summary.groupBy === 'none') return { heading, body };
-        return { heading, body, chart: chartFrom(merged, ctx, summary, optString(chartArgs, 'title') ?? heading) };
+        if (summary.groupBy === 'none') return base;
+        return { ...base, chart: chartFrom(merged, ctx, summary, optString(chartArgs, 'title') ?? heading) };
       } catch (error) {
         throw new ToolInputError(`Section ${i + 1} chart: ${(error as Error).message}`);
       }
     });
 
+    const overview = optString(args, 'overview');
+    const takeaways = (optStringList(args, 'takeaways') ?? []).slice(0, 5);
+    // Every piece of prose the PDF will render, so every cite in it resolves.
+    const prose = [
+      title,
+      overview ?? '',
+      ...sections.map((s) => s.heading),
+      ...takeaways,
+      ...sections.flatMap((s) => [s.body, ...(s.highlights ?? []).map((h) => `${h.value} ${h.detail ?? ''}`)]),
+    ];
     const lookup = (ref: string) => ctx.figures.get(ref);
-    const figures = Object.assign({}, ...sections.map((s) => citedFigures(s.body, lookup)));
+    const figures = Object.assign({}, ...prose.map((text) => citedFigures(text, lookup)));
 
     return {
       response: {
@@ -574,7 +667,7 @@ const makeReport: ReadTool = {
         title,
         range: span.label,
         sections: sections.length,
-        guidance: 'The report is on screen with a button to open and share the PDF. Tell the user in a sentence; do not repeat its contents.',
+        guidance: 'The report is on screen with a button to save it as a PDF. Tell the user in a sentence; do not repeat its contents.',
       },
       display: {
         kind: 'report',
@@ -583,13 +676,30 @@ const makeReport: ReadTool = {
           rangeLabel: span.label,
           currency: ctx.homeCurrency,
           generatedAt: ctx.now.getTime(),
+          ...(overview ? { overview } : {}),
+          ...(takeaways.length > 0 ? { takeaways } : {}),
           summary: {
-            incomeMinor: income.totalMinor,
-            expenseMinor: expense.totalMinor,
-            netMinor: income.totalMinor - expense.totalMinor,
-            unvaluedCount: income.unvaluedCount + expense.unvaluedCount,
+            incomeMinor: now.income.totalMinor,
+            expenseMinor: now.expense.totalMinor,
+            netMinor: now.income.totalMinor - now.expense.totalMinor,
+            unvaluedCount: now.income.unvaluedCount + now.expense.unvaluedCount,
           },
-          topCategories: top.map((bucket, i) => ({ label: bucket.label, valueMinor: bucket.valueMinor, percent: percents[i] })),
+          ...(then && before
+            ? {
+                previous: {
+                  label: before.label,
+                  incomeMinor: then.income.totalMinor,
+                  expenseMinor: then.expense.totalMinor,
+                  netMinor: then.income.totalMinor - then.expense.totalMinor,
+                },
+              }
+            : {}),
+          topCategories: top.map((bucket, i) => ({
+            label: bucket.label,
+            valueMinor: bucket.valueMinor,
+            percent: percents[i],
+            ...(then ? { previousMinor: previousByKey.get(bucket.key) ?? 0 } : {}),
+          })),
           sections,
           figures,
         },

@@ -26,7 +26,13 @@ export type Figure = { minor: number; currency: string };
 /** What a tool result carries in place of a bare number. */
 export type CitedAmount = { amount: number; currency: string; cite: string };
 
-const TOKEN = /\{\{\s*([A-Za-z0-9_.]+)\s*\}\}/g;
+/**
+ * `{{t3f2}}`, or `{{t3f2|abs}}` for the SIZE of an amount without its sign.
+ * Expenses are negative in the ledger, so a cited saving or overspend read
+ * "a cut of -E£18,675" — right figure, wrong sentence. `|abs` lets the prose
+ * say how much without the model ever typing the number.
+ */
+const TOKEN = /\{\{\s*([A-Za-z0-9_.]+)\s*(\|\s*abs\s*)?\}\}/g;
 
 export class FigureBook {
   private readonly added = new Map<string, Figure>();
@@ -62,7 +68,7 @@ export class FigureBook {
   }
 }
 
-export type Segment = { kind: 'text'; text: string } | { kind: 'figure'; ref: string };
+export type Segment = { kind: 'text'; text: string } | { kind: 'figure'; ref: string; abs: boolean };
 
 /** Split prose into text and cite tokens, in order. */
 export function splitFigures(text: string): Segment[] {
@@ -71,7 +77,7 @@ export function splitFigures(text: string): Segment[] {
   for (const match of text.matchAll(TOKEN)) {
     const at = match.index ?? 0;
     if (at > last) out.push({ kind: 'text', text: text.slice(last, at) });
-    out.push({ kind: 'figure', ref: match[1] });
+    out.push({ kind: 'figure', ref: match[1], abs: match[2] !== undefined });
     last = at + match[0].length;
   }
   if (last < text.length) out.push({ kind: 'text', text: text.slice(last) });

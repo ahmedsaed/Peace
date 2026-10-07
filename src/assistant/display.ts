@@ -1,4 +1,5 @@
 import type { StoredRow } from '../db/repo/chat';
+import { attachmentsOf, type ChatAttachment } from './attachments';
 import type { ErrorMeta, ModelMeta, Proposal, ToolsMeta } from './engine';
 import type { Figure } from './figures';
 import { textOf, type Content } from './gemini-chat';
@@ -15,7 +16,7 @@ import type { Display } from './tools/types';
  */
 
 export type Item =
-  | { type: 'user'; key: string; text: string; at: Date }
+  | { type: 'user'; key: string; text: string; at: Date; files: ChatAttachment[] }
   | { type: 'reply'; key: string; text: string; figures: Record<string, Figure> }
   | { type: 'activity'; key: string; labels: string[] }
   | { type: 'proposal'; key: string; seq: number; proposal: Proposal; expired: boolean }
@@ -35,7 +36,8 @@ export function toItems(rows: StoredRow[]): Item[] {
     switch (row.kind) {
       case 'user': {
         const text = textOf(row.content as Content);
-        if (text) items.push({ type: 'user', key, text, at: row.createdAt });
+        const files = attachmentsOf(row);
+        if (text || files.length > 0) items.push({ type: 'user', key, text, at: row.createdAt, files });
         break;
       }
       case 'model': {

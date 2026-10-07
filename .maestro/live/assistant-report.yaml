@@ -2,11 +2,15 @@ appId: com.ahmed.peace
 tags:
   - live
 ---
-# The assistant's outputs that leave the app: a bar chart's CSV and image, and
-# a PDF report. What is asserted is that each reaches the share sheet without
-# the card reporting a failure — the bytes themselves are checked by the size
-# guard in `assistant/export.ts`, which throws on an empty file.
+# The assistant's outputs that leave the app: a bar chart's CSV and image go
+# to the share sheet, a PDF report is SAVED to a folder. What is asserted is
+# that each gets that far without the card reporting a failure — the bytes
+# themselves are checked by the size guard in `assistant/export.ts`, which
+# throws on an empty file.
 - runFlow: common/setup.yaml
+# NO `hideKeyboard` anywhere below: when no keyboard is up it falls back to
+# pressing Back, which leaves the assistant — on one emulator and not another,
+# depending on the keyboard's state. Scrolling works with the keyboard open.
 
 - tapOn:
     id: "assistant-input"
@@ -38,7 +42,6 @@ tags:
     notVisible:
       id: "assistant-busy"
     timeout: 120000
-- hideKeyboard
 - scrollUntilVisible:
     element:
       id: "assistant-chart-export-csv"
@@ -77,22 +80,22 @@ tags:
     notVisible:
       id: "assistant-busy"
     timeout: 120000
-- hideKeyboard
 - scrollUntilVisible:
     element:
-      id: "assistant-report-share"
+      id: "assistant-report-save"
     direction: UP
 - takeScreenshot: 03-report-card
 - tapOn:
-    id: "assistant-report-share"
-# The share sheet replacing the screen is the PDF having been written,
-# moved and size-checked — any failure leaves the card saying so instead.
+    id: "assistant-report-save"
+# The first save asks for a folder: the system picker replacing the screen is
+# the PDF having been written and checked. Backing out of it is a cancel, and a
+# cancel is not an error — the card must not turn red over it.
 - extendedWaitUntil:
     notVisible:
       id: "assistant-screen"
     timeout: 30000
-- takeScreenshot: 04-pdf-share-sheet
+- takeScreenshot: 04-folder-picker
 - back
 - assertVisible:
     id: "assistant-report"
-- assertNotVisible: "Could not make the PDF."
+- assertNotVisible: "Could not save the PDF."

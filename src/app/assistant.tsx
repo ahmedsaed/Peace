@@ -10,6 +10,8 @@ import { streamingVisible } from '@/assistant/gemini-chat';
 import type { ChartPoint, ChartSpec, Display } from '@/assistant/tools/types';
 import { ProposalCard, RecordsCard, ReportCard } from '@/components/assistant/cards';
 import { ChartCard } from '@/components/assistant/chart-card';
+import { AttachMenu, MessageFiles, PendingFiles } from '@/components/assistant/files';
+import { AttachmentViewer } from '@/components/attachment-viewer';
 import { RecordsSheet } from '@/components/assistant/records-sheet';
 import { RichText } from '@/components/assistant/rich-text';
 import { Caret, TypingIndicator } from '@/components/assistant/typing';
@@ -17,9 +19,11 @@ import { Icon } from '@/components/icon';
 import { HeaderButton, StackHeader } from '@/components/screen';
 import { Snackbar } from '@/components/snackbar';
 import palette from '@/constants/palette';
+import { attachFromCamera, attachFromFiles, type StagedAttachment } from '@/db/attachments';
 import { db } from '@/db/client';
 import type { RecordRow } from '@/db/repo/records';
 import { searchRecords } from '@/db/repo/search';
+import { AttachmentError } from '@/lib/attachment';
 import { EMPTY_QUERY } from '@/lib/search-query';
 import { useKeyboardOverlap } from '@/lib/layout';
 import { getGeminiKey } from '@/lib/secrets';
@@ -74,6 +78,11 @@ export default function AssistantScreen() {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [draft, setDraft] = useState('');
   const [drill, setDrill] = useState<Drill | null>(null);
+  /** Files waiting to go with the next message. Already on disk; only rows wait. */
+  const [pending, setPending] = useState<StagedAttachment[]>([]);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<StagedAttachment | null>(null);
   // Bumped on focus so lists drawn from the ledger re-read it: a record
   // edited from a sheet here should not come back showing its old amount.
   const [focusTick, setFocusTick] = useState(0);
@@ -113,9 +122,33 @@ export default function AssistantScreen() {
 
   const submit = (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || busy) return;
+    if ((!trimmed && pending.length === 0) || busy) return;
+    const files = pending;
     setDraft('');
-    void send(trimmed);
+    setPending([]);
+    setAttachError(null);
+    void send(trimmed, files);
+  };
+
+  /**
+   * Bytes are written the moment a file is picked — the camera leaves its
+   * photo in a cache Android may reclaim — and the file is only REFERENCED
+   * once the message is sent. Removing one before sending leaves a file the
+   * launch sweep collects, the same cost the record screen accepts.
+   */
+  const attach = async (source: 'camera' | 'files') => {
+    setAttachOpen(false);
+    setAttachError(null);
+    try {
+      const outcome = source === 'camera' ? await attachFromCamera() : await attachFromFiles();
+      if (outcome.cancelled) return;
+      setPending((current) =>
+        current.some((f) => f.fileName === outcome.attachment.fileName) ? current : [...current, outcome.attachment]
+      );
+    } catch (error) {
+      console.warn('[assistant] attaching failed', error);
+      setAttachError(error instanceof AttachmentError ? error.message : 'Could not attach that file.');
+    }
   };
 
   const openChart = (chart: ChartSpec, point: ChartPoint | null) => {
@@ -198,17 +231,47 @@ export default function AssistantScreen() {
             onDecide={(seq, index, approve) => void decide(seq, index, approve)}
             onChart={openChart}
             onRecords={(title, subtitle, list) => setDrill({ title, subtitle, rows: list })}
+            onOpenFile={setViewing}
           />
         )}
       />
 
+      <View className="border-t border-line bg-surface">
+      <PendingFiles
+        files={pending}
+        onOpen={setViewing}
+        onRemove={(fileName) => setPending((current) => current.filter((f) => f.fileName !== fileName))}
+      />
+      {attachError ? (
+        <Text className="px-4 pt-2 text-xs text-expense" testID="assistant-attach-error">
+          {attachError}
+        </Text>
+      ) : null}
       <View
-        className="flex-row items-end gap-2 border-t border-line bg-surface px-3 pt-2"
+        className="flex-row items-end gap-2 px-3 pt-2"
         style={{ paddingBottom: keyboard > 0 ? 8 : Math.max(insets.bottom, 8) }}>
+        {/* A PLUS — "add something to this message". Not a paperclip, whose
+            hole closes into a blob at this size (see the glyph rule in
+            AGENTS.md), and not a folder, which read as "browse files". */}
+        <Pressable
+          onPress={() => setAttachOpen(true)}
+          disabled={busy}
+          testID="assistant-attach"
+          accessibilityRole="button"
+          accessibilityLabel="Attach a receipt or a file"
+          className={`h-11 w-11 items-center justify-center rounded-full active:bg-raised ${busy ? 'opacity-40' : ''}`}>
+          <Icon name="plus" size={22} color={palette.muted} />
+        </Pressable>
         <TextInput
           value={draft}
           onChangeText={setDraft}
-          placeholder={waiting ? 'Answer the card above, or ask something else' : 'Ask about your money'}
+          placeholder={
+            waiting
+              ? 'Answer the card above, or ask something else'
+              : pending.length > 0
+                ? 'Ask about it, or send to have it read'
+                : 'Ask about your money'
+          }
           placeholderTextColor={palette.muted}
           multiline
           className="max-h-32 flex-1 rounded-2xl bg-raised px-4 py-2.5 text-base text-ink"
@@ -227,17 +290,26 @@ export default function AssistantScreen() {
         ) : (
           <Pressable
             onPress={() => submit(draft)}
-            disabled={draft.trim() === ''}
+            disabled={draft.trim() === '' && pending.length === 0}
             testID="assistant-send"
             accessibilityRole="button"
             accessibilityLabel="Send"
             className={`h-11 w-11 items-center justify-center rounded-full bg-accent active:opacity-80 ${
-              draft.trim() === '' ? 'opacity-40' : ''
+              draft.trim() === '' && pending.length === 0 ? 'opacity-40' : ''
             }`}>
             <Icon name="send" size={18} color={palette['accent-ink']} />
           </Pressable>
         )}
       </View>
+      </View>
+
+      <AttachMenu
+        visible={attachOpen}
+        onCamera={() => void attach('camera')}
+        onFiles={() => void attach('files')}
+        onClose={() => setAttachOpen(false)}
+      />
+      <AttachmentViewer attachment={viewing} onClose={() => setViewing(null)} />
 
       {pendingUndo ? (
         // Above the composer AND the keyboard: absolute positioning ignores the
@@ -313,6 +385,7 @@ function ItemView({
   onDecide,
   onChart,
   onRecords,
+  onOpenFile,
 }: {
   item: Item;
   busy: boolean;
@@ -321,12 +394,18 @@ function ItemView({
   onDecide: (seq: number, index: number, approve: boolean) => void;
   onChart: (chart: ChartSpec, point: ChartPoint | null) => void;
   onRecords: (title: string, subtitle: string, rows: RecordRow[]) => void;
+  onOpenFile: (file: StagedAttachment) => void;
 }) {
   switch (item.type) {
     case 'user':
       return (
-        <View className="my-1.5 max-w-[85%] self-end rounded-2xl rounded-br-md bg-raised px-4 py-2.5" testID="assistant-user">
-          <Text className="text-[15px] leading-[22px] text-ink">{item.text}</Text>
+        <View className="my-1.5 max-w-[85%] gap-2 self-end" testID="assistant-user">
+          {item.files.length > 0 ? <MessageFiles files={item.files} onOpen={onOpenFile} /> : null}
+          {item.text ? (
+            <View className="self-end rounded-2xl rounded-br-md bg-raised px-4 py-2.5">
+              <Text className="text-[15px] leading-[22px] text-ink">{item.text}</Text>
+            </View>
+          ) : null}
         </View>
       );
     case 'reply':

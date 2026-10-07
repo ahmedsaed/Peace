@@ -106,5 +106,5 @@ export function buildLedger(): Ledger {
 }
 
 export function ctxFor(db: TestDb, prefix = 't1'): ToolContext {
-  return { db, homeCurrency: 'EGP', now: NOW, figures: new FigureBook(prefix, decimalsFor) };
+  return { db, homeCurrency: 'EGP', now: NOW, figures: new FigureBook(prefix, decimalsFor), attachments: [] };
 }

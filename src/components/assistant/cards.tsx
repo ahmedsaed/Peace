@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import type { Proposal } from '@/assistant/engine';
-import { shareReport } from '@/assistant/export';
+import { saveReport, type SavedReport } from '@/assistant/export';
 import type { ReportSpec } from '@/assistant/tools/types';
 import { Icon } from '@/components/icon';
 import { RecordRow } from '@/components/record-row';
 import palette from '@/constants/palette';
+import { formatBytes } from '@/db/backup';
 import type { RecordRow as Row } from '@/db/repo/records';
 import { useMoney } from '@/state/money';
+import { useSetting, useSettingsStore } from '@/state/settings';
 
 /**
  * The approval card: the one thing standing between a model's guess and the
@@ -153,47 +155,77 @@ export function RecordsCard({
   );
 }
 
-/** A finished report, and the button that turns it into a PDF to share. */
+/**
+ * A finished report, and the button that SAVES it as a PDF.
+ *
+ * Save, not share: keeping a report is the common case, and the share sheet
+ * answers it with a grid of apps. The first save asks for a folder; after
+ * that it is one tap into the same one, with the place and size said out loud
+ * — "it worked" is a folder and a number, not a claim.
+ */
 export function ReportCard({ report, testID }: { report: ReportSpec; testID: string }) {
+  const folderUri = useSetting('reportFolderUri');
+  const update = useSettingsStore((state) => state.update);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedReport | null>(null);
 
-  const open = async () => {
+  const save = async (pickAgain: boolean) => {
     setBusy(true);
     setError(null);
     try {
-      await shareReport(report);
+      const result = await saveReport(report, folderUri, pickAgain);
+      if (result.folderUri !== folderUri) update('reportFolderUri', result.folderUri);
+      setSaved(result);
     } catch (e) {
-      // Friendly sentence for the screen, the real failure for the log.
-      console.warn('[assistant] report export failed', e);
-      setError('Could not make the PDF.');
+      // Backing out of the folder picker is not a failure worth a red line.
+      const message = e instanceof Error ? e.message : String(e);
+      if (!/cancel/i.test(message)) {
+        console.warn('[assistant] report save failed', e);
+        setError('Could not save the PDF.');
+      }
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <View className="flex-row items-center gap-3 rounded-xl border border-line bg-surface p-4" testID={testID}>
-      <View className="h-11 w-11 items-center justify-center rounded-lg bg-raised">
-        <Icon name="document" size={22} color={palette.accent} />
+    <View className="rounded-xl border border-line bg-surface p-4" testID={testID}>
+      <View className="flex-row items-center gap-3">
+        <View className="h-11 w-11 items-center justify-center rounded-lg bg-raised">
+          <Icon name="document" size={22} color={palette.accent} />
+        </View>
+        <View className="flex-1">
+          <Text className="text-[15px] font-semibold text-ink" numberOfLines={2}>
+            {report.title}
+          </Text>
+          <Text className="text-xs text-muted">
+            {report.rangeLabel} · {report.sections.length} section{report.sections.length === 1 ? '' : 's'} · PDF
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => save(false)}
+          disabled={busy}
+          testID={`${testID}-save`}
+          accessibilityRole="button"
+          accessibilityLabel="Save the report as a PDF"
+          className={`flex-row items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 active:opacity-80 ${busy ? 'opacity-40' : ''}`}>
+          <Icon name="export" size={14} color={palette['accent-ink']} />
+          <Text className="text-sm font-semibold text-accent-ink">{busy ? 'Saving…' : 'Save'}</Text>
+        </Pressable>
       </View>
-      <View className="flex-1">
-        <Text className="text-[15px] font-semibold text-ink" numberOfLines={2}>
-          {report.title}
-        </Text>
-        <Text className="text-xs text-muted">
-          {report.rangeLabel} · {report.sections.length} section{report.sections.length === 1 ? '' : 's'} · PDF
-        </Text>
-        {error ? <Text className="mt-1 text-xs text-expense">{error}</Text> : null}
-      </View>
-      <Pressable
-        onPress={open}
-        disabled={busy}
-        testID={`${testID}-share`}
-        accessibilityRole="button"
-        className={`rounded-lg bg-accent px-4 py-2.5 active:opacity-80 ${busy ? 'opacity-40' : ''}`}>
-        <Text className="text-sm font-semibold text-accent-ink">{busy ? 'Making…' : 'Share'}</Text>
-      </Pressable>
+
+      {saved ? (
+        <View className="mt-3 flex-row items-center gap-2 border-t border-line pt-3" testID={`${testID}-saved`}>
+          <Text className="flex-1 text-xs text-income" numberOfLines={2}>
+            Saved to {saved.folderName} · {formatBytes(saved.bytes)}
+          </Text>
+          <Pressable onPress={() => save(true)} disabled={busy} hitSlop={8} testID={`${testID}-change-folder`}>
+            <Text className="text-xs font-semibold text-accent">Change folder</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {error ? <Text className="mt-2 text-xs text-expense">{error}</Text> : null}
     </View>
   );
 }

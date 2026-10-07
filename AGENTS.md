@@ -38,8 +38,8 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Validate the JS bundle without a device | `npx expo export --platform android` |
 | Check every flow's testIDs without a device | `npm test -- flows` |
 | E2E without an emulator to hand | Actions › **E2E** › Run workflow (manual) |
-| Assistant against the real Gemini API | `PEACE_GEMINI_KEY_FILE=<file> npx jest src/assistant/live` |
-| Assistant E2E with a real key | `PEACE_GEMINI_KEY_FILE=<file> npm run e2e:live` (flows in `.maestro/live/`) |
+| Assistant against the real Gemini API — **costs money, ask first** | `PEACE_GEMINI_KEY_FILE=<file> npx jest src/assistant/live` |
+| Assistant E2E with a real key — **costs money, ask first** | `PEACE_GEMINI_KEY_FILE=<file> npm run e2e:live` (flows in `.maestro/live/`) |
 | Dev server | `npm start` |
 
 ## How to verify a change
@@ -757,6 +757,11 @@ app ignoring input. `pkill -f GradleDaemon`.
   charge AND the card's commission through `createCardPurchase` and `updateRecord` has no such
   branch. What editing needed was to SEE the original amount, which the row has stored all along
   and displayed nowhere. Before enabling a control on a new path, follow it to the write.
+- **Anything that calls the real Gemini API spends the owner's money — run it only when asked.**
+  The live jest suite and `.maestro/live/` are opt-in by construction (no key file, no run), and
+  must stay out of `npm test`, `npm run e2e` and CI. Iterate on flow STEPS with the key-less flows
+  and on prompts with the scripted model in `engine.test.ts`; spend a live run once the change is
+  ready, and say beforehand that it will cost something.
 - **The assistant's model never writes an amount — it CITES one.** Every amount a tool returns is
   registered in a `FigureBook` and handed over as `{"amount": 1240.5, "cite": "{{t41f3}}"}`; the
   reply writes the token and the screen renders it through `useMoney`. Typed prose figures would be

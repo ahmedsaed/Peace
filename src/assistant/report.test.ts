@@ -30,7 +30,7 @@ describe('parseBlocks', () => {
     expect(blocks.map((b) => b.kind)).toEqual(['paragraph', 'bullet', 'bullet', 'heading']);
     expect(blocks[0].inlines).toEqual([
       { kind: 'text', text: 'Fuel was ', bold: false },
-      { kind: 'figure', ref: 't1f1', bold: true },
+      { kind: 'figure', ref: 't1f1', bold: true, abs: false },
       { kind: 'text', text: '.', bold: false },
     ]);
     expect(blocks[2].marker).toBe('2.');
@@ -92,6 +92,12 @@ describe('the PDF', () => {
     expect(html).toContain(format(65000, 'EGP'));
     expect(html).not.toContain('{{');
     expect(html).toContain('—');
+  });
+
+  it('renders |abs as the size of the amount', () => {
+    const html = proseHtml('Over by {{a1|abs}}.', { a1: { minor: -55600, currency: 'EGP' } }, format);
+    expect(html).toContain(format(55600, 'EGP'));
+    expect(html).not.toContain(format(-55600, 'EGP'));
   });
 
   it('escapes what the model and the user typed', () => {

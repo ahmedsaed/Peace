@@ -8,6 +8,7 @@ import {
   type StoredRow,
 } from '../db/repo/chat';
 import { decimalsFor } from '../lib/money';
+import { attachmentsOf, inlineSet, sessionAttachments, userParts, type ChatAttachment } from './attachments';
 import { citedFigures, FigureBook, type Figure } from './figures';
 import { callsOf, textOf, type Content, type FunctionCall, type Part } from './gemini-chat';
 import { systemPrompt } from './prompt';
@@ -81,6 +82,8 @@ export type Deps = {
   step: (request: { system: string; contents: Content[]; tools: ReturnType<typeof declarations> }) => Promise<Content>;
   /** Called after every row is written, so the screen can repaint. */
   onRow?: (row: StoredRow) => void;
+  /** A stored attachment's bytes as base64, or null when it is gone. */
+  loadAttachment?: (fileName: string) => Promise<string | null>;
 };
 
 export type RunResult = 'done' | 'awaiting' | 'stopped';
@@ -112,19 +115,46 @@ function knownFigures(session: StoredRow[]): Map<string, Figure> {
  * USER TEXT row, because a history that opens on a function response (the cap
  * having cut its call off) is rejected outright.
  */
-export function toContents(session: StoredRow[]): Content[] {
+export function toContents(session: StoredRow[], loaded: Map<string, string> = new Map()): Content[] {
   const sendable = session.filter((row) => row.kind === 'user' || row.kind === 'model' || row.kind === 'tools');
   const first = sendable.findIndex((row) => row.kind === 'user');
   if (first < 0) return [];
-  return sendable.slice(first).map((row) => row.content as Content);
+  return sendable.slice(first).map((row) => {
+    const attached = attachmentsOf(row);
+    if (attached.length === 0) return row.content as Content;
+    // Rebuilt from the meta on every request, so the bytes come from disk and
+    // only the newest few are sent — see `attachments.ts`.
+    return { role: 'user', parts: userParts(textOf(row.content as Content), attached, loaded) };
+  });
 }
 
-function context(deps: Deps, prefix: string, known: Map<string, Figure>): ToolContext {
+/** Read the bytes of the files this request sends inline. A missing one is skipped. */
+async function loadInline(deps: Deps, session: StoredRow[]): Promise<Map<string, string>> {
+  const loaded = new Map<string, string>();
+  if (!deps.loadAttachment) return loaded;
+  for (const fileName of inlineSet(session)) {
+    try {
+      const data = await deps.loadAttachment(fileName);
+      if (data) loaded.set(fileName, data);
+    } catch (error) {
+      console.warn('[assistant] could not read an attachment', fileName, error);
+    }
+  }
+  return loaded;
+}
+
+function context(
+  deps: Deps,
+  prefix: string,
+  known: Map<string, Figure>,
+  attachments: ChatAttachment[] = []
+): ToolContext {
   return {
     db: deps.db,
     homeCurrency: deps.homeCurrency,
     now: deps.now(),
     figures: new FigureBook(prefix, decimalsFor, known),
+    attachments,
   };
 }
 
@@ -143,10 +173,15 @@ function shape(db: Db) {
  * asked — so a chart drawn after an approved re-categorisation shows the
  * ledger the user just approved, not the one before it.
  */
-function answerCalls(deps: Deps, modelRow: StoredRow, known: Map<string, Figure>): StoredRow {
+function answerCalls(
+  deps: Deps,
+  modelRow: StoredRow,
+  known: Map<string, Figure>,
+  attachments: ChatAttachment[]
+): StoredRow {
   const calls = callsOf(modelRow.content as Content);
   const meta = (modelRow.meta ?? {}) as ModelMeta;
-  const ctx = context(deps, `t${modelRow.seq}`, known);
+  const ctx = context(deps, `t${modelRow.seq}`, known, attachments);
   const displays: Display[] = [];
 
   const parts: Part[] = calls.map((call, index) => {
@@ -184,7 +219,8 @@ function answerCalls(deps: Deps, modelRow: StoredRow, known: Map<string, Figure>
 function recordModelTurn(
   deps: Deps,
   content: Content,
-  known: Map<string, Figure>
+  known: Map<string, Figure>,
+  attachments: ChatAttachment[]
 ): { row: StoredRow; parked: boolean } {
   const calls = callsOf(content);
   const text = textOf(content);
@@ -201,7 +237,7 @@ function recordModelTurn(
 
   // Prepared against a context whose figures are thrown away: a preview's
   // amounts are rendered from the preview itself, never cited.
-  const ctx = context(deps, 'preview', known);
+  const ctx = context(deps, 'preview', known, attachments);
   const proposals: Proposal[] = writes.map(({ call, index }) => {
     const prepared = prepareWrite(call, ctx);
     if ('error' in prepared) {
@@ -244,7 +280,7 @@ export async function run(deps: Deps, signal?: AbortSignal): Promise<RunResult> 
       if (calls.length === 0) return 'done';
       const proposals = ((last.meta ?? {}) as ModelMeta).proposals ?? [];
       if (proposals.some((p) => p.status === 'pending')) return 'awaiting';
-      answerCalls(deps, last, known);
+      answerCalls(deps, last, known, sessionAttachments(session));
       continue;
     }
 
@@ -260,12 +296,12 @@ export async function run(deps: Deps, signal?: AbortSignal): Promise<RunResult> 
 
     const content = await deps.step({
       system: systemPrompt(deps.now(), deps.homeCurrency, shape(deps.db)),
-      contents: toContents(session),
+      contents: toContents(session, await loadInline(deps, session)),
       tools: declarations(),
     });
     if (signal?.aborted) return 'stopped';
 
-    const { parked } = recordModelTurn(deps, content, known);
+    const { parked } = recordModelTurn(deps, content, known, sessionAttachments(session));
     if (parked) return 'awaiting';
   }
 }
@@ -303,7 +339,7 @@ export function decide(
 
   let undo: Undo | undefined;
   if (approve) {
-    const ctx = context(deps, 'apply', new Map());
+    const ctx = context(deps, 'apply', new Map(), sessionAttachments(sessionMessages(deps.db, CONTEXT_ROWS)));
     const outcome = applyWrite(proposal.call, ctx);
     const error = outcome.response.error;
     if (typeof error === 'string') {
@@ -328,8 +364,24 @@ export function decide(
 }
 
 /** Start a turn from what the user typed. */
-export function ask(deps: Writer, text: string): StoredRow {
-  return write(deps, 'user', { role: 'user', parts: [{ text }] }, null);
+/**
+ * Start a turn from what the user typed, and any files they attached.
+ *
+ * The files' ids come from the row's own sequence number — `file12-1` — so
+ * they are unique for the whole history without a counter to keep, and short
+ * enough for a model to copy exactly.
+ */
+export function ask(deps: Writer, text: string, files: Omit<ChatAttachment, 'id'>[] = []): StoredRow {
+  const row = appendMessage(deps.db, 'user', { role: 'user', parts: [{ text }] }, null, deps.now());
+  if (files.length === 0) {
+    deps.onRow?.(row);
+    return row;
+  }
+  const meta = { attachments: files.map((file, i) => ({ ...file, id: `file${row.seq}-${i + 1}` })) };
+  updateMessageMeta(deps.db, row.seq, meta);
+  const stored = { ...row, meta };
+  deps.onRow?.(stored);
+  return stored;
 }
 
 export function reset(deps: Writer): StoredRow {

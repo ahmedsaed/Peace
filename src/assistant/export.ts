@@ -1,4 +1,4 @@
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
@@ -61,8 +61,53 @@ export async function reportPdf(report: ReportSpec): Promise<File> {
   return verified(destination);
 }
 
-export async function shareReport(report: ReportSpec): Promise<void> {
-  await share(await reportPdf(report), 'application/pdf');
+export type SavedReport = { folderUri: string; folderName: string; bytes: number; fileName: string };
+
+/**
+ * Save a report's PDF into a folder — the remembered one, or one picked now.
+ *
+ * A SAVE rather than the share sheet, because "keep this" is the common case
+ * and the share sheet answers it with a list of apps. The folder is the
+ * Storage Access Framework's, so no permission is needed and the grant covers
+ * exactly the folder chosen; Android cannot grant Download itself, which is
+ * why the picker may suggest Documents or a subfolder.
+ *
+ * Saving the same report twice replaces the earlier copy rather than leaving
+ * "report (1).pdf" beside it — and the copy is then FOUND and size-checked in
+ * the folder, because a SAF uri cannot be re-read by path and an empty file
+ * there would otherwise be invisible.
+ */
+export async function saveReport(report: ReportSpec, folderUri: string, pickAgain = false): Promise<SavedReport> {
+  const pdf = await reportPdf(report);
+
+  let folder: Directory | null = null;
+  if (folderUri && !pickAgain) {
+    try {
+      folder = new Directory(folderUri);
+      folder.list(); // throws when the grant is gone
+    } catch (error) {
+      console.warn('[assistant] remembered report folder is not usable, asking again', error);
+      folder = null;
+    }
+  }
+  folder ??= await Directory.pickDirectoryAsync(folderUri || undefined);
+
+  for (const entry of folder.list()) {
+    if (entry instanceof File && entry.name === pdf.name) entry.delete();
+  }
+  await pdf.copy(folder);
+  const written = folder.list().find((entry): entry is File => entry instanceof File && entry.name === pdf.name);
+  if (!written || (written.size ?? 0) <= 0) throw new Error(`Saved an empty file (${pdf.name}).`);
+
+  return { folderUri: folder.uri, folderName: folderLabel(folder.uri), bytes: written.size ?? 0, fileName: pdf.name };
+}
+
+/** "content://…/tree/primary%3ADocuments%2FPeace" → "Documents/Peace". */
+export function folderLabel(uri: string): string {
+  const tree = /\/tree\/([^/]+)/.exec(uri)?.[1];
+  if (!tree) return 'the folder you chose';
+  const decoded = decodeURIComponent(tree);
+  return decoded.includes(':') ? decoded.slice(decoded.indexOf(':') + 1) || 'Internal storage' : decoded;
 }
 
 export async function shareChartCsv(chart: ChartSpec): Promise<void> {

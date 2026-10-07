@@ -34,11 +34,19 @@ describe('splitFigures and citedFigures', () => {
   it('splits prose around tokens, tolerating spaces inside the braces', () => {
     expect(splitFigures('You spent {{t3f2}} on fuel, up from {{ t3f1 }}.')).toEqual([
       { kind: 'text', text: 'You spent ' },
-      { kind: 'figure', ref: 't3f2' },
+      { kind: 'figure', ref: 't3f2', abs: false },
       { kind: 'text', text: ' on fuel, up from ' },
-      { kind: 'figure', ref: 't3f1' },
+      { kind: 'figure', ref: 't3f1', abs: false },
       { kind: 'text', text: '.' },
     ]);
+  });
+
+  it('reads the |abs modifier, and resolves the ref without it', () => {
+    expect(splitFigures('over by {{t1f1|abs}}')).toEqual([
+      { kind: 'text', text: 'over by ' },
+      { kind: 'figure', ref: 't1f1', abs: true },
+    ]);
+    expect(citedFigures('{{t1f1 | abs}}', () => ({ minor: -5, currency: 'EGP' }))).toEqual({ t1f1: { minor: -5, currency: 'EGP' } });
   });
 
   it('keeps only refs that resolve', () => {
