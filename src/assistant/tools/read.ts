@@ -263,6 +263,9 @@ const findRecords: ReadTool = {
         date: ymd(row.occurredAt),
         kind: ledgerSide(row),
         ...(row.isRefund ? { refund: true } : {}),
+        // What this row undoes — a refund's purchase, a reversal's transfer —
+        // so "was that already refunded?" is answerable from the list.
+        ...(row.reversesId ? { reverses: row.reversesId } : {}),
         amount: ctx.figures.cite(row.isTransfer ? Math.abs(row.amountMinor) : row.amountMinor, row.currency),
         category: row.categoryName,
         account: row.accountName,

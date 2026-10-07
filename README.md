@@ -117,7 +117,7 @@ And it stays on your phone. That is the part most of the alternatives get wrong.
 - Charts it draws from the same totals every screen uses; tap a bar to see the records inside it, save it as an image or a CSV
 - Reports as PDFs: a verdict, takeaways, the change from last period, and charts — saved to a folder you pick
 - Hand it a receipt photo or a PDF invoice and ask about it, or have it logged with the file attached
-- It can add, edit and delete records, categories, tags, accounts, budgets and recurring payments — **each change is a card you approve first**, and deletes ask twice and can be undone
+- It can add, edit and delete records, categories, tags, accounts, budgets and recurring payments, refund a purchase and reverse a transfer — **each change is a card you approve first**, and deletes ask twice and can be undone
 - Every amount it mentions is cited from your data and drawn by the app, so hiding amounts hides its answers too
 
 **Keeping it**

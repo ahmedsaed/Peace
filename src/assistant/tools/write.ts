@@ -19,6 +19,8 @@ import { accounts, attachments, categories, tags, transactionTags, transactions 
 import type { Account, Category, Transaction } from '../../db/schema';
 import { newId } from '../../lib/id';
 import { formatPeriod } from '../../lib/period';
+import { decimalsFor } from '../../lib/money';
+import { canRefund, canReverse } from '../../lib/record-actions';
 import { describeRecurrence } from '../../lib/recurrence';
 import { cleanTagName, tagKey } from '../../lib/tag';
 import type { ChatAttachment } from '../attachments';
@@ -1058,8 +1060,251 @@ const setBudgetTool: WriteTool = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Refunds and reversals
+// ---------------------------------------------------------------------------
+
+/**
+ * A record by id, in the form the long-press menu acts on — or a refusal that
+ * says why that menu would not offer it.
+ */
+function recordById(ctx: ToolContext, args: Args): Transaction {
+  const id = reqString(args, 'id');
+  const row = ctx.db.select().from(transactions).where(eq(transactions.id, id)).get();
+  if (!row) throw new ToolInputError(`No record has the id "${id}". Use an id from find_records.`);
+  return row;
+}
+
+/** What has already come back against a record, in its own currency. */
+function alreadyReversed(ctx: ToolContext, id: string): { count: number; minor: number } {
+  const rows = ctx.db.select().from(transactions).where(eq(transactions.reversesId, id)).all();
+  return { count: rows.length, minor: rows.reduce((sum, r) => sum + r.amountMinor, 0) };
+}
+
+type RefundPlan = {
+  purchase: Transaction;
+  amountMinor: number;
+  refundedMinor: number;
+  occurredAt: Date;
+  note: string | null;
+  files: ChatAttachment[];
+  category: Category | null;
+  account: Account;
+};
+
+/**
+ * A refund is planned FROM the purchase, as the record screen's "Refund" does:
+ * it inherits the account, category, currency and rate, so a return reduces
+ * the category it was spent in instead of whichever one the model guessed.
+ *
+ * The same eligibility as the long-press menu (`canRefund`): an ordinary
+ * expense that is not itself a refund. One rule the screen does not need and a
+ * model does: the refunds together cannot come to more than was paid. A person
+ * types the amount off the receipt in front of them; a model guessing one
+ * overshoots, and a refund larger than its purchase reads as income that was
+ * never earned.
+ */
+function planRefund(args: Args, ctx: ToolContext): RefundPlan {
+  const purchase = recordById(ctx, args);
+  const subject = {
+    isTransfer: purchase.transferPairId !== null,
+    isAdjustment: purchase.isAdjustment,
+    isRefund: purchase.isRefund,
+    amountMinor: purchase.amountMinor,
+    reversesId: purchase.reversesId,
+    reversedByCount: 0,
+  };
+  if (!canRefund(subject)) {
+    const why = subject.isTransfer
+      ? 'it is a transfer — use reverse_transfer'
+      : subject.isAdjustment
+        ? 'it is a balance correction'
+        : subject.isRefund
+          ? 'it is already a refund'
+          : 'it is income, not a purchase';
+    throw new ToolInputError(`That record cannot be refunded: ${why}.`);
+  }
+
+  const paid = Math.abs(purchase.amountMinor);
+  const refundedMinor = alreadyReversed(ctx, purchase.id).minor;
+  const left = paid - refundedMinor;
+  if (left <= 0) throw new ToolInputError('That purchase has already been refunded in full.');
+
+  const asked = amountMinor(args, 'amount', purchase.currency, false);
+  if (asked !== undefined && asked > left) {
+    throw new ToolInputError(
+      `That is more than is left to refund on this purchase (${(left / 10 ** decimalsFor(purchase.currency)).toFixed(decimalsFor(purchase.currency))} ${purchase.currency}).`
+    );
+  }
+
+  const account = ctx.db.select().from(accounts).where(eq(accounts.id, purchase.accountId)).get()!;
+  const category = purchase.categoryId
+    ? (ctx.db.select().from(categories).where(eq(categories.id, purchase.categoryId)).get() ?? null)
+    : null;
+  return {
+    purchase,
+    amountMinor: asked ?? left,
+    refundedMinor,
+    occurredAt: dateArg(args, 'date', ctx) ?? new Date(ctx.now),
+    note: optString(args, 'note') ?? null,
+    files: attachmentsArg(args, 'attachments', ctx),
+    category,
+    account,
+  };
+}
+
+const refundRecordTool: WriteTool = {
+  kind: 'write',
+  activity: 'Preparing a refund',
+  declaration: {
+    name: 'refund_record',
+    description:
+      'Propose a refund against a purchase (by id, from find_records): money that came back for something bought. It inherits the purchase\'s account, category and currency and is linked to it, so it reduces that category\'s spending — never record a return as income. Leave amount out for a full refund. The user approves it first.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The purchase being refunded.' },
+        amount: { type: 'number', description: 'Unsigned, in the purchase currency. Omit for whatever is left to refund.' },
+        date: { type: 'string', description: 'YYYY-MM-DD the money came back. Defaults to now.' },
+        note: { type: 'string' },
+        attachments: { type: 'array', items: { type: 'string' }, description: 'Ids of attached files, e.g. the refund receipt.' },
+      },
+      required: ['id'],
+    },
+  },
+  prepare(args, ctx) {
+    const plan = planRefund(args, ctx);
+    const full = plan.refundedMinor === 0 && plan.amountMinor === Math.abs(plan.purchase.amountMinor);
+    return {
+      title: full ? 'Refund this purchase in full?' : 'Refund part of this purchase?',
+      lines: [
+        recordLine(plan.purchase, `Purchase · ${dayLabel(plan.purchase.occurredAt)}${plan.purchase.note ? ` · ${plan.purchase.note.split('\n')[0].slice(0, 30)}` : ''}`),
+        ...(plan.refundedMinor > 0
+          ? [{ label: 'Already refunded', figure: { minor: plan.refundedMinor, currency: plan.purchase.currency } }]
+          : []),
+        { label: 'Refund', figure: { minor: plan.amountMinor, currency: plan.purchase.currency } },
+        { label: 'Back to', value: plan.account.name },
+        { label: 'Category', value: plan.category?.name ?? 'None' },
+        { label: 'Date', value: dayLabel(plan.occurredAt) },
+        ...(plan.note ? [{ label: 'Note', value: plan.note }] : []),
+        ...(plan.files.length > 0 ? [{ label: 'Attached', value: plan.files.map(fileLabel).join(', ') }] : []),
+      ],
+      danger: false,
+      confirmLabel: 'Refund',
+    };
+  },
+  apply(args, ctx) {
+    const plan = planRefund(args, ctx);
+    let id = '';
+    ctx.db.transaction((tx) => {
+      const db = tx as unknown as Db;
+      id = createRecord(db, {
+        type: 'expense',
+        isRefund: true,
+        accountId: plan.purchase.accountId,
+        categoryId: plan.purchase.categoryId,
+        amountMinor: plan.amountMinor,
+        currency: plan.purchase.currency,
+        // The purchase's own rate: the money comes back at the price it went
+        // out at, so the category nets to exactly what it should.
+        fxRate: plan.purchase.fxRate,
+        homeCurrency: ctx.homeCurrency,
+        note: plan.note,
+        occurredAt: plan.occurredAt,
+        reversesId: plan.purchase.id,
+      }).id;
+      keepFiles(db, id, plan.files);
+    });
+    return { response: { refunded: true, id } };
+  },
+};
+
+type ReversalPlan = { out: Transaction; from: Account; to: Account; amountMinor: number; occurredAt: Date; note: string | null };
+
+/**
+ * Undoing a transfer is a transfer the other way, linked to the first — the
+ * record screen's "Reverse". Eligibility is `canReverse`: a transfer that is
+ * not itself a reversal and has not been reversed already. Whichever leg the
+ * model names, the plan works from the leg the money LEFT on, as the screen does.
+ */
+function planReversal(args: Args, ctx: ToolContext): ReversalPlan {
+  const row = recordById(ctx, args);
+  if (!row.transferPairId) {
+    throw new ToolInputError('Only a transfer can be reversed. To give money back on a purchase, use refund_record.');
+  }
+  const legs = ctx.db.select().from(transactions).where(eq(transactions.transferPairId, row.transferPairId)).all();
+  const out = legs.find((leg) => leg.amountMinor < 0);
+  if (!out || !out.counterAccountId) throw new ToolInputError('This transfer is missing a leg and cannot be reversed.');
+  const reversed = alreadyReversed(ctx, out.id).count + legs.reduce((n, leg) => n + (leg.id === out.id ? 0 : alreadyReversed(ctx, leg.id).count), 0);
+  if (!canReverse({ isTransfer: true, isAdjustment: out.isAdjustment, isRefund: false, amountMinor: out.amountMinor, reversesId: out.reversesId, reversedByCount: reversed })) {
+    throw new ToolInputError(out.reversesId ? 'That transfer is itself a reversal.' : 'That transfer has already been reversed.');
+  }
+  const from = ctx.db.select().from(accounts).where(eq(accounts.id, out.counterAccountId)).get()!;
+  const to = ctx.db.select().from(accounts).where(eq(accounts.id, out.accountId)).get()!;
+  return {
+    out,
+    from,
+    to,
+    amountMinor: amountMinor(args, 'amount', out.currency, false) ?? Math.abs(out.amountMinor),
+    occurredAt: dateArg(args, 'date', ctx) ?? new Date(ctx.now),
+    note: optString(args, 'note') ?? null,
+  };
+}
+
+const reverseTransferTool: WriteTool = {
+  kind: 'write',
+  activity: 'Preparing a reversal',
+  declaration: {
+    name: 'reverse_transfer',
+    description:
+      'Propose reversing a transfer between the user\'s own accounts (by id, from find_records): the same money moved back, linked to the original. Defaults to the full amount. The user approves it first.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The transfer being reversed (either leg).' },
+        amount: { type: 'number', description: 'Unsigned. Omit to move the whole amount back.' },
+        date: { type: 'string', description: 'YYYY-MM-DD. Defaults to now.' },
+        note: { type: 'string' },
+      },
+      required: ['id'],
+    },
+  },
+  prepare(args, ctx) {
+    const plan = planReversal(args, ctx);
+    return {
+      title: 'Reverse this transfer?',
+      lines: [
+        recordLine(plan.out, `Original · ${plan.to.name} → ${plan.from.name}`),
+        { label: 'Back', value: `${plan.from.name} → ${plan.to.name}` },
+        { label: 'Amount', figure: { minor: plan.amountMinor, currency: plan.out.currency } },
+        { label: 'Date', value: dayLabel(plan.occurredAt) },
+        ...(plan.note ? [{ label: 'Note', value: plan.note }] : []),
+      ],
+      danger: false,
+      confirmLabel: 'Reverse',
+    };
+  },
+  apply(args, ctx) {
+    const plan = planReversal(args, ctx);
+    const created = createTransfer(ctx.db, {
+      fromAccountId: plan.from.id,
+      toAccountId: plan.to.id,
+      amountMinor: plan.amountMinor,
+      currency: plan.out.currency,
+      fxRate: plan.out.fxRate,
+      homeCurrency: ctx.homeCurrency,
+      note: plan.note,
+      occurredAt: plan.occurredAt,
+      reversesId: plan.out.id,
+    });
+    return { response: { reversed: true, id: created.out.id } };
+  },
+};
+
 export const WRITE_TOOLS: WriteTool[] = [
   createRecordTool,
+  refundRecordTool,
+  reverseTransferTool,
   updateRecordsTool,
   deleteRecordsTool,
   createCategoryTool,
