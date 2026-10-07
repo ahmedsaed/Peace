@@ -114,6 +114,24 @@ const CHROME_PATHS = {
    */,
   sparkle:
     'M13 2l1.9 5.6L20.5 9.5l-5.6 1.9L13 17l-1.9-5.6L5.5 9.5l5.6-1.9L13 2zM5.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6L2 17.5l2.6-.9L5.5 14z',
+  // --- the assistant's composer ---
+  // SOLID shapes, both. They sit inside an 18px button, and an outlined arrow
+  // or a ring-shaped stop closes up at that size the way `refresh` does.
+  // Centred on 12,12 — the send arrow's shaft and head share one axis.
+  send: 'M12 3l8 8h-5.5v10h-5V11H4l8-8z',
+  // Starts a new conversation. NOT `refresh`: the circular arrow already means
+  // "repeats" here — Recurring, the Installments category, every upcoming row —
+  // so in the chat header it read as "reload". A bubble with a plus says
+  // "another conversation" and nothing else in the app claims it. The plus is
+  // a cut-out, wound against the bubble so the default fill rule leaves it
+  // empty; rasterised at 22px, its 2.4-unit arms stay open.
+  // Adds a file to the next message. A plain plus, the same 2.4-unit arms as
+  // the one cut into `chat-new`, centred on 12,12 — an action, not a thing, so
+  // it reads as "add" rather than as a picture of a document or a folder.
+  plus: 'M10.8 4h2.4v6.8H20v2.4h-6.8V20h-2.4v-6.8H4v-2.4h6.8V4z',
+  'chat-new':
+    'M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-4 4v-4H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm5.8 2.5v3.3H7.5v2.4h3.3v3.3h2.4v-3.3h3.3V8.8h-3.3V5.5z',
+  stop: 'M6 6h12v12H6z',
   /**
    * A TAG, and deliberately NOT the `tag` glyph in the category map below.
    *

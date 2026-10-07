@@ -17,12 +17,11 @@
  * right spelling from inside the app.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
-import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
+import { ModelRow } from '@/components/model-picker';
 import palette from '@/constants/palette';
-import { GeminiError, listModels, type GeminiModel } from '@/lib/gemini';
 import { getGeminiKey, maskKey, setGeminiKey } from '@/lib/secrets';
 import { runBankCatchUp } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
@@ -37,65 +36,6 @@ export function GeminiKeyCard() {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [models, setModels] = useState<GeminiModel[] | null>(null);
-  const [listing, setListing] = useState(false);
-  const [modelError, setModelError] = useState<string | null>(null);
-
-  /**
-   * Ask Google which models this key can call, then let the user pick one.
-   *
-   * A dropdown rather than a free-text field, because a typed model name is a
-   * 404 waiting to happen and there is no way to discover the right spelling
-   * from inside the app. Fetched on demand rather than at launch: it costs a
-   * request, it is only needed on the rare occasion somebody changes it, and a
-   * Settings screen that makes a network call just by opening is a Settings
-   * screen that fails to open on a plane.
-   */
-  const onPickModel = useCallback(async () => {
-    setListing(true);
-    setModelError(null);
-    try {
-      const key = await getGeminiKey();
-      if (key === null) {
-        setModelError('Add a key first.');
-        return;
-      }
-      setModels(await listModels(key));
-    } catch (e) {
-      // Listing failing must not strand anyone on a broken model — whatever is
-      // already set keeps working, and the message says what went wrong.
-      setModelError(e instanceof GeminiError ? e.message : 'Could not list the models.');
-    } finally {
-      setListing(false);
-    }
-  }, []);
-
-  /**
-   * What the sheet offers.
-   *
-   * The model currently in use is ALWAYS present, even when the fetched list
-   * does not contain it — otherwise opening the picker on a retired model would
-   * show no selection at all and leave the user unsure what they are running.
-   */
-  const modelOptions: PickerOption[] = useMemo(() => {
-    const fetched = models ?? [];
-    const rows = fetched.map((m) => ({
-      id: m.id,
-      label: m.label,
-      icon: 'sparkle',
-      detail: m.id,
-    }));
-    if (!rows.some((r) => r.id === settings.geminiModel)) {
-      rows.unshift({
-        id: settings.geminiModel,
-        label: settings.geminiModel,
-        icon: 'sparkle',
-        detail: 'In use',
-      });
-    }
-    return rows;
-  }, [models, settings.geminiModel]);
 
   // Read once. The keystore is async and the row must not flash "Not set"
   // before the answer arrives, which would read as the key having been lost.
@@ -147,8 +87,8 @@ export function GeminiKeyCard() {
     <View className="rounded-xl bg-surface p-4" testID="gemini-card">
       <Text className="mb-1 text-base font-semibold text-ink">Gemini</Text>
       <Text className="mb-3 text-sm leading-5 text-muted">
-        One key, used by everything that reads for you — photographed receipts and bank messages
-        both. It is kept on this device and never goes into a backup.
+        One key, used by everything that reads for you — photographed receipts, bank messages and
+        Penny. It is kept on this device and never goes into a backup.
       </Text>
 
       <View className="mb-3 flex-row items-center justify-between">
@@ -214,42 +154,18 @@ export function GeminiKeyCard() {
        */}
       {saved ? (
         <View className="mt-4 border-t border-line pt-4">
-          <View className="mb-2 flex-row items-center justify-between">
-            <Text className="text-sm text-muted">Model</Text>
-            <Text className="text-sm text-ink" testID="gemini-model-state">
-              {settings.geminiModel}
-            </Text>
-          </View>
-
-          <SmallButton
-            label={listing ? 'Loading models…' : 'Change model'}
-            disabled={listing}
-            testID="gemini-model-edit"
-            onPress={onPickModel}
+          {/* Selecting writes straight through to the settings store, which is
+              a write-through cache over SQLite — so the record screen picks up
+              the new model without this component telling it anything. */}
+          <ModelRow
+            label="Model"
+            value={settings.geminiModel}
+            onChange={(id) => update('geminiModel', id)}
+            sheetTitle="Gemini model"
+            testIDPrefix="gemini-model"
           />
-          {modelError ? (
-            <Text className="mt-2 text-xs text-expense" testID="gemini-model-error">
-              {modelError}
-            </Text>
-          ) : null}
         </View>
       ) : null}
-
-      {/* Selecting writes straight through to the settings store, which is a
-          write-through cache over SQLite — so the record screen picks up the
-          new model without this component telling it anything. */}
-      <PickerSheet
-        visible={models !== null}
-        title="Gemini model"
-        options={modelOptions}
-        selectedId={settings.geminiModel}
-        onSelect={(id) => {
-          update('geminiModel', id);
-          setModels(null);
-        }}
-        onClose={() => setModels(null)}
-        testID="sheet-gemini-model"
-      />
     </View>
   );
 }

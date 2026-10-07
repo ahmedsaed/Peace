@@ -1,4 +1,4 @@
-import { byDensity, centerScrollOffset, densityForHeight } from './layout';
+import { byDensity, centerScrollOffset, densityForHeight, keyboardOverlap } from './layout';
 
 describe('densityForHeight', () => {
   it('treats a whole phone as regular', () => {
@@ -85,5 +85,21 @@ describe('centerScrollOffset', () => {
     expect(centerScrollOffset({ y: 0, height: 0 }, 0, 0)).toBe(0);
     expect(centerScrollOffset({ y: 500, height: 48 }, 0, 1000)).toBe(0);
     expect(centerScrollOffset({ y: 500, height: 48 }, 400, 0)).toBe(0);
+  });
+});
+
+describe('keyboardOverlap', () => {
+  it('measures from the keyboard top, so the nav bar beneath it counts', () => {
+    // 2400px screen at 1x for simplicity: a 300 keyboard over a 63 nav bar.
+    expect(keyboardOverlap(2400, 2037, 300)).toBe(363);
+  });
+
+  it('falls back to the reported height when there is no position', () => {
+    expect(keyboardOverlap(2400, 0, 300)).toBe(300);
+    expect(keyboardOverlap(2400, Number.NaN, 300)).toBe(300);
+  });
+
+  it('is never negative', () => {
+    expect(keyboardOverlap(800, 900, 0)).toBe(0);
   });
 });

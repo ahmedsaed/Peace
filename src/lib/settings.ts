@@ -79,6 +79,34 @@ export const SETTING_DEFAULTS = {
   bankGuidance: '' as string,
 
   /**
+   * The assistant — a chat that answers from the ledger. OFF until switched on.
+   *
+   * Off by default for the same reason the bank sender list starts empty:
+   * every question sends what the tools read to answer it — totals, record
+   * notes, account names — to Google. That is acceptable, but only once
+   * somebody has read the sentence saying so, and the switch that turns it on
+   * sits directly beneath that sentence. Turning it on IS the acknowledgement.
+   */
+  assistantEnabled: false as boolean,
+  /**
+   * Which model the assistant talks to, separate from `geminiModel`.
+   *
+   * Reading a receipt and running a multi-step conversation with tools are
+   * different jobs with different trade-offs — a cheap fast model is right for
+   * the first and may fumble the second — so they are chosen apart.
+   */
+  assistantModel: 'gemini-flash-latest' as string,
+  /**
+   * The folder reports were last saved to, as a Storage Access Framework uri.
+   *
+   * Remembered so "Save" is one tap after the first time. Android keeps the
+   * grant across launches; if it has been revoked, or the folder is gone, the
+   * save asks again rather than failing. Not a control in Settings — it is
+   * changed by saving somewhere else.
+   */
+  reportFolderUri: '' as string,
+
+  /**
    * The newest release seen on GitHub, and when it was last looked for.
    *
    * CACHED because the answer changes at most once a merge and the check is

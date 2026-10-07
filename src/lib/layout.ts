@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, useWindowDimensions } from 'react-native';
+import { Dimensions, Keyboard, useWindowDimensions } from 'react-native';
 
 /**
  * How much vertical room a screen has to work with.
@@ -71,6 +71,42 @@ export function useKeyboardHeight(): number {
   }, []);
 
   return height;
+}
+
+/**
+ * How much of the SCREEN the keyboard covers, measured from its top edge.
+ *
+ * `endCoordinates.height` is the keyboard's own height, and on an edge-to-edge
+ * Android that is not how much it covers: the navigation bar sits below it,
+ * and content drawn behind that bar is covered too. A composer padded by the
+ * reported height came to rest a nav bar's height UNDER the keyboard — half an
+ * input field, visible only in a screenshot. The distance from the keyboard's
+ * top to the bottom of the screen is the overlap itself; the reported height
+ * is kept as a floor for a device that reports no position.
+ */
+export function keyboardOverlap(screenHeight: number, screenY: number, reported: number): number {
+  const fromTop = Number.isFinite(screenY) && screenY > 0 ? screenHeight - screenY : 0;
+  return Math.max(0, reported, fromTop);
+}
+
+/** `useKeyboardHeight`, for a SCREEN that draws to the bottom edge. */
+export function useKeyboardOverlap(): number {
+  const [overlap, setOverlap] = useState(0);
+
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', (event) =>
+      setOverlap(
+        keyboardOverlap(Dimensions.get('screen').height, event.endCoordinates.screenY, event.endCoordinates.height)
+      )
+    );
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setOverlap(0));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+
+  return overlap;
 }
 
 /**

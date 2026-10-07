@@ -16,6 +16,7 @@ import m0011 from './0011_steep_anthem.sql';
 import m0012 from './0012_pink_senator_kelly.sql';
 import m0013 from './0013_groovy_frog_thor.sql';
 import m0014 from './0014_wonderful_gambit.sql';
+import m0015 from './0015_small_sandman.sql';
 
   export default {
     journal,
@@ -34,7 +35,8 @@ m0010,
 m0011,
 m0012,
 m0013,
-m0014
+m0014,
+m0015
     }
   }
   

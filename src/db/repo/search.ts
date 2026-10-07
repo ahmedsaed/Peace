@@ -3,6 +3,7 @@ import {
   desc,
   eq,
   gte,
+  inArray,
   isNotNull,
   isNull,
   lt,
@@ -65,11 +66,25 @@ const EMPTY: SearchOutcome = {
  * hand-kept copies of a filter is how a screen ends up showing twelve rows
  * under a total computed from fourteen.
  */
+/**
+ * Narrowing that the search SCREEN never asks for, but the assistant does.
+ *
+ * `span` replaces the range preset with explicit bounds — "December 2025" is
+ * not one of the chips. `ids` re-reads rows a reply already found, so a list
+ * shown in the conversation is drawn from the ledger as it is NOW rather than
+ * from a snapshot that may since have been edited.
+ */
+export type SearchScope = {
+  span?: { start: Date | null; end: Date | null };
+  ids?: string[];
+};
+
 function conditions(
   query: SearchQuery,
   counter: ReturnType<typeof alias<typeof accounts, 'counter_account'>>,
   homeCurrency: string,
-  now: Date
+  now: Date,
+  scope: SearchScope = {}
 ): SQL[] {
   const where: SQL[] = [
     // TRANSFERS APPEAR ONCE. Both legs are in the table; the outgoing
@@ -160,9 +175,20 @@ function conditions(
   if (min !== null) where.push(sql`abs(${transactions.amountMinor}) >= ${min}`);
   if (max !== null) where.push(sql`abs(${transactions.amountMinor}) <= ${max}`);
 
-  const range = rangeBounds(query.range, now);
-  if (range) {
-    where.push(gte(transactions.occurredAt, range.start), lt(transactions.occurredAt, range.end));
+  if (scope.span) {
+    if (scope.span.start) where.push(gte(transactions.occurredAt, scope.span.start));
+    if (scope.span.end) where.push(lt(transactions.occurredAt, scope.span.end));
+  } else {
+    const range = rangeBounds(query.range, now);
+    if (range) {
+      where.push(gte(transactions.occurredAt, range.start), lt(transactions.occurredAt, range.end));
+    }
+  }
+
+  if (scope.ids) {
+    // An empty list matches nothing, not everything — `in ()` is not valid SQL
+    // and dropping the condition would return the whole ledger.
+    where.push(scope.ids.length > 0 ? inArray(transactions.id, scope.ids) : sql`0 = 1`);
   }
 
   return where;
@@ -186,10 +212,11 @@ export function searchRecords(
     homeCurrency = 'EGP',
     limit = SEARCH_LIMIT,
     now = new Date(),
-  }: { homeCurrency?: string; limit?: number; now?: Date } = {}
+    ...scope
+  }: { homeCurrency?: string; limit?: number; now?: Date } & SearchScope = {}
 ): SearchOutcome {
   const counter = alias(accounts, 'counter_account');
-  const where = conditions(query, counter, homeCurrency, now);
+  const where = conditions(query, counter, homeCurrency, now, scope);
 
   const rows = db
     .select({

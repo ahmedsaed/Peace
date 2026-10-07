@@ -56,3 +56,6 @@ dist/
 *.keystore
 *.jks
 keystore.properties
+
+# Generated demo ledger (npm run demo:ledger)
+/.demo/

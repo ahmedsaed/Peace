@@ -1,0 +1,203 @@
+appId: com.ahmed.peace
+tags:
+  - live
+---
+# The assistant against the REAL Gemini API. Needs a key, so it lives apart
+# from the suite and runs with:
+#
+#   PEACE_GEMINI_KEY_FILE=.toolchain/gemini-key npm run e2e:live
+#
+# The key arrives as ${GEMINI_KEY} from that script and is typed into Settings
+# like a person would. It is never written into this file.
+#
+# A real model words things its own way, so nothing here asserts on prose.
+# It asserts on what the APP put on screen: the approval card, the figure
+# rendered from a cite, the chart, the records behind a slice, the mask, the
+# undo. Each of those is computed from the ledger, which is the point.
+- runFlow: common/setup.yaml
+- assertVisible:
+    id: "assistant-starters"
+- takeScreenshot: 01-empty-conversation
+
+# --- a write waits for approval ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "Add an expense of 250 for Fuel, paid from Cash, today"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-create-record-approve"
+    timeout: 120000
+- takeScreenshot: 02-proposal
+- tapOn:
+    id: "assistant-proposal-create-record-approve"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-create-record-status"
+      text: "Done"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+
+# --- a question answered from the ledger, the figure rendered by the app ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "How much did I spend on fuel this month?"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+# Hermes formats EGP through SYMBOL_OVERRIDES, so this is the string a device
+# shows — checked here because Node's Intl would print something else.
+- assertVisible: ".*E£250\\.00.*"
+- takeScreenshot: 03-answer
+
+# --- a chart, and the records behind it ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "Show my spending by category this month as a donut chart"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-chart"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+- takeScreenshot: 04-chart
+# Fuel sits under Car, and a category chart groups by the top level.
+- scrollUntilVisible:
+    element:
+      id: "assistant-slice-seed-cat-car"
+    direction: UP
+- tapOn:
+    id: "assistant-slice-seed-cat-car"
+- assertVisible:
+    id: "assistant-records-sheet"
+- assertVisible: "Fuel"
+- takeScreenshot: 05-drill
+- tapOn:
+    id: "assistant-records-close"
+# A tap while the sheet is still sliding away lands on its backdrop.
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-records-sheet"
+    timeout: 5000
+
+# --- hiding amounts reaches the assistant's figures too ---
+# Opened from Settings, so it takes two steps back to reach a tab header.
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-screen"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-hide-amounts"
+- tapOn:
+    id: "nav-assistant"
+- assertVisible:
+    id: "assistant-screen"
+- assertNotVisible: ".*E£250.*"
+- takeScreenshot: 06-masked
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-hide-amounts"
+- tapOn:
+    id: "nav-assistant"
+
+# --- a delete asks twice, and can be undone ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "Delete the fuel expense I just added"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-delete-records-approve"
+    timeout: 120000
+- tapOn:
+    id: "assistant-proposal-delete-records-approve"
+# The first tap only arms it.
+- assertVisible: "Tap again to delete"
+- assertNotVisible:
+    id: "assistant-undo"
+- takeScreenshot: 07-armed
+- tapOn:
+    id: "assistant-proposal-delete-records-approve"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-undo"
+    timeout: 15000
+- tapOn:
+    id: "snackbar-action"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+
+# The record survived: it is back on the records list.
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "home-screen"
+- assertVisible: "Fuel"
+
+# --- a receipt, attached from Files and logged with its photo ---
+# e2e-live.sh pushes the fixture receipt to the device's Download folder.
+# The undo check above ended on the records list; come back in first.
+- tapOn:
+    id: "nav-assistant"
+- tapOn:
+    id: "assistant-attach"
+- assertVisible:
+    id: "assistant-attach-menu"
+- tapOn:
+    id: "assistant-attach-files"
+- extendedWaitUntil:
+    visible: "peace-receipt.jpg"
+    timeout: 15000
+- tapOn: "peace-receipt.jpg"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-pending-file"
+    timeout: 15000
+- tapOn:
+    id: "assistant-input"
+- inputText: "Log this receipt, paid from Bank"
+- tapOn:
+    id: "assistant-send"
+- assertVisible:
+    id: "assistant-message-files"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-create-record-approve"
+    timeout: 120000
+# The card names the file it will keep with the record, and the total actually
+# paid — the service charge included.
+- assertVisible: "Attached"
+- assertVisible: ".*E£240\\.80.*"
+- takeScreenshot: 09-receipt-proposal
+- tapOn:
+    id: "assistant-proposal-create-record-approve"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+
+# --- reset is a divider, not a deletion ---
+- tapOn:
+    id: "assistant-reset"
+- assertVisible:
+    id: "assistant-divider"
+- assertVisible:
+    id: "assistant-starters"
+- takeScreenshot: 08-reset

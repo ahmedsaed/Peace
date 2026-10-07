@@ -86,6 +86,7 @@ export default function RootLayout() {
             <Stack.Screen name="portfolio" />
             <Stack.Screen name="recurring" />
             <Stack.Screen name="about" />
+            <Stack.Screen name="assistant" />
           </Stack>
         </DatabaseProvider>
       </SafeAreaProvider>

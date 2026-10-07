@@ -38,6 +38,8 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Validate the JS bundle without a device | `npx expo export --platform android` |
 | Check every flow's testIDs without a device | `npm test -- flows` |
 | E2E without an emulator to hand | Actions › **E2E** › Run workflow (manual) |
+| Assistant against the real Gemini API — **costs money, ask first** | `PEACE_GEMINI_KEY_FILE=<file> npx jest src/assistant/live` |
+| Assistant E2E with a real key — **costs money, ask first** | `PEACE_GEMINI_KEY_FILE=<file> npm run e2e:live` (flows in `.maestro/live/`) |
 | Dev server | `npm start` |
 
 ## How to verify a change
@@ -755,6 +757,45 @@ app ignoring input. `pkill -f GradleDaemon`.
   charge AND the card's commission through `createCardPurchase` and `updateRecord` has no such
   branch. What editing needed was to SEE the original amount, which the row has stored all along
   and displayed nowhere. Before enabling a control on a new path, follow it to the write.
+- **Anything that calls the real Gemini API spends the owner's money — run it only when asked.**
+  The live jest suite and `.maestro/live/` are opt-in by construction (no key file, no run), and
+  must stay out of `npm test`, `npm run e2e` and CI. Iterate on flow STEPS with the key-less flows
+  and on prompts with the scripted model in `engine.test.ts`; spend a live run once the change is
+  ready, and say beforehand that it will cost something.
+- **The assistant's model never writes an amount — it CITES one.** Every amount a tool returns is
+  registered in a `FigureBook` and handed over as `{"amount": 1240.5, "cite": "{{t41f3}}"}`; the
+  reply writes the token and the screen renders it through `useMoney`. Typed prose figures would be
+  the one amount left legible while the header says amounts are hidden, and the one sum the model
+  did itself. `maskStrayFigures` masks anything money-shaped it typed anyway, failing closed; the
+  live suite asserts the reply carries the cited figure and NOT the typed one.
+- **The assistant gets tools, never SQL.** Each tool wraps a repository function, so transfers,
+  corrections and refunds are counted by `predicates.ts` like every screen. A model with SQL writes
+  `SUM(amount_minor) WHERE category = 'Fuel'` — and every rule above about sides and exclusions
+  comes back as a plausible wrong number. A new question means a new tool or a new argument.
+- **Every assistant write is a proposal: `prepare` changes nothing, `apply` runs after a tap and
+  validates AGAIN.** A proposal can sit for a week while the ledger moves under it. A delete asks
+  twice and offers Undo with the rows' tags and attachment rows, captured before the cascade ate
+  them. Refused-before-shown writes go back to the model as errors and never become a card.
+- **Replay Gemini's turns VERBATIM.** Thinking models put a `thoughtSignature` on function-call parts
+  and reject a history that loses it — which only shows up on those models, in multi-step turns. The
+  stored row IS the `Content` received; the screen is derived from it, never the other way round.
+- **On an edge-to-edge Android, `adjustResize` no longer resizes the window.** The first device run
+  typed a question into a composer hidden under the keyboard. A screen with an input at its foot pads
+  itself by `useKeyboardOverlap` — measured from the keyboard's top edge, because
+  `endCoordinates.height` leaves out the nav bar beneath it (the composer came to rest one nav bar
+  under the keys). Anything ABSOLUTELY positioned ignores that padding: the Undo snackbar sat under
+  the keyboard until it was offset by the same overlap.
+- **Streaming needs `expo/fetch`; React Native's own `fetch` buffers the whole body.** Built on the
+  wrong one, a streamed reply arrives all at once at the end — correct, tested, and not streaming.
+  Three more traps live in `SseParser` and `mergeParts`: a network read can end between `\r` and
+  `\n` (normalising each piece alone makes a blank line and splits an event's JSON); a thinking
+  model's `thoughtSignature` can arrive on a final EMPTY text part, so joining text fragments must
+  never drop it; and the assembled turn goes through the same `extractTurn` checks as an
+  unstreamed one, or a stream cut off by `MAX_TOKENS` gets executed. While a reply streams, an
+  unfinished `{{cite` is held back (`streamingVisible`) rather than shown raw.
+- **jest-expo replaces `fetch` with Expo's, which does nothing useful under Node.** A request made in
+  a test comes back with `status: undefined` and reads as "Gemini refused the request (undefined)".
+  The live suite uses a `node:https` fetch of its own; unit tests inject `fetchImpl`.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.
@@ -771,9 +812,10 @@ src/app/         Expo Router routes (file-based) — tabs under (drawer)/(tabs),
 src/components/  shared UI
 src/db/          drizzle schema, client, migration provider
 src/lib/         pure logic — this is where unit tests live
+src/assistant/   the chat assistant: tools, engine loop, cited figures, charts, report HTML
 drizzle/         generated migrations (committed)
-.maestro/        E2E flows
-scripts/         emu-up.sh, screenshot.sh
+.maestro/        E2E flows (`live/` needs a Gemini key and runs via `npm run e2e:live`)
+scripts/         emu-up.sh, screenshot.sh, e2e-live.sh
 ```
 
 ## Known environment constraints

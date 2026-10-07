@@ -1,0 +1,46 @@
+appId: com.ahmed.peace
+---
+# Shared by the live flows: a fresh install, a key typed into Settings the way
+# a person would, the consent switch, and the assistant opened. In a sub-folder
+# so `maestro test .maestro/live/` does not run it as a flow of its own.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- a key, and consent ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- scrollUntilVisible:
+    element:
+      id: "gemini-key-edit"
+    direction: DOWN
+- tapOn:
+    id: "gemini-key-edit"
+- tapOn:
+    id: "gemini-key-input"
+- inputText: ${GEMINI_KEY}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "gemini-key-save"
+    direction: DOWN
+- tapOn:
+    id: "gemini-key-save"
+- scrollUntilVisible:
+    element:
+      id: "assistant-enabled"
+    direction: DOWN
+- tapOn:
+    id: "assistant-enabled"
+- scrollUntilVisible:
+    element:
+      id: "assistant-open"
+    direction: DOWN
+- tapOn:
+    id: "assistant-open"

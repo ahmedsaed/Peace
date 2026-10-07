@@ -1,0 +1,115 @@
+appId: com.ahmed.peace
+tags:
+  - live
+---
+# The assistant's outputs that leave the app: a bar chart's CSV and image go
+# to the share sheet, a PDF report is SAVED to a folder. What is asserted is
+# that each gets that far without the card reporting a failure — the bytes
+# themselves are checked by the size guard in `assistant/export.ts`, which
+# throws on an empty file.
+- runFlow: common/setup.yaml
+# NO `hideKeyboard` anywhere below: when no keyboard is up it falls back to
+# pressing Back, which leaves the assistant — on one emulator and not another,
+# depending on the keyboard's state. Scrolling works with the keyboard open.
+
+- tapOn:
+    id: "assistant-input"
+- inputText: "Add an expense of 120 for Coffee, paid from Cash, today"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-create-record-approve"
+    timeout: 120000
+- tapOn:
+    id: "assistant-proposal-create-record-approve"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+
+# --- a bar chart over months, its export buttons ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "Show my coffee spending for the last 3 months as a bar chart"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-chart"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+- scrollUntilVisible:
+    element:
+      id: "assistant-chart-export-csv"
+    direction: UP
+- takeScreenshot: 01-bar-chart
+- tapOn:
+    id: "assistant-chart-export-csv"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-screen"
+    timeout: 15000
+- takeScreenshot: 02-csv-share-sheet
+- back
+- assertVisible:
+    id: "assistant-screen"
+- tapOn:
+    id: "assistant-chart-export-image"
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-screen"
+    timeout: 15000
+- back
+- assertNotVisible: "Could not export the chart."
+
+# --- a report, as a PDF ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "Write a short report on this month's spending"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-report"
+    timeout: 180000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+- scrollUntilVisible:
+    element:
+      id: "assistant-report-save"
+    direction: UP
+- takeScreenshot: 03-report-card
+- tapOn:
+    id: "assistant-report-save"
+# The first save asks for a folder: the system picker replacing the screen is
+# the PDF having been written and checked. Backing out of it is a cancel, and a
+# cancel is not an error — the card must not turn red over it.
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-screen"
+    timeout: 30000
+- takeScreenshot: 04-folder-picker
+# The picker opens wherever it was last left, and Back inside it climbs one
+# folder rather than closing it — so back out until the conversation is there.
+- back
+- runFlow:
+    when:
+      notVisible:
+        id: "assistant-screen"
+    commands:
+      - back
+- runFlow:
+    when:
+      notVisible:
+        id: "assistant-screen"
+    commands:
+      - back
+- assertVisible:
+    id: "assistant-report"
+- assertNotVisible: "Could not save the PDF."

@@ -1,0 +1,88 @@
+import { Text, View } from 'react-native';
+
+import type { Figure } from '@/assistant/figures';
+import { maskStrayFigures } from '@/assistant/figures';
+import { parseBlocks, type Inline } from '@/assistant/markdown';
+import { AMOUNT_MASK } from '@/lib/money';
+import { useAmountsHidden, useMoney } from '@/state/money';
+
+/**
+ * A reply, with its figures drawn the way every other amount in the app is.
+ *
+ * Each cite token becomes `money(minor, currency)` — so hiding amounts hides
+ * these too, with no special case. Prose the model wrote is masked as well
+ * when amounts are hidden, for the figure it TYPED instead of citing: the
+ * prompt forbids it, and this is what keeps "forbidden" from meaning "usually
+ * absent". It fails closed on anything shaped like money.
+ */
+export function RichText({
+  text,
+  figures,
+  testID,
+  trailing,
+}: {
+  text: string;
+  figures: Record<string, Figure>;
+  testID?: string;
+  /**
+   * Drawn INSIDE the last line, right after the last word — Penny's coin while
+   * a reply is still arriving, so it moves along with the text like a cursor
+   * instead of sitting on a line of its own beneath it.
+   */
+  trailing?: React.ReactNode;
+}) {
+  const money = useMoney();
+  const hidden = useAmountsHidden();
+
+  const render = (inline: Inline, i: number) => {
+    if (inline.kind === 'figure') {
+      const figure = figures[inline.ref];
+      return (
+        <Text key={i} className="font-semibold text-ink" testID={figure ? `figure-${inline.ref}` : undefined}>
+          {/* A ref that resolves to nothing is shown as a gap, never as the raw
+              token and never as a guess. */}
+          {figure ? money(inline.abs ? Math.abs(figure.minor) : figure.minor, figure.currency) : '—'}
+        </Text>
+      );
+    }
+    const text = hidden ? maskStrayFigures(inline.text, AMOUNT_MASK) : inline.text;
+    return (
+      <Text key={i} className={inline.bold ? 'font-semibold' : undefined}>
+        {text}
+      </Text>
+    );
+  };
+
+  const blocks = parseBlocks(text);
+  const tail = (i: number) =>
+    trailing && i === blocks.length - 1 ? (
+      <>
+        {' '}
+        {trailing}
+      </>
+    ) : null;
+
+  return (
+    <View className="gap-1.5" testID={testID}>
+      {blocks.length === 0 && trailing ? <View className="py-1">{trailing}</View> : null}
+      {blocks.map((block, i) =>
+        block.kind === 'bullet' ? (
+          <View key={i} className="flex-row gap-2 pl-1">
+            <Text className="text-[15px] leading-[22px] text-muted">{block.marker}</Text>
+            <Text className="flex-1 text-[15px] leading-[22px] text-ink">
+              {block.inlines.map(render)}
+              {tail(i)}
+            </Text>
+          </View>
+        ) : (
+          <Text
+            key={i}
+            className={`text-[15px] leading-[22px] text-ink ${block.kind === 'heading' ? 'font-semibold' : ''}`}>
+            {block.inlines.map(render)}
+            {tail(i)}
+          </Text>
+        )
+      )}
+    </View>
+  );
+}
