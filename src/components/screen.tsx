@@ -69,6 +69,23 @@ function HideAmountsButton() {
  * Menu on the left, search on the right: both thumb-reachable corners, and the
  * arrangement every Android user already has muscle memory for.
  */
+/**
+ * The assistant, one tap from every tab — but only once it has been turned on
+ * in Settings, beside the sentence saying what it sends to Google.
+ */
+function AssistantButton() {
+  const enabled = useSetting('assistantEnabled');
+  if (!enabled) return null;
+  return (
+    <HeaderButton
+      icon="sparkle"
+      label="Open the assistant"
+      testID="nav-assistant"
+      onPress={() => router.push('/assistant')}
+    />
+  );
+}
+
 export function AppHeader({ right }: { right?: React.ReactNode }) {
   // Addressed to the drawer layout explicitly rather than relying on the tab
   // navigator inheriting `openDrawer` from its parent. Passing the path makes
@@ -86,6 +103,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
       />
       <Wordmark style={{ flex: 1, paddingLeft: 4 }} testID="app-title" />
       {right}
+      <AssistantButton />
       <HideAmountsButton />
       <HeaderButton
         icon="search"

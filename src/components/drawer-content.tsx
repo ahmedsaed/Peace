@@ -65,8 +65,23 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
   },
 ];
 
+/**
+ * The assistant leads the list when it is on, and is absent when it is off —
+ * an entry that opens onto "this is switched off" is a door to a wall. It is
+ * turned on from Settings, which is where its privacy sentence lives.
+ */
+const ASSISTANT_ITEM = {
+  icon: 'sparkle',
+  label: 'Assistant',
+  hint: 'Ask about your money',
+  href: '/assistant' as Href,
+  testID: 'drawer-assistant',
+};
+
 export function DrawerContent({ navigation }: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
+  const assistantEnabled = useSetting('assistantEnabled');
+  const items = assistantEnabled ? [ASSISTANT_ITEM, ...ITEMS] : ITEMS;
 
   // Close first, then navigate. Pushing onto the root stack does not dismiss
   // the drawer by itself, so it would still be sitting open behind the new
@@ -105,7 +120,7 @@ export function DrawerContent({ navigation }: DrawerContentComponentProps) {
       </View>
 
       <View className="py-2">
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <Pressable
             key={item.testID}
             onPress={() => go(item.href)}

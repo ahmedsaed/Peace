@@ -8,6 +8,7 @@ import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import { BankMessagesCard } from '@/components/bank-card';
 import { ReminderCard } from '@/components/reminder-card';
 import { ReceiptsCard } from '@/components/receipts-card';
+import { AssistantCard } from '@/components/assistant-card';
 import { GeminiKeyCard } from '@/components/gemini-key';
 import { StackHeader } from '@/components/screen';
 import { db } from '@/db/client';
@@ -142,6 +143,10 @@ export default function SettingsScreen() {
 
         <View className="pt-4">
           <BankMessagesCard />
+        </View>
+
+        <View className="pt-4">
+          <AssistantCard />
         </View>
 
         <Text className="px-1 pt-6 text-xs leading-5 text-muted opacity-70">

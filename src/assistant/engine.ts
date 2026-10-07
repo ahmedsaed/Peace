@@ -84,7 +84,10 @@ export type Deps = {
 
 export type RunResult = 'done' | 'awaiting' | 'stopped';
 
-function write(deps: Deps, kind: StoredRow['kind'], content: unknown, meta: unknown): StoredRow {
+/** What writing a row needs — less than running a turn does. */
+export type Writer = Pick<Deps, 'db' | 'now' | 'onRow'>;
+
+function write(deps: Writer, kind: StoredRow['kind'], content: unknown, meta: unknown): StoredRow {
   const row = appendMessage(deps.db, kind, content, meta, deps.now());
   deps.onRow?.(row);
   return row;
@@ -319,14 +322,14 @@ export function decide(
 }
 
 /** Start a turn from what the user typed. */
-export function ask(deps: Deps, text: string): StoredRow {
+export function ask(deps: Writer, text: string): StoredRow {
   return write(deps, 'user', { role: 'user', parts: [{ text }] }, null);
 }
 
-export function reset(deps: Deps): StoredRow {
+export function reset(deps: Writer): StoredRow {
   return write(deps, 'divider', null, null);
 }
 
-export function recordFailure(deps: Deps, message: string, retryable: boolean): StoredRow {
+export function recordFailure(deps: Writer, message: string, retryable: boolean): StoredRow {
   return write(deps, 'error', null, { message, retryable } satisfies ErrorMeta);
 }

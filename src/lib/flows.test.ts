@@ -89,9 +89,16 @@ for (const text of source) {
   }
 }
 
-for (const suffix of suffixes) {
-  for (const id of [...literalIds]) literalIds.add(`${id}${suffix}`);
-}
+// TWO levels, not a closure. Appending every suffix to every id INCLUDING the
+// ones already suffixed doubled the set once per suffix, which was fine at a
+// handful and overflowed `Set` the day the assistant's cards added ten more —
+// 2^k is not a size, it is a countdown. A part naming a part of a part
+// (`${testID}-chart` handed to a card that adds `-export-csv`) is as deep as
+// any component here nests, so two rounds from the base is exhaustive.
+const base = [...literalIds];
+const once = base.flatMap((id) => [...suffixes].map((suffix) => `${id}${suffix}`));
+for (const id of once) literalIds.add(id);
+for (const id of once) for (const suffix of suffixes) literalIds.add(`${id}${suffix}`);
 
 const flowFiles = fs
   .readdirSync(FLOWS)

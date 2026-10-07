@@ -114,6 +114,12 @@ const CHROME_PATHS = {
    */,
   sparkle:
     'M13 2l1.9 5.6L20.5 9.5l-5.6 1.9L13 17l-1.9-5.6L5.5 9.5l5.6-1.9L13 2zM5.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6L2 17.5l2.6-.9L5.5 14z',
+  // --- the assistant's composer ---
+  // SOLID shapes, both. They sit inside an 18px button, and an outlined arrow
+  // or a ring-shaped stop closes up at that size the way `refresh` does.
+  // Centred on 12,12 — the send arrow's shaft and head share one axis.
+  send: 'M12 3l8 8h-5.5v10h-5V11H4l8-8z',
+  stop: 'M6 6h12v12H6z',
   /**
    * A TAG, and deliberately NOT the `tag` glyph in the category map below.
    *
