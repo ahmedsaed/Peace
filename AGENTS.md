@@ -780,6 +780,14 @@ app ignoring input. `pkill -f GradleDaemon`.
   `endCoordinates.height` leaves out the nav bar beneath it (the composer came to rest one nav bar
   under the keys). Anything ABSOLUTELY positioned ignores that padding: the Undo snackbar sat under
   the keyboard until it was offset by the same overlap.
+- **Streaming needs `expo/fetch`; React Native's own `fetch` buffers the whole body.** Built on the
+  wrong one, a streamed reply arrives all at once at the end — correct, tested, and not streaming.
+  Three more traps live in `SseParser` and `mergeParts`: a network read can end between `\r` and
+  `\n` (normalising each piece alone makes a blank line and splits an event's JSON); a thinking
+  model's `thoughtSignature` can arrive on a final EMPTY text part, so joining text fragments must
+  never drop it; and the assembled turn goes through the same `extractTurn` checks as an
+  unstreamed one, or a stream cut off by `MAX_TOKENS` gets executed. While a reply streams, an
+  unfinished `{{cite` is held back (`streamingVisible`) rather than shown raw.
 - **jest-expo replaces `fetch` with Expo's, which does nothing useful under Node.** A request made in
   a test comes back with `status: undefined` and reads as "Gemini refused the request (undefined)".
   The live suite uses a `node:https` fetch of its own; unit tests inject `fetchImpl`.

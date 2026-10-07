@@ -17,11 +17,12 @@
  */
 import fs from 'node:fs';
 import https from 'node:https';
+import { Readable } from 'node:stream';
 
 import { sessionMessages } from '../db/repo/chat';
 import { getRecord } from '../db/repo/transactions';
 import { ask, decide, run, type Deps, type ModelMeta, type ToolsMeta } from './engine';
-import { callsOf, chatStep, type Content } from './gemini-chat';
+import { callsOf, chatStepStreaming, type Content } from './gemini-chat';
 import { buildLedger, NOW, type Ledger } from './test-ledger';
 
 const keyFile = process.env.PEACE_GEMINI_KEY_FILE;
@@ -42,16 +43,17 @@ const nodeFetch = ((url: string, init: RequestInit = {}) =>
       url,
       { method: init.method ?? 'GET', headers: init.headers as Record<string, string>, signal: init.signal ?? undefined },
       (response) => {
+        const ok = (response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300;
+        // A success is handed over as a STREAM, so the SSE path is exercised
+        // against Google's real chunking; a failure is read whole for its JSON.
+        if (ok) {
+          resolve({ ok, status: response.statusCode, body: Readable.toWeb(response), json: async () => ({}) });
+          return;
+        }
         let body = '';
         response.setEncoding('utf8');
         response.on('data', (chunk) => (body += chunk));
-        response.on('end', () =>
-          resolve({
-            ok: (response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300,
-            status: response.statusCode,
-            json: async () => JSON.parse(body),
-          })
-        );
+        response.on('end', () => resolve({ ok, status: response.statusCode, json: async () => JSON.parse(body) }));
       }
     );
     request.on('error', reject);
@@ -61,6 +63,8 @@ const nodeFetch = ((url: string, init: RequestInit = {}) =>
 
 let ledger: Ledger;
 let deps: Deps;
+/** How many times prose arrived in pieces — proof the answers really streamed. */
+let streamed = 0;
 
 beforeEach(() => {
   ledger = buildLedger();
@@ -68,7 +72,8 @@ beforeEach(() => {
     db: ledger.db,
     homeCurrency: 'EGP',
     now: () => NOW,
-    step: (request) => chatStep(key, model, request, { fetchImpl: nodeFetch }),
+    step: (request) =>
+      chatStepStreaming(key, model, request, { fetchImpl: nodeFetch, onText: (t) => (streamed += t.length > 0 ? 1 : 0) }),
   };
 });
 
@@ -126,6 +131,7 @@ live(`the assistant on ${model}`, () => {
     // E£900 + E£600 of fuel in December 2025 — and the model CITED it rather
     // than typing it.
     expect(replyFigures()).toContain(150000);
+    expect(streamed).toBeGreaterThan(0);
     expect(lastReply()).not.toMatch(/1,?500(\.00)?/);
   });
 

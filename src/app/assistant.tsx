@@ -1,15 +1,18 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { canRetry, sessionIsEmpty, toItems, type Item } from '@/assistant/display';
 import { drillRows } from '@/assistant/drill';
+import type { Figure } from '@/assistant/figures';
+import { streamingVisible } from '@/assistant/gemini-chat';
 import type { ChartPoint, ChartSpec, Display } from '@/assistant/tools/types';
 import { ProposalCard, RecordsCard, ReportCard } from '@/components/assistant/cards';
 import { ChartCard } from '@/components/assistant/chart-card';
 import { RecordsSheet } from '@/components/assistant/records-sheet';
 import { RichText } from '@/components/assistant/rich-text';
+import { Caret, TypingIndicator } from '@/components/assistant/typing';
 import { Icon } from '@/components/icon';
 import { HeaderButton, StackHeader } from '@/components/screen';
 import { Snackbar } from '@/components/snackbar';
@@ -63,6 +66,7 @@ export default function AssistantScreen() {
   const loaded = useAssistantStore((s) => s.loaded);
   const busy = useAssistantStore((s) => s.busy);
   const activity = useAssistantStore((s) => s.activity);
+  const streaming = useAssistantStore((s) => s.streaming);
   const hasOlder = useAssistantStore((s) => s.hasOlder);
   const pendingUndo = useAssistantStore((s) => s.pendingUndo);
   const { load, loadOlder, send, retry, stop, decide, reset, undo, clearUndo } = useAssistantStore.getState();
@@ -91,6 +95,14 @@ export default function AssistantScreen() {
 
   // Inverted: the list's first item sits at the bottom, by the composer.
   const items = useMemo(() => toItems(rows).reverse(), [rows]);
+  // What a reply still arriving can cite: every figure a tool has registered in
+  // the rows on screen. The finished row stores its own; this is only for the
+  // seconds before it exists.
+  const known = useMemo(() => {
+    const out: Record<string, Figure> = {};
+    for (const row of rows) Object.assign(out, (row.meta as { figures?: Record<string, Figure> } | null)?.figures);
+    return out;
+  }, [rows]);
   const retryable = canRetry(rows);
   const empty = sessionIsEmpty(rows);
   // From the items rather than the rows, so a card expired by a reset does
@@ -130,7 +142,7 @@ export default function AssistantScreen() {
         title="Assistant"
         right={
           <HeaderButton
-            icon="refresh"
+            icon="chat-new"
             label="New conversation"
             testID="assistant-reset"
             onPress={() => {
@@ -153,12 +165,18 @@ export default function AssistantScreen() {
         // composer, where the state of the running turn belongs.
         ListHeaderComponent={
           <View>
+            {streaming ? (
+              <View className="my-1.5" testID="assistant-streaming">
+                <RichText text={streamingVisible(streaming)} figures={known} />
+                <Caret />
+              </View>
+            ) : null}
             {busy ? (
-              <View className="mt-2 flex-row items-center gap-2" testID="assistant-busy">
-                <ActivityIndicator size="small" color={palette.accent} />
-                <Text className="flex-1 text-xs text-muted" numberOfLines={1}>
-                  {activity ?? 'Thinking'}…
-                </Text>
+              // The dots stay while words stream too — `assistant-busy` is what
+              // a flow waits on to know the turn is over, and the turn is not
+              // over while it is still being written.
+              <View className="mt-2" testID="assistant-busy">
+                {streaming ? null : <TypingIndicator label={`${activity ?? 'Thinking'}…`} />}
               </View>
             ) : retryable ? (
               <Pressable

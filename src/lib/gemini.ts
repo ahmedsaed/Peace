@@ -49,10 +49,14 @@ export class GeminiError extends Error {
   }
 }
 
-export function endpoint(model: string): string {
+export function endpoint(model: string, method: 'generateContent' | 'streamGenerateContent' = 'generateContent'): string {
   // The model id is user-editable in Settings, so it is encoded rather than
   // interpolated raw — a stray slash would otherwise rewrite the path.
-  return `${BASE_URL}/${encodeURIComponent(model)}:generateContent`;
+  const base = `${BASE_URL}/${encodeURIComponent(model)}:${method}`;
+  // `alt=sse` makes the stream Server-Sent Events — one complete JSON object
+  // per `data:` line — rather than one JSON array delivered in pieces, which
+  // cannot be parsed until it has all arrived and so would not stream at all.
+  return method === 'streamGenerateContent' ? `${base}?alt=sse` : base;
 }
 
 export function buildRequest(
@@ -429,6 +433,145 @@ export async function postGenerate(
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+/**
+ * The same request, answered as a STREAM of partial responses.
+ *
+ * Every response the server sends is handed to `onEvent` as it arrives, and
+ * the transport stays identical to `postGenerate` — the key in a header, the
+ * same failures in the same words — because a second copy of that is exactly
+ * what `postGenerate` exists to prevent.
+ *
+ * The timeout is an IDLE timeout. A long answer that keeps arriving is fine;
+ * a stream that goes quiet for `idleMs` is a stalled connection, and leaving
+ * it open is the captive-portal spinner again in a new place.
+ *
+ * Needs a `fetch` whose response has a readable `body` — `expo/fetch` on a
+ * device. React Native's built-in fetch buffers the whole body, which would
+ * deliver every chunk at once at the end: correct, and not streaming.
+ */
+export async function postStream(
+  apiKey: string,
+  model: string,
+  body: unknown,
+  {
+    idleMs,
+    fetchImpl,
+    label,
+    meanwhile,
+    signal,
+    onEvent,
+  }: {
+    idleMs: number;
+    fetchImpl: typeof fetch;
+    label: string;
+    meanwhile: string;
+    signal?: AbortSignal;
+    onEvent: (event: unknown) => void;
+  }
+): Promise<void> {
+  if (apiKey.trim() === '') {
+    throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
+  }
+
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const arm = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), idleMs);
+  };
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort);
+  arm();
+
+  try {
+    const response = await fetchImpl(endpoint(model, 'streamGenerateContent'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey.trim() },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => null);
+      throw new GeminiError(
+        describeFailure(response.status, errorBody, meanwhile),
+        isTransientStatus(response.status, errorBody)
+      );
+    }
+    if (!response.body) throw new Error('the response has no readable body');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const sse = new SseParser();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      arm();
+      for (const data of sse.push(decoder.decode(value, { stream: true }))) {
+        onEvent(parseEvent(data));
+      }
+    }
+    for (const data of sse.push(decoder.decode() + '\n\n')) onEvent(parseEvent(data));
+  } catch (error) {
+    if (error instanceof GeminiError) throw error;
+    if (signal?.aborted) throw new GeminiError('Stopped.', true);
+    console.warn(`[gemini] ${label} failed`, endpoint(model, 'streamGenerateContent'), error);
+    throw new GeminiError(`Could not reach Gemini. ${meanwhile}`, true);
+  } finally {
+    if (timer) clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+function parseEvent(data: string): unknown {
+  try {
+    return JSON.parse(data);
+  } catch {
+    // One mangled event must not be mistaken for a network failure — but it
+    // is worth knowing about, so it is logged and handed on as nothing.
+    console.warn('[gemini] a streamed event was not JSON', data.slice(0, 200));
+    return null;
+  }
+}
+
+/**
+ * Server-Sent Events, fed in arbitrary pieces.
+ *
+ * A network read can end anywhere — mid-line, mid-word, between the `\r` and
+ * the `\n` — so text is buffered until a blank line closes an event, and only
+ * then are its `data:` lines joined and handed back.
+ */
+export class SseParser {
+  private buffer = '';
+  /** A `\r` that ended the last piece — it may be half of a `\r\n`. */
+  private held = '';
+
+  push(text: string): string[] {
+    let raw = this.held + text;
+    this.held = '';
+    // Normalising "\r" to "\n" here and its partner "\n" in the next piece
+    // would make one line break into two — a blank line, which ENDS an event
+    // early and splits its JSON in half.
+    if (raw.endsWith('\r')) {
+      this.held = '\r';
+      raw = raw.slice(0, -1);
+    }
+    this.buffer += raw.replace(/\r\n?/g, '\n');
+    const events: string[] = [];
+    let end: number;
+    while ((end = this.buffer.indexOf('\n\n')) >= 0) {
+      const block = this.buffer.slice(0, end);
+      this.buffer = this.buffer.slice(end + 2);
+      const data = block
+        .split('\n')
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice(5).replace(/^ /, ''));
+      if (data.length > 0) events.push(data.join('\n'));
+    }
+    return events;
   }
 }
 

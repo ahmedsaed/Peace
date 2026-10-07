@@ -119,6 +119,14 @@ const CHROME_PATHS = {
   // or a ring-shaped stop closes up at that size the way `refresh` does.
   // Centred on 12,12 — the send arrow's shaft and head share one axis.
   send: 'M12 3l8 8h-5.5v10h-5V11H4l8-8z',
+  // Starts a new conversation. NOT `refresh`: the circular arrow already means
+  // "repeats" here — Recurring, the Installments category, every upcoming row —
+  // so in the chat header it read as "reload". A bubble with a plus says
+  // "another conversation" and nothing else in the app claims it. The plus is
+  // a cut-out, wound against the bubble so the default fill rule leaves it
+  // empty; rasterised at 22px, its 2.4-unit arms stay open.
+  'chat-new':
+    'M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-4 4v-4H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm5.8 2.5v3.3H7.5v2.4h3.3v3.3h2.4v-3.3h3.3V8.8h-3.3V5.5z',
   stop: 'M6 6h12v12H6z',
   /**
    * A TAG, and deliberately NOT the `tag` glyph in the category map below.

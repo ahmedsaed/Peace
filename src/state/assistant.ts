@@ -1,6 +1,7 @@
+import { fetch as streamingFetch } from 'expo/fetch';
 import { create } from 'zustand';
 
-import { chatStep } from '@/assistant/gemini-chat';
+import { chatStepStreaming } from '@/assistant/gemini-chat';
 import {
   ask,
   decide as decideProposal,
@@ -41,6 +42,12 @@ type AssistantStore = {
   busy: boolean;
   /** What the running turn is doing, for the line under the last message. */
   activity: string | null;
+  /**
+   * The reply as it arrives, before it is a row. Null between steps — while a
+   * tool runs there is nothing being written, and an empty bubble would say
+   * otherwise.
+   */
+  streaming: string | null;
   pendingUndo: PendingUndo | null;
   load: () => void;
   loadOlder: () => void;
@@ -70,11 +77,23 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
       db,
       homeCurrency: settings.homeCurrency,
       now: () => new Date(),
-      step: (request) => chatStep(apiKey, settings.assistantModel, request, { signal }),
+      /**
+       * STREAMED, through `expo/fetch`: React Native's own fetch buffers the
+       * whole body, which would deliver every word at once at the end. The
+       * words go to `streaming` as they arrive; the finished turn still comes
+       * back whole and is stored exactly as the unstreamed path stores it.
+       */
+      step: (request) =>
+        chatStepStreaming(apiKey, settings.assistantModel, request, {
+          signal,
+          fetchImpl: streamingFetch as unknown as typeof fetch,
+          onText: (soFar) => set({ streaming: soFar }),
+        }),
       onRow: (row) => {
         const activity =
           row.kind === 'model' ? ((row.meta as ModelMeta | null)?.activity?.join(' · ') ?? null) : get().activity;
-        set((state) => ({ rows: upsert(state.rows, row), activity: activity ?? 'Thinking' }));
+        // The row now holds what was streaming, so the draft bubble goes.
+        set((state) => ({ rows: upsert(state.rows, row), activity: activity ?? 'Thinking', streaming: null }));
       },
     };
   }
@@ -105,7 +124,7 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
       }
     } finally {
       if (controller === local) controller = null;
-      set({ busy: false, activity: null });
+      set({ busy: false, activity: null, streaming: null });
     }
   }
 
@@ -115,6 +134,7 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
     loaded: false,
     busy: false,
     activity: null,
+    streaming: null,
     pendingUndo: null,
 
     load: () => {
