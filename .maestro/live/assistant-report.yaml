@@ -95,7 +95,21 @@ tags:
       id: "assistant-screen"
     timeout: 30000
 - takeScreenshot: 04-folder-picker
+# The picker opens wherever it was last left, and Back inside it climbs one
+# folder rather than closing it — so back out until the conversation is there.
 - back
+- runFlow:
+    when:
+      notVisible:
+        id: "assistant-screen"
+    commands:
+      - back
+- runFlow:
+    when:
+      notVisible:
+        id: "assistant-screen"
+    commands:
+      - back
 - assertVisible:
     id: "assistant-report"
 - assertNotVisible: "Could not save the PDF."

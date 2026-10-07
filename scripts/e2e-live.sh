@@ -16,9 +16,13 @@ key="$(tr -d '[:space:]' < "$PEACE_GEMINI_KEY_FILE")"
 
 # The receipt the attachment flow picks from Files. A media scan so the picker
 # lists it straight away.
-adb push src/assistant/__fixtures__/receipt.jpg /sdcard/Download/peace-receipt.jpg >/dev/null
-adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE \
-  -d file:///sdcard/Download/peace-receipt.jpg >/dev/null 2>&1 || true
+# Pushed to BOTH Download and Documents: the system picker opens wherever it was
+# last used, so a receipt in only one of them is found on some runs and not others.
+for dir in Download Documents; do
+  adb push src/assistant/__fixtures__/receipt.jpg "/sdcard/$dir/peace-receipt.jpg" >/dev/null
+  adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE \
+    -d "file:///sdcard/$dir/peace-receipt.jpg" >/dev/null 2>&1 || true
+done
 # Revoke rather than grant the keyboard's microphone: granted, Gboard drops
 # into voice typing the moment its mic key is brushed and covers the composer.
 # Flows hide the keyboard before tapping Send, so nothing should touch it.

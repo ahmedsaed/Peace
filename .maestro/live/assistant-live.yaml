@@ -153,6 +153,9 @@ tags:
 
 # --- a receipt, attached from Files and logged with its photo ---
 # e2e-live.sh pushes the fixture receipt to the device's Download folder.
+# The undo check above ended on the records list; come back in first.
+- tapOn:
+    id: "nav-assistant"
 - tapOn:
     id: "assistant-attach"
 - assertVisible:
@@ -191,8 +194,6 @@ tags:
     timeout: 120000
 
 # --- reset is a divider, not a deletion ---
-- tapOn:
-    id: "nav-assistant"
 - tapOn:
     id: "assistant-reset"
 - assertVisible:
