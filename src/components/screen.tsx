@@ -79,7 +79,7 @@ function AssistantButton() {
   return (
     <HeaderButton
       icon="sparkle"
-      label="Open the assistant"
+      label="Ask Penny"
       testID="nav-assistant"
       onPress={() => router.push('/assistant')}
     />

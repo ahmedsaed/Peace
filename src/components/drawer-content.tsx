@@ -72,7 +72,7 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
  */
 const ASSISTANT_ITEM = {
   icon: 'sparkle',
-  label: 'Assistant',
+  label: 'Penny',
   hint: 'Ask about your money',
   href: '/assistant' as Href,
   testID: 'drawer-assistant',

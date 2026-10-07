@@ -88,7 +88,7 @@ export function GeminiKeyCard() {
       <Text className="mb-1 text-base font-semibold text-ink">Gemini</Text>
       <Text className="mb-3 text-sm leading-5 text-muted">
         One key, used by everything that reads for you — photographed receipts, bank messages and
-        the assistant. It is kept on this device and never goes into a backup.
+        Penny. It is kept on this device and never goes into a backup.
       </Text>
 
       <View className="mb-3 flex-row items-center justify-between">

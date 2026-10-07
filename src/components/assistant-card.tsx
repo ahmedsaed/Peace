@@ -42,9 +42,10 @@ export function AssistantCard() {
     <View className="rounded-xl bg-surface p-4" testID="assistant-card">
       <View className="flex-row items-center gap-3">
         <View className="flex-1">
-          <Text className="mb-1 text-base font-semibold text-ink">Assistant</Text>
+          <Text className="mb-1 text-base font-semibold text-ink">Penny</Text>
           <Text className="text-sm leading-5 text-muted">
-            Ask about your money in plain words, and have it make changes you approve first.
+            Your assistant. Ask about your money in plain words — Penny only changes anything once you
+            approve it.
           </Text>
         </View>
         <Switch
@@ -56,14 +57,14 @@ export function AssistantCard() {
             void getGeminiKey().then((key) => setHasKey(key !== null));
           }}
           testID="assistant-enabled"
-          accessibilityLabel="Use the assistant"
+          accessibilityLabel="Use Penny"
           trackColor={{ false: palette.line, true: palette.accent }}
           thumbColor={palette.ink}
         />
       </View>
 
       <Text className="mt-3 text-xs leading-5 text-muted" testID="assistant-privacy">
-        To answer, the assistant sends your question and what it reads from your ledger — totals, notes,
+        To answer, Penny sends your question and what it reads from your ledger — totals, notes,
         account, category and tag names — to Google&apos;s Gemini using your key. Your data stays stored on
         this phone. Turning this on means you accept that.
       </Text>
@@ -75,7 +76,7 @@ export function AssistantCard() {
               label="Model"
               value={model}
               onChange={(id) => update('assistantModel', id)}
-              sheetTitle="Assistant model"
+              sheetTitle="Penny's model"
               testIDPrefix="assistant-model"
             />
             <Pressable
@@ -83,7 +84,7 @@ export function AssistantCard() {
               testID="assistant-open"
               accessibilityRole="button"
               className="items-center rounded-lg bg-accent py-2.5 active:opacity-80">
-              <Text className="text-sm font-semibold text-accent-ink">Open the assistant</Text>
+              <Text className="text-sm font-semibold text-accent-ink">Open Penny</Text>
             </Pressable>
           </View>
         ) : hasKey === false ? (

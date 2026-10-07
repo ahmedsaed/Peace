@@ -163,7 +163,7 @@ export default function AssistantScreen() {
   if (!enabled || hasKey === false) {
     return (
       <View className="flex-1 bg-ground" testID="assistant-screen">
-        <StackHeader title="Assistant" />
+        <StackHeader title="Penny" />
         <Gate reason={!enabled ? 'off' : 'no-key'} />
       </View>
     );
@@ -172,7 +172,7 @@ export default function AssistantScreen() {
   return (
     <View className="flex-1 bg-ground" style={{ paddingBottom: keyboard }} testID="assistant-screen">
       <StackHeader
-        title="Assistant"
+        title="Penny"
         right={
           <HeaderButton
             icon="chat-new"
@@ -209,7 +209,7 @@ export default function AssistantScreen() {
               // a flow waits on to know the turn is over, and the turn is not
               // over while it is still being written.
               <View className="mt-2" testID="assistant-busy">
-                {streaming ? null : <TypingIndicator label={`${activity ?? 'Thinking'}…`} />}
+                {streaming ? null : <TypingIndicator label={`${activity ?? 'Penny is thinking'}…`} />}
               </View>
             ) : retryable ? (
               <Pressable
@@ -270,7 +270,7 @@ export default function AssistantScreen() {
               ? 'Answer the card above, or ask something else'
               : pending.length > 0
                 ? 'Ask about it, or send to have it read'
-                : 'Ask about your money'
+                : 'Ask Penny about your money'
           }
           placeholderTextColor={palette.muted}
           multiline
@@ -343,12 +343,12 @@ function Gate({ reason }: { reason: 'off' | 'no-key' }) {
     <View className="flex-1 items-center justify-center gap-3 px-8" testID={`assistant-gate-${reason}`}>
       <Icon name="sparkle" size={32} color={palette.accent} />
       <Text className="text-center text-base font-semibold text-ink">
-        {reason === 'off' ? 'The assistant is off' : 'Add a Gemini key first'}
+        {reason === 'off' ? 'Penny is switched off' : 'Add a Gemini key first'}
       </Text>
       <Text className="text-center text-sm leading-5 text-muted">
         {reason === 'off'
           ? 'Turn it on in Settings. To answer, it sends what it reads from your ledger to Google’s Gemini.'
-          : 'The assistant runs on your own Gemini API key, kept on this device.'}
+          : 'Penny runs on your own Gemini API key, kept on this device.'}
       </Text>
       <Pressable
         onPress={() => router.push('/settings')}

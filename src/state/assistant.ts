@@ -110,7 +110,7 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
         const activity =
           row.kind === 'model' ? ((row.meta as ModelMeta | null)?.activity?.join(' · ') ?? null) : get().activity;
         // The row now holds what was streaming, so the draft bubble goes.
-        set((state) => ({ rows: upsert(state.rows, row), activity: activity ?? 'Thinking', streaming: null }));
+        set((state) => ({ rows: upsert(state.rows, row), activity: activity ?? 'Penny is thinking', streaming: null }));
       },
     };
   }
@@ -127,7 +127,7 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
     const apiKey = await getGeminiKey();
     const local = new AbortController();
     controller = local;
-    set({ busy: true, activity: 'Thinking' });
+    set({ busy: true, activity: 'Penny is thinking' });
     const d = deps(apiKey ?? '', local.signal);
     try {
       if (apiKey === null) throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
