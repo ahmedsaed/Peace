@@ -1,0 +1,140 @@
+appId: com.ahmed.peace
+---
+# The README's Penny row, from the demo ledger and a REAL Gemini key.
+#
+# NOT in .maestro/: it costs money (a handful of requests) and asserts little.
+# Run it through `npm run shots:penny`, which restores the demo ledger first.
+#
+# A real model words things its own way, so these are reviewed by eye before
+# they are committed — the script copies them, a person decides they are good.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- the demo ledger, restored the way a person would ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-export"
+- scrollUntilVisible:
+    element:
+      id: "restore-pick"
+    direction: DOWN
+- tapOn:
+    id: "restore-pick"
+- extendedWaitUntil:
+    visible: "peace-demo.db"
+    timeout: 15000
+- tapOn: "peace-demo.db"
+- extendedWaitUntil:
+    visible: "REPLACE"
+    timeout: 15000
+- tapOn: "REPLACE"
+- extendedWaitUntil:
+    visible: ".*records in the ledger.*"
+    timeout: 30000
+- tapOn:
+    id: "nav-back"
+
+# --- a key, and consent (after the restore, which replaces settings) ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- scrollUntilVisible:
+    element:
+      id: "gemini-key-edit"
+    direction: DOWN
+- tapOn:
+    id: "gemini-key-edit"
+- tapOn:
+    id: "gemini-key-input"
+- inputText: ${GEMINI_KEY}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "gemini-key-save"
+    direction: DOWN
+- tapOn:
+    id: "gemini-key-save"
+- scrollUntilVisible:
+    element:
+      id: "assistant-enabled"
+    direction: DOWN
+- tapOn:
+    id: "assistant-enabled"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-assistant"
+
+# --- 1. ask: an answer worked out from the ledger, every figure cited ---
+- tapOn:
+    id: "assistant-input"
+- inputText: "How did September compare with August?"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-reply"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+# Headless emulator only: on a windowed one this falls back to Back.
+- hideKeyboard
+- takeScreenshot: penny-ask
+
+# --- 2. a chart, drawn from the same totals every screen uses ---
+- tapOn:
+    id: "assistant-reset"
+- tapOn:
+    id: "assistant-input"
+- inputText: "How does my coffee spending compare month to month?"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-chart"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+- hideKeyboard
+- takeScreenshot: penny-chart
+
+# --- 3. a receipt, read into a card that waits for approval ---
+- tapOn:
+    id: "assistant-reset"
+- tapOn:
+    id: "assistant-attach"
+- tapOn:
+    id: "assistant-attach-files"
+- extendedWaitUntil:
+    visible: "peace-receipt.jpg"
+    timeout: 15000
+- tapOn: "peace-receipt.jpg"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-pending-file"
+    timeout: 15000
+- tapOn:
+    id: "assistant-input"
+- inputText: "Log this, I paid with the Visa"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-create-record-approve"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+- hideKeyboard
+- takeScreenshot: penny-receipt
