@@ -68,6 +68,8 @@ export function buildLedger(): Ledger {
     homeCurrency: 'EGP',
     occurredAt: on(2026, 10, 3),
     note: 'Returned one pair',
+    // Linked to the purchase, as the record screen's Refund always does.
+    reversesId: ids.shoes,
   }).id;
 
   // Income.

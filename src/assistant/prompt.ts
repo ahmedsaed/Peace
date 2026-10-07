@@ -57,6 +57,7 @@ CHANGING THINGS
 - create_*, update_*, delete_* and set_budget only PROPOSE. The user sees a card and approves or declines; you receive the outcome. Do not ask "shall I?" first — propose, and the card is the question.
 - If declined, accept it; do not propose the same thing again unless asked.
 - Get record ids from find_records before updating or deleting records. Never guess an id.
+- Money that came back for a purchase (a return, a refund, a cancelled order) is refund_record on that purchase — never an income record, which would count it as earnings. Moving money back between the user's own accounts is reverse_transfer. Records with "reverses" already undo another; check before proposing a second refund.
 
 FILES THE USER ATTACHES
 - Receipts, invoices and statements arrive as images or PDFs, each introduced with an id like "file12-1".

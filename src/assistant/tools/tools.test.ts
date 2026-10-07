@@ -41,7 +41,7 @@ describe('the tool catalogue', () => {
 
   it('classifies anything that changes data as a write', () => {
     const writes = TOOLS.filter((t) => t.kind === 'write').map((t) => t.declaration.name);
-    for (const name of writes) expect(name).toMatch(/^(create|update|delete|set)_/);
+    for (const name of writes) expect(name).toMatch(/^(create|update|delete|set|refund|reverse)_/);
     // And nothing that only reads sneaks into that set.
     for (const name of ['summarize', 'find_records', 'show_chart', 'make_report']) expect(isWrite(name)).toBe(false);
   });
@@ -436,4 +436,71 @@ describe('writes', () => {
     ledger.db.delete(transactions).where(eq(transactions.id, ledger.ids.shoes)).run();
     expect(apply('update_records', args).response.error).toMatch(/No record has the id/);
   });
+
+  it('refunds a purchase in full by default, inheriting its account, category and currency', () => {
+    const prepared = prepare('refund_record', { id: ledger.ids.fuelDec1 });
+    if (!('preview' in prepared)) throw new Error(prepared.error);
+    expect(prepared.preview.title).toBe('Refund this purchase in full?');
+    expect(prepared.preview.lines.find((l) => l.label === 'Refund')?.figure).toEqual({ minor: 90000, currency: 'EGP' });
+
+    const { response } = apply('refund_record', { id: ledger.ids.fuelDec1, date: '2025-12-10' });
+    const refund = getRecord(ledger.db, response.id as string)!;
+    expect(refund).toEqual(
+      expect.objectContaining({ isRefund: true, amountMinor: 90000, accountId: CASH, categoryId: 'seed:cat:fuel', reversesId: ledger.ids.fuelDec1 })
+    );
+    // It nets against fuel: December's fuel is now just the second fill.
+    const { response: summary } = read('summarize', { measure: 'expense', category: 'Fuel', month: '2025-12' });
+    expect(minor(summary.total)).toBe(60000);
+    // And it is not income, however positive its amount.
+    expect(minor(read('summarize', { measure: 'income', month: '2025-12' }).response.total)).toBe(0);
+  });
+
+  it('refunds part of a purchase, and never more than is left', () => {
+    // The shoes cost 800 and 300 has already come back.
+    expect(prepare('refund_record', { id: ledger.ids.shoes, amount: 600 })).toEqual({
+      error: expect.stringMatching(/more than is left to refund.*500\.00 EGP/),
+    });
+    const prepared = prepare('refund_record', { id: ledger.ids.shoes, amount: 200 });
+    if (!('preview' in prepared)) throw new Error(prepared.error);
+    expect(prepared.preview.title).toBe('Refund part of this purchase?');
+    expect(prepared.preview.lines.find((l) => l.label === 'Already refunded')?.figure).toEqual({ minor: 30000, currency: 'EGP' });
+    // Leaving the amount out takes whatever is left.
+    const { response } = apply('refund_record', { id: ledger.ids.shoes });
+    expect(getRecord(ledger.db, response.id as string)!.amountMinor).toBe(50000);
+    expect(prepare('refund_record', { id: ledger.ids.shoes })).toEqual({ error: expect.stringMatching(/refunded in full/) });
+  });
+
+  it('refuses what the long-press menu would not offer to refund, saying what to do instead', () => {
+    expect(prepare('refund_record', { id: ledger.ids.salary })).toEqual({ error: expect.stringMatching(/income/) });
+    expect(prepare('refund_record', { id: ledger.ids.refund })).toEqual({ error: expect.stringMatching(/already a refund/) });
+    expect(prepare('refund_record', { id: ledger.ids.atm })).toEqual({ error: expect.stringMatching(/reverse_transfer/) });
+    expect(prepare('refund_record', { id: 'nope' })).toEqual({ error: expect.stringMatching(/No record has the id/) });
+  });
+
+  it('reverses a transfer by swapping its ends, linked to the original, once', () => {
+    const prepared = prepare('reverse_transfer', { id: ledger.ids.atm });
+    if (!('preview' in prepared)) throw new Error(prepared.error);
+    expect(prepared.preview.lines.find((l) => l.label === 'Back')?.value).toBe('Cash → Bank');
+
+    const { response } = apply('reverse_transfer', { id: ledger.ids.atm, date: '2026-10-06' });
+    const back = getRecord(ledger.db, response.id as string)!;
+    expect(back).toEqual(expect.objectContaining({ accountId: CASH, counterAccountId: 'seed:acct:bank', amountMinor: -500000, reversesId: ledger.ids.atm }));
+
+    expect(prepare('reverse_transfer', { id: ledger.ids.atm })).toEqual({ error: expect.stringMatching(/already been reversed/) });
+    expect(prepare('reverse_transfer', { id: back.id })).toEqual({ error: expect.stringMatching(/itself a reversal/) });
+    expect(prepare('reverse_transfer', { id: ledger.ids.shoes })).toEqual({ error: expect.stringMatching(/refund_record/) });
+  });
+
+  it('works from either leg of the transfer', () => {
+    const legs = ledger.db.select().from(transactions).where(eq(transactions.note, 'ATM')).all();
+    const incoming = legs.find((l) => l.amountMinor > 0)!;
+    const { response } = apply('reverse_transfer', { id: incoming.id });
+    expect(getRecord(ledger.db, response.id as string)!.reversesId).toBe(ledger.ids.atm);
+  });
+
+  it('shows in find_records what a row undoes', () => {
+    const { response } = read('find_records', { text: 'Returned' });
+    expect((response.records as { reverses?: string }[])[0].reverses).toBe(ledger.ids.shoes);
+  });
 });
+
