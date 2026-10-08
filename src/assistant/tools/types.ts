@@ -30,6 +30,8 @@ export type StoredFilter = {
   tagId: string | null;
   accountId: string | null;
   text: string;
+  /** Left out, sub-categories included. Optional: charts stored before it existed have none. */
+  excludeCategoryIds?: string[];
 };
 
 export type ChartType = 'bar' | 'line' | 'donut';

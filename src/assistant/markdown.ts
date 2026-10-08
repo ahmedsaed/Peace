@@ -69,3 +69,30 @@ export function parseBlocks(text: string): Block[] {
   flush();
   return blocks;
 }
+
+/**
+ * A reply as plain text, for the clipboard.
+ *
+ * The figures are drawn by the CALLER — on screen that is `useMoney`, so a
+ * copy made while amounts are hidden carries the mask, not the numbers. A
+ * clipboard is a way out of the screen, and hiding amounts must not have one.
+ * Markdown goes; bullets keep their marker, paragraphs keep a blank line.
+ */
+export function plainText(
+  text: string,
+  figure: (ref: string, abs: boolean) => string,
+  prose: (text: string) => string = (s) => s
+): string {
+  const line = (inlines: Inline[]) =>
+    inlines.map((i) => (i.kind === 'figure' ? figure(i.ref, i.abs) : prose(i.text))).join('');
+  const out: string[] = [];
+  let previous: Block['kind'] | null = null;
+  for (const block of parseBlocks(text)) {
+    const body = block.kind === 'bullet' ? `${block.marker} ${line(block.inlines)}` : line(block.inlines);
+    // Bullets in a run stay together; anything else starts a new paragraph.
+    if (previous !== null) out.push(block.kind === 'bullet' && previous === 'bullet' ? '\n' : '\n\n');
+    out.push(body);
+    previous = block.kind;
+  }
+  return out.join('');
+}

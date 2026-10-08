@@ -776,6 +776,12 @@ app ignoring input. `pkill -f GradleDaemon`.
   validates AGAIN.** A proposal can sit for a week while the ledger moves under it. A delete asks
   twice and offers Undo with the rows' tags and attachment rows, captured before the cascade ate
   them. Refused-before-shown writes go back to the model as errors and never become a card.
+- **When the assistant needs many steps, a TOOL is missing — never add a step cap.** An emergency-fund
+  question hit the old 8-step limit because no tool could exclude a category, average per category,
+  or produce a derived amount — and since amounts must be CITED, the model kept calling tools hoping
+  one would hand it the number. The fix was `spending_profile`, `exclude_categories` and `calculate`
+  (dimension-checked arithmetic over cite tokens, rounded half away from zero in minor units); the
+  same question now takes three steps and an engine test asserts it. Stop is the user's brake.
 - **Replay Gemini's turns VERBATIM.** Thinking models put a `thoughtSignature` on function-call parts
   and reject a history that loses it — which only shows up on those models, in multi-step turns. The
   stored row IS the `Content` received; the screen is derived from it, never the other way round.

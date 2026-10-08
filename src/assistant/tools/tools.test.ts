@@ -129,6 +129,71 @@ describe('summarize', () => {
   });
 });
 
+describe('spending_profile', () => {
+  it('averages over FULL months only, per category and overall', () => {
+    // Twelve full months before October 2026: Oct 2025 – Sep 2026. Fuel (under
+    // Car) 800 + 900 + 600, coffee (under Food) 120. October's week is left out.
+    const { response } = read('spending_profile', { months: 12 });
+    expect(response.range).toBe('Oct 2025 – Sep 2026');
+    expect(minor(response.total)).toBe(242000);
+    expect(minor(response.monthly_average)).toBe(20167); // 2420.00 / 12, rounded half away
+    const categories = response.categories as { category: string; monthly_average: unknown; months_with_spending: number; busiest_month: { month: string; value: unknown } }[];
+    expect(categories.map((c) => [c.category, minor(c.monthly_average)])).toEqual([
+      ['Car', 19167],
+      ['Food', 1000],
+    ]);
+    expect(categories[0].months_with_spending).toBe(2);
+    expect(categories[0].busiest_month.month).toBe('Dec 2025');
+    expect(minor(categories[0].busiest_month.value)).toBe(150000);
+    expect((response.by_month as unknown[]).length).toBe(12);
+  });
+
+  it('leaves out excluded categories, sub-categories with them', () => {
+    const { response } = read('spending_profile', { months: 12, exclude_categories: ['Car'] });
+    expect(response.excluded).toEqual(['Car']);
+    expect(minor(response.total)).toBe(12000);
+    expect((response.categories as { category: string }[]).map((c) => c.category)).toEqual(['Food']);
+  });
+});
+
+describe('summarize with exclude_categories', () => {
+  it('answers "everything except" in one call', () => {
+    const { response } = read('summarize', { measure: 'expense', month: '2026-10', exclude_categories: ['Clothing'] });
+    expect(minor(response.total)).toBe(15000);
+    expect(response.filters).toEqual(['excluding Clothing']);
+  });
+
+  it('keeps the exclusion when a chart is drilled into', () => {
+    const { display } = read('show_chart', { title: 'x', measure: 'expense', group_by: 'month', month: '2026-10', exclude_categories: ['Clothing'] });
+    if (display?.kind !== 'chart') throw new Error('no chart');
+    expect(display.chart.points[0].valueMinor).toBe(15000);
+    expect(display.chart.filter.excludeCategoryIds).toEqual([CLOTHING]);
+  });
+});
+
+describe('calculate', () => {
+  it('turns a sum of cited figures into a new cited figure', () => {
+    const profile = read('spending_profile', { months: 12 }).response;
+    const [car, food] = profile.categories as { monthly_average: { cite: string } }[];
+    const { response } = read('calculate', {
+      expression: `(${car.monthly_average.cite} + ${food.monthly_average.cite}) * 6`,
+      label: '6 months',
+    });
+    expect(minor(response.result)).toBe((19167 + 1000) * 6);
+    expect(response.label).toBe('6 months');
+  });
+
+  it('returns a plain ratio, and refuses what makes no sense', () => {
+    const { response: total } = read('summarize', { measure: 'expense', month: '2026-10' });
+    const { response: income } = read('summarize', { measure: 'income', month: '2026-10' });
+    const t = (total.total as { cite: string }).cite;
+    const i = (income.total as { cite: string }).cite;
+    expect(read('calculate', { expression: `${i} / ${t}` }).response.ratio).toBeCloseTo(30.7692, 3);
+    expect(read('calculate', { expression: `${t} * ${i}` }).response.error).toMatch(/amount by an amount/);
+    expect(read('calculate', { expression: '{{t9f9}} * 2' }).response.error).toMatch(/not a figure/);
+  });
+});
+
 describe('find_records', () => {
   it('totals EVERY match, not just the rows it returns', () => {
     const { response } = read('find_records', { category: 'Fuel', limit: 1 });

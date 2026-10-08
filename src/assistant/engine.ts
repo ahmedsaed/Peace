@@ -45,7 +45,15 @@ import type { Db, ToolContext } from './tools/types';
  * is also why a batch is never half-executed.
  */
 
-export const MAX_STEPS = 8;
+/**
+ * NO STEP LIMIT. There was one — eight — and it ended a reasonable question
+ * ("how big should my emergency fund be, without the installments?") with
+ * "Stopped after 8 steps" just as the answer was close. The limit was standing
+ * in for tools that could not reach the data in a few calls; the fix was the
+ * tools (`spending_profile`, `calculate`, `exclude_categories`). The person
+ * watching has a Stop button, which is the right owner of "this is taking too
+ * long".
+ */
 /** Rows of history sent per request — bounds the cost of a long session. */
 export const CONTEXT_ROWS = 80;
 
@@ -267,7 +275,7 @@ function lastMeaningful(session: StoredRow[]): StoredRow | undefined {
 }
 
 export async function run(deps: Deps, signal?: AbortSignal): Promise<RunResult> {
-  for (let steps = 0; ; ) {
+  for (;;) {
     if (signal?.aborted) return 'stopped';
 
     const session = sessionMessages(deps.db, CONTEXT_ROWS);
@@ -285,15 +293,6 @@ export async function run(deps: Deps, signal?: AbortSignal): Promise<RunResult> 
     }
 
     // A user message or a tools row: the model's turn.
-    if (steps >= MAX_STEPS) {
-      write(deps, 'error', null, {
-        message: `Stopped after ${MAX_STEPS} steps without an answer. Try a narrower question.`,
-        retryable: true,
-      } satisfies ErrorMeta);
-      return 'done';
-    }
-    steps++;
-
     const content = await deps.step({
       system: systemPrompt(deps.now(), deps.homeCurrency, shape(deps.db)),
       contents: toContents(session, await loadInline(deps, session)),

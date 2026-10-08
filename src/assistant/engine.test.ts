@@ -4,7 +4,7 @@
 import { appendMessage, latestMessages, messagesBefore, sessionMessages } from '../db/repo/chat';
 import { getRecord } from '../db/repo/transactions';
 import { transactions } from '../db/schema';
-import { ask, CONTEXT_ROWS, decide, MAX_STEPS, reset, run, toContents, type Deps, type ModelMeta, type ToolsMeta } from './engine';
+import { ask, CONTEXT_ROWS, decide, reset, run, toContents, type Deps, type ModelMeta, type ToolsMeta } from './engine';
 import type { Content, Part } from './gemini-chat';
 import { buildLedger, NOW, type Ledger } from './test-ledger';
 
@@ -118,14 +118,57 @@ describe('a read-only turn', () => {
     expect(answers).toEqual(['get_balances', 'list_recurring']);
   });
 
-  it('gives up after MAX_STEPS rather than looping forever', async () => {
-    const script: Script = Array.from({ length: MAX_STEPS }, () => [call('get_balances', {})]);
-    const { step } = scripted(script);
-    ask(deps(step), 'loop');
+  it('has no step limit: a long turn runs to its answer, and Stop is what ends it early', async () => {
+    const long: Script = [...Array.from({ length: 12 }, () => [call('get_balances', {})]), [{ text: 'Done.' }]];
+    const { step } = scripted(long);
+    ask(deps(step), 'many steps');
     expect(await run(deps(step))).toBe('done');
-    const last = sessionMessages(ledger.db, 100).at(-1)!;
-    expect(last.kind).toBe('error');
-    expect((last.meta as { retryable: boolean }).retryable).toBe(true);
+    expect(sessionMessages(ledger.db, 100).at(-1)!.kind).toBe('model');
+
+    const controller = new AbortController();
+    const endless: Deps['step'] = async () => {
+      controller.abort(); // the user taps Stop while this step is in flight
+      return { role: 'model', parts: [call('get_balances', {})] };
+    };
+    ask(deps(endless), 'again');
+    expect(await run(deps(endless), controller.signal)).toBe('stopped');
+  });
+});
+
+describe('the emergency-fund question', () => {
+  it('is answered in three model steps: a profile, two calculations in parallel, the reply', async () => {
+    const cite = (contents: Content[], name: string) => {
+      for (const content of [...contents].reverse()) {
+        for (const part of content.parts) {
+          if (part.functionResponse?.name === name) return part.functionResponse.response;
+        }
+      }
+      throw new Error(`no ${name}`);
+    };
+    const { step, requests } = scripted([
+      [call('spending_profile', { months: 12, exclude_categories: ['Installments'] })],
+      (contents) => {
+        const profile = cite(contents, 'spending_profile') as { monthly_average: { cite: string }; categories: { monthly_average: { cite: string } }[] };
+        const essentials = profile.categories.map((c) => c.monthly_average.cite).join(' + ');
+        return [
+          call('calculate', { expression: `${profile.monthly_average.cite} * 6`, label: 'same lifestyle' }),
+          call('calculate', { expression: `(${essentials}) * 3`, label: 'bare minimum' }),
+        ];
+      },
+      (contents) => {
+        const answers = contents.at(-1)!.parts.map((p) => (p.functionResponse!.response.result as { cite: string }).cite);
+        return [{ text: `Keep ${answers[0]} to carry on as you are, or ${answers[1]} at the bare minimum.` }];
+      },
+    ]);
+    ask(deps(step), 'How big should my emergency fund be, excluding installments?');
+    expect(await run(deps(step))).toBe('done');
+    expect(requests).toHaveLength(3);
+
+    const reply = sessionMessages(ledger.db, 50).at(-1)!;
+    expect(Object.values((reply.meta as ModelMeta).figures!)).toEqual([
+      { minor: 20167 * 6, currency: 'EGP' },
+      { minor: (19167 + 1000) * 3, currency: 'EGP' },
+    ]);
   });
 });
 

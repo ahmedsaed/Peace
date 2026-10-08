@@ -13,6 +13,7 @@ import { ChartCard } from '@/components/assistant/chart-card';
 import { AttachMenu, MessageFiles, PendingFiles } from '@/components/assistant/files';
 import { AttachmentViewer } from '@/components/attachment-viewer';
 import { RecordsSheet } from '@/components/assistant/records-sheet';
+import { Reply } from '@/components/assistant/reply';
 import { RichText } from '@/components/assistant/rich-text';
 import { Coin, TypingIndicator } from '@/components/assistant/typing';
 import { Icon } from '@/components/icon';
@@ -402,17 +403,15 @@ function ItemView({
           {item.files.length > 0 ? <MessageFiles files={item.files} onOpen={onOpenFile} /> : null}
           {item.text ? (
             <View className="self-end rounded-2xl rounded-br-md bg-raised px-4 py-2.5">
-              <Text className="text-[15px] leading-[22px] text-ink">{item.text}</Text>
+              <Text selectable className="text-[15px] leading-[22px] text-ink">
+                {item.text}
+              </Text>
             </View>
           ) : null}
         </View>
       );
     case 'reply':
-      return (
-        <View className="my-1.5" testID="assistant-reply">
-          <RichText text={item.text} figures={item.figures} />
-        </View>
-      );
+      return <Reply text={item.text} figures={item.figures} />;
     case 'activity':
       return (
         <View className="my-1 flex-row items-center gap-1.5">

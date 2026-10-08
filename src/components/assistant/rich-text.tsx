@@ -69,7 +69,7 @@ export function RichText({
         block.kind === 'bullet' ? (
           <View key={i} className="flex-row gap-2 pl-1">
             <Text className="text-[15px] leading-[22px] text-muted">{block.marker}</Text>
-            <Text className="flex-1 text-[15px] leading-[22px] text-ink">
+            <Text selectable className="flex-1 text-[15px] leading-[22px] text-ink">
               {block.inlines.map(render)}
               {tail(i)}
             </Text>
@@ -77,6 +77,10 @@ export function RichText({
         ) : (
           <Text
             key={i}
+            // Long-press to select and copy, like any text a person might want
+            // to quote. The figures inside are already masked when hidden, so
+            // selecting cannot reach past the mask.
+            selectable
             className={`text-[15px] leading-[22px] text-ink ${block.kind === 'heading' ? 'font-semibold' : ''}`}>
             {block.inlines.map(render)}
             {tail(i)}

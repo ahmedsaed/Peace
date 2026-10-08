@@ -129,6 +129,9 @@ const CHROME_PATHS = {
   // the one cut into `chat-new`, centred on 12,12 — an action, not a thing, so
   // it reads as "add" rather than as a picture of a document or a folder.
   plus: 'M10.8 4h2.4v6.8H20v2.4h-6.8V20h-2.4v-6.8H4v-2.4h6.8V4z',
+  // Copies a reply. A solid front sheet and an L of the one behind — outlined
+  // sheets close up at the 14px it is drawn at; this keeps a 2.4-unit gap.
+  copy: 'M8 2h12v12h-2.4V4.4H8V2zM4 6.4h11.6V22H4V6.4z',
   'chat-new':
     'M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-4 4v-4H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm5.8 2.5v3.3H7.5v2.4h3.3v3.3h2.4v-3.3h3.3V8.8h-3.3V5.5z',
   stop: 'M6 6h12v12H6z',
