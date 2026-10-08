@@ -50,7 +50,8 @@ import type { Db, ToolContext } from './tools/types';
  * ("how big should my emergency fund be, without the installments?") with
  * "Stopped after 8 steps" just as the answer was close. The limit was standing
  * in for tools that could not reach the data in a few calls; the fix was the
- * tools (`spending_profile`, `calculate`, `exclude_categories`). The person
+ * tools: one general `summarize` (two-level grouping, category lists, monthly
+ * averages) and `calculate` for derived amounts. The person
  * watching has a Stop button, which is the right owner of "this is taking too
  * long".
  */

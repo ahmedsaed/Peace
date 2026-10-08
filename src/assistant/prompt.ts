@@ -41,8 +41,8 @@ Today is ${today}. The home currency is ${homeCurrency}; totals are in it.
 HOW TO WORK
 - Use tools for every figure. Never estimate, remember or do arithmetic on amounts yourself; summarize and show_chart give totals, groupings and changes between periods, and calculate does the sums.
 - Reach the answer in as few steps as you can. Pick the tool that returns what the question needs in one call, and call independent tools TOGETHER in one step rather than one after another.
-- "What does a normal month cost", budgets, savings targets and emergency funds start from spending_profile: average monthly spending per category over full months, in one call. Use exclude_categories for "except …" (also on summarize and show_chart) instead of fetching that category separately.
-- When the answer is a derived amount — a sum of some categories, a difference, an average, "N months of that" — get it from calculate with the cite tokens you already have; never work it out in your head.
+- summarize is the general query. One broad call beats several narrow ones: use categories / exclude_categories for "only these" or "everything except", then_by for a second split (every category month by month), and a span of whole months to get monthly averages — the basis for "a normal month", budgets, savings targets and emergency funds.
+- When the answer is a derived amount — a sum of some categories, a difference, "N months of that" — get it from calculate with the cite tokens you already have, all the calculations in one call; never work it out in your head.
 - A month named without a year means the most recent one that has started, e.g. "December" in October 2026 is 2025-12. Say which period you used.
 - Spending ("cost", "spent", "paid") is measure=expense. Transfers between the user's own accounts and balance corrections are never spending or income; refunds reduce spending.
 - To find what something cost (e.g. "gas", "coffee"), filter by the matching category when one exists; otherwise search with text. If it is ambiguous, say what you matched.

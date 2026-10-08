@@ -129,30 +129,55 @@ describe('summarize', () => {
   });
 });
 
-describe('spending_profile', () => {
-  it('averages over FULL months only, per category and overall', () => {
-    // Twelve full months before October 2026: Oct 2025 – Sep 2026. Fuel (under
-    // Car) 800 + 900 + 600, coffee (under Food) 120. October's week is left out.
-    const { response } = read('spending_profile', { months: 12 });
-    expect(response.range).toBe('Oct 2025 – Sep 2026');
+describe('summarize as the general query', () => {
+  const year = { from: '2025-10', to: '2026-09' }; // twelve whole months
+
+  it('gives monthly averages over whole months, overall and per group', () => {
+    const { response } = read('summarize', { measure: 'expense', group_by: 'category', ...year });
+    expect(response.whole_months).toBe(12);
     expect(minor(response.total)).toBe(242000);
     expect(minor(response.monthly_average)).toBe(20167); // 2420.00 / 12, rounded half away
-    const categories = response.categories as { category: string; monthly_average: unknown; months_with_spending: number; busiest_month: { month: string; value: unknown } }[];
-    expect(categories.map((c) => [c.category, minor(c.monthly_average)])).toEqual([
+    const groups = response.groups as { label: string; monthly_average: unknown }[];
+    expect(groups.map((g) => [g.label, minor(g.monthly_average)])).toEqual([
       ['Car', 19167],
       ['Food', 1000],
     ]);
-    expect(categories[0].months_with_spending).toBe(2);
-    expect(categories[0].busiest_month.month).toBe('Dec 2025');
-    expect(minor(categories[0].busiest_month.value)).toBe(150000);
-    expect((response.by_month as unknown[]).length).toBe(12);
   });
 
-  it('leaves out excluded categories, sub-categories with them', () => {
-    const { response } = read('spending_profile', { months: 12, exclude_categories: ['Car'] });
-    expect(response.excluded).toEqual(['Car']);
-    expect(minor(response.total)).toBe(12000);
-    expect((response.categories as { category: string }[]).map((c) => c.category)).toEqual(['Food']);
+  it('gives no average over a span that is not whole months — a week would count as a month', () => {
+    const { response } = read('summarize', { measure: 'expense', from: '2026-09-01', to: '2026-10-07' });
+    expect(response).not.toHaveProperty('monthly_average');
+    expect(response).not.toHaveProperty('whole_months');
+  });
+
+  it('splits each group a second way in the same call, adding up to the group', () => {
+    const { response } = read('summarize', { measure: 'expense', group_by: 'category', then_by: 'month', ...year });
+    const car = (response.groups as { label: string; value: unknown; by: { label: string; value: unknown }[] }[])[0];
+    expect(car.by).toHaveLength(12); // empty months kept on a time split
+    expect(car.by.filter((m) => minor(m.value) > 0).map((m) => [m.label, minor(m.value)])).toEqual([
+      ['Nov 2025', 80000],
+      ['Dec 2025', 150000],
+    ]);
+    expect(car.by.reduce((sum, m) => sum + minor(m.value), 0)).toBe(minor(car.value));
+  });
+
+  it('splits months by category, leaving out categories with nothing in them', () => {
+    const { response } = read('summarize', { measure: 'expense', group_by: 'month', then_by: 'category', ...year });
+    const december = (response.groups as { label: string; by: { label: string }[] }[]).find((g) => g.label === 'Dec 2025')!;
+    expect(december.by.map((b) => b.label)).toEqual(['Car']);
+  });
+
+  it('narrows to several categories at once, parents bringing their children', () => {
+    const { response } = read('summarize', { measure: 'expense', categories: ['Car', 'Clothing'], month: '2026-10' });
+    expect(minor(response.total)).toBe(50000); // clothing net of the refund; no fuel in October
+    expect(response.filters).toEqual(['categories Car, Clothing']);
+    const all = read('summarize', { measure: 'expense', categories: ['Car', 'Food'], ...year }).response;
+    expect(minor(all.total)).toBe(242000);
+  });
+
+  it('refuses a second split that says nothing', () => {
+    expect(read('summarize', { measure: 'expense', then_by: 'month' }).response.error).toMatch(/needs group_by/);
+    expect(read('summarize', { measure: 'expense', group_by: 'month', then_by: 'month' }).response.error).toMatch(/differ/);
   });
 });
 
@@ -172,25 +197,44 @@ describe('summarize with exclude_categories', () => {
 });
 
 describe('calculate', () => {
-  it('turns a sum of cited figures into a new cited figure', () => {
-    const profile = read('spending_profile', { months: 12 }).response;
-    const [car, food] = profile.categories as { monthly_average: { cite: string } }[];
+  it('does every calculation in one call, each a new cited figure', () => {
+    const { response: summary } = read('summarize', { measure: 'expense', group_by: 'category', from: '2025-10', to: '2026-09' });
+    const [car, food] = summary.groups as { monthly_average: { cite: string } }[];
+    const all = (summary.monthly_average as { cite: string }).cite;
     const { response } = read('calculate', {
-      expression: `(${car.monthly_average.cite} + ${food.monthly_average.cite}) * 6`,
-      label: '6 months',
+      calculations: [
+        { label: 'same lifestyle', expression: `${all} * 6` },
+        { label: 'bare minimum', expression: `(${car.monthly_average.cite} + ${food.monthly_average.cite}) * 3` },
+      ],
     });
-    expect(minor(response.result)).toBe((19167 + 1000) * 6);
-    expect(response.label).toBe('6 months');
+    const [same, bare] = response.results as { label: string; result: unknown }[];
+    expect([same.label, minor(same.result)]).toEqual(['same lifestyle', 20167 * 6]);
+    expect([bare.label, minor(bare.result)]).toEqual(['bare minimum', (19167 + 1000) * 3]);
   });
 
-  it('returns a plain ratio, and refuses what makes no sense', () => {
+  it('reports a bad expression beside the good ones instead of failing them all', () => {
     const { response: total } = read('summarize', { measure: 'expense', month: '2026-10' });
     const { response: income } = read('summarize', { measure: 'income', month: '2026-10' });
     const t = (total.total as { cite: string }).cite;
     const i = (income.total as { cite: string }).cite;
-    expect(read('calculate', { expression: `${i} / ${t}` }).response.ratio).toBeCloseTo(30.7692, 3);
-    expect(read('calculate', { expression: `${t} * ${i}` }).response.error).toMatch(/amount by an amount/);
-    expect(read('calculate', { expression: '{{t9f9}} * 2' }).response.error).toMatch(/not a figure/);
+    const { response } = read('calculate', {
+      calculations: [
+        { label: 'ratio', expression: `${i} / ${t}` },
+        { label: 'nonsense', expression: `${t} * ${i}` },
+        { expression: '{{t9f9}} * 2' },
+      ],
+    });
+    const [ratio, nonsense, missing] = response.results as { ratio?: number; error?: string }[];
+    expect(ratio.ratio).toBeCloseTo(30.7692, 3);
+    expect(nonsense.error).toMatch(/amount by an amount/);
+    expect(missing.error).toMatch(/not a figure/);
+  });
+
+  it('still takes a single expression', () => {
+    const { response: total } = read('summarize', { measure: 'expense', month: '2026-10' });
+    const t = (total.total as { cite: string }).cite;
+    const { response } = read('calculate', { expression: `${t} * 2` });
+    expect(minor((response.results as { result: unknown }[])[0].result)).toBe(130000);
   });
 });
 

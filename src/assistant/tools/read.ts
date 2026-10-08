@@ -12,7 +12,7 @@ import { calculate } from '../calc';
 import { formatPeriod } from '../../lib/period';
 import { describeRecurrence } from '../../lib/recurrence';
 import { EMPTY_QUERY, type SearchQuery } from '../../lib/search-query';
-import { aggregate, GROUP_BYS, MEASURES, type Aggregate, type GroupBy, type Measure } from '../aggregate';
+import { aggregate, GROUP_BYS, inBucket, MEASURES, wholeMonths, type Aggregate, type GroupBy, type Measure } from '../aggregate';
 import { resolveSpan, spanLabel, ToolInputError, ymd, type Span } from '../dates';
 import { citedFigures } from '../figures';
 import type { Schema } from '../gemini-chat';
@@ -63,7 +63,14 @@ const FILTER_PROPS: Record<string, Schema> = {
   },
 };
 
-/** For the totals that come from `ledgerFacts` — summarize, charts, the profile. */
+/** Several categories at once, for the totals that come from `ledgerFacts`. */
+const CATEGORIES_PROP: Schema = {
+  type: 'array',
+  items: { type: 'string' },
+  description: 'Only these categories (ids or names), e.g. ["Home", "Bills", "Food"] — parents include their sub-categories.',
+};
+
+/** For the totals that come from `ledgerFacts` — summarize and charts. */
 const EXCLUDE_PROP: Schema = {
   type: 'array',
   items: { type: 'string' },
@@ -105,6 +112,9 @@ function readFilter(args: Args, ctx: ToolContext): Filter {
   const text = optString(args, 'text') ?? '';
   if (text) described.push(`matching "${text}"`);
 
+  const several = (optStringList(args, 'categories') ?? []).map((ref) => resolveCategory(ctx.db, ref));
+  if (several.length > 0) described.push(`categories ${several.map((c) => c.name).join(', ')}`);
+
   const excluded = (optStringList(args, 'exclude_categories') ?? []).map((ref) => resolveCategory(ctx.db, ref));
   if (excluded.length > 0) described.push(`excluding ${excluded.map((c) => c.name).join(', ')}`);
 
@@ -115,6 +125,7 @@ function readFilter(args: Args, ctx: ToolContext): Filter {
     tagId: tag?.id ?? null,
     accountId: account?.id ?? null,
     text,
+    categoryIds: several.map((c) => c.id),
     excludeCategoryIds: excluded.map((c) => c.id),
   };
   return {
@@ -128,6 +139,7 @@ function readFilter(args: Args, ctx: ToolContext): Filter {
       tagId: filter.tagId ?? null,
       accountId: filter.accountId ?? null,
       text,
+      ...(several.length > 0 ? { categoryIds: several.map((c) => c.id) } : {}),
       ...(excluded.length > 0 ? { excludeCategoryIds: excluded.map((c) => c.id) } : {}),
     },
   };
@@ -142,6 +154,7 @@ export function fromStored(stored: StoredFilter): LedgerFilter {
     tagId: stored.tagId,
     accountId: stored.accountId,
     text: stored.text,
+    categoryIds: stored.categoryIds ?? [],
     excludeCategoryIds: stored.excludeCategoryIds ?? [],
   };
 }
@@ -157,26 +170,72 @@ function categoryColors(ctx: ToolContext): Map<string, string> {
   );
 }
 
-function summarise(args: Args, ctx: ToolContext): { filter: Filter; measure: Measure; groupBy: GroupBy; result: Aggregate } {
+type Summary = {
+  filter: Filter;
+  measure: Measure;
+  groupBy: GroupBy;
+  result: Aggregate;
+  /** The second split, per first-level bucket, when `then_by` was asked for. */
+  thenBy: GroupBy | null;
+  nested: Aggregate[] | null;
+};
+
+function summarise(args: Args, ctx: ToolContext): Summary {
   const filter = readFilter(args, ctx);
   const measure = reqEnum(args, 'measure', MEASURES);
   const groupBy = optEnum(args, 'group_by', GROUP_BYS) ?? 'none';
+  const thenBy = optEnum(args, 'then_by', GROUP_BYS) ?? null;
+  if (thenBy && (groupBy === 'none' || thenBy === 'none')) {
+    throw new ToolInputError('then_by needs group_by, and both need a real grouping.');
+  }
+  if (thenBy === groupBy) throw new ToolInputError('then_by must differ from group_by.');
+
   const facts = ledgerFacts(ctx.db, filter.filter, ctx.homeCurrency);
-  const result = aggregate(facts, {
-    measure,
-    groupBy,
-    start: filter.span.start,
-    end: filter.span.end,
-  });
-  return { filter, measure, groupBy, result };
+  const span = { start: filter.span.start, end: filter.span.end };
+  const result = aggregate(facts, { measure, groupBy, ...span });
+  // The second level is split from the SAME facts the first level counted, so
+  // a category's months add up to the category.
+  const nested = thenBy
+    ? result.buckets.map((bucket) =>
+        aggregate(
+          facts.filter((fact) => inBucket(fact, groupBy, bucket)),
+          {
+            measure,
+            groupBy: thenBy,
+            // A time split inside a time bucket runs over that bucket's span.
+            start: bucket.start ?? span.start,
+            end: bucket.end ?? span.end,
+          }
+        )
+      )
+    : null;
+  return { filter, measure, groupBy, result, thenBy, nested };
 }
 
 /** What the model is told about a summary. Every amount is a cite. */
 function summaryResponse(
   ctx: ToolContext,
-  { filter, measure, groupBy, result }: ReturnType<typeof summarise>
+  { filter, measure, groupBy, result, thenBy, nested }: Summary
 ): Record<string, unknown> {
   const cite = (minor: number) => ctx.figures.cite(minor, ctx.homeCurrency);
+  // Per-month averages whenever the span is WHOLE months — the figure behind
+  // "a normal month", budgets and savings targets, and one the model cannot
+  // work out itself without typing a number.
+  const months = wholeMonths(filter.span.start, filter.span.end);
+  const perMonth = (minor: number) =>
+    months && months > 1 ? { monthly_average: cite(roundHalfAwayFromZero(minor / months) + 0) } : {};
+  const second = (index: number) => {
+    if (!thenBy || !nested) return {};
+    const inner = nested[index];
+    const innerTime = thenBy === 'month' || thenBy === 'week' || thenBy === 'day';
+    return {
+      by: inner.buckets
+        // Empty months are kept on a time split (a zero is information); an
+        // empty category is not a group at all.
+        .filter((b) => innerTime || b.valueMinor !== 0)
+        .map((b) => ({ label: b.label, value: cite(b.valueMinor), records: b.count })),
+    };
+  };
   const timeSeries = groupBy === 'month' || groupBy === 'week' || groupBy === 'day';
   // Shares only where the groups partition the total. Tags overlap, and net
   // mixes signs, so a percentage of either would be a number that means
@@ -188,7 +247,9 @@ function summaryResponse(
     range: filter.span.label,
     filters: filter.described,
     measure,
+    ...(months ? { whole_months: months } : {}),
     total: cite(result.totalMinor),
+    ...perMonth(result.totalMinor),
     records_counted: result.count,
     ...(result.unvaluedCount > 0
       ? {
@@ -202,11 +263,13 @@ function summaryResponse(
           groups: result.buckets.map((bucket, i) => ({
             label: bucket.label,
             value: cite(bucket.valueMinor),
+            ...(timeSeries ? {} : perMonth(bucket.valueMinor)),
             records: bucket.count,
             ...(partition ? { percent: percents[i] } : {}),
             ...(timeSeries && i > 0
               ? { change_from_previous: cite(bucket.valueMinor - result.buckets[i - 1].valueMinor) }
               : {}),
+            ...second(i),
           })),
         }),
   };
@@ -312,10 +375,23 @@ const summarize: ReadTool = {
   declaration: {
     name: 'summarize',
     description:
-      'Total spending, income or net over a span, optionally split by month/week/day/category/tag/account. Transfers between own accounts and balance corrections are excluded, refunds net against spending. This is how to answer "how much".',
+      'The general way to query the ledger\'s money: total spending, income or net over any span, narrowed to one or several categories (or everything except some), a tag, an account or text, split by month/week/day/category/subcategory/tag/account — and, with then_by, split a second way in the same call (every category month by month). Over whole months it also gives monthly averages, overall and per group. Transfers between own accounts and balance corrections are excluded, refunds net against spending. Prefer ONE broad call over several narrow ones.',
     parameters: {
       type: 'object',
-      properties: { measure: MEASURE_PROP, group_by: GROUP_PROP, ...SPAN_PROPS, ...FILTER_PROPS, exclude_categories: EXCLUDE_PROP },
+      properties: {
+        measure: MEASURE_PROP,
+        group_by: GROUP_PROP,
+        then_by: {
+          type: 'string',
+          enum: GROUP_BYS,
+          description:
+            'Split each group a second way, e.g. group_by=category, then_by=month gives every category month by month in one call.',
+        },
+        ...SPAN_PROPS,
+        ...FILTER_PROPS,
+        categories: CATEGORIES_PROP,
+        exclude_categories: EXCLUDE_PROP,
+      },
       required: ['measure'],
     },
   },
@@ -388,6 +464,7 @@ const showChart: ReadTool = {
         group_by: GROUP_PROP,
         ...SPAN_PROPS,
         ...FILTER_PROPS,
+        categories: CATEGORIES_PROP,
         exclude_categories: EXCLUDE_PROP,
       },
       required: ['title', 'measure', 'group_by'],
@@ -729,84 +806,6 @@ const makeReport: ReadTool = {
 };
 
 /**
- * Typical monthly spending, per category, in ONE call.
- *
- * The question behind "how big should my emergency fund be", "what can I
- * afford", "what does a normal month cost me" — and the one the other tools
- * made expensive: `summarize` gives a total over a span or a split by one
- * dimension, so a per-category monthly average took one call per category and
- * an average no tool would hand over. Here it is computed from the same facts
- * every total uses, over FULL months only — a week-old month would drag every
- * average down.
- */
-const spendingProfile: ReadTool = {
-  kind: 'read',
-  activity: 'Working out a typical month',
-  declaration: {
-    name: 'spending_profile',
-    description:
-      'What a typical month costs: the average monthly spending per top-level category and overall, over the last N FULL months (the current month is left out), with each category\'s busiest month and how many months it appeared in. One call answers "what does a normal month cost me", budgeting and emergency-fund questions — combine its averages with calculate.',
-    parameters: {
-      type: 'object',
-      properties: {
-        months: { type: 'integer', description: 'How many full months to average over, 1-24. Default 6.' },
-        measure: { type: 'string', enum: ['expense', 'income'], description: 'Default expense.' },
-        exclude_categories: EXCLUDE_PROP,
-      },
-    },
-  },
-  run(args, ctx) {
-    const months = optInt(args, 'months', 1, 24) ?? 6;
-    const measure = optEnum(args, 'measure', ['expense', 'income'] as const) ?? 'expense';
-    const end = new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1);
-    const start = new Date(end.getFullYear(), end.getMonth() - months, 1);
-    const excluded = (optStringList(args, 'exclude_categories') ?? []).map((ref) => resolveCategory(ctx.db, ref));
-
-    const facts = ledgerFacts(
-      ctx.db,
-      { start, end, excludeCategoryIds: excluded.map((c) => c.id) },
-      ctx.homeCurrency
-    );
-    const overall = aggregate(facts, { measure, groupBy: 'month', start, end });
-    const byCategory = aggregate(facts, { measure, groupBy: 'category' });
-    const cite = (minor: number) => ctx.figures.cite(minor, ctx.homeCurrency);
-    const average = (total: number) => roundHalfAwayFromZero(total / months);
-
-    const categories = byCategory.buckets.map((bucket) => {
-      const mine = facts.filter((f) => (f.topCategoryId ?? 'none') === bucket.key);
-      const perMonth = aggregate(mine, { measure, groupBy: 'month', start, end }).buckets;
-      const busiest = perMonth.reduce((top, b) => (b.valueMinor > top.valueMinor ? b : top), perMonth[0]);
-      return {
-        category: bucket.label,
-        ...(bucket.categoryId ? { category_id: bucket.categoryId } : {}),
-        monthly_average: cite(average(bucket.valueMinor)),
-        total: cite(bucket.valueMinor),
-        months_with_spending: perMonth.filter((b) => b.valueMinor !== 0).length,
-        ...(busiest ? { busiest_month: { month: busiest.label, value: cite(busiest.valueMinor) } } : {}),
-      };
-    });
-
-    return {
-      response: {
-        range: spanLabel(start, end),
-        full_months: months,
-        measure,
-        ...(excluded.length > 0 ? { excluded: excluded.map((c) => c.name) } : {}),
-        monthly_average: cite(average(overall.totalMinor)),
-        total: cite(overall.totalMinor),
-        by_month: overall.buckets.map((b) => ({ month: b.label, value: cite(b.valueMinor) })),
-        categories,
-        ...(overall.unvaluedCount > 0
-          ? { not_counted: `${overall.unvaluedCount} record(s) have no ${ctx.homeCurrency} value and are left out.` }
-          : {}),
-        guidance:
-          'Averages are per full month. To combine them (a sum of chosen categories, times a number of months), use calculate with their cite tokens.',
-      },
-    };
-  },
-};
-
-/**
  * Arithmetic on figures already in the conversation — see `calc.ts`.
  *
  * A READ: it changes nothing and needs no approval, and its answer is a new
@@ -818,35 +817,56 @@ const calculateTool: ReadTool = {
   declaration: {
     name: 'calculate',
     description:
-      'Do arithmetic on amounts a tool already returned, so a derived figure (a sum, a difference, an average, "six months of that") can be cited instead of typed. Write the cite tokens with + - * / and brackets, e.g. "({{t3f1}} + {{t3f4}}) * 6". Plain numbers may multiply or divide amounts, never be added to them. Returns a new cite token, or a plain ratio when an amount is divided by an amount. Call several in the same step when they are independent.',
+      'Do arithmetic on amounts a tool already returned, so a derived figure (a sum, a difference, an average, "six months of that") can be cited instead of typed. Write the cite tokens with + - * / and brackets, e.g. "({{t3f1}} + {{t3f4}}) * 6". Plain numbers may multiply or divide amounts, never be added to them. Each result is a new cite token, or a plain ratio when an amount is divided by an amount. Put every calculation you need in ONE call.',
     parameters: {
       type: 'object',
       properties: {
-        expression: { type: 'string' },
-        label: { type: 'string', description: 'What the result is, e.g. "6 months of essentials".' },
+        calculations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string', description: 'What the result is, e.g. "6 months of essentials".' },
+              expression: { type: 'string' },
+            },
+            required: ['expression'],
+          },
+        },
       },
-      required: ['expression'],
+      required: ['calculations'],
     },
   },
   run(args, ctx) {
-    const expression = reqString(args, 'expression');
-    const label = optString(args, 'label');
-    const result = calculate(expression, (ref) => ctx.figures.get(ref));
-    return {
-      response: {
-        ...(label ? { label } : {}),
-        expression,
-        ...(result.kind === 'money'
-          ? { result: ctx.figures.cite(result.figure.minor, result.figure.currency) }
-          : { ratio: result.value }),
-      },
-    };
+    const raw = args.calculations ?? (args.expression ? [{ expression: args.expression, label: args.label }] : null);
+    if (!Array.isArray(raw) || raw.length === 0) throw new ToolInputError('"calculations" needs at least one expression.');
+    if (raw.length > 20) throw new ToolInputError('At most 20 calculations at a time.');
+    // Each one stands or falls on its own: one bad expression is reported
+    // beside the others' answers rather than failing the whole call, which
+    // would cost a step to redo the ones that were right.
+    const results = raw.map((entry) => {
+      const item = (entry ?? {}) as Args;
+      const label = optString(item, 'label');
+      try {
+        const expression = reqString(item, 'expression');
+        const result = calculate(expression, (ref) => ctx.figures.get(ref));
+        return {
+          ...(label ? { label } : {}),
+          expression,
+          ...(result.kind === 'money'
+            ? { result: ctx.figures.cite(result.figure.minor, result.figure.currency) }
+            : { ratio: result.value }),
+        };
+      } catch (error) {
+        if (error instanceof ToolInputError) return { ...(label ? { label } : {}), error: error.message };
+        throw error;
+      }
+    });
+    return { response: { results } };
   },
 };
 
 export const READ_TOOLS: ReadTool[] = [
   summarize,
-  spendingProfile,
   calculateTool,
   findRecords,
   showChart,

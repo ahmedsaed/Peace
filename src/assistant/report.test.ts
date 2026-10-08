@@ -4,7 +4,7 @@
 import { formatMinor } from '../lib/money';
 import { canRetry, sessionIsEmpty, toItems } from './display';
 import { chartCsv, drillFacts, drillRows } from './drill';
-import { parseBlocks, plainText } from './markdown';
+import { parseBlocks } from './markdown';
 import { chartSvg, proseHtml, reportHtml } from './report-html';
 import { runRead } from './tools';
 import type { ChartSpec, ReportSpec } from './tools/types';
@@ -39,18 +39,6 @@ describe('parseBlocks', () => {
   it('drops single-asterisk emphasis instead of printing the asterisks', () => {
     const [block] = parseBlocks('This is *really* high.');
     expect(block.inlines).toEqual([{ kind: 'text', text: 'This is really high.', bold: false }]);
-  });
-});
-
-describe('plainText', () => {
-  it('flattens a reply for the clipboard with figures drawn by the caller', () => {
-    const text = 'You spent **{{a1}}**.\n\n- Fuel: {{a2|abs}}\n- Coffee\n\nThat is all.';
-    const draw = (ref: string, abs: boolean) => `[${ref}${abs ? '|abs' : ''}]`;
-    expect(plainText(text, draw)).toBe('You spent [a1].\n\n• Fuel: [a2|abs]\n• Coffee\n\nThat is all.');
-  });
-
-  it('lets the caller mask prose too, as the screen does when amounts are hidden', () => {
-    expect(plainText('About E£1,240 in all.', () => '', (s) => s.replace(/E£[\d,]+/, '••••'))).toBe('About •••• in all.');
   });
 });
 

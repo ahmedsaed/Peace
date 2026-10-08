@@ -136,8 +136,8 @@ describe('a read-only turn', () => {
 });
 
 describe('the emergency-fund question', () => {
-  it('is answered in three model steps: a profile, two calculations in parallel, the reply', async () => {
-    const cite = (contents: Content[], name: string) => {
+  it('is answered in three model steps with the general tools: one query, one batch of sums, the reply', async () => {
+    const response = (contents: Content[], name: string) => {
       for (const content of [...contents].reverse()) {
         for (const part of content.parts) {
           if (part.functionResponse?.name === name) return part.functionResponse.response;
@@ -146,18 +146,33 @@ describe('the emergency-fund question', () => {
       throw new Error(`no ${name}`);
     };
     const { step, requests } = scripted([
-      [call('spending_profile', { months: 12, exclude_categories: ['Installments'] })],
+      [
+        call('summarize', {
+          measure: 'expense',
+          group_by: 'category',
+          from: '2025-10',
+          to: '2026-09',
+          exclude_categories: ['Installments'],
+        }),
+      ],
       (contents) => {
-        const profile = cite(contents, 'spending_profile') as { monthly_average: { cite: string }; categories: { monthly_average: { cite: string } }[] };
-        const essentials = profile.categories.map((c) => c.monthly_average.cite).join(' + ');
+        const summary = response(contents, 'summarize') as {
+          monthly_average: { cite: string };
+          groups: { monthly_average: { cite: string } }[];
+        };
+        const essentials = summary.groups.map((g) => g.monthly_average.cite).join(' + ');
         return [
-          call('calculate', { expression: `${profile.monthly_average.cite} * 6`, label: 'same lifestyle' }),
-          call('calculate', { expression: `(${essentials}) * 3`, label: 'bare minimum' }),
+          call('calculate', {
+            calculations: [
+              { label: 'same lifestyle', expression: `${summary.monthly_average.cite} * 6` },
+              { label: 'bare minimum', expression: `(${essentials}) * 3` },
+            ],
+          }),
         ];
       },
       (contents) => {
-        const answers = contents.at(-1)!.parts.map((p) => (p.functionResponse!.response.result as { cite: string }).cite);
-        return [{ text: `Keep ${answers[0]} to carry on as you are, or ${answers[1]} at the bare minimum.` }];
+        const results = response(contents, 'calculate').results as { result: { cite: string } }[];
+        return [{ text: `Keep ${results[0].result.cite} to carry on as you are, or ${results[1].result.cite} at the bare minimum.` }];
       },
     ]);
     ask(deps(step), 'How big should my emergency fund be, excluding installments?');

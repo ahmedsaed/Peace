@@ -13,7 +13,6 @@ import { ChartCard } from '@/components/assistant/chart-card';
 import { AttachMenu, MessageFiles, PendingFiles } from '@/components/assistant/files';
 import { AttachmentViewer } from '@/components/attachment-viewer';
 import { RecordsSheet } from '@/components/assistant/records-sheet';
-import { Reply } from '@/components/assistant/reply';
 import { RichText } from '@/components/assistant/rich-text';
 import { Coin, TypingIndicator } from '@/components/assistant/typing';
 import { Icon } from '@/components/icon';
@@ -411,7 +410,11 @@ function ItemView({
         </View>
       );
     case 'reply':
-      return <Reply text={item.text} figures={item.figures} />;
+      return (
+        <View className="my-1.5" testID="assistant-reply">
+          <RichText text={item.text} figures={item.figures} />
+        </View>
+      );
     case 'activity':
       return (
         <View className="my-1 flex-row items-center gap-1.5">
