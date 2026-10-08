@@ -1,0 +1,122 @@
+diff --git a/node_modules/react-native-enriched-markdown/android/src/main/java/com/swmansion/enriched/markdown/spans/ImageSpan.kt b/node_modules/react-native-enriched-markdown/android/src/main/java/com/swmansion/enriched/markdown/spans/ImageSpan.kt
+index 0000000..0000000 100644
+--- a/node_modules/react-native-enriched-markdown/android/src/main/java/com/swmansion/enriched/markdown/spans/ImageSpan.kt
++++ b/node_modules/react-native-enriched-markdown/android/src/main/java/com/swmansion/enriched/markdown/spans/ImageSpan.kt
+@@ -29,6 +29,8 @@
+ import android.text.style.ImageSpan as AndroidImageSpan
+ import android.text.style.LineHeightSpan as AndroidLineHeightSpan
+ 
++private const val CURSOR_PERIOD_MS = 1300L
++
+ class ImageSpan(
+   private val context: Context,
+   val imageUrl: String,
+@@ -42,6 +44,12 @@
+   ),
+   AndroidLineHeightSpan {
+   private var loadedDrawable: Drawable? = null
++
++  // [peace patch] `peace://cursor?color=E3A33C&ink=17140F` is not an image: it is
++  // the streaming cursor, a coin drawn here that breathes in and out. It loads
++  // nothing and asks for the next frame only from inside its own draw, so the
++  // loop runs exactly while the coin is on screen and stops when it is not.
++  private val cursor: CursorStyle? = CursorStyle.parse(imageUrl)
+   private val height: Int = if (isInline) styleConfig.inlineImageStyle.size.toInt() else styleConfig.imageStyle.height.toInt()
+ 
+   private val borderRadiusPx: Int = styleConfig.imageStyle.borderRadius.toInt()
+@@ -107,6 +115,7 @@
+   }
+ 
+   private fun loadImage() {
++    if (cursor != null) return // [peace patch] drawn, not loaded
+     val scheme = Uri.parse(imageUrl).scheme?.lowercase()
+     if (scheme == "http" || scheme == "https") {
+       ImageDownloader.download(context, imageUrl, requestHeaders) { bitmap ->
+@@ -298,6 +307,10 @@
+     bottom: Int,
+     paint: Paint,
+   ) {
++    cursor?.let { style ->
++      drawCursor(canvas, style, x, y)
++      return
++    }
+     val drawable = getDrawable()
+     canvas.withSave {
+       if (isInline) {
+@@ -310,6 +323,76 @@
+     }
+   }
+ 
++  // [peace patch] The coin: an accent disc, a darker rim, a glint. Its opacity
++  // follows a slow cosine (1.3 s a breath) so it reads as "still writing"
++  // without pulling the eye off the words.
++  private val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG)
++
++  private fun drawCursor(
++    canvas: Canvas,
++    style: CursorStyle,
++    x: Float,
++    y: Int,
++  ) {
++    val size = height.toFloat()
++    val phase = (android.os.SystemClock.uptimeMillis() % CURSOR_PERIOD_MS).toFloat() / CURSOR_PERIOD_MS
++    val breath = 0.65f + 0.35f * kotlin.math.cos(phase * 2f * Math.PI.toFloat())
++    val alpha = (255 * breath).toInt().coerceIn(0, 255)
++    val radius = size / 2f
++    val cx = x + radius
++    // Sit on the text the way an inline image does: bottom just below the baseline.
++    val cy = y - size + size * 0.1f + radius
++
++    cursorPaint.style = Paint.Style.FILL
++    cursorPaint.color = style.color
++    cursorPaint.alpha = alpha
++    canvas.drawCircle(cx, cy, radius * 0.92f, cursorPaint)
++
++    cursorPaint.style = Paint.Style.STROKE
++    cursorPaint.strokeWidth = size * 0.08f
++    cursorPaint.color = style.ink
++    cursorPaint.alpha = (alpha * 0.35f).toInt()
++    canvas.drawCircle(cx, cy, radius * 0.62f, cursorPaint)
++
++    cursorPaint.color = Color.WHITE
++    cursorPaint.alpha = (alpha * 0.7f).toInt()
++    cursorPaint.strokeWidth = size * 0.075f
++    cursorPaint.strokeCap = Paint.Cap.ROUND
++    canvas.drawArc(
++      cx - radius * 0.42f,
++      cy - radius * 0.42f,
++      cx + radius * 0.42f,
++      cy + radius * 0.42f,
++      200f,
++      55f,
++      false,
++      cursorPaint,
++    )
++    cursorPaint.strokeCap = Paint.Cap.BUTT
++
++    // The next frame, asked for from inside this frame: an off-screen or
++    // detached view never draws, so it never asks again.
++    viewRef?.get()?.postInvalidateOnAnimation()
++  }
++
++  private data class CursorStyle(
++    val color: Int,
++    val ink: Int,
++  ) {
++    companion object {
++      fun parse(url: String): CursorStyle? {
++        val uri = Uri.parse(url)
++        if (uri.scheme != "peace" || uri.host != "cursor") return null
++        fun hex(name: String, fallback: Int): Int =
++          uri.getQueryParameter(name)?.let { runCatching { Color.parseColor("#$it") }.getOrNull() } ?: fallback
++        return CursorStyle(
++          color = hex("color", Color.parseColor("#E3A33C")),
++          ink = hex("ink", Color.parseColor("#17140F")),
++        )
++      }
++    }
++  }
++
+   private data class CacheKey(
+     val url: String,
+     val width: Int,

@@ -33,6 +33,17 @@ export type LedgerFilter = {
   end: Date | null;
   /** A parent matches its sub-categories, as it does in search. */
   categoryId?: string | null;
+  /**
+   * Several categories at once — "rent, bills and food". Combined with
+   * `categoryId` if both are given; each parent brings its sub-categories.
+   */
+  categoryIds?: string[];
+  /**
+   * Categories to LEAVE OUT — "everything except the installments". A parent
+   * takes its sub-categories with it, the same rule as `categoryId` the other
+   * way round. Uncategorised records stay in: they are not in the list.
+   */
+  excludeCategoryIds?: string[];
   tagId?: string | null;
   accountId?: string | null;
   /** Matched against the note, category, account and tag names. */
@@ -73,6 +84,28 @@ function conditions(filter: LedgerFilter): SQL[] {
       sql`${transactions.categoryId} in (
         select ${categories.id} from ${categories}
         where ${categories.id} = ${filter.categoryId} or ${categories.parentId} = ${filter.categoryId}
+      )`
+    );
+  }
+
+  const included = [...(filter.categoryIds ?? [])];
+  if (included.length > 0) {
+    const list = sql.join(included.map((id) => sql`${id}`), sql`, `);
+    where.push(
+      sql`${transactions.categoryId} in (
+        select ${categories.id} from ${categories}
+        where ${categories.id} in (${list}) or ${categories.parentId} in (${list})
+      )`
+    );
+  }
+
+  const excluded = filter.excludeCategoryIds ?? [];
+  if (excluded.length > 0) {
+    const list = sql.join(excluded.map((id) => sql`${id}`), sql`, `);
+    where.push(
+      sql`coalesce(${transactions.categoryId}, '') not in (
+        select ${categories.id} from ${categories}
+        where ${categories.id} in (${list}) or ${categories.parentId} in (${list})
       )`
     );
   }

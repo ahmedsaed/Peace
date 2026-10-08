@@ -776,6 +776,16 @@ app ignoring input. `pkill -f GradleDaemon`.
   validates AGAIN.** A proposal can sit for a week while the ledger moves under it. A delete asks
   twice and offers Undo with the rows' tags and attachment rows, captured before the cascade ate
   them. Refused-before-shown writes go back to the model as errors and never become a card.
+- **When the assistant needs many steps, a TOOL is missing — never add a step cap.** An emergency-fund
+  question hit the old 8-step limit because no tool could exclude a category, average per category,
+  or produce a derived amount — and since amounts must be CITED, the model kept calling tools hoping
+  one would hand it the number. **And not a special tool per question either** — a
+  `spending_profile` tool answered that one and was removed in review, because a tool for every
+  question that takes many calls never stops growing. The fix is GENERAL: `summarize` queries with
+  category include/exclude lists, a second grouping (`then_by`) and monthly averages over whole
+  months, and `calculate` does dimension-checked arithmetic over cite tokens in one batched call
+  (minor units, rounded half away from zero). The question takes three steps and an engine test
+  asserts it. Stop is the user's brake.
 - **Replay Gemini's turns VERBATIM.** Thinking models put a `thoughtSignature` on function-call parts
   and reject a history that loses it — which only shows up on those models, in multi-step turns. The
   stored row IS the `Content` received; the screen is derived from it, never the other way round.
@@ -796,6 +806,22 @@ app ignoring input. `pkill -f GradleDaemon`.
 - **jest-expo replaces `fetch` with Expo's, which does nothing useful under Node.** A request made in
   a test comes back with `status: undefined` and reads as "Gemini refused the request (undefined)".
   The live suite uses a `node:https` fetch of its own; unit tests inject `fetchImpl`.
+- **A selection cannot cross a view boundary, so a reply is ONE native text view.** Rendering a
+  reply as a `<Text>` per paragraph made every block selectable and stopped every selection at the
+  paragraph's edge — on any device, not an emulator quirk. `react-native-enriched-markdown` in its
+  `commonmark` flavour paints the whole document into a single `TextView` with spans, which is how
+  native chat apps do it. Consequences: the renderer draws MARKDOWN, not our components, so cite
+  tokens are resolved into it first by `toDisplayMarkdown` (through `useMoney`, so the mask is in
+  the text before any selection or Copy can reach it — amounts are backslash-escaped, which is why
+  "Copy as Markdown" is turned off); and the coin cursor cannot be a React component trailing the
+  text. It is an inline image with the reserved address `peace://cursor`, drawn and animated by
+  **`patches/react-native-enriched-markdown+1.1.1.patch`** (applied by `patch-package` on
+  postinstall, which `npm ci` runs). The library is pinned EXACTLY because of that patch: bumping
+  it means regenerating the patch against the new `ImageSpan.kt`, and a patch that fails to apply
+  fails `npm ci` loudly rather than shipping a reply without its cursor. The cursor redraws itself
+  with `postInvalidateOnAnimation` from inside its own `draw`, so it costs frames only while it is
+  on screen. Its code-highlighting and maths extras are opted out in `package.json`
+  (`"enriched-markdown"`) — they download ~200MB of native dependencies nothing here uses.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.

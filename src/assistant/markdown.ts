@@ -24,12 +24,17 @@ function inlines(text: string): Inline[] {
   const runs = text.split(/(\*\*[^*]+\*\*)/g).filter((run) => run !== '');
   for (const run of runs) {
     const bold = run.startsWith('**') && run.endsWith('**') && run.length > 4;
-    const body = bold ? run.slice(2, -2) : run;
+    // Single-asterisk italics are dropped rather than shown as punctuation —
+    // and BEFORE the figures are split out: "*(or {{t1f2}} without travel)*"
+    // wraps a figure, so once split the two asterisks sit in different text
+    // pieces and neither piece sees a pair.
+    const body = (bold ? run.slice(2, -2) : run).replace(
+      /(^|\s)\*(\S[^*]*?\S|\S)\*(?=\s|$|[.,;:!?)])/g,
+      '$1$2'
+    );
     for (const segment of splitFigures(body)) {
       if (segment.kind === 'figure') out.push({ kind: 'figure', ref: segment.ref, bold, abs: segment.abs });
-      // A stray single asterisk pair the model meant as italics is dropped
-      // rather than shown as punctuation.
-      else out.push({ kind: 'text', text: segment.text.replace(/(^|\s)\*(\S[^*]*\S|\S)\*(?=\s|$|[.,;:!?])/g, '$1$2'), bold });
+      else out.push({ kind: 'text', text: segment.text, bold });
     }
   }
   return out;
@@ -46,7 +51,10 @@ export function parseBlocks(text: string): Block[] {
 
   for (const raw of text.replace(/\r\n/g, '\n').split('\n')) {
     const line = raw.trimEnd();
-    if (line.trim() === '') {
+    // A blank line, or a horizontal rule ("---", "***", "___") — which a
+    // chat bubble has no use for and showed as literal dashes: both are
+    // simply the end of a paragraph.
+    if (line.trim() === '' || /^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
       flush();
       continue;
     }
@@ -69,3 +77,4 @@ export function parseBlocks(text: string): Block[] {
   flush();
   return blocks;
 }
+

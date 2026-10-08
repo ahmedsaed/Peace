@@ -129,6 +129,115 @@ describe('summarize', () => {
   });
 });
 
+describe('summarize as the general query', () => {
+  const year = { from: '2025-10', to: '2026-09' }; // twelve whole months
+
+  it('gives monthly averages over whole months, overall and per group', () => {
+    const { response } = read('summarize', { measure: 'expense', group_by: 'category', ...year });
+    expect(response.whole_months).toBe(12);
+    expect(minor(response.total)).toBe(242000);
+    expect(minor(response.monthly_average)).toBe(20167); // 2420.00 / 12, rounded half away
+    const groups = response.groups as { label: string; monthly_average: unknown }[];
+    expect(groups.map((g) => [g.label, minor(g.monthly_average)])).toEqual([
+      ['Car', 19167],
+      ['Food', 1000],
+    ]);
+  });
+
+  it('gives no average over a span that is not whole months — a week would count as a month', () => {
+    const { response } = read('summarize', { measure: 'expense', from: '2026-09-01', to: '2026-10-07' });
+    expect(response).not.toHaveProperty('monthly_average');
+    expect(response).not.toHaveProperty('whole_months');
+  });
+
+  it('splits each group a second way in the same call, adding up to the group', () => {
+    const { response } = read('summarize', { measure: 'expense', group_by: 'category', then_by: 'month', ...year });
+    const car = (response.groups as { label: string; value: unknown; by: { label: string; value: unknown }[] }[])[0];
+    expect(car.by).toHaveLength(12); // empty months kept on a time split
+    expect(car.by.filter((m) => minor(m.value) > 0).map((m) => [m.label, minor(m.value)])).toEqual([
+      ['Nov 2025', 80000],
+      ['Dec 2025', 150000],
+    ]);
+    expect(car.by.reduce((sum, m) => sum + minor(m.value), 0)).toBe(minor(car.value));
+  });
+
+  it('splits months by category, leaving out categories with nothing in them', () => {
+    const { response } = read('summarize', { measure: 'expense', group_by: 'month', then_by: 'category', ...year });
+    const december = (response.groups as { label: string; by: { label: string }[] }[]).find((g) => g.label === 'Dec 2025')!;
+    expect(december.by.map((b) => b.label)).toEqual(['Car']);
+  });
+
+  it('narrows to several categories at once, parents bringing their children', () => {
+    const { response } = read('summarize', { measure: 'expense', categories: ['Car', 'Clothing'], month: '2026-10' });
+    expect(minor(response.total)).toBe(50000); // clothing net of the refund; no fuel in October
+    expect(response.filters).toEqual(['categories Car, Clothing']);
+    const all = read('summarize', { measure: 'expense', categories: ['Car', 'Food'], ...year }).response;
+    expect(minor(all.total)).toBe(242000);
+  });
+
+  it('refuses a second split that says nothing', () => {
+    expect(read('summarize', { measure: 'expense', then_by: 'month' }).response.error).toMatch(/needs group_by/);
+    expect(read('summarize', { measure: 'expense', group_by: 'month', then_by: 'month' }).response.error).toMatch(/differ/);
+  });
+});
+
+describe('summarize with exclude_categories', () => {
+  it('answers "everything except" in one call', () => {
+    const { response } = read('summarize', { measure: 'expense', month: '2026-10', exclude_categories: ['Clothing'] });
+    expect(minor(response.total)).toBe(15000);
+    expect(response.filters).toEqual(['excluding Clothing']);
+  });
+
+  it('keeps the exclusion when a chart is drilled into', () => {
+    const { display } = read('show_chart', { title: 'x', measure: 'expense', group_by: 'month', month: '2026-10', exclude_categories: ['Clothing'] });
+    if (display?.kind !== 'chart') throw new Error('no chart');
+    expect(display.chart.points[0].valueMinor).toBe(15000);
+    expect(display.chart.filter.excludeCategoryIds).toEqual([CLOTHING]);
+  });
+});
+
+describe('calculate', () => {
+  it('does every calculation in one call, each a new cited figure', () => {
+    const { response: summary } = read('summarize', { measure: 'expense', group_by: 'category', from: '2025-10', to: '2026-09' });
+    const [car, food] = summary.groups as { monthly_average: { cite: string } }[];
+    const all = (summary.monthly_average as { cite: string }).cite;
+    const { response } = read('calculate', {
+      calculations: [
+        { label: 'same lifestyle', expression: `${all} * 6` },
+        { label: 'bare minimum', expression: `(${car.monthly_average.cite} + ${food.monthly_average.cite}) * 3` },
+      ],
+    });
+    const [same, bare] = response.results as { label: string; result: unknown }[];
+    expect([same.label, minor(same.result)]).toEqual(['same lifestyle', 20167 * 6]);
+    expect([bare.label, minor(bare.result)]).toEqual(['bare minimum', (19167 + 1000) * 3]);
+  });
+
+  it('reports a bad expression beside the good ones instead of failing them all', () => {
+    const { response: total } = read('summarize', { measure: 'expense', month: '2026-10' });
+    const { response: income } = read('summarize', { measure: 'income', month: '2026-10' });
+    const t = (total.total as { cite: string }).cite;
+    const i = (income.total as { cite: string }).cite;
+    const { response } = read('calculate', {
+      calculations: [
+        { label: 'ratio', expression: `${i} / ${t}` },
+        { label: 'nonsense', expression: `${t} * ${i}` },
+        { expression: '{{t9f9}} * 2' },
+      ],
+    });
+    const [ratio, nonsense, missing] = response.results as { ratio?: number; error?: string }[];
+    expect(ratio.ratio).toBeCloseTo(30.7692, 3);
+    expect(nonsense.error).toMatch(/amount by an amount/);
+    expect(missing.error).toMatch(/not a figure/);
+  });
+
+  it('still takes a single expression', () => {
+    const { response: total } = read('summarize', { measure: 'expense', month: '2026-10' });
+    const t = (total.total as { cite: string }).cite;
+    const { response } = read('calculate', { expression: `${t} * 2` });
+    expect(minor((response.results as { result: unknown }[])[0].result)).toBe(130000);
+  });
+});
+
 describe('find_records', () => {
   it('totals EVERY match, not just the rows it returns', () => {
     const { response } = read('find_records', { category: 'Fuel', limit: 1 });

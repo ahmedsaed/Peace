@@ -30,6 +30,10 @@ export type StoredFilter = {
   tagId: string | null;
   accountId: string | null;
   text: string;
+  /** Several categories at once. Optional, like the exclusion: older charts have neither. */
+  categoryIds?: string[];
+  /** Left out, sub-categories included. Optional: charts stored before it existed have none. */
+  excludeCategoryIds?: string[];
 };
 
 export type ChartType = 'bar' | 'line' | 'donut';

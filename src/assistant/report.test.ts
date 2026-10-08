@@ -36,6 +36,14 @@ describe('parseBlocks', () => {
     expect(blocks[2].marker).toBe('2.');
   });
 
+  it('drops italics that wrap a figure, and treats a horizontal rule as a paragraph break', () => {
+    const blocks = parseBlocks('Fund: **{{t1f1}}** *(or {{t1f2}} without travel)*\n\n---\n\nNext part.');
+    expect(blocks.map((b) => b.kind)).toEqual(['paragraph', 'paragraph']);
+    const text = blocks[0].inlines.map((i) => (i.kind === 'text' ? i.text : `[${i.ref}]`)).join('');
+    expect(text).toBe('Fund: [t1f1] (or [t1f2] without travel)');
+    expect(parseBlocks('a\n***\nb').map((b) => b.kind)).toEqual(['paragraph', 'paragraph']);
+  });
+
   it('drops single-asterisk emphasis instead of printing the asterisks', () => {
     const [block] = parseBlocks('This is *really* high.');
     expect(block.inlines).toEqual([{ kind: 'text', text: 'This is really high.', bold: false }]);

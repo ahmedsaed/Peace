@@ -278,3 +278,44 @@ export function aggregate(
 
   return { buckets, totalMinor, count, unvaluedCount, overlapping: groupBy === 'tag' };
 }
+
+/**
+ * Whether a fact belongs to a bucket — for splitting a group a second way
+ * ("each category, by month") from the same facts the first split counted.
+ */
+export function inBucket(fact: LedgerFact, groupBy: GroupBy, bucket: Bucket): boolean {
+  switch (groupBy) {
+    case 'none':
+      return true;
+    case 'month':
+    case 'week':
+    case 'day':
+      return (
+        bucket.start !== undefined &&
+        bucket.end !== undefined &&
+        fact.occurredAt.getTime() >= bucket.start.getTime() &&
+        fact.occurredAt.getTime() < bucket.end.getTime()
+      );
+    case 'category':
+      return (fact.topCategoryId ?? 'none') === bucket.key;
+    case 'subcategory':
+      return (fact.categoryId ?? 'none') === bucket.key;
+    case 'tag':
+      return bucket.tagId !== undefined && fact.tagIds.includes(bucket.tagId);
+    case 'account':
+      return fact.accountId === bucket.accountId;
+  }
+}
+
+/**
+ * How many whole calendar months a span covers, or null when it does not
+ * start and end on month boundaries — an "average per month" over a span
+ * that ends a week into October would quietly count that week as a month.
+ */
+export function wholeMonths(start: Date | null, end: Date | null): number | null {
+  if (!start || !end) return null;
+  const aligned = (d: Date) => d.getDate() === 1 && d.getHours() === 0 && d.getMinutes() === 0;
+  if (!aligned(start) || !aligned(end)) return null;
+  const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  return months > 0 ? months : null;
+}
