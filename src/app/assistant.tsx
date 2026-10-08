@@ -6,15 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { canRetry, sessionIsEmpty, toItems, type Item } from '@/assistant/display';
 import { drillRows } from '@/assistant/drill';
 import type { Figure } from '@/assistant/figures';
-import { streamingVisible } from '@/assistant/gemini-chat';
 import type { ChartPoint, ChartSpec, Display } from '@/assistant/tools/types';
 import { ProposalCard, RecordsCard, ReportCard } from '@/components/assistant/cards';
 import { ChartCard } from '@/components/assistant/chart-card';
 import { AttachMenu, MessageFiles, PendingFiles } from '@/components/assistant/files';
 import { AttachmentViewer } from '@/components/attachment-viewer';
 import { RecordsSheet } from '@/components/assistant/records-sheet';
-import { RichText } from '@/components/assistant/rich-text';
-import { Coin, TypingIndicator } from '@/components/assistant/typing';
+import { MarkdownReply } from '@/components/assistant/markdown-reply';
+import { TypingIndicator } from '@/components/assistant/typing';
 import { Icon } from '@/components/icon';
 import { HeaderButton, StackHeader } from '@/components/screen';
 import { Snackbar } from '@/components/snackbar';
@@ -200,7 +199,7 @@ export default function AssistantScreen() {
           <View>
             {streaming ? (
               <View className="my-1.5" testID="assistant-streaming">
-                <RichText text={streamingVisible(streaming)} figures={known} trailing={<Coin />} />
+                <MarkdownReply text={streaming} figures={known} streaming />
               </View>
             ) : null}
             {busy ? (
@@ -412,7 +411,7 @@ function ItemView({
     case 'reply':
       return (
         <View className="my-1.5" testID="assistant-reply">
-          <RichText text={item.text} figures={item.figures} />
+          <MarkdownReply text={item.text} figures={item.figures} />
         </View>
       );
     case 'activity':

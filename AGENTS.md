@@ -806,6 +806,22 @@ app ignoring input. `pkill -f GradleDaemon`.
 - **jest-expo replaces `fetch` with Expo's, which does nothing useful under Node.** A request made in
   a test comes back with `status: undefined` and reads as "Gemini refused the request (undefined)".
   The live suite uses a `node:https` fetch of its own; unit tests inject `fetchImpl`.
+- **A selection cannot cross a view boundary, so a reply is ONE native text view.** Rendering a
+  reply as a `<Text>` per paragraph made every block selectable and stopped every selection at the
+  paragraph's edge — on any device, not an emulator quirk. `react-native-enriched-markdown` in its
+  `commonmark` flavour paints the whole document into a single `TextView` with spans, which is how
+  native chat apps do it. Consequences: the renderer draws MARKDOWN, not our components, so cite
+  tokens are resolved into it first by `toDisplayMarkdown` (through `useMoney`, so the mask is in
+  the text before any selection or Copy can reach it — amounts are backslash-escaped, which is why
+  "Copy as Markdown" is turned off); and the coin cursor cannot be a React component trailing the
+  text. It is an inline image with the reserved address `peace://cursor`, drawn and animated by
+  **`patches/react-native-enriched-markdown+1.1.1.patch`** (applied by `patch-package` on
+  postinstall, which `npm ci` runs). The library is pinned EXACTLY because of that patch: bumping
+  it means regenerating the patch against the new `ImageSpan.kt`, and a patch that fails to apply
+  fails `npm ci` loudly rather than shipping a reply without its cursor. The cursor redraws itself
+  with `postInvalidateOnAnimation` from inside its own `draw`, so it costs frames only while it is
+  on screen. Its code-highlighting and maths extras are opted out in `package.json`
+  (`"enriched-markdown"`) — they download ~200MB of native dependencies nothing here uses.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.
