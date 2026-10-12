@@ -1,0 +1,146 @@
+appId: com.ahmed.peace
+# `core` runs on `npm run e2e:fast` — the core action: logging a spend, then
+# changing it and taking it away again.
+tags:
+  - core
+---
+# One record's whole life, on one launch: logged end to end (category picker
+# including a sub-category, the calculator keypad, Save writing through the
+# repository layer), reopened and edited, then deleted.
+#
+# This used to be three flows — add-record, edit-record and delete-undo — and
+# the second and third each began by logging a Restaurants expense exactly the
+# way this one does. Every assertion they made is still made below, against the
+# record this flow already has, without two more cold launches to get there.
+- launchApp:
+    clearState: true
+
+# `clearState` wipes the dev build's cached JS too, so a cold launch re-fetches
+# the whole bundle from Metro *and* then runs migrations and seeding. That is
+# comfortably longer than Maestro's default assertion wait, and it fails looking
+# like a broken screen rather than a slow one. Gate on the first screen instead
+# of racing it — this still fails if the app never renders.
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "record-screen"
+
+# Expense is the default — the overwhelmingly common case.
+- assertVisible:
+    id: "type-expense"
+
+- tapOn:
+    id: "pick-category"
+- assertVisible:
+    id: "sheet-category"
+# A second-level category, so this covers the two-tier tree end to end.
+- tapOn: "Restaurants"
+
+# 120 + 35. The operator commits the 120 immediately and the display shows 35,
+# so this also pins the immediate-execution behaviour.
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-op-plus"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-5"
+
+- takeScreenshot: 01-record-filled
+
+# Thousand separators are display-only, so this is the only place the grouping
+# can be checked at all — the saved value never carries a comma. Typing four
+# more digits pushes the entry past a thousand and back.
+- tapOn:
+    id: "key-9"
+- tapOn:
+    id: "key-8"
+- assertVisible:
+    id: "amount-display"
+    text: "3,598"
+- tapOn:
+    id: "key-backspace"
+- tapOn:
+    id: "key-backspace"
+- assertVisible:
+    id: "amount-display"
+    text: "35"
+
+# Save without pressing "=" — evaluating a pending operation is Save's job.
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+
+# THE ASSERTION THAT MATTERS. An earlier version of this flow passed while
+# actually saving 120 - 35, because the keypad shows "35" either way and nothing
+# checked the result. The amount below is the only thing that would have caught
+# a wrong operator key.
+- assertVisible:
+    id: "records-list"
+- assertVisible: "-E£155.00" # 120 + 35, not 120 - 35
+- assertVisible: "Restaurants" # the sub-category chosen earlier
+- assertVisible:
+    id: "summary-expense" # the month total picked the record up
+- takeScreenshot: 02-record-listed
+
+# EDITING. Reopen it. Row testIDs carry a generated uuid, so match the category
+# name. An edit that silently inserts instead of updating would leave the old
+# value beside the new one, so the old value must be GONE, not merely joined.
+- tapOn: "Restaurants"
+- assertVisible:
+    id: "record-screen"
+- assertVisible: "Edit record"
+
+# The form must arrive prefilled, or "edit" is really "retype".
+- assertVisible: "155"
+- assertVisible: "Restaurants"
+
+# Typing replaces the loaded amount rather than appending to it: 2-0-0, not
+# 155200.
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+
+- assertVisible:
+    id: "home-screen"
+- assertVisible: "-E£200.00"
+- assertNotVisible: "-E£155.00" # updated in place, not duplicated
+- takeScreenshot: 03-edited
+
+# DELETING, and the destructive path.
+#
+# Delete lives behind a LONG PRESS on the row, not at the bottom of the edit
+# form — opening a record to change it in order to remove it was a strange way
+# in, and it put a destructive control beside Save.
+#
+# NOT COVERED HERE: actually taking the undo. The offer auto-dismisses after 8s
+# and every Maestro step costs 1-2s on this emulator, so the tap regularly lands
+# after the snackbar has gone — which fails in a way that looks like a broken
+# feature rather than a slow test. Restoring is covered properly by
+# `restoreRecords` in src/db/repo/repo.test.ts (including that both legs of a
+# transfer come back together), and was verified by hand on device.
+- longPressOn: "Restaurants"
+- assertVisible:
+    id: "record-actions"
+- tapOn:
+    id: "action-delete"
+
+- assertVisible: "No records this month"
+- assertNotVisible: "-E£200.00"
+- takeScreenshot: 04-deleted
