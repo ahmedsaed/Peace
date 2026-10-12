@@ -130,11 +130,12 @@ jobs:
             # The flows run against the RELEASE APK, never a dev build:
             # `clearState` wipes the dev client's packager URL and the next
             # launch dies on an embedded bundle a debug build does not have.
-            if [ -n "$TAGS" ]; then
-              maestro test --include-tags="$TAGS" "$FLOWS"
-            else
-              maestro test "$FLOWS"
-            fi
+            #
+            # ONE LINE, on purpose. android-emulator-runner hands each line of
+            # `script` to its own `sh -c`, so a multi-line `if … fi` dies on its
+            # first line with "Syntax error: end of file unexpected" before a
+            # single flow has run. `${TAGS:+…}` adds the flag only when set.
+            maestro test ${TAGS:+--include-tags="$TAGS"} "$FLOWS"
 
       # The point of running this here at all: a failure has to be readable by
       # somebody who cannot attach to the device. Maestro writes a hierarchy
