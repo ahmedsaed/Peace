@@ -19,3 +19,9 @@ export const buildInfo: BuildInfo = {
   gitSha: String(Constants.expoConfig?.extra?.gitSha ?? 'unknown'),
   dirty: Boolean(Constants.expoConfig?.extra?.dirty),
 };
+
+/**
+ * The Android application id this build was made with — read back rather than
+ * written down, so the About screen cannot name a package the APK is not.
+ */
+export const packageName: string = Constants.expoConfig?.android?.package ?? 'unknown';

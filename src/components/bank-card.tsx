@@ -184,7 +184,7 @@ export function BankMessagesCard() {
         {senders.length === 0 ? (
           <Text className="mb-2 text-xs leading-4 text-muted" testID="bank-senders-empty">
             None yet — nothing will be read. Add the name your bank&apos;s messages arrive under,
-            such as CIB or QNB. Part of it is enough.
+            as it shows at the top of the notification. Part of it is enough.
           </Text>
         ) : (
           <View className="mb-2 flex-row flex-wrap gap-2" testID="bank-senders">
@@ -220,7 +220,7 @@ export function BankMessagesCard() {
             value={draft}
             onChangeText={setDraft}
             onSubmitEditing={addSender}
-            placeholder="CIB"
+            placeholder="Bank name"
             placeholderTextColor={palette.muted}
             autoCapitalize="characters"
             autoCorrect={false}
@@ -242,7 +242,7 @@ export function BankMessagesCard() {
         <PromptEditor
           label="Your rules"
           hint="Which card is which, and anything particular to your banks' wording. Peace hands the model your account names, so naming one here is what puts the record on the right card — and its currency."
-          example={'The card ending 0042 is Kenana.\nCIB messages about "instalment" are not purchases.'}
+          example={'The card ending 0042 is my Travel card.\nMessages about an "instalment plan" are not purchases.'}
           value={settings.bankGuidance}
           onChange={(next) => update('bankGuidance', next)}
           testID="bank-guidance"

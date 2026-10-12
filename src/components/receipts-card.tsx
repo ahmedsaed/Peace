@@ -26,7 +26,7 @@ export function ReceiptsCard() {
       <PromptEditor
         label="Your rules"
         hint="Anything about your own receipts the model could not work out — a shop it keeps misreading, a charge that should not count. Most people need none."
-        example={'Ignore the 12% service charge at Zooba.\nReceipts from "AMZN Mktp" are Amazon.'}
+        example={'Leave out the service charge on restaurant bills.\nReceipts from "AMZN Mktp" are Amazon.'}
         value={settings.receiptGuidance}
         onChange={(next) => update('receiptGuidance', next)}
         testID="receipt-guidance"
