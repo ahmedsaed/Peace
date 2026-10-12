@@ -1,0 +1,85 @@
+appId: com.ahmed.peace
+---
+# The keypad's layout settings reach the record screen, and the keys still type
+# what they say after moving.
+#
+# Positions are asserted with relative selectors (`below`, `rightOf`): a
+# screenshot would show the swap but cannot fail, and the testIDs alone cannot
+# tell the layouts apart — they name the key, not where it is.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- default: calculator digits, operators on the left ---
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "key-1"
+    below:
+      id: "key-7"
+- assertVisible:
+    id: "key-7"
+    rightOf:
+      id: "key-op-plus"
+- tapOn:
+    id: "record-cancel"
+
+# --- switch both settings ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-keypad-digits-phone"
+- tapOn:
+    id: "setting-keypad-operators-right"
+- takeScreenshot: 01-keypad-settings
+- tapOn:
+    id: "nav-back"
+
+# THE ASSERTION THAT MATTERS: on a different screen, the keypad has moved.
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "key-7"
+    below:
+      id: "key-1"
+- assertVisible:
+    id: "key-op-plus"
+    rightOf:
+      id: "key-3"
+- takeScreenshot: 02-keypad-phone-right
+
+# And the moved keys still type what they say: 12 + 3 = 15.
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-op-plus"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-equals"
+- assertVisible:
+    id: "amount-display"
+    text: "15"
+
+# --- the choice survives a restart ---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "key-7"
+    below:
+      id: "key-1"

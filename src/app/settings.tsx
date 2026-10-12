@@ -10,6 +10,7 @@ import { ReminderCard } from '@/components/reminder-card';
 import { ReceiptsCard } from '@/components/receipts-card';
 import { AssistantCard } from '@/components/assistant-card';
 import { GeminiKeyCard } from '@/components/gemini-key';
+import { Segmented } from '@/components/form';
 import { StackHeader } from '@/components/screen';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
@@ -90,6 +91,34 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        <View className="pt-6">
+          <Section title="Keypad">
+            <Choice
+              label="Digits"
+              hint="Which row of numbers sits on top — a calculator's or a phone's."
+              options={[
+                { value: 'calculator', label: '7 8 9 on top' },
+                { value: 'phone', label: '1 2 3 on top' },
+              ]}
+              value={settings.keypadDigits}
+              onChange={(next) => update('keypadDigits', next)}
+              testIDPrefix="setting-keypad-digits"
+            />
+            <Choice
+              label="Operators"
+              hint="Which side the + − × ÷ column is on."
+              options={[
+                { value: 'left', label: 'Left' },
+                { value: 'right', label: 'Right' },
+              ]}
+              value={settings.keypadOperators}
+              onChange={(next) => update('keypadOperators', next)}
+              testIDPrefix="setting-keypad-operators"
+              last
+            />
+          </Section>
+        </View>
+
         {/* NO ARCHIVED SECTION. It used to live here because every list hid
             what was archived, so the toggle that undid it sat behind a row
             that no longer existed — the way back could not live where the
@@ -98,23 +127,25 @@ export default function SettingsScreen() {
             a second place to look would be a second vocabulary for it. Tags
             got a list of their own for exactly this reason. */}
 
-        <Section title="Reporting">
-          <Toggle
-            label="Carry the balance forward"
-            hint="Show what each month started with, and your running total. Nothing is added to any budget — a limit stays a limit."
-            value={settings.carryOver}
-            onChange={(next) => update('carryOver', next)}
-            testID="setting-carry-over"
-          />
-          <Toggle
-            label="Daily totals"
-            hint="Put each day's net beside its date in the records list. Transfers between your own accounts are left out."
-            value={settings.showTotal}
-            onChange={(next) => update('showTotal', next)}
-            testID="setting-show-total"
-            last
-          />
-        </Section>
+        <View className="pt-6">
+          <Section title="Reporting">
+            <Toggle
+              label="Carry the balance forward"
+              hint="Show what each month started with, and your running total. Nothing is added to any budget — a limit stays a limit."
+              value={settings.carryOver}
+              onChange={(next) => update('carryOver', next)}
+              testID="setting-carry-over"
+            />
+            <Toggle
+              label="Daily totals"
+              hint="Put each day's net beside its date in the records list. Transfers between your own accounts are left out."
+              value={settings.showTotal}
+              onChange={(next) => update('showTotal', next)}
+              testID="setting-show-total"
+              last
+            />
+          </Section>
+        </View>
 
         {/* Between Reporting and the AI cards because that is the boundary it
             sits on: everything above changes what the app SHOWS when you open
@@ -195,6 +226,45 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <View>
       <Text className="mb-2 px-1 text-[10px] uppercase tracking-widest text-muted">{title}</Text>
       <View className="overflow-hidden rounded-xl bg-surface">{children}</View>
+    </View>
+  );
+}
+
+/**
+ * A row whose value is one of a few named choices, all of them in view.
+ *
+ * Segmented rather than a picker sheet: with two options, a sheet is a tap to
+ * open it, a tap to choose and nothing to show for either until you leave.
+ */
+function Choice<T extends string>({
+  label,
+  hint,
+  options,
+  value,
+  onChange,
+  testIDPrefix,
+  last = false,
+}: {
+  label: string;
+  hint: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (next: T) => void;
+  testIDPrefix: string;
+  last?: boolean;
+}) {
+  return (
+    <View className={`gap-2 px-4 py-3.5 ${last ? '' : 'border-b border-line'}`}>
+      <View>
+        <Text className="text-[15px] text-ink">{label}</Text>
+        <Text className="text-xs leading-4 text-muted">{hint}</Text>
+      </View>
+      <Segmented
+        options={options}
+        value={value}
+        onChange={onChange}
+        testIDPrefix={testIDPrefix}
+      />
     </View>
   );
 }
