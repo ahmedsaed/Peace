@@ -24,4 +24,18 @@ export const buildInfo: BuildInfo = {
  * The Android application id this build was made with — read back rather than
  * written down, so the About screen cannot name a package the APK is not.
  */
+/**
+ * Which app this is — see FLAVORS in app.config.js. Anything unrecognised reads
+ * as `oss`, the build that carries the GitHub update check: a build that cannot
+ * say what it is should keep the way to find a newer one.
+ */
+export const flavor: 'oss' | 'play' =
+  Constants.expoConfig?.extra?.flavor === 'play' ? 'play' : 'oss';
+
+/**
+ * Whether this build looks for its own updates on GitHub. The Play build never
+ * does: Play delivers its updates, and its policy forbids any other route.
+ */
+export const selfUpdates = flavor === 'oss';
+
 export const packageName: string = Constants.expoConfig?.android?.package ?? 'unknown';

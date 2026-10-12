@@ -124,7 +124,7 @@ jobs:
             # the launch gate looking exactly like a broken screen.
             adb shell settings put global hide_error_dialogs 1
 
-            adb uninstall com.ahmed.peace || true
+            adb uninstall dev.merope.peace.oss || true
             adb install -r "$APK"
 
             # The flows run against the RELEASE APK, never a dev build:

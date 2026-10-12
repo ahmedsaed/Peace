@@ -1,4 +1,4 @@
-appId: com.ahmed.peace
+appId: dev.merope.peace.oss
 ---
 # Creating an account and a category, and the guard that stops an account being
 # deleted out from under its history.

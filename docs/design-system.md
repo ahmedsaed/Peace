@@ -281,7 +281,7 @@ longest chips. Asserting the testID alone would have passed throughout.
 ## Naming
 
 The app is **Peace** — as in peace of mind. Lowercase `peace` remains the project slug and the
-Android package suffix (`com.ahmed.peace`); the display name and the in-app wordmark are
+Android package suffix (`dev.merope.peace`, published by Merope); the display name and the in-app wordmark are
 capitalised.
 
 ## Open

@@ -1,4 +1,4 @@
-appId: com.ahmed.peace
+appId: dev.merope.peace.oss
 ---
 # Credit cards: a balance read as debt, a limit instead of an opening balance,
 # and a correction that never counts as spending.

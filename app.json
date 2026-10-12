@@ -2,7 +2,7 @@
   "expo": {
     "name": "Peace",
     "slug": "peace",
-    "version": "1.14.1",
+    "version": "1.16.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "peace",
@@ -15,7 +15,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.ahmed.peace",
+      "package": "dev.merope.peace",
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"

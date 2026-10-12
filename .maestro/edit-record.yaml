@@ -1,4 +1,4 @@
-appId: com.ahmed.peace
+appId: dev.merope.peace.oss
 ---
 # Creates a record, reopens it from the list, changes the amount, and checks the
 # list reflects the edit. The old value must be GONE, not merely joined by the
