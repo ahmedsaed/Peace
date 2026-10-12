@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import { createTestDb } from '../../test/db';
+import { augustNoon as at } from '../../test/dates';
 import { createAccount } from './accounts';
 import { createRecord } from './transactions';
 import {
@@ -15,8 +16,6 @@ import {
   recordCaptures,
   reviewableCaptures,
 } from './bank-captures';
-
-const at = (day: number) => new Date(2026, 7, day, 12, 0);
 
 const incoming = (key: string, day = 1, over: Record<string, unknown> = {}) => ({
   captureKey: key,

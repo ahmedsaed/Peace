@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import { createTestDb, type TestDb } from '../../test/db';
+import { localNoon as on } from '../../test/dates';
 import { accountBalance } from './adjust';
 import { createAccount } from './accounts';
 import { categoryBreakdown } from './analysis';
@@ -10,8 +11,6 @@ import { InvariantError } from './categories';
 import { periodSummary } from './records';
 import { deleteRecord, restoreRecords } from './transactions';
 import { seedDefaults } from '../seed';
-
-const on = (year: number, month: number, day: number) => new Date(year, month - 1, day, 12, 0);
 
 function seed({ feeBp = 300 }: { feeBp?: number | null } = {}) {
   const { db } = createTestDb();

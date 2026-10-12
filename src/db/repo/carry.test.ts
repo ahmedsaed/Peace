@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import { createTestDb, type TestDb } from '../../test/db';
+import { localNoon as on } from '../../test/dates';
 import {
   balanceByCurrency,
   createAccount,
@@ -18,8 +19,6 @@ import {
 import { createCategory } from './categories';
 import { periodSummary } from './records';
 import { createRecord, createTransfer } from './transactions';
-
-const on = (year: number, month: number, day: number) => new Date(year, month - 1, day, 12, 0);
 
 function seed({ opening = 0 } = {}) {
   const { db } = createTestDb();

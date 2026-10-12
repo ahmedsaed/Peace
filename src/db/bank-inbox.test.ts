@@ -114,6 +114,18 @@ describe('draining what the service captured', () => {
 });
 
 describe('reading what is waiting', () => {
+  // A transient failure pauses 1.5s before its one retry. Under a fake clock
+  // that pause is still scheduled and awaited, in order — `read` just runs the
+  // clock forward instead of three tests spending 4.5s of wall time on it.
+  beforeEach(() => jest.useFakeTimers({ doNotFake: ['Date'] }));
+  afterEach(() => jest.useRealTimers());
+
+  const read = async (...args: Parameters<typeof readPending>) => {
+    const pending = readPending(...args);
+    await jest.runAllTimersAsync();
+    return pending;
+  };
+
   const queue = (...bodies: string[]) => {
     recordCaptures(
       db,
@@ -130,7 +142,7 @@ describe('reading what is waiting', () => {
     queue('Purchase of EGP 450 at CARREFOUR');
     mocked.readBankMessage.mockResolvedValue(GOOD);
 
-    expect(await readPending('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
       read: 1,
       failed: 0,
       deferred: 0,
@@ -157,7 +169,7 @@ describe('reading what is waiting', () => {
       new GeminiError('Gemini is unavailable right now.', true)
     );
 
-    const outcome = await readPending('EGP', 'gemini-flash-latest');
+    const outcome = await read('EGP', 'gemini-flash-latest');
 
     expect(outcome).toEqual({ read: 0, failed: 0, deferred: 1 });
     // Still pending, so the next launch, foreground or capture reads it.
@@ -171,7 +183,7 @@ describe('reading what is waiting', () => {
       .mockRejectedValueOnce(new GeminiError('Gemini is unavailable right now.', true))
       .mockResolvedValueOnce(GOOD);
 
-    expect(await readPending('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
       read: 1,
       failed: 0,
       deferred: 0,
@@ -189,7 +201,7 @@ describe('reading what is waiting', () => {
       new GeminiError('That Gemini API key was refused.', false)
     );
 
-    const outcome = await readPending('EGP', 'gemini-flash-latest');
+    const outcome = await read('EGP', 'gemini-flash-latest');
 
     expect(outcome).toEqual({ read: 0, failed: 1, deferred: 0 });
     expect(mocked.readBankMessage).toHaveBeenCalledTimes(1);
@@ -208,7 +220,7 @@ describe('reading what is waiting', () => {
       .mockRejectedValueOnce(new GeminiError('That Gemini API key was refused.', false))
       .mockResolvedValueOnce(GOOD);
 
-    expect(await readPending('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
       read: 1,
       failed: 1,
       deferred: 0,
@@ -224,7 +236,7 @@ describe('reading what is waiting', () => {
     queue('Purchase of EGP 450');
     mocked.getGeminiKey.mockResolvedValue(null);
 
-    expect(await readPending('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
       read: 0,
       failed: 0,
       deferred: 0,
@@ -234,7 +246,7 @@ describe('reading what is waiting', () => {
   });
 
   it('asks for nothing when the queue is empty', async () => {
-    expect(await readPending('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
       read: 0,
       failed: 0,
       deferred: 0,
@@ -256,7 +268,7 @@ describe('reading what is waiting', () => {
     mocked.readBankMessage.mockResolvedValue(GOOD);
 
     const seen: number[] = [];
-    await readPending('EGP', 'gemini-flash-latest', '', () => seen.push(1));
+    await read('EGP', 'gemini-flash-latest', '', () => seen.push(1));
 
     expect(seen).toHaveLength(3);
   });
@@ -269,7 +281,7 @@ describe('reading what is waiting', () => {
     );
 
     let calls = 0;
-    await readPending('EGP', 'gemini-flash-latest', '', () => {
+    await read('EGP', 'gemini-flash-latest', '', () => {
       calls += 1;
     });
 
@@ -286,7 +298,7 @@ describe('reading what is waiting', () => {
     mocked.readBankMessage.mockRejectedValue(new GeminiError('Gemini is busy.', true));
 
     let calls = 0;
-    await readPending('EGP', 'gemini-flash-latest', '', () => {
+    await read('EGP', 'gemini-flash-latest', '', () => {
       calls += 1;
     });
 
@@ -297,7 +309,7 @@ describe('reading what is waiting', () => {
     queue('oldest', 'newest');
     mocked.readBankMessage.mockResolvedValue(GOOD);
 
-    await readPending('EGP', 'gemini-flash-latest');
+    await read('EGP', 'gemini-flash-latest');
 
     const prompts = mocked.readBankMessage.mock.calls.map((call) => call[2] as string);
     expect(prompts[0]).toContain('oldest');

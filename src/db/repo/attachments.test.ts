@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import { createTestDb, type TestDb } from '../../test/db';
+import { augustNoon as on } from '../../test/dates';
 import { createAccount } from './accounts';
 import { createCategory } from './categories';
 import { createRecord, deleteRecord } from './transactions';
@@ -15,8 +16,6 @@ import {
   removeAttachment,
   syncAttachments,
 } from './attachments';
-
-const on = (day: number) => new Date(2026, 7, day, 12, 0);
 
 const hash = (seed: string) => seed.padEnd(64, '0');
 
