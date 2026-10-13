@@ -75,6 +75,9 @@ tags:
 - assertVisible:
     id: "about-package"
     text: "com.ahmed.peace"
+- assertVisible:
+    id: "about-maker"
+    text: "Merope"
 
 # The custom back button returns to the tabs, not to the drawer.
 - tapOn:

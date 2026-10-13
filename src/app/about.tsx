@@ -3,7 +3,7 @@ import { Image, ScrollView, Text, View } from 'react-native';
 import { StackHeader } from '@/components/screen';
 import { UpdateRow } from '@/components/update-row';
 import { Wordmark } from '@/components/wordmark';
-import { buildInfo } from '@/lib/build-info';
+import { buildInfo, packageName } from '@/lib/build-info';
 import { formatCommit, formatVersion } from '@/lib/version';
 
 /**
@@ -14,7 +14,8 @@ import { formatCommit, formatVersion } from '@/lib/version';
 const FACTS: { label: string; value: string; testID: string }[] = [
   { label: 'Version', value: formatVersion(buildInfo), testID: 'about-version' },
   { label: 'Commit', value: formatCommit(buildInfo), testID: 'about-commit' },
-  { label: 'Package', value: 'com.ahmed.peace', testID: 'about-package' },
+  { label: 'Package', value: packageName, testID: 'about-package' },
+  { label: 'Made by', value: 'Merope', testID: 'about-maker' },
   { label: 'Data', value: 'One SQLite file on this device', testID: 'about-data' },
   // NOT "None", which stopped being true some time ago and is now contradicted
   // by the button directly beneath it. Rates, this update check, the Drive
