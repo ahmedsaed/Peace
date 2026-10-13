@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+# Copied in from the repo by scripts/copy-assets.mjs — the originals are the source.
+public/screenshots/
+public/logo-mark.png
+public/icon.png
+# Written by `next dev` on every start.
+AGENTS.md
+CLAUDE.md

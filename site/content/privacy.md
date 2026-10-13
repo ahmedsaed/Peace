@@ -1,8 +1,8 @@
 <!--
-  DRAFT for peace.merope.dev/privacy. Two placeholders to fill before publishing:
-  [EFFECTIVE DATE] and [SUPPORT EMAIL]. Every claim below is checked against the
+  DRAFT for peace.merope.dev/privacy. Fill in the effective date and the support
+  email (the bracketed placeholders below) before publishing. Every claim is checked against the
   code — if a feature changes what leaves the phone, this page changes in the
-  same PR (see docs/site/README.md).
+  same PR (see site/content/README.md).
 -->
 
 # Peace — Privacy Policy
