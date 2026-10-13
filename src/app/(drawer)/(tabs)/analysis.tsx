@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -15,6 +15,7 @@ import {
   type CashFlowPoint,
 } from '@/db/repo/analysis';
 import { broughtForward, runningTotals } from '@/db/repo/carry';
+import { hasAnyRecords } from '@/db/repo/records';
 import { tagBreakdown, type TagTotal } from '@/db/repo/tags';
 import type { CategoryKind } from '@/db/repo/spend';
 import { rankSlices, type RankedSlice } from '@/lib/analysis';
@@ -34,6 +35,7 @@ const EMPTY: Breakdown = {
 const CASH_FLOW_MONTHS = 6;
 
 export default function AnalysisScreen() {
+  const router = useRouter();
   const money = useMoney();
   const homeCurrency = useSetting('homeCurrency');
   const carryOver = useSetting('carryOver');
@@ -85,7 +87,35 @@ export default function AnalysisScreen() {
       <ScrollView contentContainerClassName="pb-10">
         <KindSwitch kind={kind} onChange={setKind} />
 
-        {nothing ? (
+        {nothing && !filteredTo && !hasAnyRecords(db) ? (
+          kind === 'expense' ? (
+            <EmptyState
+              teach
+              icon="analysis"
+              title="Where your money goes"
+              hint="Once you have logged a few expenses, this ranks them by category: each one's share of the month, and how the month compares with the ones before it."
+              action={{
+                label: 'Log an expense',
+                onPress: () => router.push('/record'),
+                testID: 'empty-analysis-action',
+              }}
+              testID="empty-analysis"
+            />
+          ) : (
+            <EmptyState
+              teach
+              icon="analysis"
+              title="Where your money comes from"
+              hint="Log your salary and anything else that comes in, and this shows what each source adds up to."
+              action={{
+                label: 'Log income',
+                onPress: () => router.push({ pathname: '/record', params: { startAs: 'income' } }),
+                testID: 'empty-analysis-income-action',
+              }}
+              testID="empty-analysis-income"
+            />
+          )
+        ) : nothing ? (
           <EmptyState
             icon="analysis"
             title={

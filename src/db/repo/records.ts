@@ -363,3 +363,16 @@ export function wroteAnythingOn(db: Db, day: Date): boolean {
 
   return row !== undefined;
 }
+
+/**
+ * Has anything EVER been written to this ledger?
+ *
+ * What separates a new ledger from a quiet month, which deserve different
+ * empty screens: somebody with a year of records who steps back to an empty
+ * month knows what Analysis is for, and somebody who installed the app five
+ * minutes ago does not — "No spending in October" tells them nothing about why
+ * the tab exists. One indexed row, so it is free to ask on every focus.
+ */
+export function hasAnyRecords(db: Db): boolean {
+  return db.select({ id: transactions.id }).from(transactions).limit(1).all().length > 0;
+}

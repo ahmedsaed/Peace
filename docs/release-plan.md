@@ -55,8 +55,8 @@ reads the version. Code that differs per flavor sits behind one small module per
       (1.17 — the detected currency is written once, on a first launch, before Cash and Bank are seeded in it)
 - [x] Card handling worded generally — "installment plan" first, Murabaha as one kind of it, not the headline
 - [x] UI copy: remove region-specific examples (bank names, E£ in hints and placeholders)
-- [ ] About screen: Peace by Merope, links to `peace.merope.dev` and the source
-      ("Made by · Merope" shipped in 1.15.1; the links wait for the website to exist)
+- [x] About screen: Peace by Merope, links to `peace.merope.dev` and the source
+      ("Made by · Merope" shipped in 1.15.1; website, privacy policy and source links in 1.18)
 - [x] Review Penny's system prompt and default category set for anything that assumes one person or one country
       — reviewed in 1.16.3. Penny's prompt, the receipt prompt and the bank-message prompt assume no
       country, bank or currency (the home currency is passed in). The default categories are generic;
@@ -121,7 +121,7 @@ layout on the screens that use them.
       previewed and undoable as one batch; sides go through `ledgerSide`, never the amount's sign.
 - [ ] **App lock** (biometric / PIN, `expo-local-authentication`) — **off by default**, so nobody pays
       a step they did not ask for. Optional grace period ("lock after 5 minutes away").
-- [ ] **Empty states that teach** — on a ledger with no data, Analysis, Budgets, Portfolio and
+- [x] **Empty states that teach** — on a ledger with no data, Analysis, Budgets, Portfolio and
       Recurring each say what the screen is for and offer the one action that fills it, instead of
       a blank chart or "No data".
 

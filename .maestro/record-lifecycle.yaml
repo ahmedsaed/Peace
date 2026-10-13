@@ -145,6 +145,8 @@ tags:
 - tapOn:
     id: "action-delete"
 
-- assertVisible: "No records this month"
+# The only record is gone, so the ledger is new again — and says so.
+- assertVisible:
+    id: "empty-records"
 - assertNotVisible: "-E£200.00"
 - takeScreenshot: 04-deleted

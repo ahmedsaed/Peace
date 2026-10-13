@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
@@ -135,21 +135,50 @@ export default function PortfolioScreen() {
   );
 
   const targetPercent = (snapshot.targetsTotalBp / 100).toFixed(1);
+  const classNameField = useRef<TextInput>(null);
 
   return (
     <View className="flex-1 bg-ground" testID="portfolio-screen">
       <StackHeader title="Portfolio" />
 
       <ScrollView contentContainerClassName="px-4 pb-10 pt-4" keyboardShouldPersistTaps="handled">
-        <View className="mb-6 px-1">
-          <Text className="text-2xl font-semibold text-ink" testID="portfolio-total">
-            {money(snapshot.totalValueMinor)}
-          </Text>
-          <Text className="mt-1 text-sm text-muted">
-            {snapshot.holdings.length === 1 ? '1 holding' : `${snapshot.holdings.length} holdings`}
-            {snapshot.classes.length > 0 ? ` across ${snapshot.classes.length} classes` : ''}
-          </Text>
-        </View>
+        {snapshot.classes.length === 0 ? (
+          // The teaching voice, as a card: this screen is a form, so the way
+          // to fill it is already on it — the card says what the form is FOR,
+          // which a "$0.00 · 0 holdings" header never could.
+          <View className="mb-6 items-center rounded-2xl bg-surface px-6 py-7" testID="empty-portfolio">
+            <View className="mb-3 h-16 w-16 items-center justify-center rounded-full bg-ground">
+              <Icon name="analysis" size={28} color={palette.muted} />
+            </View>
+            <Text className="text-center text-lg font-semibold text-ink">
+              Rebalance without selling
+            </Text>
+            <Text className="mt-2 text-center text-sm leading-5 text-muted">
+              Write down the split you want — say 60% stocks and 40% bonds — and what you hold. Peace
+              shows how far each part has drifted and where your next contribution should go to close
+              the gap. It never tells you to sell, and it never touches your ledger.
+            </Text>
+            <Pressable
+              onPress={() => classNameField.current?.focus()}
+              testID="empty-portfolio-action"
+              accessibilityRole="button"
+              className="mt-4 rounded-full bg-accent px-6 py-3 active:opacity-80">
+              <Text className="text-[15px] font-semibold text-accent-ink">Add your first asset class</Text>
+            </Pressable>
+          </View>
+        ) : (
+          // A total of zero across zero holdings says nothing the card above
+          // does not — it appears with the first class.
+          <View className="mb-6 px-1">
+            <Text className="text-2xl font-semibold text-ink" testID="portfolio-total">
+              {money(snapshot.totalValueMinor)}
+            </Text>
+            <Text className="mt-1 text-sm text-muted">
+              {snapshot.holdings.length === 1 ? '1 holding' : `${snapshot.holdings.length} holdings`}
+              {` across ${snapshot.classes.length} ${snapshot.classes.length === 1 ? 'class' : 'classes'}`}
+            </Text>
+          </View>
+        )}
 
         {/*
           THE ENTRY FORM SITS ABOVE ITS LIST IN BOTH CARDS, not below it.
@@ -179,6 +208,7 @@ export default function PortfolioScreen() {
 
           <View className="mb-3 flex-row items-center gap-2">
             <TextInput
+              ref={classNameField}
               value={className}
               onChangeText={setClassName}
               placeholder="Asset class"

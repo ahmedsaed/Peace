@@ -349,20 +349,62 @@ export function Fab({
   );
 }
 
+/**
+ * What a screen shows when it has nothing to show — in one of two voices.
+ *
+ * The plain one is for a QUIET MONTH: the person knows what the screen is for,
+ * and only needs telling that this month has nothing in it.
+ *
+ * `teach` is for a NEW LEDGER, where "No spending in October" explains nothing
+ * to somebody who installed the app five minutes ago. It says what the screen is
+ * FOR and carries the one action that fills it, so every tab a newcomer opens
+ * has a way forward instead of a blank. The icon sits in a surface circle and
+ * the button is the screen's only accent — the one interaction worth pointing
+ * at, which is what `accent` is reserved for.
+ */
 export function EmptyState({
   icon,
   title,
   hint,
+  teach = false,
+  action,
+  testID,
 }: {
   icon: string;
   title: string;
   hint: string;
+  teach?: boolean;
+  action?: { label: string; onPress: () => void; testID: string };
+  testID?: string;
 }) {
   return (
-    <View className="flex-1 items-center justify-center gap-3 px-10">
-      <Icon name={icon} size={40} color={palette.line} />
-      <Text className="text-center text-base font-medium text-muted">{title}</Text>
-      <Text className="text-center text-sm leading-5 text-muted opacity-70">{hint}</Text>
+    <View className="flex-1 items-center justify-center gap-3 px-10 py-8" testID={testID}>
+      {teach ? (
+        <View className="mb-1 h-20 w-20 items-center justify-center rounded-full bg-surface">
+          <Icon name={icon} size={34} color={palette.muted} />
+        </View>
+      ) : (
+        <Icon name={icon} size={40} color={palette.line} />
+      )}
+      <Text
+        className={`text-center ${
+          teach ? 'text-lg font-semibold text-ink' : 'text-base font-medium text-muted'
+        }`}>
+        {title}
+      </Text>
+      <Text
+        className={`text-center text-sm leading-5 text-muted ${teach ? '' : 'opacity-70'}`}>
+        {hint}
+      </Text>
+      {action ? (
+        <Pressable
+          onPress={action.onPress}
+          testID={action.testID}
+          accessibilityRole="button"
+          className="mt-3 rounded-full bg-accent px-6 py-3 active:opacity-80">
+          <Text className="text-[15px] font-semibold text-accent-ink">{action.label}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

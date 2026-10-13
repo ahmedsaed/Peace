@@ -1,4 +1,7 @@
-import { Image, ScrollView, Text, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+
+import { Icon } from '@/components/icon';
+import palette from '@/constants/palette';
 
 import { StackHeader } from '@/components/screen';
 import { UpdateRow } from '@/components/update-row';
@@ -26,6 +29,22 @@ const FACTS: { label: string; value: string; testID: string }[] = [
     label: 'Network',
     value: 'Only what you switch on. No telemetry.',
     testID: 'about-network',
+  },
+];
+
+const LINKS: { label: string; value: string; url: string; testID: string }[] = [
+  { label: 'Website', value: 'peace.merope.dev', url: 'https://peace.merope.dev', testID: 'about-website' },
+  {
+    label: 'Privacy policy',
+    value: 'What leaves this phone',
+    url: 'https://peace.merope.dev/privacy/',
+    testID: 'about-privacy',
+  },
+  {
+    label: 'Source code',
+    value: 'GitHub · GPL-3.0',
+    url: 'https://github.com/ahmedsaed/Peace',
+    testID: 'about-source',
   },
 ];
 
@@ -62,7 +81,29 @@ export default function AboutScreen() {
           ))}
         </View>
 
-        {/* The one thing on this screen that does something. The drawer tells
+        {/* Where Peace lives outside the app. Opened in the browser, never
+            fetched — this screen still sends nothing until a row is tapped. */}
+        <View className="mt-4 overflow-hidden rounded-xl bg-surface">
+          {LINKS.map((link, i) => (
+            <Pressable
+              key={link.label}
+              onPress={() => void Linking.openURL(link.url)}
+              testID={link.testID}
+              accessibilityRole="link"
+              accessibilityLabel={`${link.label}, ${link.value}`}
+              className={`flex-row items-center gap-3 px-4 py-3.5 active:bg-raised ${
+                i > 0 ? 'border-t border-line' : ''
+              }`}>
+              <Text className="text-sm text-muted">{link.label}</Text>
+              <Text className="flex-1 text-right text-sm text-accent" numberOfLines={1}>
+                {link.value}
+              </Text>
+              <Icon name="chevron" size={12} color={palette.muted} />
+            </Pressable>
+          ))}
+        </View>
+
+        {/* The one thing on this screen that does something on its own. The drawer tells
             you about a newer build without being asked and says nothing the
             rest of the time — which is right, and leaves no way to tell "you
             are up to date" from "the check is broken". */}
