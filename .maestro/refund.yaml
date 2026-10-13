@@ -11,6 +11,10 @@ appId: dev.merope.peace.oss
 # So the assertions below are the CATEGORY totals, not the net.
 - launchApp:
     clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
 
 - extendedWaitUntil:
     visible:

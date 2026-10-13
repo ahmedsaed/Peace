@@ -1,8 +1,11 @@
 import { CURRENCIES, currencyName } from './currencies';
 
 describe('currencies', () => {
-  it('leads with EGP, the currency the app is built for', () => {
-    expect(CURRENCIES[0].code).toBe('EGP');
+  // No country goes first: the home currency is detected, and the sheet opens
+  // on it. What a person scans for in a list this long is the name.
+  it('is sorted by name', () => {
+    const names = CURRENCIES.map((c) => c.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   });
 
   it('has no duplicate codes', () => {

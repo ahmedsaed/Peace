@@ -211,6 +211,35 @@ export const SETTING_DEFAULTS = {
   keypadDigits: 'calculator' as DigitOrder,
   /** Which edge of the keypad the + − × ÷ column sits on. */
   keypadOperators: 'left' as OperatorSide,
+
+  /**
+   * Has this ledger been through the welcome screens?
+   *
+   * THE DEFAULT IS `true`, and that is the migration. Every install from before
+   * onboarding existed — and every backup written by one — has no row for this,
+   * and somebody with a year of records must not be greeted as a stranger, on
+   * upgrade or on restoring a file. Only a ledger opened for the very first
+   * time writes an explicit `false` (`src/lib/first-run.ts`), so "missing"
+   * can only ever mean "from before there was a question to ask".
+   */
+  onboardingDone: true as boolean,
+  /**
+   * Setup steps finished on purpose, by name (`SETUP_STEPS` in `lib/setup.ts`).
+   *
+   * Only the steps with no state of their own to read back need this — a
+   * currency that was CONFIRMED looks exactly like one left at the detected
+   * value. The optional features answer from what they actually are: a
+   * reminder is set up when reminders are on, not when a screen was visited.
+   */
+  setupDone: [] as string[],
+  /**
+   * Show "Finish setting up" on the Records screen.
+   *
+   * Off by default for the same reason `onboardingDone` defaults on: an
+   * existing ledger never saw the steps it would be counting. A first launch
+   * turns it on; dismissing the card, or finishing every step, turns it off.
+   */
+  setupCard: false as boolean,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

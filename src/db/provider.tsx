@@ -1,4 +1,5 @@
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import { getLocales } from 'expo-localization';
 import { useMemo } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
@@ -8,8 +9,11 @@ import { useSettingsStore } from '../state/settings';
 import { sweepOrphans } from './attachments';
 import { forgetHandled } from './repo/bank-captures';
 import { db } from './client';
+import { readLaunchExtras } from '../../modules/launch-extras/src/LaunchExtrasModule';
+import { firstRunSettings } from '../lib/first-run';
+import { accounts } from './schema';
 import { seedDefaults } from './seed';
-import { getSetting } from './settings';
+import { getSetting, setSetting } from './settings';
 
 /**
  * Runs pending migrations, then tops up default categories and accounts,
@@ -32,6 +36,23 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const seedError = useMemo(() => {
     if (!success) return null;
     try {
+      /**
+       * A ledger that has never been opened: no account exists yet, not even
+       * the seeded ones. Decided BEFORE seeding, because seeding is what makes
+       * it untrue — and because Cash and Bank are created in the currency
+       * written here.
+       *
+       * Every later launch skips this, so the welcome screens are reached
+       * through `onboardingDone` alone, and a launch extra on an existing
+       * ledger changes nothing.
+       */
+      if (db.select({ id: accounts.id }).from(accounts).limit(1).all().length === 0) {
+        const first = firstRunSettings(readLaunchExtras(), getLocales());
+        setSetting('homeCurrency', first.homeCurrency);
+        setSetting('onboardingDone', first.onboardingDone);
+        setSetting('setupCard', first.setupCard);
+      }
+
       seedDefaults(db, getSetting('homeCurrency'));
       // Loaded here, behind the same gate, so no screen ever renders with the
       // built-in defaults and then flicks to the stored values a frame later.

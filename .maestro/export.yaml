@@ -9,6 +9,10 @@ appId: dev.merope.peace.oss
 # filename appearing here means the whole chain ran.
 - launchApp:
     clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
 
 - extendedWaitUntil:
     visible:

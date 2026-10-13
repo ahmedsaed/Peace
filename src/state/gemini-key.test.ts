@@ -9,8 +9,23 @@ jest.mock('@/lib/secrets', () => ({
   },
 }));
 
+// Google, as a list of keys it would accept.
+let mockValid = new Set<string>();
+jest.mock('@/lib/gemini', () => {
+  const actual = jest.requireActual('@/lib/gemini');
+  return {
+    ...actual,
+    checkGeminiKey: async (key: string) => {
+      if (!mockValid.has(key.trim())) {
+        throw new actual.GeminiError('Google did not accept that key.');
+      }
+    },
+  };
+});
+
 beforeEach(() => {
   mockStored = null;
+  mockValid = new Set(['AIzaSyD-1234']);
   useGeminiKeyStore.setState({ hasKey: null });
 });
 
@@ -42,5 +57,22 @@ describe('whether there is a Gemini key', () => {
     mockStored = 'AIzaSyD-already-there';
     await useGeminiKeyStore.getState().refresh();
     expect(useGeminiKeyStore.getState().hasKey).toBe(true);
+  });
+});
+
+describe('saving a key', () => {
+  it('refuses one Google rejects, and keeps the key that was there', async () => {
+    mockStored = 'AIzaSyD-1234';
+    await expect(useGeminiKeyStore.getState().save('random text')).rejects.toThrow(
+      /did not accept/
+    );
+    expect(mockStored).toBe('AIzaSyD-1234');
+  });
+
+  it('removes without asking Google anything', async () => {
+    mockValid = new Set();
+    mockStored = 'AIzaSyD-1234';
+    await useGeminiKeyStore.getState().save('');
+    expect(mockStored).toBeNull();
   });
 });

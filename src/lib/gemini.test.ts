@@ -5,6 +5,7 @@ import {
   endpoint,
   extractJson,
   isTransientStatus,
+  checkGeminiKey,
   listModels,
   parseModelList,
   readReceipt,
@@ -412,5 +413,45 @@ describe('reading a receipt end to end', () => {
     // And the key is not in what was logged, because it is in a header.
     expect(JSON.stringify(warn.mock.calls)).not.toContain('key');
     warn.mockRestore();
+  });
+});
+
+describe('checkGeminiKey', () => {
+  it('accepts a key Google answers for, sending it in a header', async () => {
+    const fetchImpl = ok({ models: [] });
+    await expect(checkGeminiKey(' AIza-good ', { fetchImpl })).resolves.toBeUndefined();
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).not.toContain('AIza-good');
+    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('AIza-good');
+  });
+
+  // Exactly what typing random text into the field used to save.
+  it('refuses a key Google rejects, in words about the key', async () => {
+    const fetchImpl = status(400, googleError(400, 'API key not valid.', 'API_KEY_INVALID'));
+    await expect(checkGeminiKey('random text', { fetchImpl })).rejects.toThrow(
+      /did not accept that key/
+    );
+  });
+
+  it('says when the key is real but the API is off', async () => {
+    const fetchImpl = status(403, googleError(403, 'disabled', 'SERVICE_DISABLED'));
+    await expect(checkGeminiKey('AIza-off', { fetchImpl })).rejects.toThrow(/not turned on/);
+  });
+
+  it('counts a rate-limited key as a working one', async () => {
+    await expect(checkGeminiKey('AIza-busy', { fetchImpl: status(429) })).resolves.toBeUndefined();
+  });
+
+  it('blames the check, not the key, when Google cannot be reached', async () => {
+    const fetchImpl = jest.fn(async () => {
+      throw new Error('offline');
+    });
+    await expect(checkGeminiKey('AIza-maybe', { fetchImpl })).rejects.toThrow(/Could not reach/);
+  });
+
+  it('does not call out for an empty key', async () => {
+    const fetchImpl = ok({});
+    await expect(checkGeminiKey('  ', { fetchImpl })).rejects.toThrow(/Paste a key/);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

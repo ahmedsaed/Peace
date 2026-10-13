@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { checkGeminiKey } from '@/lib/gemini';
 import { getGeminiKey, setGeminiKey } from '@/lib/secrets';
 
 /**
@@ -13,6 +14,12 @@ import { getGeminiKey, setGeminiKey } from '@/lib/secrets';
  * on. Same rule as settings and the bank inbox: the store holds a copy and
  * repaints, the secure store stays the truth, and the only way to change the
  * key is through `save` here so the copy cannot fall behind.
+ *
+ * SAVING CHECKS THE KEY FIRST, here, so no screen can store one unchecked: a
+ * typo accepted at the paste fails weeks later in a receipt or a bank message,
+ * which is the wrong place to learn the key was never right. A refused key
+ * throws a `GeminiError` worded for the screen, and the old key stays. An
+ * empty value is a removal and is never sent anywhere.
  *
  * Presence only. The key itself stays in the secure store and is read at the
  * moment of use; a billable credential has no business sitting in UI state.
@@ -30,6 +37,7 @@ export const useGeminiKeyStore = create<GeminiKeyStore>((set) => ({
     set({ hasKey: (await getGeminiKey()) !== null });
   },
   save: async (key) => {
+    if (key !== null && key.trim() !== '') await checkGeminiKey(key);
     await setGeminiKey(key);
     set({ hasKey: (await getGeminiKey()) !== null });
   },

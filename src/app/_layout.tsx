@@ -68,6 +68,7 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: palette.ground },
             }}>
             <Stack.Screen name="(drawer)" />
+            <Stack.Screen name="setup" options={{ animation: 'fade' }} />
             <Stack.Screen
               name="record"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

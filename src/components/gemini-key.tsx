@@ -22,6 +22,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { ModelRow } from '@/components/model-picker';
 import palette from '@/constants/palette';
+import { GeminiError } from '@/lib/gemini';
 import { getGeminiKey, maskKey } from '@/lib/secrets';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { runBankCatchUp } from '@/state/bank';
@@ -77,10 +78,15 @@ export function GeminiKeyCard() {
         guidance: settings.bankGuidance,
       });
     } catch (e) {
-      // The keystore can refuse on a device with a broken keychain. Friendly
-      // sentence here, real error in the log.
-      console.warn('[settings] could not save the Gemini key', e);
-      setError('Could not save that key on this device.');
+      // A refused key arrives as a GeminiError already worded for this
+      // screen. Anything else is the keystore refusing, on a device with a
+      // broken keychain: friendly sentence here, real error in the log.
+      if (e instanceof GeminiError) {
+        setError(e.message);
+      } else {
+        console.warn('[settings] could not save the Gemini key', e);
+        setError('Could not save that key on this device.');
+      }
     } finally {
       setBusy(false);
     }
@@ -107,26 +113,40 @@ export function GeminiKeyCard() {
         <>
           <TextInput
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={(next) => {
+              setDraft(next);
+              setError(null);
+            }}
             placeholder="Paste your key, or leave blank to remove it"
             placeholderTextColor={palette.muted}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
-            className="mb-2 rounded-lg border border-line px-3 py-2.5 text-ink"
+            className={`mb-2 rounded-lg border px-3 py-2.5 text-ink ${
+              error ? 'border-expense' : 'border-line'
+            }`}
             testID="gemini-key-input"
           />
+          {/* Directly under the field it is about. At the foot of the card it
+              sat below the fold with the keyboard up, and a Save that seemed
+              to do nothing was all anyone saw. */}
+          {error ? (
+            <Text className="mb-2 text-sm leading-5 text-expense" testID="gemini-key-error">
+              {error}
+            </Text>
+          ) : null}
           <Text className="mb-3 text-xs leading-5 text-muted">
             Make one at aistudio.google.com. Reading a receipt is one request; the free tier covers
             ordinary use.
           </Text>
-          {error ? (
-            <Text className="mb-2 text-xs text-expense" testID="gemini-key-error">
-              {error}
-            </Text>
-          ) : null}
           <View className="flex-row gap-2">
-            <SmallButton label="Save" onPress={onSave} disabled={busy} primary testID="gemini-key-save" />
+            <SmallButton
+              label={busy ? 'Checking…' : 'Save'}
+              onPress={onSave}
+              disabled={busy}
+              primary
+              testID="gemini-key-save"
+            />
             <SmallButton
               label="Cancel"
               onPress={() => {

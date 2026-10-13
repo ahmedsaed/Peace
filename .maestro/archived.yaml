@@ -13,6 +13,10 @@ appId: dev.merope.peace.oss
 # Tags are the same story on their own screen; that half lives in tags.yaml.
 - launchApp:
     clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
 
 # Gate on the first screen rather than racing migrations and seeding — see
 # manage.yaml for why this is an extendedWaitUntil and not an assertion.
