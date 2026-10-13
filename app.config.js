@@ -38,16 +38,47 @@ const buildNumber = Number(
   process.env.PEACE_BUILD_NUMBER ?? git('git rev-list --count HEAD', '0')
 );
 
+/**
+ * BUILD FLAVORS
+ *
+ * One codebase, two apps. `PEACE_FLAVOR` picks which one this build is:
+ *
+ *   oss   the open build: GitHub Releases, its own update check, bring your
+ *         own Gemini key. The DEFAULT, so a fresh clone, CI and every local
+ *         build are this one unless something asks otherwise.
+ *   play  the Play Store build: Play delivers updates, so the self-updater is
+ *         left out — Play policy forbids an app updating itself any other way.
+ *
+ * The two have DIFFERENT application ids on purpose. Android treats them as two
+ * apps, so somebody trying a GitHub release keeps their Play install untouched
+ * beside it; moving data between them is backup and restore. The launcher name
+ * differs too, or two identical icons sit side by side.
+ *
+ * An unknown value throws rather than falling back: a typo in a release job
+ * that silently built the wrong app would ship the wrong updater.
+ */
+const FLAVORS = {
+  oss: { package: 'dev.merope.peace.oss', name: 'Peace OSS' },
+  play: { package: 'dev.merope.peace', name: 'Peace' },
+};
+const flavor = process.env.PEACE_FLAVOR || 'oss';
+if (!FLAVORS[flavor]) {
+  throw new Error(`PEACE_FLAVOR must be one of ${Object.keys(FLAVORS).join(', ')}; got "${flavor}"`);
+}
+
 const gitSha = process.env.GITHUB_SHA?.slice(0, 7) ?? git('git rev-parse --short HEAD', 'unknown');
 
 module.exports = ({ config }) => ({
   ...config,
+  name: FLAVORS[flavor].name,
   android: {
     ...config.android,
+    package: FLAVORS[flavor].package,
     versionCode: buildNumber,
   },
   extra: {
     ...config.extra,
+    flavor,
     buildNumber,
     gitSha,
     // A working tree with uncommitted changes does not match its own SHA, so

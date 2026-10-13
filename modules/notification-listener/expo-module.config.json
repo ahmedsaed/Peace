@@ -1,6 +1,6 @@
 {
   "platforms": ["android"],
   "android": {
-    "modules": ["com.ahmed.peace.notifications.NotificationListenerModule"]
+    "modules": ["dev.merope.peace.notifications.NotificationListenerModule"]
   }
 }

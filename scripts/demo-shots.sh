@@ -23,7 +23,7 @@ adb get-state >/dev/null 2>&1 || { echo "no device — run 'npm run emu' first";
 # A dev build here would produce screenshots with a Metro banner and a
 # development-mode overlay, which is worse than no screenshots at all because it
 # looks like the shipped app.
-if adb shell pm list packages -f com.ahmed.peace | grep -q "debug"; then
+if adb shell pm list packages -f dev.merope.peace.oss | grep -q "debug"; then
   echo "warning: a debug build appears to be installed — install the release APK first" >&2
 fi
 

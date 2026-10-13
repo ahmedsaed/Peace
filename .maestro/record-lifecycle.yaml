@@ -1,4 +1,4 @@
-appId: com.ahmed.peace
+appId: dev.merope.peace.oss
 # `core` runs on `npm run e2e:fast` — the core action: logging a spend, then
 # changing it and taking it away again.
 tags:

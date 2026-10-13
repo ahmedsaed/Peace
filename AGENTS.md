@@ -71,6 +71,29 @@ To actually see the app: `npm run shot -- after-change` and read the returned PN
 Drive the UI with `adb shell input tap X Y`, `adb shell input text "..."`,
 `adb shell input keyevent KEYCODE_BACK`. Prefer Maestro flows in `.maestro/` for anything repeatable.
 
+## Build flavors
+
+One codebase builds two apps, chosen by `PEACE_FLAVOR` in `app.config.js`:
+
+| Flavor | Application id | Launcher name | Updates |
+|---|---|---|---|
+| `oss` (**default**) | `dev.merope.peace.oss` | Peace OSS | GitHub release check in the drawer and About |
+| `play` | `dev.merope.peace` | Peace | Play delivers them; the self-updater is off |
+
+Everything local, every CI job, every GitHub release and every Maestro flow is `oss` unless
+something asks otherwise — which is why every flow's `appId` is `dev.merope.peace.oss`. The two ids
+differ ON PURPOSE: a GitHub build installs beside a Play install instead of over it, and moving
+data between them is backup and restore. An unknown `PEACE_FLAVOR` throws rather than falling back.
+JS reads the flavor through `flavor` / `selfUpdates` in `src/lib/build-info.ts`; put a per-flavor
+difference behind one small module per concern, never as `if (flavor === …)` across screens.
+
+**Changing the application id makes a new app.** Builds before 1.16 were `com.ahmed.peace`; that
+install does not upgrade into either flavor, it sits beside them until uninstalled. **Each id and
+signing key also needs its own Android OAuth client** in Google Cloud, or Drive sign-in fails with
+`DEVELOPER_ERROR` — and the `play` build is re-signed by Play App Signing, so its client takes the
+SHA-1 from Play Console, not from our keystore. **Prebuild with `--clean` after a flavor or id
+change**: a reused `android/` keeps the old package directory for `MainActivity`.
+
 ## Versioning
 
 | Field | Where it comes from | When it changes |
@@ -200,7 +223,7 @@ so does pausing Play Protect. Do not go looking for a signing or manifest fix, t
 
 ```
 npm run apk:emu                                    # x86_64, ~5 min
-adb uninstall com.ahmed.peace
+adb uninstall dev.merope.peace.oss
 adb install -r android/app/build/outputs/apk/release/app-release.apk
 npm run e2e
 ```

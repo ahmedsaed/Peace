@@ -1,4 +1,4 @@
-appId: com.ahmed.peace
+appId: dev.merope.peace.oss
 # `core` runs on `npm run e2e:fast` — the chrome every screen hangs off.
 tags:
   - core
@@ -74,7 +74,10 @@ tags:
 - takeScreenshot: 02-about
 - assertVisible:
     id: "about-package"
-    text: "com.ahmed.peace"
+    text: "dev.merope.peace.oss"
+- assertVisible:
+    id: "about-maker"
+    text: "Merope"
 
 # The custom back button returns to the tabs, not to the drawer.
 - tapOn:
