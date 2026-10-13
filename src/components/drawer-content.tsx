@@ -8,7 +8,6 @@ import { Icon } from '@/components/icon';
 import { UpdateNotice } from '@/components/update-notice';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
-import { useAi } from '@/state/ai';
 import { backupDue, describeAge } from '@/lib/drive-backup';
 import type { Settings } from '@/lib/settings';
 import { useSetting } from '@/state/settings';
@@ -61,23 +60,12 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
   },
 ];
 
-/**
- * The assistant leads the list when it is on, and is absent when it is off —
- * an entry that opens onto "this is switched off" is a door to a wall. It is
- * turned on from Settings, which is where its privacy sentence lives.
- */
-const ASSISTANT_ITEM = {
-  icon: 'sparkle',
-  label: 'Penny',
-  hint: 'Ask about your money',
-  href: '/assistant' as Href,
-  testID: 'drawer-assistant',
-};
 
 export function DrawerContent({ navigation }: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
-  // Penny is listed only when she can answer: a key, Use AI, and her switch.
-  const items = useAi().penny ? [ASSISTANT_ITEM, ...ITEMS] : ITEMS;
+  // No Penny here: she has her own button in every tab's header, and a second
+  // way to one screen is one more thing to wonder about.
+  const items = ITEMS;
 
   // Close first, then navigate. Pushing onto the root stack does not dismiss
   // the drawer by itself, so it would still be sitting open behind the new

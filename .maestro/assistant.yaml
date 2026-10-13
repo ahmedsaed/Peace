@@ -27,8 +27,6 @@ appId: dev.merope.peace.oss
     id: "nav-menu"
 - assertVisible:
     id: "drawer-settings"
-- assertNotVisible:
-    id: "drawer-assistant"
 - tapOn:
     id: "drawer-settings"
 

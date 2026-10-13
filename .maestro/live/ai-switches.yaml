@@ -93,7 +93,7 @@ tags:
 - tapOn:
     id: "record-cancel"
 
-# --- Use AI off: Penny is gone from the header and the menu ---
+# --- Use AI off: Penny's header button is gone ---
 - tapOn:
     id: "nav-menu"
 - tapOn:
@@ -112,12 +112,10 @@ tags:
     id: "nav-back"
 - assertNotVisible:
     id: "nav-assistant"
-- tapOn:
-    id: "nav-menu"
-- assertNotVisible:
-    id: "drawer-assistant"
 
 # --- and back on: everything returns as it was left, Penny included ---
+- tapOn:
+    id: "nav-menu"
 - tapOn:
     id: "drawer-settings"
 - tapOn:

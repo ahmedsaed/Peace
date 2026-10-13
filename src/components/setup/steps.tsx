@@ -649,9 +649,20 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
    * reading the disclosure is the yes, and asking a second time would only be
    * a second switch to forget.
    */
+  /**
+   * Access is granted on Android's own page, so the answer arrives while this
+   * step is NOT what Android considers foreground. Asked on returning to the
+   * app AND, until it is granted, once a second while the step is open: on a
+   * device the foreground event alone left this step saying "allow access"
+   * over access that had been granted, and the user stuck on it. The check is
+   * one synchronous native call, and it stops the moment access is there.
+   *
+   * Capturing switches on with it: allowing access after reading the
+   * disclosure is the yes, and asking a second time would only be a second
+   * switch to forget.
+   */
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') return;
+    const check = () => {
       const now = bankAccess();
       if (now.permitted && !now.capturing) {
         try {
@@ -661,10 +672,19 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
           // The row below still says what state it is in.
         }
       }
-      setAccess(now);
+      setAccess((was) =>
+        was.permitted === now.permitted && was.capturing === now.capturing ? was : now
+      );
+    };
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') check();
     });
-    return () => subscription.remove();
-  }, []);
+    const poll = access.permitted ? null : setInterval(check, 1000);
+    return () => {
+      subscription.remove();
+      if (poll) clearInterval(poll);
+    };
+  }, [access.permitted]);
 
   const add = () => {
     const value = draft.trim();
