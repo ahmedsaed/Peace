@@ -4,6 +4,7 @@ import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import type { BankCapture } from '@/db/schema';
 import { useMoney } from '@/state/money';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * A bank message, shown in the records list before it is a record.
@@ -122,9 +123,7 @@ export function BankActions({
     <Modal visible={capture !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
 
-      <View
-        className="rounded-t-2xl border-t border-line bg-ground pb-8"
-        style={{ elevation: 16 }}
+      <SheetPanel
         testID="bank-actions">
         {capture ? (
           <>
@@ -184,7 +183,7 @@ export function BankActions({
             />
           </>
         ) : null}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

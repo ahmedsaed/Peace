@@ -502,6 +502,7 @@ export default function RecordsScreen() {
 
       {pendingUndo ? (
         <Snackbar
+          overTabBar
           message={pendingUndo.message}
           actionLabel="Undo"
           onAction={onUndo}

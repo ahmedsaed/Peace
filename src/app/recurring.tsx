@@ -8,6 +8,7 @@ import { db } from '@/db/client';
 import { deleteRule, listRules, nextProposalDate, setRuleActive } from '@/db/repo/recurring';
 import { describeRecurrence, fromYmd } from '@/lib/recurrence';
 import { useMoney } from '@/state/money';
+import { SheetPanel } from '@/components/sheet-panel';
 
 type Rule = ReturnType<typeof listRules>[number];
 
@@ -195,9 +196,7 @@ function RuleActions({
     <Modal visible={rule !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
 
-      <View
-        className="rounded-t-2xl border-t border-line bg-ground pb-8"
-        style={{ elevation: 16 }}
+      <SheetPanel
         testID="rule-actions">
         {rule ? (
           <>
@@ -231,7 +230,7 @@ function RuleActions({
             />
           </>
         ) : null}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

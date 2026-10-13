@@ -25,6 +25,7 @@ import { testIdSlug as slug } from '@/lib/id';
 import { formatPeriod, currentPeriod, type Period } from '@/lib/period';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
+import { SheetPanel } from '@/components/sheet-panel';
 
 const EMPTY: BudgetSummary = {
   budgeted: [],
@@ -515,9 +516,9 @@ function BudgetEditor({
           limit" and "Remove limit" sit underneath it. The input `autoFocus`es,
           so that is the state the sheet opens in — and an empty field means
           REMOVE, which makes a hidden pair of buttons worse here than usual. */}
-      <View
-        className="rounded-t-2xl border-t border-line bg-ground px-5 pb-8 pt-5"
-        style={{ elevation: 16, marginBottom: keyboardHeight }}
+      <SheetPanel
+        className="px-5 pt-5"
+        lift={keyboardHeight}
         testID="budget-editor">
         {row ? (
           <>
@@ -562,7 +563,7 @@ function BudgetEditor({
             ) : null}
           </>
         ) : null}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

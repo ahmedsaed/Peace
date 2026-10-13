@@ -638,6 +638,17 @@ app ignoring input. `pkill -f GradleDaemon`.
   `keyboardDidShow`, never `keyboardWillShow`: Android only fires the `Did` events, so a `Will`
   listener reports zero on the one platform that needs it. The flow has to TYPE into the field and
   then assert the button below it is still visible; asserting the field exists proves nothing.
+- **A bottom sheet's foot is underneath the navigation bar — every sheet is a `SheetPanel`.** A
+  `Modal` is drawn edge to edge, and each sheet padded itself with a fixed `pb-8`. With gesture
+  navigation that is invisible; with the THREE-BUTTON bar, the last picker row, "Remove limit" and
+  "Repeat this" sat under Back/Home/Recents and a tap on them hit the bar. All fourteen sheets had
+  it at once and every flow passed locally, because the test AVD used gestures — it took a runner's
+  emulator to show it. `SheetPanel` adds the inset in one place (and `lift` for the keyboard, ON
+  TOP of the inset — the keyboard height leaves the nav bar out); `sheet-panel.test.ts` fails a
+  sliding `Modal` that does not use it. Check a sheet with
+  `adb shell cmd overlay enable com.android.internal.systemui.navbar.threebutton`. Same family on
+  the flow side: a bare `tapOn: "Home"` matches the nav bar's Home KEY — scope text taps on common
+  words to the sheet with `childOf`.
 - **The moment a row can point at a FILE, the backup stops being the database.** Attachments live
   on disk with only their names in `attachments`, so copying `peace.db` alone restores a ledger
   whose every receipt is a broken thumbnail — on the one day a backup is being used at all. A

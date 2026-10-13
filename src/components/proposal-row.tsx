@@ -5,6 +5,7 @@ import palette from '@/constants/palette';
 import type { Proposal } from '@/db/repo/recurring';
 import { fromYmd } from '@/lib/recurrence';
 import { useMoney } from '@/state/money';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * A record a rule says is due, shown before it exists.
@@ -105,9 +106,7 @@ export function ProposalActions({
     <Modal visible={proposal !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
 
-      <View
-        className="rounded-t-2xl border-t border-line bg-ground pb-8"
-        style={{ elevation: 16 }}
+      <SheetPanel
         testID="due-actions">
         {proposal ? (
           <>
@@ -138,7 +137,7 @@ export function ProposalActions({
             />
           </>
         ) : null}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

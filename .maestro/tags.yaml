@@ -23,11 +23,19 @@ appId: dev.merope.peace.oss
     id: "fab"
 - tapOn:
     id: "pick-category"
+# Scoped to the sheet: a bare "Home" also matches the three-button navigation
+# bar's Home key (its content description), which a runner's emulator has and
+# a gesture-navigation AVD does not — the tap sends the app to the launcher.
 - scrollUntilVisible:
     element:
       text: "Home"
+      childOf:
+        id: "sheet-category"
     direction: DOWN
-- tapOn: "Home"
+- tapOn:
+    text: "Home"
+    childOf:
+      id: "sheet-category"
 - tapOn:
     id: "record-note"
 - inputText: "Tiles"

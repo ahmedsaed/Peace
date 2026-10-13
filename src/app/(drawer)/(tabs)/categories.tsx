@@ -233,6 +233,7 @@ export default function CategoriesScreen() {
           top of a list the user has scrolled away from. */}
       {said ? (
         <Snackbar
+          overTabBar
           message={said.text}
           token={said.token}
           onDismiss={() => setSaid(null)}

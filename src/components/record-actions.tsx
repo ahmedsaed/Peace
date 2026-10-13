@@ -6,6 +6,7 @@ import type { RecordRow } from '@/db/repo/records';
 import type { ReversalLink } from '@/db/repo/reversal';
 import { canDuplicate, canRefund, canReverse } from '@/lib/record-actions';
 import { useMoney, type Money } from '@/state/money';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * Everything this sheet knows about how the row relates to others.
@@ -82,9 +83,7 @@ export function RecordActions({
     <Modal visible={row !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
 
-      <View
-        className="rounded-t-2xl border-t border-line bg-ground pb-8"
-        style={{ elevation: 16 }}
+      <SheetPanel
         testID="record-actions">
         {/* Rendered from a NON-NULL row handed down, never from `row!` inside a
             handler: the sheet is closed almost all of the time, and an assertion
@@ -102,7 +101,7 @@ export function RecordActions({
             onOpen={onOpen}
           />
         ) : null}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

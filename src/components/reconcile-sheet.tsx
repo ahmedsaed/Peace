@@ -11,6 +11,7 @@ import {
 } from '@/lib/liability';
 import { parseAmountToMinor } from '@/lib/money';
 import { useMoney } from '@/state/money';
+import { SheetPanel } from '@/components/sheet-panel';
 
 type Mode = 'owed' | 'available';
 
@@ -84,9 +85,9 @@ export function ReconcileSheet({
           The input `autoFocus`es, so the keyboard is up before the sheet has
           been looked at — the number you are being asked to check, and the
           button that commits it, were both hidden the whole time. */}
-      <View
-        className="rounded-t-2xl border-t border-line bg-ground px-5 pb-8 pt-5"
-        style={{ elevation: 16, marginBottom: keyboardHeight }}
+      <SheetPanel
+        className="px-5 pt-5"
+        lift={keyboardHeight}
         testID="reconcile-sheet">
         <Text className="text-base font-semibold text-ink">Update balance</Text>
         <Text className="mt-1 text-xs leading-4 text-muted">
@@ -164,7 +165,7 @@ export function ReconcileSheet({
             Save correction
           </Text>
         </Pressable>
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

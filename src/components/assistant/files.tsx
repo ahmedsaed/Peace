@@ -5,6 +5,7 @@ import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { attachmentExists, attachmentUri, type StagedAttachment } from '@/db/attachments';
 import { isImageMime, shortName } from '@/lib/attachment';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * Files in the conversation — picking them, previewing them before they are
@@ -142,13 +143,18 @@ export function AttachMenu({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityRole="button" accessibilityLabel="Dismiss" />
-      <View
-        className="rounded-t-2xl border-t border-line bg-ground pb-8 pt-2"
-        style={{ elevation: 16, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: -4 } }}
+      <SheetPanel
+        className="pt-2"
+        style={{
+          shadowColor: '#000',
+          shadowOpacity: 0.5,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: -4 },
+        }}
         testID="assistant-attach-menu">
         {row('camera', 'Take a photo', 'A receipt, a bill, a price tag', onCamera, 'assistant-attach-camera')}
         {row('folder', 'Choose a file', 'A photo or a PDF invoice or statement', onFiles, 'assistant-attach-files')}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

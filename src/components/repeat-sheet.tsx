@@ -4,6 +4,7 @@ import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 import palette from '@/constants/palette';
 import { useKeyboardHeight } from '@/lib/layout';
 import { describeRecurrence, type Frequency, type Recurrence } from '@/lib/recurrence';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * How often a record repeats — and NOTHING ELSE.
@@ -79,9 +80,9 @@ export function RepeatSheet({
           not resize with the keyboard the way the app's window does, so the day
           field and the buttons below it sit underneath it — scrolling cannot
           help, because the sheet still believes it has the whole screen. */}
-      <View
-        className="max-h-[80%] rounded-t-2xl border-t border-line bg-ground pb-8"
-        style={{ elevation: 16, marginBottom: keyboardHeight }}
+      <SheetPanel
+        className="max-h-[80%]"
+        lift={keyboardHeight}
         testID="repeat-sheet">
         <View className="border-b border-line px-5 py-4">
           <Text className="text-base font-semibold text-ink">Repeat</Text>
@@ -192,7 +193,7 @@ export function RepeatSheet({
             <Text className="text-sm font-semibold text-ink">Cancel</Text>
           </Pressable>
         </View>
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

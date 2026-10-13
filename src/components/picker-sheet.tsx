@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, Text, View, type LayoutRectangle } from '
 
 import { Icon } from '@/components/icon';
 import { centerScrollOffset } from '@/lib/layout';
+import { SheetPanel } from '@/components/sheet-panel';
 
 export type PickerOption = {
   id: string;
@@ -102,10 +103,10 @@ export function PickerSheet({
         accessibilityLabel="Dismiss"
       />
 
-      <View
-        className="max-h-[70%] rounded-t-2xl border-t border-line bg-ground pb-6"
+      <SheetPanel
+        className="max-h-[70%]"
+        pad={24}
         style={{
-          elevation: 16,
           shadowColor: '#000',
           shadowOpacity: 0.5,
           shadowRadius: 16,
@@ -175,7 +176,7 @@ export function PickerSheet({
             );
           })}
         </ScrollView>
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }
