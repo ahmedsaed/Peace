@@ -430,7 +430,10 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   Records by a few days a month. A custom month is NAMED after the calendar month holding most of it
   (25 Sep – 24 Oct is "October"), so budgets keyed `YYYY-MM` stay attached to the stretch of time
   people mean. The start day is module state set by the settings store (`configurePeriods`); a test
-  that changes it resets it in `afterEach`. Weeks follow `weekStart` the same way, and only the date
+  that changes it resets it in `afterEach`. **A component never calls `formatPeriod` directly** — it
+  uses `usePeriodLabel()`: the React Compiler memoises components on their props, so MonthHeader went
+  on saying "October 2026" after the start day moved, because its `period` prop had not changed and
+  the module state behind it is invisible to the compiler. Weeks follow `weekStart` the same way, and only the date
   picker and Penny's week buckets are week-shaped — do not add a third without the setting reaching it.
 - **A default that only works for someone with history is a dead feature.** `suggestBudgets` first
   averaged the three months *before* the one being budgeted, which returns nothing for a ledger a
