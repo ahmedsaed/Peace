@@ -192,6 +192,29 @@ Three things that are true only because CI caught them, and will bite again:
   those packages under `@unrs/resolver-binding-wasm32-wasi` where they belong, and the lockfile
   became self-consistent. An override that survives its original problem becomes the next one.
 
+**Every flow skips onboarding — and a new one must too.** A fresh install opens on the welcome
+screens, and every flow starts from `clearState`, so a flow without the skip dies on its first
+`home-screen` gate looking exactly like a broken app. Copy the block every flow already has:
+
+```yaml
+- launchApp:
+    clearState: true
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+```
+
+Maestro hands `arguments` to the app as intent extras; `modules/launch-extras` reads the `peace.*`
+ones and `src/lib/first-run.ts` honours them ONLY on a ledger opened for the first time, so they
+change nothing on an existing install. The currency is pinned because a fresh install detects it
+from the phone's region, and the fixtures are in pounds. `onboarding.yaml` is the one flow that
+walks setup, and it asserts the choices on the screens that use them.
+
+**`onboardingDone` defaults to `true`, and that is the migration.** Installs and backups from before
+onboarding have no row for it, and a year-old ledger must not be greeted as new. Only a first
+launch writes an explicit `false`. A setting added for a FRESH install's benefit needs the same
+thought: what does a missing row mean for the people who already have the app?
+
 **Maestro does not run on every push** — it needs a booted emulator, which is minutes rather than
 seconds. Run `npm run e2e` locally before merging anything that touches a screen.
 

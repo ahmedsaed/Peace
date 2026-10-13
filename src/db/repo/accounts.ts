@@ -216,3 +216,36 @@ export function deleteAccount(db: Db, id: string): void {
 
   db.delete(accounts).where(eq(accounts.id, id)).run();
 }
+
+/**
+ * Move every account that has never been used from one currency to another.
+ *
+ * For changing the home currency during setup. Cash and Bank are seeded in
+ * whatever currency was detected, BEFORE anybody confirmed it — so a person
+ * who corrects the guess would otherwise find their two starter accounts still
+ * in the wrong money, and records entered into them converted at a rate
+ * nobody asked for.
+ *
+ * "Never been used" is strict on purpose: no records AND no opening balance.
+ * An opening balance is a figure in the old currency's minor units, and
+ * relabelling it would turn 500.000 dinars into 5,000.00 pounds. An account
+ * with history is in the currency its history says, whatever the home
+ * currency becomes. Returns how many accounts moved.
+ */
+export function adoptCurrency(db: Db, from: string, to: string): number {
+  if (from === to) return 0;
+  const unused = db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.currency, from))
+    .all()
+    .filter((a) => a.openingBalance === 0 && accountRecordCount(db, a.id) === 0);
+
+  for (const account of unused) {
+    db.update(accounts)
+      .set({ currency: to, updatedAt: new Date() })
+      .where(eq(accounts.id, account.id))
+      .run();
+  }
+  return unused.length;
+}

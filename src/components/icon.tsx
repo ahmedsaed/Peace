@@ -147,6 +147,13 @@ const CHROME_PATHS = {
    */
   label:
     'M3 5h11l7 7-7 7H3V5zm4 5.3a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 1 1 0-3.4z',
+
+  // --- setup ---
+  /** Nine keys. Solid squares rather than outlines, so it survives 20px. */
+  keypad:
+    'M4 4h4v4H4zM10 4h4v4h-4zM16 4h4v4h-4zM4 10h4v4H4zM10 10h4v4h-4zM16 10h4v4h-4zM4 16h4v4H4zM10 16h4v4h-4zM16 16h4v4h-4z',
+  bell: 'M12 2.5a1.5 1.5 0 0 1 1.5 1.5v.7A6 6 0 0 1 18 10.5v4.2l2 2.3v1H4v-1l2-2.3v-4.2a6 6 0 0 1 4.5-5.8V4A1.5 1.5 0 0 1 12 2.5zM9.5 19.5h5a2.5 2.5 0 0 1-5 0z',
+  check: 'M9.5 15.6l9.2-9.2 1.8 1.8-11 11-5.6-5.6 1.8-1.8z',
 } as const;
 
 /**

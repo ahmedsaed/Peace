@@ -12,12 +12,13 @@
  * send every text message the user receives to Google.
  */
 
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Pressable, Text, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
-import { isCapturing, isPermitted, openListenerSettings, setCapturing } from '@/db/bank-inbox';
+import { isCapturing, isPermitted, setCapturing } from '@/db/bank-inbox';
 import { PromptEditor } from '@/components/prompt-editor';
 import { useBankInbox } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
@@ -46,6 +47,7 @@ function safeIsCapturing(): boolean {
 }
 
 export function BankMessagesCard() {
+  const router = useRouter();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
 
@@ -123,14 +125,11 @@ export function BankMessagesCard() {
             Allowed
           </Text>
         ) : (
+          // Through the disclosure, never straight to Android's page: Play
+          // requires the prominent disclosure before every request for this
+          // access, and setup's bank step IS that disclosure.
           <Pressable
-            onPress={() => {
-              try {
-                openListenerSettings();
-              } catch {
-                // Nothing sensible to do; the row still says "Not allowed".
-              }
-            }}
+            onPress={() => router.push('/setup?step=bank')}
             testID="bank-permission-grant"
             accessibilityRole="button"
             className="rounded-lg border border-line px-3 py-1.5 active:opacity-70">

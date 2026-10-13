@@ -8,6 +8,10 @@ appId: dev.merope.peace.oss
 # whether the query did anything.
 - launchApp:
     clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
 
 - extendedWaitUntil:
     visible:

@@ -51,7 +51,8 @@ reads the version. Code that differs per flavor sits behind one small module per
 
 - [x] Package name → `dev.merope.peace` (+ `.oss`); new Android OAuth clients for Drive
       (`oss` client done in 1.16; the `play` client waits for Play's app-signing SHA-1 — Phase 4)
-- [ ] `homeCurrency` default detected from the device locale (`expo-localization`), confirmed in onboarding
+- [x] `homeCurrency` default detected from the device locale (`expo-localization`), confirmed in onboarding
+      (1.17 — the detected currency is written once, on a first launch, before Cash and Bank are seeded in it)
 - [x] Card handling worded generally — "installment plan" first, Murabaha as one kind of it, not the headline
 - [x] UI copy: remove region-specific examples (bank names, E£ in hints and placeholders)
 - [ ] About screen: Peace by Merope, links to `peace.merope.dev` and the source
@@ -87,6 +88,10 @@ reads the version. Code that differs per flavor sits behind one small module per
    - Backups — choose a folder and/or Google Drive
 6. **"Getting set up 3/6" card** on Records afterwards, dismissable, so a skipped step is one tap away.
 
+Shipped in 1.17 as `/setup` (`?step=<name>` for one step on its own), the "Finish setting up" card,
+and Settings › Walk through setup again. The bank step is the disclosure, and the Settings card's
+"Allow…" routes to it. Welcome also offers "I have a backup to restore".
+
 Testing: a launch argument (or debug-only intent extra) marks onboarding done; every existing flow
 passes it; one new flow walks onboarding end to end and asserts the chosen currency and keypad
 layout on the screens that use them.
@@ -96,7 +101,7 @@ layout on the screens that use them.
 - [ ] Release builds an **AAB** for Play (`bundleRelease`) alongside the APK for GitHub, through the same reusable workflow
 - [ ] Play App Signing enrolled; upload key kept out of the repo like the current signing key
 - [ ] Drive OAuth: Android client for Play's app-signing SHA-1; consent screen to production with brand verification
-- [ ] Notification-listener **prominent disclosure** screen, consent before deep-linking to settings.
+- [x] Notification-listener **prominent disclosure** screen, consent before deep-linking to settings.
       **Built once, with onboarding** — the onboarding step IS the disclosure, and the Settings card
       opens the same screen for anyone who skipped it. Play reviews closed-test builds too, so this
       must land **before the first AAB is uploaded**, even if the rest of onboarding is not done.

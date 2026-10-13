@@ -9,6 +9,10 @@ appId: dev.merope.peace.oss
 # which is the exact failure this feature cannot be allowed to have.
 - launchApp:
     clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
 
 - extendedWaitUntil:
     visible:

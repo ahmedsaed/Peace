@@ -1,0 +1,165 @@
+appId: dev.merope.peace.oss
+tags:
+  - core
+---
+# The ONE flow that sees the welcome screens — every other flow skips them with
+# `peace.onboarding: done`. The currency is still pinned so the detected value
+# is the same on every emulator, whatever region it was imaged in.
+#
+# What it proves is that the choices LAND: the currency and the keypad are each
+# asserted on the screen that uses them, not on the step that set them. A setup
+# that only remembers what it was told would pass every assertion on its own
+# screens and fail here.
+- launchApp:
+    clearState: true
+    arguments:
+      peace.currency: EGP
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-welcome"
+    timeout: 90000
+- assertVisible: "Peace of mind. Piece of cake."
+- takeScreenshot: 01-welcome
+- tapOn:
+    id: "setup-start"
+
+# --- currency: correct the detected one ---
+- assertVisible:
+    id: "setup-currency-name"
+    text: "Egyptian pound"
+- tapOn:
+    id: "setup-currency-change"
+- assertVisible:
+    id: "sheet-setup-currency"
+- scrollUntilVisible:
+    element:
+      text: "Euro"
+    direction: DOWN
+- tapOn: "Euro"
+- assertVisible:
+    id: "setup-currency-name"
+    text: "Euro"
+- takeScreenshot: 02-currency
+- tapOn:
+    id: "setup-currency-confirm"
+
+# --- accounts: rename one and give it a starting balance ---
+- assertVisible:
+    id: "setup-accounts"
+- tapOn:
+    id: "setup-account-name-0"
+- eraseText: 20
+- inputText: "Wallet"
+- tapOn:
+    id: "setup-account-opening-0"
+- inputText: "250"
+- hideKeyboard
+- takeScreenshot: 03-accounts
+- tapOn:
+    id: "setup-accounts-save"
+
+# --- keypad: phone digits, operators on the right ---
+- assertVisible:
+    id: "setup-keypad"
+- tapOn:
+    id: "setup-keypad-phone"
+- tapOn:
+    id: "setup-keypad-operators-right"
+- takeScreenshot: 04-keypad
+- tapOn:
+    id: "setup-keypad-confirm"
+
+# --- the optional features, each left for later ---
+- assertVisible:
+    id: "setup-reminder"
+- takeScreenshot: 05-reminder
+- tapOn:
+    id: "setup-reminder-skip"
+- assertVisible:
+    id: "setup-ai"
+- takeScreenshot: 06-ai
+- tapOn:
+    id: "setup-ai-skip"
+# Play's prominent disclosure: it must be on screen BEFORE anything asks
+# Android for notification access.
+- assertVisible:
+    id: "setup-bank-disclosure"
+- assertVisible: "What Peace can see"
+- takeScreenshot: 07-bank
+- tapOn:
+    id: "setup-bank-skip"
+- assertVisible:
+    id: "setup-backup"
+- takeScreenshot: 08-backup
+- tapOn:
+    id: "setup-backup-skip"
+
+# --- the summary says what was done and what was not ---
+- assertVisible:
+    id: "setup-done"
+- assertVisible:
+    id: "setup-summary-currency"
+    text: "Done"
+- assertVisible:
+    id: "setup-summary-reminder"
+    text: "Later"
+- takeScreenshot: 09-done
+- tapOn:
+    id: "setup-finish"
+
+# --- what was skipped waits on Records ---
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "setup-card-count"
+    text: "3 of 7"
+- assertVisible:
+    id: "setup-card-bank"
+- takeScreenshot: 10-records-card
+
+# A chip opens that one step on its own, and closing it comes back.
+- tapOn:
+    id: "setup-card-bank"
+- assertVisible:
+    id: "setup-bank-disclosure"
+- tapOn:
+    id: "setup-close"
+- assertVisible:
+    id: "home-screen"
+
+# THE ASSERTIONS THAT MATTER, on other screens: the account was renamed and
+# holds its starting balance in euros...
+- tapOn:
+    id: "tab-accounts"
+- assertVisible: "Wallet"
+- assertVisible: ".*€250.00.*"
+
+# ...and the record screen's keypad is the one that was picked.
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "key-7"
+    below:
+      id: "key-1"
+- assertVisible:
+    id: "key-op-plus"
+    rightOf:
+      id: "key-3"
+- tapOn:
+    id: "record-cancel"
+
+# Dismissing the card is for good.
+- tapOn:
+    id: "setup-card-dismiss"
+- assertNotVisible:
+    id: "setup-card"
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+- assertNotVisible:
+    id: "setup-card"

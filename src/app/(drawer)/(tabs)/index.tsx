@@ -13,6 +13,7 @@ import {
 } from '@/db/repo/recurring';
 import { RecordActions, type ReversalContext } from '@/components/record-actions';
 import { RecordRow } from '@/components/record-row';
+import { SetupCard } from '@/components/setup-card';
 import { Snackbar } from '@/components/snackbar';
 import { EmptyState, Fab, MonthHeader, Screen, SummaryTrio } from '@/components/screen';
 import { db } from '@/db/client';
@@ -287,6 +288,11 @@ export default function RecordsScreen() {
           </Text>
         ) : null}
       </MonthHeader>
+
+      {/* What setup left for later. Above the list rather than in it, so it
+          is there in an empty month too — which is exactly when it is most
+          use — and renders nothing once dismissed or finished. */}
+      <SetupCard />
 
       {/* `sections`, not `rows`. A month with no records but something DUE is
           not empty — gating on records alone hid the due rows behind the empty

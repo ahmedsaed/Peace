@@ -1,7 +1,9 @@
+import { Redirect } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 
 import { DrawerContent } from '@/components/drawer-content';
 import palette from '@/constants/palette';
+import { useSetting } from '@/state/settings';
 
 /**
  * Side menu wrapped around the tab bar.
@@ -19,6 +21,12 @@ import palette from '@/constants/palette';
  * react-native-drawer-layout) — @react-navigation/drawer is not a dependency.
  */
 export default function DrawerLayout() {
+  // A first launch goes through setup before anything else. Here rather than
+  // in the root layout so the setup screen itself, and the steps it pushes
+  // (Backup & export, for a restore), are never caught by the redirect.
+  const onboarded = useSetting('onboardingDone');
+  if (!onboarded) return <Redirect href="/setup" />;
+
   return (
     <Drawer
       drawerContent={DrawerContent}

@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
@@ -29,6 +29,7 @@ import { useMoney } from '@/state/money';
  * records list learned to total a day.
  */
 export default function SettingsScreen() {
+  const router = useRouter();
   const money = useMoney();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
@@ -178,6 +179,19 @@ export default function SettingsScreen() {
 
         <View className="pt-4">
           <AssistantCard />
+        </View>
+
+        <View className="pt-6">
+          <Section title="Setup">
+            <Row
+              label="Walk through setup again"
+              value="Open"
+              hint="Currency, accounts, keypad, reminder, AI, bank messages and backups — any step can be left for later."
+              onPress={() => router.push('/setup')}
+              testID="setting-run-setup"
+              last
+            />
+          </Section>
         </View>
 
         <Text className="px-1 pt-6 text-xs leading-5 text-muted opacity-70">

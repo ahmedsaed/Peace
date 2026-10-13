@@ -7,6 +7,10 @@ appId: dev.merope.peace.oss
 # chart — the numbers are the only thing that says it read the data.
 - launchApp:
     clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
 
 - extendedWaitUntil:
     visible:
