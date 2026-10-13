@@ -8,6 +8,7 @@ import { Icon } from '@/components/icon';
 import { UpdateNotice } from '@/components/update-notice';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
+import { useAi } from '@/state/ai';
 import { backupDue, describeAge } from '@/lib/drive-backup';
 import type { Settings } from '@/lib/settings';
 import { useSetting } from '@/state/settings';
@@ -75,10 +76,8 @@ const ASSISTANT_ITEM = {
 
 export function DrawerContent({ navigation }: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
-  // Penny is listed only while BOTH switches are on: hers, and Use AI.
-  const assistantEnabled = useSetting('assistantEnabled');
-  const aiEnabled = useSetting('aiEnabled');
-  const items = assistantEnabled && aiEnabled ? [ASSISTANT_ITEM, ...ITEMS] : ITEMS;
+  // Penny is listed only when she can answer: a key, Use AI, and her switch.
+  const items = useAi().penny ? [ASSISTANT_ITEM, ...ITEMS] : ITEMS;
 
   // Close first, then navigate. Pushing onto the root stack does not dismiss
   // the drawer by itself, so it would still be sitting open behind the new

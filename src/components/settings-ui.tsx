@@ -5,7 +5,7 @@ import { Icon } from '@/components/icon';
 import { Segmented } from '@/components/form';
 import { StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
-import { useGeminiKeyStore } from '@/state/gemini-key';
+import { useAi } from '@/state/ai';
 
 /**
  * The parts every Settings page is built from.
@@ -186,6 +186,7 @@ export function Toggle({
   value,
   onChange,
   testID,
+  disabled = false,
   last = false,
 }: {
   label: string;
@@ -193,6 +194,8 @@ export function Toggle({
   value: boolean;
   onChange: (next: boolean) => void;
   testID: string;
+  /** Muted: shown, but nothing it controls can run yet. The hint says why. */
+  disabled?: boolean;
   last?: boolean;
 }) {
   return (
@@ -205,6 +208,7 @@ export function Toggle({
       <Switch
         value={value}
         onValueChange={onChange}
+        disabled={disabled}
         testID={testID}
         accessibilityLabel={label}
         trackColor={{ false: palette.line, true: palette.accent }}
@@ -277,29 +281,33 @@ export function Row({
 }
 
 /**
- * "This runs on the Gemini key, which is not set" — at the top of every AI
- * feature's page, with the way to fix it.
+ * Why an AI feature cannot run, at the top of its page — with the way to fix it.
  *
- * The key lives on the Settings page, one level up, so a feature page that only said
- * "needs a key" would send somebody hunting. Nothing at all once a key exists:
- * a notice that is always there stops being read.
+ * Its switch is muted when this shows: a feature with no key, or with Use AI
+ * off, cannot run, and a switch sitting "on" above that would be a control
+ * claiming something untrue. Nothing at all when the feature CAN run — a
+ * notice that is always there stops being read.
  */
-export function KeyNotice() {
+export function AiNotice() {
   const router = useRouter();
-  const hasKey = useGeminiKeyStore((state) => state.hasKey);
-  if (hasKey !== false) return null;
+  const { blocked } = useAi();
+  if (blocked === null) return null;
   return (
     <View className="flex-row items-center gap-3 rounded-xl border border-line px-4 py-3" testID="key-notice">
-      <Icon name="key" size={18} color={palette.muted} />
+      <Icon name={blocked === 'no-key' ? 'key' : 'sparkle'} size={18} color={palette.muted} />
       <Text className="flex-1 text-sm leading-5 text-muted">
-        Runs on your Gemini key, which is not set yet.
+        {blocked === 'no-key'
+          ? 'Runs on your Gemini key, which is not set yet.'
+          : 'Use AI is switched off, so nothing here can run.'}
       </Text>
       <Pressable
         onPress={() => router.navigate('/settings')}
         testID="key-notice-add"
         accessibilityRole="button"
         className="rounded-full bg-accent px-4 py-2 active:opacity-80">
-        <Text className="text-sm font-semibold text-accent-ink">Add a key</Text>
+        <Text className="text-sm font-semibold text-accent-ink">
+          {blocked === 'no-key' ? 'Add a key' : 'Turn on'}
+        </Text>
       </Pressable>
     </View>
   );

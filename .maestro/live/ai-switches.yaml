@@ -1,0 +1,128 @@
+appId: dev.merope.peace.oss
+tags:
+  - live
+---
+# The AI switches WITH a key: each one actually reaches the screens it governs.
+#
+# Needs a real key (typed in by common/setup.yaml), but spends nothing — saving
+# a key only lists models, and nothing here reads a receipt or asks Penny a
+# question. Without a key every switch is muted, which `.maestro/assistant.yaml`
+# covers in the ordinary suite.
+#
+#   PEACE_GEMINI_KEY_FILE=.toolchain/gemini-key npm run e2e:live -- .maestro/live/ai-switches.yaml
+#
+# The photo reaches the phone through `addMedia` and is picked from the system
+# Files app, which is the only way a flow can attach one.
+- runFlow: common/setup.yaml
+- addMedia:
+    - "../../scripts/fixtures/receipt-usd.jpg"
+# Setup ends on Penny's screen.
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "home-screen"
+
+# --- with a key and Penny on: she is in the header, and photos can be read ---
+- assertVisible:
+    id: "nav-assistant"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "attach-file"
+# Tap the file NAME, the first match: the tile around it also holds a preview
+# control, and every run's addMedia adds another copy.
+- extendedWaitUntil:
+    visible: "receipt-usd.*\\.jpg"
+    timeout: 20000
+- tapOn:
+    text: "receipt-usd.*\\.jpg"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "attachment-read-.*"
+    timeout: 15000
+- takeScreenshot: 01-read-button
+- tapOn:
+    id: "record-cancel"
+
+# --- Receipts off: the photo still attaches, with nothing to read it ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-receipts"
+    direction: DOWN
+- tapOn:
+    id: "settings-ai-receipts"
+- tapOn:
+    id: "receipts-enabled"
+- assertVisible:
+    id: "receipts-off"
+- assertNotVisible:
+    id: "receipt-guidance"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-ai-receipts-summary"
+    text: "Off"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "attach-file"
+- extendedWaitUntil:
+    visible: "receipt-usd.*\\.jpg"
+    timeout: 20000
+- tapOn:
+    text: "receipt-usd.*\\.jpg"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "attachment-.*"
+    timeout: 15000
+- assertNotVisible:
+    id: "attachment-read-.*"
+- takeScreenshot: 02-no-read-button
+- tapOn:
+    id: "record-cancel"
+
+# --- Use AI off: Penny is gone from the header and the menu ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-ai-enabled"
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-penny"
+    direction: DOWN
+- assertVisible:
+    id: "settings-ai-penny-summary"
+    text: "AI is off"
+- takeScreenshot: 03-ai-off
+- tapOn:
+    id: "nav-back"
+- assertNotVisible:
+    id: "nav-assistant"
+- tapOn:
+    id: "nav-menu"
+- assertNotVisible:
+    id: "drawer-assistant"
+
+# --- and back on: everything returns as it was left, Penny included ---
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-ai-enabled"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "nav-assistant"

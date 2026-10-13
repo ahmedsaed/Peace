@@ -21,6 +21,7 @@ import { Icon } from '@/components/icon';
 import palette from '@/constants/palette';
 import { isCapturing, isPermitted, setCapturing } from '@/db/bank-inbox';
 import { PromptEditor } from '@/components/prompt-editor';
+import { useAi } from '@/state/ai';
 import { useBankInbox } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
 
@@ -118,7 +119,11 @@ export function BankMessagesCard() {
    * there is no second way in. That step turns capture on itself once access
    * is granted, and this card re-reads both on the way back.
    */
-  const on = permitted && capturing;
+  // And only while reading can happen at all — a key and Use AI. Without
+  // them the switch is off and muted; Android's access and the capture flag
+  // are left exactly as they are, so nothing needs redoing once a key exists.
+  const ai = useAi();
+  const on = permitted && capturing && ai.bank;
   const toggle = (next: boolean) => {
     if (next && !permitted) {
       router.push('/setup?step=bank');
@@ -144,6 +149,7 @@ export function BankMessagesCard() {
         <Switch
           value={on}
           onValueChange={toggle}
+          disabled={!ai.ready}
           testID="bank-enabled"
           accessibilityLabel="Read bank messages"
           trackColor={{ false: palette.line, true: palette.accent }}
@@ -151,7 +157,7 @@ export function BankMessagesCard() {
         />
       </View>
 
-      {!on ? (
+      {!on && !ai.ready ? null : !on ? (
         <Text className="mt-3 text-xs leading-5 text-muted" testID="bank-off">
           {permitted
             ? 'Off: nothing is captured. Notification access is still allowed in Android — turn it off there if you will not use this again.'
@@ -190,8 +196,7 @@ export function BankMessagesCard() {
 
           {waiting > 0 ? (
             <Text className="mb-2 text-xs leading-4 text-expense" testID="bank-waiting">
-              {waiting === 1 ? '1 message is' : `${waiting} messages are`} waiting to be read — they
-              need a Gemini key and Use AI, both in Settings.
+              {waiting === 1 ? '1 message is' : `${waiting} messages are`} waiting to be read.
             </Text>
           ) : null}
 

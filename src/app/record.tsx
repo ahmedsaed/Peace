@@ -66,6 +66,7 @@ import { captureNote } from '@/lib/bank-sms';
 import { noteWithReading } from '@/lib/note';
 import { foreignPurchase } from '@/lib/fees';
 import { hasCardProfile, isLiability } from '@/lib/liability';
+import { useAi } from '@/state/ai';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
 
@@ -228,11 +229,9 @@ export default function RecordScreen() {
 
   const defaultAccountId = useSetting('defaultAccountId');
   const geminiModel = useSetting('geminiModel');
-  // Settings › Use AI, and Receipts within it. Either off: no reading button,
-  // and the photograph shortcut only photographs.
-  const useAi = useSetting('aiEnabled');
-  const receiptsOn = useSetting('receiptsEnabled');
-  const aiEnabled = useAi && receiptsOn;
+  // A key, Use AI, and Receipts — all three, or no reading button, and the
+  // photograph shortcut only photographs (`state/ai.ts` decides).
+  const aiEnabled = useAi().receipts;
   const receiptGuidance = useSetting('receiptGuidance');
 
   // A transfer can be opened from either leg; the form always presents it as

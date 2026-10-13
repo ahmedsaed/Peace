@@ -36,7 +36,18 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "gemini-key-save"
-# Penny has a page of its own under AI.
+# Saving checks the key with Google first. Wait for the editor to close — the
+# page shifts when it does, and a tap sent before that lands on whatever moved
+# under it.
+- extendedWaitUntil:
+    notVisible:
+      id: "gemini-key-input"
+    timeout: 20000
+# Penny has a page of her own under AI.
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-penny"
+    direction: DOWN
 - tapOn:
     id: "settings-ai-penny"
 - tapOn:

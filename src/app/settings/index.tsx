@@ -14,6 +14,7 @@ import { formatTimeLabel } from '@/lib/period';
 import { onDay } from '@/lib/reminder';
 import { setupProgress } from '@/lib/setup';
 import { runBankCatchUp } from '@/state/bank';
+import { useAi } from '@/state/ai';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSettingsStore } from '@/state/settings';
 import { bankAccess, describeBank, useSetupFacts } from '@/state/setup';
@@ -63,11 +64,12 @@ export default function SettingsIndex() {
   const backup = s.driveAccount ? `Google Drive · ${describeCadence(s.driveCadence)}` : 'Your own copies';
   const { done, total } = setupProgress(facts);
 
-  // What each AI feature says it is doing. With AI off, all three say so —
-  // their own settings are kept, and come back when it is turned on.
-  const ai = s.aiEnabled;
+  // What each AI feature says it is doing, from the one place that decides
+  // whether it can run. Their own settings are kept whatever this says.
+  const aiState = useAi();
+  const ai = aiState.ready;
   const keyless = hasKey === false;
-  const feature = (running: string) => (!ai ? 'AI is off' : keyless ? 'Needs the key above' : running);
+  const blockedLabel = keyless ? 'Needs a key' : 'AI is off';
   const bankState = describeBank(access, s.bankSenders);
 
   const toggleAi = (next: boolean) => {
@@ -130,20 +132,24 @@ export default function SettingsIndex() {
           <Toggle
             label="Use AI"
             hint={
-              ai
-                ? 'Reading receipts, reading bank messages and Penny can run.'
-                : 'Paused. Your key and choices are kept; bank messages wait unread.'
+              keyless
+                ? 'Add your Gemini key below, then switch this on.'
+                : s.aiEnabled
+                  ? 'Reading receipts, reading bank messages and Penny can run.'
+                  : 'Paused. Your key and choices are kept; bank messages wait unread.'
             }
-            value={ai}
+            // Muted without a key: there is nothing for it to turn on.
+            value={s.aiEnabled && !keyless}
+            disabled={keyless}
             onChange={toggleAi}
             testID="setting-ai-enabled"
           />
-          {ai ? <GeminiKeyRows /> : null}
+          <GeminiKeyRows />
           <SectionLink
             emblem="camera"
             color={SECTIONS.ai.color}
             title="Receipts"
-            summary={!s.receiptsEnabled && ai ? 'Off' : feature('Read when you photograph one on a record')}
+            summary={!ai ? blockedLabel : aiState.receipts ? 'Read when you photograph one on a record' : 'Off'}
             onPress={go('/settings/ai/receipts')}
             testID="settings-ai-receipts"
             dim={!ai}
@@ -151,7 +157,7 @@ export default function SettingsIndex() {
           <SectionLink
             {...SECTIONS.bank}
             title="Bank messages"
-            summary={!ai ? 'AI is off' : bankState === 'Off' ? 'Off' : feature(bankState)}
+            summary={!ai ? blockedLabel : bankState}
             onPress={go('/settings/ai/bank')}
             testID="settings-ai-bank"
             dim={!ai}
@@ -160,7 +166,7 @@ export default function SettingsIndex() {
             emblem="sparkle"
             color={SECTIONS.ai.color}
             title="Penny, the assistant"
-            summary={!ai ? 'AI is off' : !s.assistantEnabled ? 'Off' : feature('On')}
+            summary={!ai ? blockedLabel : aiState.penny ? 'On' : 'Off'}
             onPress={go('/settings/ai/penny')}
             testID="settings-ai-penny"
             dim={!ai}

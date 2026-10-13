@@ -27,6 +27,7 @@ import { EMPTY_QUERY } from '@/lib/search-query';
 import { useKeyboardOverlap } from '@/lib/layout';
 import { useAssistantStore } from '@/state/assistant';
 import { useMoney } from '@/state/money';
+import { useAi } from '@/state/ai';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSetting } from '@/state/settings';
 
@@ -62,7 +63,7 @@ export default function AssistantScreen() {
    */
   const keyboard = useKeyboardOverlap();
   const enabled = useSetting('assistantEnabled');
-  const aiEnabled = useSetting('aiEnabled');
+  const ai = useAi();
   const homeCurrency = useSetting('homeCurrency');
   const money = useMoney();
 
@@ -75,7 +76,6 @@ export default function AssistantScreen() {
   const pendingUndo = useAssistantStore((s) => s.pendingUndo);
   const { load, loadOlder, send, retry, stop, decide, reset, undo, clearUndo } = useAssistantStore.getState();
 
-  const hasKey = useGeminiKeyStore((state) => state.hasKey);
   const refreshKey = useGeminiKeyStore((state) => state.refresh);
   const [draft, setDraft] = useState('');
   const [drill, setDrill] = useState<Drill | null>(null);
@@ -157,11 +157,13 @@ export default function AssistantScreen() {
     });
   };
 
-  if (!aiEnabled || !enabled || hasKey === false) {
+  // `ai.penny` needs all three: a key, Use AI, and her own switch. The gate
+  // names whichever is missing, in that order — a key comes before anything.
+  if (ai.hasKey !== null && !ai.penny) {
     return (
       <View className="flex-1 bg-ground" testID="assistant-screen">
         <StackHeader title="Penny" />
-        <Gate reason={!aiEnabled ? 'ai-off' : !enabled ? 'off' : 'no-key'} />
+        <Gate reason={ai.blocked ?? (enabled ? 'no-key' : 'off')} />
       </View>
     );
   }

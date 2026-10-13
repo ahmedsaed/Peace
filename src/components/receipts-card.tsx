@@ -11,12 +11,16 @@ import { Switch, Text, View } from 'react-native';
 
 import { PromptEditor } from '@/components/prompt-editor';
 import palette from '@/constants/palette';
+import { useAi } from '@/state/ai';
 import { useSettingsStore } from '@/state/settings';
 
 export function ReceiptsCard() {
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
-  const enabled = settings.receiptsEnabled;
+  // What the switch SHOWS is whether reading can run — a key, Use AI and this
+  // switch. With no key it is off and muted, and the setting itself is kept.
+  const ai = useAi();
+  const enabled = ai.receipts;
 
   return (
     <View className="rounded-xl bg-surface p-4" testID="receipts-card">
@@ -30,6 +34,7 @@ export function ReceiptsCard() {
         <Switch
           value={enabled}
           onValueChange={(next) => update('receiptsEnabled', next)}
+          disabled={!ai.ready}
           testID="receipts-enabled"
           accessibilityLabel="Read receipts"
           trackColor={{ false: palette.line, true: palette.accent }}
@@ -48,11 +53,11 @@ export function ReceiptsCard() {
             testID="receipt-guidance"
           />
         </View>
-      ) : (
+      ) : ai.ready ? (
         <Text className="mt-3 text-xs leading-5 text-muted" testID="receipts-off">
           Off: photos still attach to records, with no reading button on them.
         </Text>
-      )}
+      ) : null}
     </View>
   );
 }
