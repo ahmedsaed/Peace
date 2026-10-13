@@ -17,7 +17,7 @@ import { dueProposals } from '../db/repo/recurring';
 import { toYmd } from '../lib/recurrence';
 import { periodOf } from '../lib/period';
 import { createTestDb } from './db';
-import { buildDemoLedger } from './demo-ledger';
+import { buildDemoLedger, DEMO_CURRENCY } from './demo-ledger';
 
 const NOW = new Date(Number(process.env.DEMO_LEDGER_NOW ?? Date.now()));
 
@@ -35,9 +35,18 @@ describe('the demo ledger', () => {
 
   it('reconciles the way the real screens must: carried + this month = what the accounts hold', () => {
     const period = periodOf(NOW);
-    const carried = broughtForward(db, period, 'EGP').amountMinor;
-    const month = periodSummary(db, period, 'EGP').balanceMinor;
-    expect(carried + month).toBe(balanceByCurrency(db).find((t) => t.currency === 'EGP')!.balanceMinor);
+    const carried = broughtForward(db, period, DEMO_CURRENCY).amountMinor;
+    const month = periodSummary(db, period, DEMO_CURRENCY).balanceMinor;
+    expect(carried + month).toBe(
+      balanceByCurrency(db).find((t) => t.currency === DEMO_CURRENCY)!.balanceMinor
+    );
+  });
+
+  it('carries its currency, so a restore does not relabel every amount', () => {
+    const row = sqlite.prepare("select value from settings where key = 'homeCurrency'").get() as
+      | { value: string }
+      | undefined;
+    expect(row?.value).toBe(DEMO_CURRENCY);
   });
 
   it('writes the file when asked', () => {

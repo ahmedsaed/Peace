@@ -54,7 +54,7 @@ no ads, no analytics — and nothing reaches the network unless you ask it to.
 <tr>
 <td><img src="docs/screenshots/penny-ask.png" alt="Penny comparing September with August: a bar chart of both months' spending, then a written answer that spending fell, with every amount drawn from the ledger and the changes in travel, entertainment, food and shopping listed"></td>
 <td><img src="docs/screenshots/penny-chart.png" alt="Penny answering how coffee spending compares month to month with a six-month bar chart and a two-line summary naming the highest and lowest months"></td>
-<td><img src="docs/screenshots/penny-receipt.png" alt="A photographed café receipt sent to Penny with 'Log this, I paid with the Visa', and the card it proposes: E£240.80 on the Visa under Coffee, dated 5 October, with the photo attached and Add and Decline buttons"></td>
+<td><img src="docs/screenshots/penny-receipt.png" alt="A photographed café receipt sent to Penny with 'Log this, I paid with the Visa', and the card it proposes: $13.77 on the Visa under Coffee, dated 5 October, with the photo attached and Add and Decline buttons"></td>
 </tr>
 <tr>
 <td align="center"><b>Ask Penny</b><br><sub>Answers worked out from your ledger, never estimated.</sub></td>

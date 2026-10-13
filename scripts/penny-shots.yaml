@@ -9,6 +9,10 @@ appId: dev.merope.peace.oss
 # they are committed — the script copies them, a person decides they are good.
 - launchApp:
     clearState: true
+    # Skip setup: the restore below brings the ledger, its currency and all.
+    arguments:
+      peace.onboarding: done
+      peace.currency: USD
 - extendedWaitUntil:
     visible:
       id: "home-screen"
