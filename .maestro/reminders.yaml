@@ -62,9 +62,15 @@ appId: dev.merope.peace.oss
 
 # The card only grows these once the permission is actually in hand, so waiting
 # on the row is also waiting for the grant to have been processed.
-- extendedWaitUntil:
-    visible:
+#
+# SCROLLED TO, not waited for in place: the row appears BELOW the switch, and
+# once Settings grew a Keypad section it landed under the fold on a screen with
+# the three-button nav bar — an `extendedWaitUntil` then waits 20s for a row
+# that is there and off screen.
+- scrollUntilVisible:
+    element:
       id: "reminder-time"
+    direction: DOWN
     timeout: 20000
 
 # The default hour, shown through the same clock the record screen uses.
@@ -81,6 +87,14 @@ appId: dev.merope.peace.oss
 # THE ASSERTION THAT MATTERS. Android has been asked what it is holding and has
 # named a time. "Nothing scheduled" is the other thing this line can say, and it
 # is what a dropped or refused schedule produces.
+#
+# Every row below is reached by scrolling to IT, never assumed on screen: the
+# card sits near the foot of Settings, and how much of it shows depends on the
+# sections above and on the height of the navigation bar.
+- scrollUntilVisible:
+    element:
+      id: "reminder-next"
+    direction: DOWN
 - assertVisible:
     id: "reminder-next"
     text: ".*Next reminder.*"
@@ -92,6 +106,10 @@ appId: dev.merope.peace.oss
 # states which behaviour is in force, so it has to change with the switch — a
 # control whose description does not move is indistinguishable from one that
 # does nothing.
+- scrollUntilVisible:
+    element:
+      id: "reminder-quiet-toggle"
+    direction: DOWN
 - assertVisible: ".*Stays quiet when you have already recorded something.*"
 - tapOn:
     id: "reminder-quiet-toggle"
@@ -118,13 +136,16 @@ appId: dev.merope.peace.oss
     id: "drawer-settings"
 - scrollUntilVisible:
     element:
-      id: "reminder-card"
+      id: "reminder-next"
     direction: DOWN
 
 - assertVisible:
     id: "reminder-next"
     text: ".*Next reminder.*"
-- assertVisible: ".*Asks every day, however much you have already recorded.*"
+- scrollUntilVisible:
+    element:
+      text: ".*Asks every day, however much you have already recorded.*"
+    direction: DOWN
 - takeScreenshot: 04-reminder-survives-restart
 
 # --- and turning it off takes the schedule away ---
@@ -132,6 +153,10 @@ appId: dev.merope.peace.oss
 # A state you can enter from the UI must be one you can leave from it, and the
 # leaving has to reach Android rather than only the setting: fourteen alarms
 # left armed behind an "off" switch would go on firing for a fortnight.
+- scrollUntilVisible:
+    element:
+      id: "reminder-toggle"
+    direction: UP
 - tapOn:
     id: "reminder-toggle"
 - assertNotVisible:
