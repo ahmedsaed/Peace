@@ -20,8 +20,8 @@ import { tagBreakdown, type TagTotal } from '@/db/repo/tags';
 import type { CategoryKind } from '@/db/repo/spend';
 import { rankSlices, type RankedSlice } from '@/lib/analysis';
 import { testIdSlug as slug } from '@/lib/id';
-import { formatPeriod, parsePeriod, type Period } from '@/lib/period';
-import { usePeriodState } from '@/state/period';
+import { parsePeriod, type Period } from '@/lib/period';
+import { usePeriodState, usePeriodLabel } from '@/state/period';
 import { useSetting } from '@/state/settings';
 import { useMoney, type Money } from '@/state/money';
 
@@ -36,6 +36,7 @@ const EMPTY: Breakdown = {
 const CASH_FLOW_MONTHS = 6;
 
 export default function AnalysisScreen() {
+  const periodLabel = usePeriodLabel();
   const router = useRouter();
   const money = useMoney();
   const homeCurrency = useSetting('homeCurrency');
@@ -121,8 +122,8 @@ export default function AnalysisScreen() {
             icon="analysis"
             title={
               filteredTo
-                ? `Nothing tagged ${filteredTo} in ${formatPeriod(period)}`
-                : `No ${kind === 'expense' ? 'spending' : 'income'} in ${formatPeriod(period)}`
+                ? `Nothing tagged ${filteredTo} in ${periodLabel(period)}`
+                : `No ${kind === 'expense' ? 'spending' : 'income'} in ${periodLabel(period)}`
             }
             hint={
               filteredTo

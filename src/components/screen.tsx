@@ -6,8 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
-import { addMonths, formatPeriod, type Period } from '@/lib/period';
+import { addMonths, type Period } from '@/lib/period';
 import { useAi } from '@/state/ai';
+import { usePeriodLabel } from '@/state/period';
 import { useSetting, useSettingsStore } from '@/state/settings';
 
 /** Header icon button. 44px square: the Material minimum touch target. */
@@ -176,6 +177,7 @@ export function MonthHeader({
   onChange: (next: Period) => void;
   children?: React.ReactNode;
 }) {
+  const periodLabel = usePeriodLabel();
   return (
     <View className="bg-surface px-4 pb-3 pt-2">
       <View className="flex-row items-center justify-center gap-6">
@@ -189,7 +191,7 @@ export function MonthHeader({
         </Pressable>
 
         <Text className="text-base font-semibold text-ink" testID="month-label">
-          {formatPeriod(period)}
+          {periodLabel(period)}
         </Text>
 
         <Pressable

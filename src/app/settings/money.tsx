@@ -74,7 +74,7 @@ export default function MoneySettings() {
           hint={
             settings.monthStartDay === 1
               ? 'Paid on the 25th? Start your months on payday, so each budget runs from one pay to the next.'
-              : `This month is ${formatPeriod(periodOf(now))}. Records, budgets, charts and Penny all count months this way.`
+              : `This month is ${formatPeriod(periodOf(now, settings.monthStartDay), settings.monthStartDay)}. Records, budgets, charts and Penny all count months this way.`
           }
           onPress={() => setSheet('month')}
           testID="setting-month-start"

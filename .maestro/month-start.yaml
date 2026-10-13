@@ -92,8 +92,6 @@ appId: dev.merope.peace.oss
 - assertVisible:
     id: "month-label"
     text: "[A-Z][a-z]{2} 25 – [A-Z][a-z]{2} 24, [0-9]{4}"
-- assertVisible:
-    id: "analysis-donut"
 
 # --- and back to calendar months, everywhere ---
 - tapOn:

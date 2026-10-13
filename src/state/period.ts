@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
-import { currentPeriod, type Period } from '@/lib/period';
+import { currentPeriod, formatPeriod, type Period } from '@/lib/period';
 import { useSetting } from '@/state/settings';
 
 /**
@@ -22,4 +22,18 @@ export function usePeriodState(): [Period, (next: Period) => void] {
     setPeriod(currentPeriod());
   }
   return [period, setPeriod];
+}
+
+/**
+ * `formatPeriod`, bound to the CURRENT month start day — for components.
+ *
+ * Not `formatPeriod` directly: it reads the start day from module state, which
+ * React cannot see, and the React Compiler memoises a component on its props.
+ * MonthHeader kept rendering "October 2026" after the start day moved to the
+ * 25th, because its `period` prop had not changed. Read through this hook the
+ * setting is a dependency the compiler can see, and the label follows it.
+ */
+export function usePeriodLabel(): (period: Period) => string {
+  const startDay = useSetting('monthStartDay');
+  return useCallback((period: Period) => formatPeriod(period, startDay), [startDay]);
 }
