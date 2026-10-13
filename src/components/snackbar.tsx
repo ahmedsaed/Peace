@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
  * A transient message with one action, pinned above the tab bar.
@@ -11,6 +12,11 @@ import { Pressable, Text, View } from 'react-native';
  *
  * `token` restarts the timer: without it, a second delete would inherit the
  * first offer's countdown and vanish almost immediately.
+ *
+ * It clears the system navigation bar unless `overTabBar` says a tab bar is
+ * already in between. The app is drawn edge to edge, so on a stack screen
+ * `bottom-4` alone put the message under the three-button bar — the snackbar
+ * "visible" and its Undo untappable, which gesture navigation never showed.
  */
 export function Snackbar({
   message,
@@ -20,6 +26,7 @@ export function Snackbar({
   token,
   durationMs = 8000,
   testID = 'snackbar',
+  overTabBar = false,
 }: {
   message: string;
   actionLabel?: string;
@@ -29,7 +36,11 @@ export function Snackbar({
   durationMs?: number;
   /** Named per screen where a flow has to tell two of them apart. */
   testID?: string;
+  /** The screen sits above the tab bar, which already clears the nav bar. */
+  overTabBar?: boolean;
 }) {
+  const insets = useSafeAreaInsets();
+
   useEffect(() => {
     const timer = setTimeout(onDismiss, durationMs);
     return () => clearTimeout(timer);
@@ -39,8 +50,9 @@ export function Snackbar({
   return (
     <View
       testID={testID}
-      className="absolute bottom-4 left-4 right-4 flex-row items-center justify-between gap-4 rounded-xl bg-raised px-4 py-3"
+      className="absolute left-4 right-4 flex-row items-center justify-between gap-4 rounded-xl bg-raised px-4 py-3"
       style={{
+        bottom: 16 + (overTabBar ? 0 : insets.bottom),
         elevation: 8,
         shadowColor: '#000',
         shadowOpacity: 0.5,

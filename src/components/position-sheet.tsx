@@ -5,6 +5,7 @@ import type { AccountPosition } from '@/db/repo/carry';
 import { isLiability, owedDisplay } from '@/lib/liability';
 import { currentPeriod, formatPeriod, shortMonth, type Period } from '@/lib/period';
 import { useMoney, type Money } from '@/state/money';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * The arithmetic behind the third cell of the summary trio.
@@ -94,10 +95,10 @@ export function PositionSheet({
         accessibilityLabel="Dismiss"
       />
 
-      <View
-        className="max-h-[85%] rounded-t-2xl border-t border-line bg-ground pb-6"
+      <SheetPanel
+        className="max-h-[85%]"
+        pad={24}
         style={{
-          elevation: 16,
           shadowColor: '#000',
           shadowOpacity: 0.5,
           shadowRadius: 16,
@@ -291,7 +292,7 @@ export function PositionSheet({
             </Text>
           ) : null}
         </ScrollView>
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

@@ -3,6 +3,7 @@ import { FlatList, Modal, Pressable, Text, View } from 'react-native';
 
 import { RecordRow } from '@/components/record-row';
 import type { RecordRow as Row } from '@/db/repo/records';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * The records behind something the assistant showed — a bar, a slice, a list.
@@ -28,10 +29,10 @@ export function RecordsSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityRole="button" accessibilityLabel="Dismiss" />
-      <View
-        className="max-h-[75%] rounded-t-2xl border-t border-line bg-ground pb-6"
+      <SheetPanel
+        className="max-h-[75%]"
+        pad={24}
         style={{
-          elevation: 16,
           shadowColor: '#000',
           shadowOpacity: 0.5,
           shadowRadius: 16,
@@ -73,7 +74,7 @@ export function RecordsSheet({
             )}
           />
         )}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

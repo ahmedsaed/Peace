@@ -16,6 +16,7 @@ import {
   type EntityKind,
   type EntitySubject,
 } from '@/lib/entity-actions';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * One account, category or tag, as everything a long press needs to know.
@@ -85,9 +86,7 @@ export function EntityActions({
     <Modal visible={item !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Dismiss" />
 
-      <View
-        className="rounded-t-2xl border-t border-line bg-ground pb-8"
-        style={{ elevation: 16 }}
+      <SheetPanel
         testID="entity-actions">
         {/* Rendered from a NON-NULL item handed down, never from `item!` inside
             a handler: the sheet is closed almost all of the time, and an
@@ -112,7 +111,7 @@ export function EntityActions({
             onDelete={() => onDelete(item)}
           />
         ) : null}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }

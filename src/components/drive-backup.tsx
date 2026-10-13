@@ -12,6 +12,7 @@ import { connect, disconnect, reconnectSilently } from '@/lib/google-auth';
 import { assertUsablePassphrase, MIN_PASSPHRASE } from '@/lib/seal';
 import { getPassphrase, setPassphrase } from '@/lib/secrets';
 import { useSetting, useSettingsStore } from '@/state/settings';
+import { SheetPanel } from '@/components/sheet-panel';
 
 type Busy = 'connect' | 'backup' | 'check' | 'passphrase' | 'list' | 'restore' | null;
 
@@ -372,9 +373,8 @@ export function DriveBackup() {
               onPress={() => setChoices(null)}
               accessibilityLabel="Dismiss"
             />
-            <View
-              className="max-h-[70%] rounded-t-2xl border-t border-line bg-ground pb-8"
-              style={{ elevation: 16 }}
+            <SheetPanel
+              className="max-h-[70%]"
               testID="drive-restore-sheet">
               <View className="border-b border-line px-5 py-4">
                 <Text className="text-base font-semibold text-ink">Restore from Drive</Text>
@@ -407,7 +407,7 @@ export function DriveBackup() {
                   ))
                 )}
               </ScrollView>
-            </View>
+            </SheetPanel>
           </Modal>
         </>
       )}

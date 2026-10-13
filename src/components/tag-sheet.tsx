@@ -6,6 +6,7 @@ import palette from '@/constants/palette';
 import type { Tag } from '@/db/schema';
 import { useKeyboardHeight } from '@/lib/layout';
 import { isNewTagName, tagKey, tagNameProblem } from '@/lib/tag';
+import { SheetPanel } from '@/components/sheet-panel';
 
 /**
  * Choosing labels. ONLY choosing them.
@@ -66,9 +67,9 @@ export function TagSheet({
           not resize with the keyboard the way the app's window does, so
           everything below the field — which here is the entire list — would sit
           underneath it the moment anyone typed. */}
-      <View
-        className="max-h-[70%] rounded-t-2xl border-t border-line bg-ground pb-8"
-        style={{ elevation: 16, marginBottom: keyboardHeight }}
+      <SheetPanel
+        className="max-h-[70%]"
+        lift={keyboardHeight}
         testID={testID}>
         <View className="border-b border-line px-5 pb-3 pt-5">
           <View className="flex-row items-center gap-3">
@@ -154,7 +155,7 @@ export function TagSheet({
             Renaming and putting a tag away live in the menu, under Tags.
           </Text>
         ) : null}
-      </View>
+      </SheetPanel>
     </Modal>
   );
 }
