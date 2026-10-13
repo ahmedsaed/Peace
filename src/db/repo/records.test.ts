@@ -5,6 +5,7 @@ import { createTestDb, type TestDb } from '../../test/db';
 import { accountId, catId, seedDefaults } from '../seed';
 import {
   groupByDay,
+  hasAnyRecords,
   listRecordsForPeriod,
   periodSummary,
   wroteAnythingOn,
@@ -480,5 +481,26 @@ describe('wroteAnythingOn', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     expect(wroteAnythingOn(db, tomorrow)).toBe(false);
+  });
+});
+
+describe('hasAnyRecords', () => {
+  it('is false for a ledger that only has its seeded accounts and categories', () => {
+    const { db } = createTestDb();
+    seedDefaults(db);
+    expect(hasAnyRecords(db)).toBe(false);
+  });
+
+  it('is true once anything is written, in any month', () => {
+    const { db } = createTestDb();
+    seedDefaults(db);
+    createRecord(db, {
+      type: 'expense',
+      accountId: CASH,
+      categoryId: catId('coffee'),
+      amountMinor: 450,
+      occurredAt: new Date('2024-01-15T09:00:00'),
+    });
+    expect(hasAnyRecords(db)).toBe(true);
   });
 });

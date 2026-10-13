@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
@@ -6,6 +6,7 @@ import { Icon } from '@/components/icon';
 import { EmptyState, MonthHeader, Screen } from '@/components/screen';
 import palette from '@/constants/palette';
 import { db } from '@/db/client';
+import { hasAnyRecords } from '@/db/repo/records';
 import {
   applySuggestions,
   clearBudget,
@@ -364,6 +365,26 @@ function StartHere({
   onCopy: () => void;
 }) {
   const money = useMoney();
+  const router = useRouter();
+  if (offer.suggestions.length === 0 && !copyFrom && !hasAnyRecords(db)) {
+    // A NEW ledger: nothing to suggest from, and nothing to copy. Say what a
+    // budget here is, and where the suggestions will come from — the categories
+    // below each have a Set button for anyone who already knows their limits.
+    return (
+      <EmptyState
+        teach
+        icon="budgets"
+        title="A limit for each category"
+        hint="Log a few expenses and this suggests a budget per category from what you actually spend. Or set one yourself now with Set beside any category below."
+        action={{
+          label: 'Log an expense',
+          onPress: () => router.push('/record'),
+          testID: 'empty-budgets-action',
+        }}
+        testID="empty-budgets"
+      />
+    );
+  }
   if (offer.suggestions.length === 0 && !copyFrom) {
     return (
       <EmptyState

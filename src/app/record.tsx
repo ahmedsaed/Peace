@@ -81,9 +81,27 @@ export default function RecordScreen() {
   const money = useMoney();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, refundOf, reverseOf, copyOf, fromRule, dueOn, capture, fromCapture } =
-    useLocalSearchParams<{
+  const {
+    id,
+    refundOf,
+    reverseOf,
+    copyOf,
+    fromRule,
+    dueOn,
+    capture,
+    fromCapture,
+    startAs,
+    repeat: startRepeating,
+  } = useLocalSearchParams<{
     id?: string;
+    /**
+     * Open a NEW record on this side. Used by the empty states, whose one
+     * button has to do what it says: "Log income" landing on Expense would
+     * be a button that half-works.
+     */
+    startAs?: 'expense' | 'income';
+    /** `1`: open with the repeat sheet up — "log a repeating record". */
+    repeat?: string;
     /**
      * Opened by holding the + button: photograph a receipt, then read it.
      *
@@ -202,7 +220,7 @@ export default function RecordScreen() {
     if (bankMessage?.isWithdrawal) return 'transfer';
     if (bankMessage?.direction) return bankMessage.direction === 'in' ? 'income' : 'expense';
     const from = source ?? existing;
-    if (!from) return 'expense';
+    if (!from) return startAs === 'income' ? 'income' : 'expense';
     if (from.transferPairId) return 'transfer';
     if (from.isRefund) return 'expense';
     return from.amountMinor < 0 ? 'expense' : 'income';
@@ -324,7 +342,7 @@ export default function RecordScreen() {
    * time. Rules are managed on the Recurring screen once they exist.
    */
   const [repeat, setRepeat] = useState<Repeat | null>(null);
-  const [repeatOpen, setRepeatOpen] = useState(false);
+  const [repeatOpen, setRepeatOpen] = useState(startRepeating === '1' && !id);
 
   /**
    * Receipts, held in state until the record is saved.
@@ -1172,6 +1190,9 @@ export default function RecordScreen() {
                 }}
                 testID={`type-${value}`}
                 accessibilityRole="button"
+                // Which side is chosen is said only by a background shade, so
+                // a screen reader — and a flow — would otherwise not know.
+                accessibilityState={{ selected: type === value }}
                 className={`flex-1 items-center rounded-md py-2 ${
                   type === value ? 'bg-raised' : ''
                 }`}>

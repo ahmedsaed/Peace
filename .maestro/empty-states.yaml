@@ -1,0 +1,145 @@
+appId: dev.merope.peace.oss
+---
+# Empty states on a NEW ledger — what somebody sees in the minute after setup.
+#
+# Each screen must say what it is for and carry one action that fills it, and
+# that action must actually LEAD somewhere: a button that opens the record
+# screen on the wrong side, or a repeat sheet that is not open, is the same
+# dead end as no button at all. Then the teaching voice has to go away once
+# there is something to show — a ledger with a record in it is not new.
+- launchApp:
+    clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- every tab a newcomer opens has a way forward ---
+- assertVisible:
+    id: "empty-records"
+- assertVisible:
+    id: "empty-records-action"
+- takeScreenshot: 01-records
+
+- tapOn:
+    id: "tab-analysis"
+- assertVisible:
+    id: "empty-analysis"
+- takeScreenshot: 02-analysis
+# The income side has its own button, and it has to open the record screen ON
+# the income side, or "Log income" half-works.
+- tapOn:
+    id: "analysis-kind-income"
+- assertVisible:
+    id: "empty-analysis-income"
+- tapOn:
+    id: "empty-analysis-income-action"
+- assertVisible:
+    id: "record-screen"
+- assertVisible:
+    id: "type-income"
+    selected: true
+- tapOn:
+    id: "record-cancel"
+
+- tapOn:
+    id: "tab-budgets"
+- assertVisible:
+    id: "empty-budgets"
+- takeScreenshot: 03-budgets
+
+# --- Recurring: the button opens the record screen with the repeat sheet up ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-recurring"
+- assertVisible:
+    id: "empty-recurring"
+- takeScreenshot: 04-recurring
+- tapOn:
+    id: "empty-recurring-action"
+- assertVisible:
+    id: "repeat-sheet"
+- tapOn:
+    id: "repeat-monthly"
+- tapOn:
+    id: "repeat-save"
+# A category, or the record is real but in no chart: uncategorised spending is
+# deliberately left out of the donut, and the assertions below need it in one.
+- tapOn:
+    id: "pick-category"
+- scrollUntilVisible:
+    element:
+      text: "Home"
+    direction: DOWN
+- tapOn: "Home"
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+# Back on Recurring, the rule that was just made is there — the screen re-reads
+# on focus, and the empty state is gone.
+- assertVisible:
+    id: "recurring-screen"
+- assertVisible:
+    id: "rule-count"
+    text: "1 rule"
+- assertNotVisible:
+    id: "empty-recurring"
+- tapOn:
+    id: "nav-back"
+
+# --- with a record in the ledger, nothing speaks to a newcomer any more ---
+- assertNotVisible:
+    id: "empty-records"
+- tapOn:
+    id: "tab-analysis"
+- tapOn:
+    id: "analysis-kind-expense"
+- assertNotVisible:
+    id: "empty-analysis"
+- assertVisible:
+    id: "analysis-donut"
+- tapOn:
+    id: "tab-budgets"
+- assertNotVisible:
+    id: "empty-budgets"
+
+# --- Portfolio: a card that says what the form is for, and a way into it ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-portfolio"
+- assertVisible:
+    id: "empty-portfolio"
+- takeScreenshot: 05-portfolio
+- tapOn:
+    id: "empty-portfolio-action"
+- inputText: "Stocks"
+- assertVisible:
+    id: "portfolio-class-name"
+    text: "Stocks"
+- hideKeyboard
+- tapOn:
+    id: "nav-back"
+
+# --- About: where Peace lives outside the app ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-about"
+- assertVisible:
+    id: "about-website"
+- assertVisible:
+    id: "about-privacy"
+- assertVisible:
+    id: "about-source"
+- takeScreenshot: 06-about

@@ -27,8 +27,9 @@ appId: dev.merope.peace.oss
 # Maestro matches the WHOLE text, so a substring of the hint would never match —
 # hence the wildcards. The date is left out for the same reason: pinning
 # "August 2026" would mean editing this flow every month.
-- assertVisible: "No budget for .*"
-- assertVisible: "Log a few expenses first.*"
+- assertVisible:
+    id: "empty-budgets"
+- assertVisible: "Log a few expenses and this suggests.*"
 
 # --- two expenses, both filed under SUB-categories ---
 # Coffee sits under Food and Taxi under Transportation, so every number below

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
@@ -28,9 +29,15 @@ type Rule = ReturnType<typeof listRules>[number];
  * once a year.
  */
 export default function RecurringScreen() {
+  const router = useRouter();
   const [version, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
   void version;
+
+  // Re-read on focus. The empty state's button leaves for the record screen
+  // and the rule is created there, so coming back has to find it — rules are
+  // read during render, and returning to a mounted screen renders nothing.
+  useFocusEffect(useCallback(() => setVersion((v) => v + 1), []));
 
   const rules = listRules(db);
   const [acting, setActing] = useState<Rule | null>(null);
@@ -61,10 +68,20 @@ export default function RecurringScreen() {
       <StackHeader title="Recurring" />
 
       {rules.length === 0 ? (
+        // Always the teaching voice: there is no "quiet month" for rules, and
+        // the way to make one lives on another screen entirely, so the button
+        // goes there with the repeat sheet already open.
         <EmptyState
+          teach
           icon="refresh"
-          title="Nothing repeats yet"
-          hint="Tap the repeat button while entering a record to save it as a rule."
+          title="Bills that come round again"
+          hint="Rent, subscriptions, a salary: while entering a record, tap the repeat button and choose how often. Each time one falls due it waits on Records for you to approve — nothing is ever posted on its own."
+          action={{
+            label: 'Add a repeating record',
+            onPress: () => router.push({ pathname: '/record', params: { repeat: '1' } }),
+            testID: 'empty-recurring-action',
+          }}
+          testID="empty-recurring"
         />
       ) : (
         <ScrollView contentContainerClassName="px-4 pb-10 pt-4">

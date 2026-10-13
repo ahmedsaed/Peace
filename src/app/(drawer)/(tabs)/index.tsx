@@ -20,6 +20,7 @@ import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import {
   groupByDay,
+  hasAnyRecords,
   listRecordsForPeriod,
   periodSummary,
   type PeriodSummary,
@@ -299,11 +300,27 @@ export default function RecordsScreen() {
           state, which is precisely the case the feature exists for: a fresh
           month where the standing orders have not been added yet. */}
       {sections.length === 0 ? (
-        <EmptyState
-          icon="records"
-          title="No records this month"
-          hint="Tap + to log your first expense."
-        />
+        // Asked only when the month is empty, and cheap when it is: one row.
+        hasAnyRecords(db) ? (
+          <EmptyState
+            icon="records"
+            title="No records this month"
+            hint="Tap + to log an expense, or step back a month."
+          />
+        ) : (
+          <EmptyState
+            teach
+            icon="records"
+            title="Your first record"
+            hint="Type what you spent, then where it came from and what it was for. Everything else in Peace — budgets, charts, balances — is built from records."
+            action={{
+              label: 'Log an expense',
+              onPress: () => router.push('/record'),
+              testID: 'empty-records-action',
+            }}
+            testID="empty-records"
+          />
+        )
       ) : (
         <SectionList
           sections={sections}

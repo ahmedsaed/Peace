@@ -28,7 +28,9 @@ appId: dev.merope.peace.oss
     id: "tab-analysis"
 - assertVisible:
     id: "analysis-screen"
-- assertVisible: "No spending in .*"
+# A NEW ledger is told what this screen is for, not that a month is empty.
+- assertVisible:
+    id: "empty-analysis"
 
 # --- two expenses under SUB-categories, and one income ---
 # Coffee sits under Food and Taxi under Transportation, so the shares below only
