@@ -103,7 +103,7 @@ export default function SettingsIndex() {
           />
           <SectionLink
             {...SECTIONS.money}
-            title="Money"
+            title="Money & months"
             summary={`${currencyName(s.homeCurrency)} · ${s.homeCurrency}${
               s.monthStartDay === 1 ? '' : ` · months start on the ${ordinal(s.monthStartDay)}`
             }`}
