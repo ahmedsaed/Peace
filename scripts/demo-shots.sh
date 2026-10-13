@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Regenerate the README screenshots.
+# Regenerate the screenshots: the README's and the website's (docs/screenshots,
+# halved), and the full-resolution ones the Play listing is drawn from
+# (store/screenshots — see store/README.md).
 #
 #   npm run shots
 #
@@ -28,7 +30,7 @@ if adb shell pm list packages -f dev.merope.peace.oss | grep -q "debug"; then
 fi
 
 DEST=docs/screenshots
-mkdir -p "$DEST"
+mkdir -p "$DEST" store/screenshots
 
 echo "running the demo flow (this seeds a ledger and takes ~10 minutes)..."
 maestro test scripts/demo-shots.yaml
@@ -37,7 +39,7 @@ SRC=$(ls -td "$HOME"/.maestro/tests/*/demo-shots/takeScreenshot 2>/dev/null | he
 [ -n "$SRC" ] || { echo "no screenshots produced — the flow must have failed early"; exit 1; }
 
 # The names README.md references. Changing one means editing both.
-SHOTS=(records record budgets analysis search accounts actions recurring portfolio)
+SHOTS=(welcome records record budgets analysis search accounts actions recurring portfolio)
 
 for name in "${SHOTS[@]}"; do
   if [ ! -f "$SRC/$name.png" ]; then
@@ -45,6 +47,9 @@ for name in "${SHOTS[@]}"; do
     exit 1
   fi
   cp "$SRC/$name.png" "$DEST/$name.png"
+  # Full resolution for the store: its framed screenshots are 1080 wide, and
+  # drawing them from the halved copies would upscale every one.
+  cp "$SRC/$name.png" "store/screenshots/$name.png"
 done
 
 # Halve the pixels. At 1080x2400 each shot is ~300 KB and renders in a README

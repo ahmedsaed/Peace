@@ -8,10 +8,10 @@ name: Website
 # get a build check; a merge to main deploys it.
 on:
   pull_request:
-    paths: ['site/**', 'docs/screenshots/**', '.github/workflows/site.yml']
+    paths: ['site/**', 'docs/screenshots/**', 'store/**', '.github/workflows/site.yml']
   push:
     branches: [main]
-    paths: ['site/**', 'docs/screenshots/**', 'assets/images/**', '.github/workflows/site.yml']
+    paths: ['site/**', 'docs/screenshots/**', 'store/**', 'assets/images/**', '.github/workflows/site.yml']
   workflow_dispatch:
 
 permissions:

@@ -16,19 +16,42 @@ appId: dev.merope.peace.oss
 # the demo ledger changed, which is how a flow ends up asserting nothing.
 #
 # THE LEDGER BELOW IS INVENTED. The repository is public and real records do not
-# go in it. The amounts are chosen so the budget screen shows every state at
-# once — a screenshot of four identical bars demonstrates nothing:
+# go in it. It is in US DOLLARS with no country's shops in it, because these
+# images are the Play listing and the website as well as the README — a
+# stranger should see their own kind of month, not somebody else's. The amounts
+# are chosen so the budget screen shows every state at once — a screenshot of
+# four identical bars demonstrates nothing:
 #
-#   Food            840 + 265 + 95  = 1,200  of 2,000    60%   comfortable
-#   Bills           380 + 500       =   880  of 1,000    88%   close
-#   Installments    4,500           = 4,500  of 5,000    90%   close
-#   Transportation  600 + 140       =   740  of   500   148%   over by 240
-#   Shopping        1,200                     unbudgeted
+#   Food            186 + 64 + 6  = 256  of 400    64%   comfortable
+#   Bills           88 + 56       = 144  of 160    90%   close
+#   Installments    90            =  90  of 100    90%   close
+#   Transportation  42 + 18       =  60  of  50   120%   over by 10
+#   Shopping        140                    unbudgeted
 #
-# Food's 1,200 is spread across three SUB-categories, so the shot shows the
+# Food's 256 is spread across three SUB-categories, so the shot shows the
 # roll-up working rather than only asserting it in a unit test.
+#
+# Maestro matches text as a REGULAR EXPRESSION, so every `$` in an assertion is
+# escaped — a bare one is an end-of-line anchor and the assertion never matches.
+
+# 0. The welcome screen — what a first launch actually looks like.
 - launchApp:
     clearState: true
+    arguments:
+      peace.currency: USD
+- extendedWaitUntil:
+    visible:
+      id: "setup-welcome"
+    timeout: 90000
+- assertVisible: "Peace of mind. Piece of cake."
+- takeScreenshot: welcome
+
+- launchApp:
+    clearState: true
+    # Skip setup, and pin dollars whatever region the emulator was imaged in.
+    arguments:
+      peace.onboarding: done
+      peace.currency: USD
 
 - extendedWaitUntil:
     visible:
@@ -49,14 +72,12 @@ appId: dev.merope.peace.oss
 - tapOn: "Salary"
 - tapOn:
     id: "record-note"
-- inputText: "August salary"
+- inputText: "Monthly salary"
 - hideKeyboard
 - tapOn:
-    id: "key-1"
+    id: "key-4"
 - tapOn:
     id: "key-8"
-- tapOn:
-    id: "key-0"
 - tapOn:
     id: "key-0"
 - tapOn:
@@ -79,11 +100,11 @@ appId: dev.merope.peace.oss
 - inputText: "Weekly shop"
 - hideKeyboard
 - tapOn:
+    id: "key-1"
+- tapOn:
     id: "key-8"
 - tapOn:
-    id: "key-4"
-- tapOn:
-    id: "key-0"
+    id: "key-6"
 - tapOn:
     id: "record-save"
 
@@ -101,11 +122,9 @@ appId: dev.merope.peace.oss
 - inputText: "Dinner out"
 - hideKeyboard
 - tapOn:
-    id: "key-2"
-- tapOn:
     id: "key-6"
 - tapOn:
-    id: "key-5"
+    id: "key-4"
 - tapOn:
     id: "record-save"
 
@@ -123,9 +142,7 @@ appId: dev.merope.peace.oss
 - inputText: "Flat white"
 - hideKeyboard
 - tapOn:
-    id: "key-9"
-- tapOn:
-    id: "key-5"
+    id: "key-6"
 - tapOn:
     id: "record-save"
 
@@ -141,14 +158,12 @@ appId: dev.merope.peace.oss
 - tapOn: "Electricity"
 - tapOn:
     id: "record-note"
-- inputText: "July meter"
+- inputText: "Monthly bill"
 - hideKeyboard
-- tapOn:
-    id: "key-3"
 - tapOn:
     id: "key-8"
 - tapOn:
-    id: "key-0"
+    id: "key-8"
 - tapOn:
     id: "record-save"
 
@@ -168,9 +183,7 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "key-5"
 - tapOn:
-    id: "key-0"
-- tapOn:
-    id: "key-0"
+    id: "key-6"
 - tapOn:
     id: "record-save"
 
@@ -192,11 +205,9 @@ appId: dev.merope.peace.oss
 - inputText: "Airport run"
 - hideKeyboard
 - tapOn:
-    id: "key-6"
+    id: "key-4"
 - tapOn:
-    id: "key-0"
-- tapOn:
-    id: "key-0"
+    id: "key-2"
 - tapOn:
     id: "record-save"
 
@@ -216,9 +227,7 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "key-1"
 - tapOn:
-    id: "key-4"
-- tapOn:
-    id: "key-0"
+    id: "key-8"
 - tapOn:
     id: "record-save"
 
@@ -237,11 +246,7 @@ appId: dev.merope.peace.oss
 - inputText: "Phone, 6 of 12"
 - hideKeyboard
 - tapOn:
-    id: "key-4"
-- tapOn:
-    id: "key-5"
-- tapOn:
-    id: "key-0"
+    id: "key-9"
 - tapOn:
     id: "key-0"
 - tapOn:
@@ -263,9 +268,7 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "key-1"
 - tapOn:
-    id: "key-2"
-- tapOn:
-    id: "key-0"
+    id: "key-4"
 - tapOn:
     id: "key-0"
 - tapOn:
@@ -278,7 +281,7 @@ appId: dev.merope.peace.oss
     id: "records-list"
 - assertVisible:
     id: "summary-expense"
-    text: "-E£8,520.00"
+    text: "-\\$690.00"
 - takeScreenshot: records
 
 # ===========================================================================
@@ -295,17 +298,15 @@ appId: dev.merope.peace.oss
 - tapOn: "Groceries"
 - tapOn:
     id: "record-note"
-- inputText: "Seoudi, weekly"
+- inputText: "Farmers' market"
 - hideKeyboard
 - tapOn:
     id: "key-4"
 - tapOn:
     id: "key-2"
-- tapOn:
-    id: "key-5"
 - assertVisible:
     id: "amount-display"
-    text: "425"
+    text: "42"
 - takeScreenshot: record
 - tapOn:
     id: "record-cancel"
@@ -322,7 +323,7 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "budget-row-seed-cat-food"
-- inputText: "2000"
+- inputText: "400"
 - tapOn:
     id: "budget-save"
 
@@ -332,7 +333,7 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "budget-row-seed-cat-bills"
-- inputText: "1000"
+- inputText: "160"
 - tapOn:
     id: "budget-save"
 
@@ -342,7 +343,7 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "budget-row-seed-cat-installments"
-- inputText: "5000"
+- inputText: "100"
 - tapOn:
     id: "budget-save"
 
@@ -352,7 +353,7 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "budget-row-seed-cat-transport"
-- inputText: "500"
+- inputText: "50"
 - tapOn:
     id: "budget-save"
 
@@ -364,13 +365,13 @@ appId: dev.merope.peace.oss
 # Food would read 0% and this would capture a wrong screen rather than fail.
 - assertVisible:
     id: "budget-percent-seed-cat-food"
-    text: "60%"
+    text: "64%"
 - assertVisible:
     id: "budget-left-seed-cat-transport"
-    text: "E£240.00 over"
+    text: "\\$10.00 over"
 - assertVisible:
     id: "budget-total-budget"
-    text: "E£8,500.00"
+    text: "\\$710.00"
 - takeScreenshot: budgets
 
 # ===========================================================================
@@ -378,18 +379,19 @@ appId: dev.merope.peace.oss
 # ===========================================================================
 - tapOn:
     id: "tab-analysis"
-# Installments is 4,500 of the 8,520 spent. The share is asserted because a ring
+# Food is 256 of the 690 spent. The share is asserted because a ring
 # drawn from the wrong total still looks exactly like a ring.
 - assertVisible:
     id: "analysis-total"
-    text: "E£8,520.00"
+    text: "\\$690.00"
 - assertVisible:
     id: "analysis-percent-seed-cat-installments"
-    text: "52.8%"
-# Food's 1,200 is three sub-categories rolled up, same as the budget tile.
+    text: "13.0%"
+# Installments is the smallest slice but one — rounded with the rest so the
+# legend sums to exactly 100.
 - assertVisible:
     id: "analysis-percent-seed-cat-food"
-    text: "14.1%"
+    text: "37.1%"
 - takeScreenshot: analysis
 
 # ===========================================================================
@@ -423,7 +425,7 @@ appId: dev.merope.peace.oss
     text: "3 records"
 - assertVisible:
     id: "search-expense"
-    text: "-E£1,200.00"
+    text: "-\\$256.00"
 # All three have to be on screen, or the tile shows a filter that found things
 # the reader cannot see.
 - assertVisible: "Groceries"
@@ -443,7 +445,7 @@ appId: dev.merope.peace.oss
     id: "fab-account"
 - tapOn:
     id: "account-name"
-- inputText: "Kenana"
+- inputText: "Travel card"
 - hideKeyboard
 - tapOn:
     id: "acct-type-card"
@@ -451,7 +453,7 @@ appId: dev.merope.peace.oss
 # a dated correction instead. The fee lives on the card, not in the app.
 - tapOn:
     id: "account-limit"
-- inputText: "50000"
+- inputText: "5000"
 - hideKeyboard
 - tapOn:
     id: "account-foreign-fee"
@@ -467,7 +469,7 @@ appId: dev.merope.peace.oss
     id: "fab"
 - tapOn:
     id: "pick-account"
-- tapOn: "Kenana"
+- tapOn: "Travel card"
 - tapOn:
     id: "pick-category"
 - scrollUntilVisible:
@@ -486,8 +488,6 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "key-0"
 - tapOn:
-    id: "key-0"
-- tapOn:
     id: "record-save"
 
 # --- and some of the cash moved to the bank ---
@@ -499,7 +499,7 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "type-transfer"
 - tapOn:
-    id: "key-4"
+    id: "key-2"
 - tapOn:
     id: "key-0"
 - tapOn:
@@ -511,13 +511,13 @@ appId: dev.merope.peace.oss
 
 - tapOn:
     id: "tab-accounts"
-# The assertion that keeps this shot honest. A card at -2,300 is two thousand
-# three hundred of DEBT, not an emptied wallet — and the limit is what is left
+# The assertion that keeps this shot honest. A card at -230 is two hundred and
+# thirty of DEBT, not an emptied wallet — and the limit is what is left
 # of it, not a second balance. If either ever rendered like an ordinary account
 # this would capture a wrong screen rather than fail.
 - assertVisible:
     id: "account-sub-.*"
-    text: "E£47,700.00 of E£50,000.00 available"
+    text: "\\$4,770.00 of \\$5,000.00 available"
 - takeScreenshot: accounts
 
 # ===========================================================================
@@ -530,7 +530,7 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "tab-index"
 
-# Return part of the jacket, so the sheet has a real figure to report rather
+# Return $40 of the $140 jacket, so the sheet has a real figure to report rather
 # than "all of it".
 - longPressOn: "Cash · “Winter jacket”"
 - tapOn:
@@ -538,8 +538,6 @@ appId: dev.merope.peace.oss
 - eraseText
 - tapOn:
     id: "key-4"
-- tapOn:
-    id: "key-0"
 - tapOn:
     id: "key-0"
 - tapOn:
@@ -551,10 +549,10 @@ appId: dev.merope.peace.oss
 - longPressOn: "Cash · “Winter jacket”"
 - assertVisible:
     id: "record-actions"
-# How much came back, not merely that some did — the difference between E£400
+# How much came back, not merely that some did — the difference between $40
 # and all of it is the entire question, and it is what a purchase could never
 # say before.
-- assertVisible: "Refunded · E£400.00 of E£1,200.00"
+- assertVisible: "Refunded · \\$40.00 of \\$140.00"
 - assertVisible:
     id: "link-undone-0"
 - takeScreenshot: actions
@@ -579,11 +577,11 @@ appId: dev.merope.peace.oss
 - inputText: "Flat rent"
 - hideKeyboard
 - tapOn:
-    id: "key-6"
+    id: "key-1"
 - tapOn:
-    id: "key-0"
+    id: "key-4"
 - tapOn:
-    id: "key-0"
+    id: "key-5"
 - tapOn:
     id: "key-0"
 - tapOn:
@@ -614,8 +612,6 @@ appId: dev.merope.peace.oss
 - hideKeyboard
 - tapOn:
     id: "key-9"
-- tapOn:
-    id: "key-0"
 - tapOn:
     id: "key-0"
 - tapOn:

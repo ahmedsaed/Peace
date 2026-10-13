@@ -192,6 +192,22 @@ export default function Home() {
               <li>CSV export that keeps both sides of every transfer, so per-account balances still add up.</li>
             </ul>
           </Feature>
+
+          <Feature
+            eyebrow="First launch"
+            title="Set up in a minute — or skip it."
+            shot="welcome"
+            alt="The welcome screen: the Peace wordmark, the line Peace of mind, piece of cake, three promises about privacy, and a Get started button"
+            flip
+          >
+            <ul>
+              <li>Your currency, worked out from the phone’s region; one tap to confirm or change it.</li>
+              <li>Name your accounts and say what each holds today, or start counting from now.</li>
+              <li>Pick a calculator or a phone keypad by looking at both.</li>
+              <li>Reminders, AI and bank alerts are each explained in plain words, and asked for only on a yes.</li>
+              <li>Anything you skip waits on the Records screen, one tap away.</li>
+            </ul>
+          </Feature>
         </div>
       </section>
 

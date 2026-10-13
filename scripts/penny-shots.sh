@@ -20,7 +20,9 @@ adb get-state >/dev/null 2>&1 || { echo "no device — run 'npm run emu' first";
 DEMO_LEDGER_OUT=.demo/peace-demo.db npx jest src/test/demo-ledger --silent
 for dir in Download Documents; do
   adb push .demo/peace-demo.db "/sdcard/$dir/peace-demo.db" >/dev/null
-  adb push src/assistant/__fixtures__/receipt.jpg "/sdcard/$dir/peace-receipt.jpg" >/dev/null
+  # A dollar receipt from nowhere in particular, matching the dollar ledger —
+  # NOT the test fixture, which the live suite asserts an exact EGP total on.
+  adb push scripts/fixtures/receipt-usd.jpg "/sdcard/$dir/peace-receipt.jpg" >/dev/null
   for f in peace-demo.db peace-receipt.jpg; do
     adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/$dir/$f" >/dev/null 2>&1 || true
   done
