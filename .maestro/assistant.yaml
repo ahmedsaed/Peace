@@ -34,9 +34,7 @@ appId: dev.merope.peace.oss
     id: "drawer-assistant"
 - tapOn:
     id: "drawer-settings"
-- tapOn:
-    id: "settings-section-ai"
-# The AI page holds the key; Penny is one of the three features under it.
+# The AI section sits on the Settings page itself; Penny is one of its rows.
 - assertVisible:
     id: "settings-ai-penny"
 - tapOn:
@@ -69,9 +67,7 @@ appId: dev.merope.peace.oss
 - takeScreenshot: 02-assistant-on-no-key
 
 # --- the setting is read on OTHER screens: the header and the drawer ---
-# Back three times: Penny's page, the AI page, the Settings index.
-- tapOn:
-    id: "nav-back"
+# Back twice: Penny's page, then Settings.
 - tapOn:
     id: "nav-back"
 - tapOn:
@@ -94,10 +90,9 @@ appId: dev.merope.peace.oss
 - takeScreenshot: 03-assistant-gate
 - tapOn:
     id: "assistant-open-settings"
-# The gate is about the missing KEY, so it opens the AI page, where the key
-# goes — not the Settings index.
+# The gate is about the missing KEY, so it opens Settings, where the key goes.
 - assertVisible:
-    id: "settings-ai"
+    id: "settings-screen"
 
 # --- off again: every way in is gone ---
 - tapOn:
@@ -110,7 +105,7 @@ appId: dev.merope.peace.oss
     id: "assistant-enabled"
 - assertNotVisible:
     id: "assistant-needs-key"
-# Penny's page, then the AI page.
+# Penny's page, then Settings.
 - tapOn:
     id: "nav-back"
 - tapOn:
@@ -135,8 +130,6 @@ appId: dev.merope.peace.oss
     id: "nav-menu"
 - tapOn:
     id: "drawer-settings"
-- tapOn:
-    id: "settings-section-ai"
 # Penny on, from its own page, so its card has a key to ask for.
 - tapOn:
     id: "settings-ai-penny"
@@ -148,7 +141,7 @@ appId: dev.merope.peace.oss
     id: "assistant-enabled"
 - assertVisible:
     id: "assistant-needs-key"
-# Back to the AI page, which owns the key.
+# Back to Settings, which holds the key.
 - tapOn:
     id: "nav-back"
 - tapOn:
@@ -177,3 +170,34 @@ appId: dev.merope.peace.oss
     id: "settings-ai-penny"
 - assertVisible:
     id: "assistant-needs-key"
+
+# --- Use AI is the master switch: off, and Penny is gone everywhere ---
+# Penny is ON here (above). Switching AI off on Settings has to reach the
+# header and the side menu — other screens — while keeping Penny's own
+# setting, so turning AI back on brings her back without asking again.
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "setting-ai-enabled"
+- assertVisible:
+    id: "settings-ai-penny-summary"
+    text: "AI is off"
+- takeScreenshot: 05-ai-off
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "home-screen"
+- assertNotVisible:
+    id: "nav-assistant"
+- tapOn:
+    id: "nav-menu"
+- assertNotVisible:
+    id: "drawer-assistant"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "setting-ai-enabled"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "nav-assistant"

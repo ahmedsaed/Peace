@@ -80,6 +80,8 @@ export async function runBankCatchUp(input: {
   homeCurrency: string;
   geminiModel: string;
   guidance?: string;
+  /** Settings › AI › Use AI. Off: messages are still captured, and wait unread. */
+  aiEnabled: boolean;
 }): Promise<void> {
   if (running) return;
   running = true;
@@ -95,6 +97,10 @@ export async function runBankCatchUp(input: {
     // Straight away, so a captured message shows as waiting even while the
     // reading of it is still in flight.
     if (drained > 0) useBankInbox.getState().reload();
+
+    // AI switched off: captured and counted as waiting, but nothing is sent.
+    // Turning it back on reads them (the Settings switch kicks a catch-up).
+    if (!input.aiEnabled) return;
 
     /**
      * Repainted after EACH message, not once at the end.
@@ -136,13 +142,14 @@ export function useBankCatchUp(): void {
   const homeCurrency = useSetting('homeCurrency');
   const geminiModel = useSetting('geminiModel');
   const guidance = useSetting('bankGuidance');
+  const aiEnabled = useSetting('aiEnabled');
 
   // Read through a ref inside the listener so the subscription is created once
   // rather than rebuilt whenever a setting changes. Written in an effect, never
   // during render — a ref mutated mid-render is invisible to React.
-  const state = useRef({ senders, homeCurrency, geminiModel, guidance });
+  const state = useRef({ senders, homeCurrency, geminiModel, guidance, aiEnabled });
   useEffect(() => {
-    state.current = { senders, homeCurrency, geminiModel, guidance };
+    state.current = { senders, homeCurrency, geminiModel, guidance, aiEnabled };
   });
 
   useEffect(() => {

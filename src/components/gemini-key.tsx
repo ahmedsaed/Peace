@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { ModelRow } from '@/components/model-picker';
 import palette from '@/constants/palette';
 import { GeminiError } from '@/lib/gemini';
@@ -28,7 +29,10 @@ import { useGeminiKeyStore } from '@/state/gemini-key';
 import { runBankCatchUp } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
 
-export function GeminiKeyCard() {
+/**
+ * The key and the model, as rows inside Settings' AI section.
+ */
+export function GeminiKeyRows() {
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
 
@@ -76,6 +80,7 @@ export function GeminiKeyCard() {
         homeCurrency: settings.homeCurrency,
         geminiModel: settings.geminiModel,
         guidance: settings.bankGuidance,
+        aiEnabled: settings.aiEnabled,
       });
     } catch (e) {
       // A refused key arrives as a GeminiError already worded for this
@@ -90,27 +95,48 @@ export function GeminiKeyCard() {
     } finally {
       setBusy(false);
     }
-  }, [draft, saveKey, settings.bankSenders, settings.homeCurrency, settings.geminiModel, settings.bankGuidance]);
+  }, [
+    draft,
+    saveKey,
+    settings.bankSenders,
+    settings.homeCurrency,
+    settings.geminiModel,
+    settings.bankGuidance,
+    settings.aiEnabled,
+  ]);
 
   return (
-    <View className="rounded-xl bg-surface p-4" testID="gemini-card">
-      <Text className="mb-1 text-base font-semibold text-ink">Gemini</Text>
-      <Text className="mb-3 text-sm leading-5 text-muted">
-        One key, used by everything that reads for you — photographed receipts, bank messages and
-        Penny. It is kept on this device and never goes into a backup.
-      </Text>
-
-      <View className="mb-3 flex-row items-center justify-between">
-        <Text className="text-sm text-muted">API key</Text>
-        <Text className="text-sm text-ink" testID="gemini-key-state">
+    <>
+      {/* The key, as a row. Tapping it opens the editor right here rather than
+          on a page of its own — it is two fields and a button, and the switch
+          it serves is directly above it. */}
+      <Pressable
+        onPress={() => setEditing(true)}
+        disabled={!loaded || editing}
+        testID="gemini-key-edit"
+        accessibilityRole="button"
+        accessibilityLabel={saved ? 'Change the Gemini key' : 'Add a Gemini key'}
+        className={`flex-row items-center gap-3 px-4 py-3.5 active:bg-raised ${
+          editing ? '' : 'border-b border-line'
+        }`}>
+        <View className="flex-1">
+          <Text className="text-[15px] text-ink">Gemini key</Text>
+          <Text className="text-xs leading-4 text-muted">
+            Your own, from Google AI Studio. Kept on this phone, never in a backup.
+          </Text>
+        </View>
+        <Text
+          className={`text-sm ${saved ? 'text-ink' : 'text-accent'}`}
+          testID="gemini-key-state">
           {/* Nothing at all until the keystore has answered — "Not set" shown
               while loading reads as the key having been lost. */}
           {loaded ? maskKey(saved) : ' '}
         </Text>
-      </View>
+        {editing ? null : <Icon name="chevron" size={14} color={palette.muted} />}
+      </Pressable>
 
       {editing ? (
-        <>
+        <View className="border-b border-line px-4 pb-4">
           <TextInput
             value={draft}
             onChangeText={(next) => {
@@ -134,11 +160,12 @@ export function GeminiKeyCard() {
             <Text className="mb-2 text-sm leading-5 text-expense" testID="gemini-key-error">
               {error}
             </Text>
-          ) : null}
-          <Text className="mb-3 text-xs leading-5 text-muted">
-            Make one at aistudio.google.com. Reading a receipt is one request; the free tier covers
-            ordinary use.
-          </Text>
+          ) : (
+            <Text className="mb-3 text-xs leading-5 text-muted">
+              Checked with Google before it is saved. Make one at aistudio.google.com — reading a
+              receipt is one request, and the free tier covers ordinary use.
+            </Text>
+          )}
           <View className="flex-row gap-2">
             <SmallButton
               label={busy ? 'Checking…' : 'Save'}
@@ -158,15 +185,8 @@ export function GeminiKeyCard() {
               testID="gemini-key-cancel"
             />
           </View>
-        </>
-      ) : (
-        <SmallButton
-          label={saved ? 'Change key' : 'Add a key'}
-          onPress={() => setEditing(true)}
-          disabled={!loaded}
-          testID="gemini-key-edit"
-        />
-      )}
+        </View>
+      ) : null}
 
       {/**
        * The model row appears ONLY once a key exists.
@@ -176,7 +196,7 @@ export function GeminiKeyCard() {
        * there is a key to call it with is exactly that.
        */}
       {saved ? (
-        <View className="mt-4 border-t border-line pt-4">
+        <View className="border-b border-line px-4 py-3.5">
           {/* Selecting writes straight through to the settings store, which is
               a write-through cache over SQLite — so the record screen picks up
               the new model without this component telling it anything. */}
@@ -189,7 +209,7 @@ export function GeminiKeyCard() {
           />
         </View>
       ) : null}
-    </View>
+    </>
   );
 }
 

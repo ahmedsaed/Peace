@@ -75,7 +75,8 @@ function HideAmountsButton() {
  */
 function AssistantButton() {
   const enabled = useSetting('assistantEnabled');
-  if (!enabled) return null;
+  const aiEnabled = useSetting('aiEnabled');
+  if (!enabled || !aiEnabled) return null;
   return (
     <HeaderButton
       icon="sparkle"

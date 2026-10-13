@@ -56,13 +56,28 @@ export function SettingsPage({
   );
 }
 
-/** A labelled group of rows on one surface. */
-export function Section({ title, children }: { title?: string; children: React.ReactNode }) {
+/**
+ * A labelled group of rows on one surface. `caption` is a sentence under the
+ * title, for a group whose rows share something worth saying once — the AI
+ * group's "sent to Google" rather than the same words on every row.
+ */
+export function Section({
+  title,
+  caption,
+  testID,
+  children,
+}: {
+  title?: string;
+  caption?: string;
+  testID?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <View>
+    <View testID={testID}>
       {title ? (
         <Text className="mb-2 px-1 text-[10px] uppercase tracking-widest text-muted">{title}</Text>
       ) : null}
+      {caption ? <Text className="-mt-1 mb-2 px-1 text-xs leading-4 text-muted">{caption}</Text> : null}
       <View className="overflow-hidden rounded-xl bg-surface">{children}</View>
     </View>
   );
@@ -80,6 +95,7 @@ export function SectionLink({
   summary,
   onPress,
   testID,
+  dim = false,
   last = false,
 }: {
   emblem: string;
@@ -88,6 +104,8 @@ export function SectionLink({
   summary: string;
   onPress: () => void;
   testID: string;
+  /** Still tappable — its page explains itself — but visibly not running. */
+  dim?: boolean;
   last?: boolean;
 }) {
   return (
@@ -101,7 +119,7 @@ export function SectionLink({
       }`}>
       <View
         className="h-10 w-10 items-center justify-center rounded-full"
-        style={{ backgroundColor: color }}>
+        style={{ backgroundColor: color, opacity: dim ? 0.4 : 1 }}>
         <Icon name={emblem} size={18} color={palette.ink} />
       </View>
       <View className="flex-1">
@@ -256,7 +274,7 @@ export function Row({
  * "This runs on the Gemini key, which is not set" — at the top of every AI
  * feature's page, with the way to fix it.
  *
- * The key lives on the AI page, one level up, so a feature page that only said
+ * The key lives on the Settings page, one level up, so a feature page that only said
  * "needs a key" would send somebody hunting. Nothing at all once a key exists:
  * a notice that is always there stops being read.
  */
@@ -271,7 +289,7 @@ export function KeyNotice() {
         Runs on your Gemini key, which is not set yet.
       </Text>
       <Pressable
-        onPress={() => router.navigate('/settings/ai')}
+        onPress={() => router.navigate('/settings')}
         testID="key-notice-add"
         accessibilityRole="button"
         className="rounded-full bg-accent px-4 py-2 active:opacity-80">

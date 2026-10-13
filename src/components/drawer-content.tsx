@@ -75,8 +75,10 @@ const ASSISTANT_ITEM = {
 
 export function DrawerContent({ navigation }: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
+  // Penny is listed only while BOTH switches are on: hers, and Use AI.
   const assistantEnabled = useSetting('assistantEnabled');
-  const items = assistantEnabled ? [ASSISTANT_ITEM, ...ITEMS] : ITEMS;
+  const aiEnabled = useSetting('aiEnabled');
+  const items = assistantEnabled && aiEnabled ? [ASSISTANT_ITEM, ...ITEMS] : ITEMS;
 
   // Close first, then navigate. Pushing onto the root stack does not dismiss
   // the drawer by itself, so it would still be sitting open behind the new

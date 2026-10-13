@@ -48,8 +48,6 @@ appId: dev.merope.peace.oss
     id: "nav-back"
 
 # --- a key, and consent (after the restore, which replaces settings) ---
-- tapOn:
-    id: "settings-section-ai"
 - scrollUntilVisible:
     element:
       id: "gemini-key-edit"
@@ -71,9 +69,7 @@ appId: dev.merope.peace.oss
     id: "settings-ai-penny"
 - tapOn:
     id: "assistant-enabled"
-# Penny's page, AI, the Settings index.
-- tapOn:
-    id: "nav-back"
+# Penny's page, then the Settings index.
 - tapOn:
     id: "nav-back"
 - tapOn:

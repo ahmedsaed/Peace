@@ -53,7 +53,8 @@ type Props = {
    * Offered per attachment rather than once for the record, because a record
    * can carry several and only one of them is the receipt worth reading.
    */
-  onRead: (attachment: StagedAttachment) => void;
+  /** Absent when AI is switched off: there is then no reading button at all. */
+  onRead?: (attachment: StagedAttachment) => void;
   /** Which attachment is being read, so only its own badge spins. */
   reading: string | null;
   /** True in split-screen: previews go, the buttons merge, the count stays. */
@@ -80,7 +81,7 @@ const Preview = memo(function Preview({
   attachment: StagedAttachment;
   onOpen: () => void;
   onRemove: () => void;
-  onRead: () => void;
+  onRead?: () => void;
   reading: boolean;
 }) {
   const missing = !attachmentExists(attachment.fileName);
@@ -141,7 +142,7 @@ const Preview = memo(function Preview({
        * affordance that is present but cannot work is the thing that teaches
        * you to stop trusting the app.
        */}
-      {image ? (
+      {image && onRead ? (
         <Pressable
           onPress={onRead}
           disabled={reading}
@@ -273,7 +274,7 @@ export function AttachmentBar({
               attachment={attachment}
               onOpen={() => onOpen(attachment)}
               onRemove={() => onRemove(attachment.fileName)}
-              onRead={() => onRead(attachment)}
+              onRead={onRead ? () => onRead(attachment) : undefined}
               reading={reading === attachment.fileName}
             />
           ))}
