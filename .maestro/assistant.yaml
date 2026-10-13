@@ -34,6 +34,8 @@ appId: dev.merope.peace.oss
     id: "drawer-assistant"
 - tapOn:
     id: "drawer-settings"
+- tapOn:
+    id: "settings-section-ai"
 
 - scrollUntilVisible:
     element:
@@ -59,6 +61,9 @@ appId: dev.merope.peace.oss
 - takeScreenshot: 02-assistant-on-no-key
 
 # --- the setting is read on OTHER screens: the header and the drawer ---
+# Back twice: the AI page, then the Settings index.
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 - assertVisible:
@@ -79,8 +84,9 @@ appId: dev.merope.peace.oss
 - takeScreenshot: 03-assistant-gate
 - tapOn:
     id: "assistant-open-settings"
+# Straight to the page that holds the switch, not the Settings index.
 - assertVisible:
-    id: "settings-screen"
+    id: "settings-ai"
 
 # --- off again: every way in is gone ---
 - scrollUntilVisible:
@@ -113,6 +119,8 @@ appId: dev.merope.peace.oss
     id: "nav-menu"
 - tapOn:
     id: "drawer-settings"
+- tapOn:
+    id: "settings-section-ai"
 - scrollUntilVisible:
     element:
       id: "assistant-enabled"

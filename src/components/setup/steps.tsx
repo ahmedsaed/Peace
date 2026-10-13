@@ -18,6 +18,7 @@ import {
 } from '@/components/setup/frame';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
+import { SECTIONS } from '@/constants/sections';
 import { openListenerSettings, setCapturing } from '@/db/bank-inbox';
 import { db } from '@/db/client';
 import { adoptCurrency, listAccountsWithBalance, updateAccount } from '@/db/repo/accounts';
@@ -35,15 +36,15 @@ import { requestReminderPermission, syncReminders } from '@/state/reminders';
 import { bankAccess } from '@/state/setup';
 import { useSettingsStore } from '@/state/settings';
 
-/** Each step's colour, from the category palette (docs/design-system.md). */
+/** Each step's colour — shared with Settings, so a section looks like its step. */
 const COLOR: Record<SetupStep | 'done', string> = {
-  currency: '#C99A2E',
-  accounts: '#2E7D46',
-  keypad: '#3B4E9E',
-  reminder: '#6B4CA8',
-  ai: '#2F8A78',
-  bank: '#2F6FA8',
-  backup: '#6E8B3D',
+  currency: SECTIONS.money.color,
+  accounts: SECTIONS.accounts.color,
+  keypad: SECTIONS.keypad.color,
+  reminder: SECTIONS.reminder.color,
+  ai: SECTIONS.ai.color,
+  bank: SECTIONS.bank.color,
+  backup: SECTIONS.backup.color,
   done: '#2E7D46',
 };
 

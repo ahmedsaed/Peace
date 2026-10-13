@@ -34,6 +34,8 @@ appId: dev.merope.peace.oss
     id: "drawer-settings"
 - assertVisible:
     id: "settings-screen"
+- tapOn:
+    id: "settings-section-ai"
 - scrollUntilVisible:
     element:
       id: "gemini-card"
@@ -75,6 +77,8 @@ appId: dev.merope.peace.oss
     id: "gemini-key-state"
     text: "Not set"
 
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 

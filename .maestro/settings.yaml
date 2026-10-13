@@ -32,6 +32,8 @@ appId: dev.merope.peace.oss
     id: "drawer-settings"
 - assertVisible:
     id: "settings-screen"
+- tapOn:
+    id: "settings-section-money"
 - assertVisible:
     id: "setting-home-currency"
 
@@ -59,6 +61,13 @@ appId: dev.merope.peace.oss
 # pounds no matter what the reporting currency is, which is the point.
 - tapOn:
     id: "nav-back"
+# The index says what each section is set to, from the same state — so it has
+# moved too, without the Money page being opened again.
+- assertVisible:
+    id: "settings-section-money-summary"
+    text: "US dollar · USD"
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "tab-index"
 - assertVisible:
@@ -84,12 +93,16 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "drawer-settings"
 - tapOn:
+    id: "settings-section-money"
+- tapOn:
     id: "setting-default-account"
 - assertVisible:
     id: "sheet-default-account"
 - tapOn: "Bank"
 - assertVisible: ".*Bank.*"
 
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 - tapOn:

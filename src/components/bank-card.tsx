@@ -210,7 +210,7 @@ export function BankMessagesCard() {
         {waiting > 0 ? (
           <Text className="mb-2 text-xs leading-4 text-expense" testID="bank-waiting">
             {waiting === 1 ? '1 message is' : `${waiting} messages are`} waiting to be read — they
-            need the Gemini key above.
+            need a Gemini key, added in Settings › AI.
           </Text>
         ) : null}
 

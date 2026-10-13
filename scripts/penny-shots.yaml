@@ -48,6 +48,8 @@ appId: dev.merope.peace.oss
     id: "nav-menu"
 - tapOn:
     id: "drawer-settings"
+- tapOn:
+    id: "settings-section-ai"
 - scrollUntilVisible:
     element:
       id: "gemini-key-edit"
@@ -70,6 +72,8 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "assistant-enabled"
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 - tapOn:
