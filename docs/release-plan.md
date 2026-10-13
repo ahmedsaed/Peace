@@ -49,16 +49,18 @@ reads the version. Code that differs per flavor sits behind one small module per
 
 ## Phase 1 — De-personalise and polish
 
-- [ ] Package name → `dev.merope.peace` (+ `.oss`); new Android OAuth clients for Drive
+- [x] Package name → `dev.merope.peace` (+ `.oss`); new Android OAuth clients for Drive
+      (`oss` client done in 1.16; the `play` client waits for Play's app-signing SHA-1 — Phase 4)
 - [ ] `homeCurrency` default detected from the device locale (`expo-localization`), confirmed in onboarding
-- [ ] Card handling worded generally — "installment plan" first, Murabaha as one kind of it, not the headline
-- [ ] UI copy: remove region-specific examples (bank names, E£ in hints and placeholders)
+- [x] Card handling worded generally — "installment plan" first, Murabaha as one kind of it, not the headline
+- [x] UI copy: remove region-specific examples (bank names, E£ in hints and placeholders)
 - [ ] About screen: Peace by Merope, links to `peace.merope.dev` and the source
+      ("Made by · Merope" shipped in 1.15.1; the links wait for the website to exist)
 - [ ] Review Penny's system prompt and default category set for anything that assumes one person or one country
 
 ## Phase 2 — Customisation
 
-- [ ] **Keypad layout** setting: calculator (7-8-9 on top, current) / phone (1-2-3 on top). `ROWS` in
+- [x] **Keypad layout** setting: calculator (7-8-9 on top, current) / phone (1-2-3 on top). `ROWS` in
       `keypad.tsx` becomes two tables. Operators left/right for left-handed use, same setting family.
 - [ ] **First day of week** and **first day of month** (payday budgeting) — reaches `periodBounds`,
       records grouping, budgets, analysis. A flow asserts a month boundary moving on a different screen.
@@ -89,11 +91,15 @@ layout on the screens that use them.
 - [ ] Release builds an **AAB** for Play (`bundleRelease`) alongside the APK for GitHub, through the same reusable workflow
 - [ ] Play App Signing enrolled; upload key kept out of the repo like the current signing key
 - [ ] Drive OAuth: Android client for Play's app-signing SHA-1; consent screen to production with brand verification
-- [ ] Notification-listener **prominent disclosure** screen, consent before deep-linking to settings
+- [ ] Notification-listener **prominent disclosure** screen, consent before deep-linking to settings.
+      **Built once, with onboarding** — the onboarding step IS the disclosure, and the Settings card
+      opens the same screen for anyone who skipped it. Play reviews closed-test builds too, so this
+      must land **before the first AAB is uploaded**, even if the rest of onboarding is not done.
 - [ ] Privacy policy + data-safety page on `peace.merope.dev`; Data safety form filled to match
       (Gemini requests, Drive backup, notification contents read on device)
-- [ ] Check the merged manifest's alarm permissions (`SCHEDULE_EXACT_ALARM` fine, `USE_EXACT_ALARM` needs a declaration)
-- [ ] Target SDK meets Play's current minimum
+- [x] Check the merged manifest's alarm permissions (`SCHEDULE_EXACT_ALARM` fine, `USE_EXACT_ALARM` needs a declaration)
+      — neither is requested; expo-notifications falls back to inexact alarms
+- [x] Target SDK meets Play's current minimum (36)
 - [ ] Store listing: screenshots (`npm run shot`), feature graphic, short and long description
 - [ ] Sideload → Play migration documented on the website (backup → install → restore)
 - [ ] Closed testing track: 12+ testers opted in for 14 consecutive days (mandatory — personal account). Testers join through a Google Group and an opt-in link, then install from the Play Store as normal.
