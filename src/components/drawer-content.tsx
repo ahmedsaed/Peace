@@ -16,18 +16,13 @@ import { useSetting } from '@/state/settings';
  * What lives in the side menu, and what does not.
  *
  * The five tabs are the app's *content*; the tab bar owns them. The drawer
- * holds the things you touch a handful of times a year — settings, getting your
- * data out — which is exactly why they should not spend a tab slot. Duplicating
+ * holds the things you touch a handful of times a year — which is exactly why
+ * they should not spend a tab slot. Backup & export lives under Settings › Your
+ * data, beside the other things about your data, rather than here as well:
+ * two ways to one screen is one more thing to wonder about. Duplicating
  * the tabs in here would only give two answers to "where is Budgets".
  */
 const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: string }[] = [
-  {
-    icon: 'settings',
-    label: 'Settings',
-    hint: 'Currency, carry-over, API key',
-    href: '/settings',
-    testID: 'drawer-settings',
-  },
   {
     icon: 'refresh',
     label: 'Recurring',
@@ -50,11 +45,11 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
     testID: 'drawer-portfolio',
   },
   {
-    icon: 'export',
-    label: 'Export & backup',
-    hint: 'CSV out, full backup and restore',
-    href: '/export',
-    testID: 'drawer-export',
+    icon: 'settings',
+    label: 'Settings',
+    hint: 'Currency, keypad, AI, backups',
+    href: '/settings',
+    testID: 'drawer-settings',
   },
   {
     icon: 'info',
@@ -65,23 +60,12 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
   },
 ];
 
-/**
- * The assistant leads the list when it is on, and is absent when it is off —
- * an entry that opens onto "this is switched off" is a door to a wall. It is
- * turned on from Settings, which is where its privacy sentence lives.
- */
-const ASSISTANT_ITEM = {
-  icon: 'sparkle',
-  label: 'Penny',
-  hint: 'Ask about your money',
-  href: '/assistant' as Href,
-  testID: 'drawer-assistant',
-};
 
 export function DrawerContent({ navigation }: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
-  const assistantEnabled = useSetting('assistantEnabled');
-  const items = assistantEnabled ? [ASSISTANT_ITEM, ...ITEMS] : ITEMS;
+  // No Penny here: she has her own button in every tab's header, and a second
+  // way to one screen is one more thing to wonder about.
+  const items = ITEMS;
 
   // Close first, then navigate. Pushing onto the root stack does not dismiss
   // the drawer by itself, so it would still be sitting open behind the new

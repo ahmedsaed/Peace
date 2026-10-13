@@ -81,6 +81,29 @@ export const SETTING_DEFAULTS = {
   bankGuidance: '' as string,
 
   /**
+   * Use AI at all — the master switch over everything that sends to Gemini.
+   *
+   * Off is a PAUSE, not a removal: the key stays in secure storage, and each
+   * feature keeps its own setting, so turning it back on puts everything back
+   * as it was. While it is off nothing is sent to Google — the receipt-reading
+   * button is gone, bank messages are still captured but wait unread, and Penny
+   * is gone from the header and the side menu.
+   *
+   * ON by default: it only ever matters once a key exists, and somebody who
+   * already has a key and Penny switched on must not find them silently
+   * disabled by an upgrade.
+   */
+  aiEnabled: true as boolean,
+  /**
+   * Read receipts with AI — on its own, so somebody who wants Penny or bank
+   * messages need not have a reading button on every photo they attach.
+   *
+   * ON by default for the same reason as `aiEnabled`: it only does anything
+   * once there is a key, and turning a feature off on upgrade would be the app
+   * changing its mind behind somebody's back.
+   */
+  receiptsEnabled: true as boolean,
+  /**
    * The assistant — a chat that answers from the ledger. OFF until switched on.
    *
    * Off by default for the same reason the bank sender list starts empty:

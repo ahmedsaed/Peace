@@ -40,10 +40,18 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "drawer-settings"
 - tapOn:
+    id: "settings-section-recording"
+# Picked by picture, the same previews setup uses.
+- tapOn:
     id: "setting-keypad-digits-phone"
 - tapOn:
     id: "setting-keypad-operators-right"
 - takeScreenshot: 01-keypad-settings
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-section-recording-summary"
+    text: "Phone keypad · .*"
 - tapOn:
     id: "nav-back"
 

@@ -224,9 +224,9 @@ export function describeFailure(
     case 'API_KEY_INVALID':
     case 'API_KEY_SERVICE_BLOCKED':
     case 'ACCESS_TOKEN_EXPIRED':
-      return 'That Gemini API key was refused. Check it in Settings.';
+      return 'That Gemini API key was refused. Check it in Settings › AI.';
     case 'SERVICE_DISABLED':
-      return 'The Gemini API is not enabled for that key. Check it in Settings.';
+      return 'The Gemini API is not enabled for that key. Check it in Settings › AI.';
     case 'RATE_LIMIT_EXCEEDED':
     case 'RESOURCE_EXHAUSTED':
       return 'Gemini is rate-limiting this key. Try again in a minute.';
@@ -235,9 +235,9 @@ export function describeFailure(
   }
 
   if (status === 401 || status === 403) {
-    return 'That Gemini API key was refused. Check it in Settings.';
+    return 'That Gemini API key was refused. Check it in Settings › AI.';
   }
-  if (status === 404) return 'That Gemini model does not exist. Check the name in Settings.';
+  if (status === 404) return 'That Gemini model does not exist. Check the name in Settings › AI.';
   if (status === 429) return 'Gemini is rate-limiting this key. Try again in a minute.';
   if (status >= 500) return `Gemini is unavailable right now. ${meanwhile}`;
 
@@ -312,7 +312,7 @@ export async function listModels(
   { timeoutMs = 15_000, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
 ): Promise<GeminiModel[]> {
   if (apiKey.trim() === '') {
-    throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
+    throw new GeminiError('No Gemini API key is saved. Add one in Settings › AI.');
   }
 
   const controller = new AbortController();
@@ -455,7 +455,7 @@ export async function postGenerate(
   }
 ): Promise<unknown> {
   if (apiKey.trim() === '') {
-    throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
+    throw new GeminiError('No Gemini API key is saved. Add one in Settings › AI.');
   }
 
   const controller = new AbortController();
@@ -553,7 +553,7 @@ export async function postStream(
   }
 ): Promise<void> {
   if (apiKey.trim() === '') {
-    throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
+    throw new GeminiError('No Gemini API key is saved. Add one in Settings › AI.');
   }
 
   const controller = new AbortController();

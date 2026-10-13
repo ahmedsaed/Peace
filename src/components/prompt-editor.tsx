@@ -11,10 +11,18 @@
  * So this starts EMPTY, and empty is the normal state rather than a gap to be
  * filled. The placeholder is an EXAMPLE of the kind of sentence that belongs
  * here, never text that would be sent.
+ *
+ * ALWAYS OPEN. It used to be folded behind "Add rules" / "Edit rules" with
+ * Save and Cancel, because it shared one long Settings page with everything
+ * else. Each AI feature has a page of its own now, so the rules are simply
+ * there: what is written can be read without a tap, and changed in place.
+ * It saves as you type — a moment after you stop — and once more as the page
+ * closes, and says so. Saving only when the edit "ended" lost text on a
+ * device: Back unmounts the field before Android reports the end of an edit.
  */
 
-import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Text, TextInput, View } from 'react-native';
 
 import palette from '@/constants/palette';
 
@@ -35,115 +43,68 @@ export function PromptEditor({
   onChange: (next: string) => void;
   testID: string;
 }) {
-  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [saved, setSaved] = useState(false);
 
-  const added = value.trim() !== '';
+  // "Saved" is a confirmation, not a state: it fades after a moment.
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), 2000);
+    return () => clearTimeout(timer);
+  }, [saved]);
+
+  // A moment after typing stops. Trimmed on the way out, so a trailing space
+  // mid-sentence is not a change and the field never fights the cursor.
+  useEffect(() => {
+    if (draft.trim() === value) return;
+    const timer = setTimeout(() => {
+      onChange(draft.trim());
+      setSaved(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [draft, value, onChange]);
+
+  // And whatever is still pending when the page closes. Refs, because the
+  // cleanup runs once, at unmount, with whatever was current then.
+  const latest = useRef({ draft, value, onChange });
+  useEffect(() => {
+    latest.current = { draft, value, onChange };
+  });
+  useEffect(
+    () => () => {
+      const { draft: pending, value: stored, onChange: save } = latest.current;
+      if (pending.trim() !== stored) save(pending.trim());
+    },
+    []
+  );
 
   return (
-    <View className="border-t border-line pt-3">
+    <View className="border-t border-line pt-3" testID={testID}>
       <View className="mb-1 flex-row items-center justify-between">
         <Text className="text-sm text-ink">{label}</Text>
-        <Text className="text-xs text-muted" testID={`${testID}-state`}>
-          {added ? 'Added' : 'None'}
+        <Text className="text-xs text-income" testID={`${testID}-state`}>
+          {saved ? 'Saved' : ''}
         </Text>
       </View>
       <Text className="mb-2 text-xs leading-4 text-muted">{hint}</Text>
 
-      {open ? (
-        <>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder={example}
-            placeholderTextColor={palette.muted}
-            multiline
-            textAlignVertical="top"
-            autoCapitalize="sentences"
-            autoCorrect={false}
-            style={{ minHeight: 120 }}
-            className="mb-2 rounded-lg border border-line px-3 py-2.5 text-xs leading-5 text-ink"
-            testID={`${testID}-input`}
-          />
-          <Text className="mb-2 text-xs leading-4 text-muted">
-            Peace already tells the model what each field means and hands it your accounts and
-            categories. Write only what it could not work out for itself.
-          </Text>
-          <View className="flex-row gap-2">
-            <Button
-              label="Save"
-              primary
-              testID={`${testID}-save`}
-              onPress={() => {
-                onChange(draft.trim());
-                setOpen(false);
-              }}
-            />
-            <Button
-              label="Cancel"
-              testID={`${testID}-cancel`}
-              onPress={() => {
-                setDraft(value);
-                setOpen(false);
-              }}
-            />
-            {added ? (
-              <Button
-                label="Clear"
-                testID={`${testID}-reset`}
-                onPress={() => {
-                  setDraft('');
-                  onChange('');
-                  setOpen(false);
-                }}
-              />
-            ) : null}
-          </View>
-        </>
-      ) : (
-        <>
-          {added ? (
-            <Text className="mb-2 text-xs leading-5 text-ink" testID={`${testID}-current`}>
-              {value}
-            </Text>
-          ) : null}
-          <Button
-            label={added ? 'Edit rules' : 'Add rules'}
-            testID={`${testID}-edit`}
-            onPress={() => {
-              // Opens on THEIR text, or on nothing. Never on the app's own rules.
-              setDraft(value);
-              setOpen(true);
-            }}
-          />
-        </>
-      )}
-    </View>
-  );
-}
-
-function Button({
-  label,
-  onPress,
-  primary,
-  testID,
-}: {
-  label: string;
-  onPress: () => void;
-  primary?: boolean;
-  testID: string;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      testID={testID}
-      accessibilityRole="button"
-      className={`rounded-lg px-4 py-2.5 active:opacity-80 ${
-        primary ? 'bg-accent' : 'border border-line'
-      }`}>
-      <Text className={`text-sm font-semibold ${primary ? 'text-accent-ink' : 'text-muted'}`}>
-        {label}
+      <TextInput
+        value={draft}
+        onChangeText={setDraft}
+        placeholder={example}
+        placeholderTextColor={palette.muted}
+        multiline
+        textAlignVertical="top"
+        autoCapitalize="sentences"
+        autoCorrect={false}
+        style={{ minHeight: 140 }}
+        className="rounded-lg border border-line bg-ground px-3 py-2.5 text-sm leading-5 text-ink"
+        testID={`${testID}-input`}
+      />
+      <Text className="mt-2 text-xs leading-4 text-muted">
+        Peace already tells the model what each field means and hands it your accounts and
+        categories. Write only what it could not work out for itself. Saved as you type.
       </Text>
-    </Pressable>
+    </View>
   );
 }

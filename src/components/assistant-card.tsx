@@ -17,16 +17,18 @@ import { Pressable, Switch, Text, View } from 'react-native';
 
 import { ModelRow } from '@/components/model-picker';
 import palette from '@/constants/palette';
+import { useAi } from '@/state/ai';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSettingsStore } from '@/state/settings';
 
 export function AssistantCard() {
-  const enabled = useSettingsStore((state) => state.settings.assistantEnabled);
+  // Shown on only when Penny can answer — a key, Use AI and this switch. With
+  // no key the switch is off and muted; her own setting is kept for later.
+  const ai = useAi();
+  const enabled = ai.penny;
   const model = useSettingsStore((state) => state.settings.assistantModel);
   const update = useSettingsStore((state) => state.update);
-  // A store, not a read on focus: the key is added in the card above, on this
-  // same screen, so no focus change ever comes to re-read it.
-  const hasKey = useGeminiKeyStore((state) => state.hasKey);
+  // Re-read on focus: the key is saved on another page of Settings.
   const refreshKey = useGeminiKeyStore((state) => state.refresh);
   useFocusEffect(
     useCallback(() => {
@@ -38,8 +40,7 @@ export function AssistantCard() {
     <View className="rounded-xl bg-surface p-4" testID="assistant-card">
       <View className="flex-row items-center gap-3">
         <View className="flex-1">
-          <Text className="mb-1 text-base font-semibold text-ink">Penny</Text>
-          <Text className="text-sm leading-5 text-muted">
+          <Text className="text-[15px] leading-6 text-ink">
             Your assistant. Ask about your money in plain words — Penny only changes anything once you
             approve it.
           </Text>
@@ -49,6 +50,7 @@ export function AssistantCard() {
           onValueChange={(next) => {
             update('assistantEnabled', next);
           }}
+          disabled={!ai.ready}
           testID="assistant-enabled"
           accessibilityLabel="Use Penny"
           trackColor={{ false: palette.line, true: palette.accent }}
@@ -63,28 +65,22 @@ export function AssistantCard() {
       </Text>
 
       {enabled ? (
-        hasKey ? (
-          <View className="mt-4 gap-4 border-t border-line pt-4">
-            <ModelRow
-              label="Model"
-              value={model}
-              onChange={(id) => update('assistantModel', id)}
-              sheetTitle="Penny's model"
-              testIDPrefix="assistant-model"
-            />
-            <Pressable
-              onPress={() => router.push('/assistant')}
-              testID="assistant-open"
-              accessibilityRole="button"
-              className="items-center rounded-lg bg-accent py-2.5 active:opacity-80">
-              <Text className="text-sm font-semibold text-accent-ink">Open Penny</Text>
-            </Pressable>
-          </View>
-        ) : hasKey === false ? (
-          <Text className="mt-3 text-xs text-expense" testID="assistant-needs-key">
-            Add a Gemini key above to use it.
-          </Text>
-        ) : null
+        <View className="mt-4 gap-4 border-t border-line pt-4">
+          <ModelRow
+            label="Model"
+            value={model}
+            onChange={(id) => update('assistantModel', id)}
+            sheetTitle="Penny's model"
+            testIDPrefix="assistant-model"
+          />
+          <Pressable
+            onPress={() => router.push('/assistant')}
+            testID="assistant-open"
+            accessibilityRole="button"
+            className="items-center rounded-lg bg-accent py-2.5 active:opacity-80">
+            <Text className="text-sm font-semibold text-accent-ink">Open Penny</Text>
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );

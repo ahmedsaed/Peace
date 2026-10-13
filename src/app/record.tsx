@@ -66,6 +66,7 @@ import { captureNote } from '@/lib/bank-sms';
 import { noteWithReading } from '@/lib/note';
 import { foreignPurchase } from '@/lib/fees';
 import { hasCardProfile, isLiability } from '@/lib/liability';
+import { useAi } from '@/state/ai';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
 
@@ -228,6 +229,9 @@ export default function RecordScreen() {
 
   const defaultAccountId = useSetting('defaultAccountId');
   const geminiModel = useSetting('geminiModel');
+  // A key, Use AI, and Receipts — all three, or no reading button, and the
+  // photograph shortcut only photographs (`state/ai.ts` decides).
+  const aiEnabled = useAi().receipts;
   const receiptGuidance = useSetting('receiptGuidance');
 
   // A transfer can be opened from either leg; the form always presents it as
@@ -853,7 +857,7 @@ export default function RecordScreen() {
     captureStarted.current = true;
     void (async () => {
       const taken = await pick('camera');
-      if (taken) await onRead(taken);
+      if (taken && aiEnabled) await onRead(taken);
     })();
     // Mount only. `pick` and `onRead` are redefined every render and listing
     // them would re-run the camera on every keystroke.
@@ -1266,7 +1270,7 @@ export default function RecordScreen() {
                 setAttached((current) => current.filter((a) => a.fileName !== fileName))
               }
               onOpen={setViewing}
-              onRead={onRead}
+              onRead={aiEnabled ? onRead : undefined}
               reading={readingFile}
               compact
               busy={attaching}
@@ -1339,7 +1343,7 @@ export default function RecordScreen() {
                   setAttached((current) => current.filter((a) => a.fileName !== fileName))
                 }
                 onOpen={setViewing}
-                onRead={onRead}
+                onRead={aiEnabled ? onRead : undefined}
                 reading={readingFile}
                 compact={false}
                 busy={attaching}

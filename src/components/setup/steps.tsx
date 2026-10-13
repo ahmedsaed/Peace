@@ -18,6 +18,7 @@ import {
 } from '@/components/setup/frame';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
+import { SECTIONS } from '@/constants/sections';
 import { openListenerSettings, setCapturing } from '@/db/bank-inbox';
 import { db } from '@/db/client';
 import { adoptCurrency, listAccountsWithBalance, updateAccount } from '@/db/repo/accounts';
@@ -35,15 +36,15 @@ import { requestReminderPermission, syncReminders } from '@/state/reminders';
 import { bankAccess } from '@/state/setup';
 import { useSettingsStore } from '@/state/settings';
 
-/** Each step's colour, from the category palette (docs/design-system.md). */
+/** Each step's colour — shared with Settings, so a section looks like its step. */
 const COLOR: Record<SetupStep | 'done', string> = {
-  currency: '#C99A2E',
-  accounts: '#2E7D46',
-  keypad: '#3B4E9E',
-  reminder: '#6B4CA8',
-  ai: '#2F8A78',
-  bank: '#2F6FA8',
-  backup: '#6E8B3D',
+  currency: SECTIONS.money.color,
+  accounts: SECTIONS.accounts.color,
+  keypad: SECTIONS.keypad.color,
+  reminder: SECTIONS.reminder.color,
+  ai: SECTIONS.ai.color,
+  bank: SECTIONS.bank.color,
+  backup: SECTIONS.backup.color,
   done: '#2E7D46',
 };
 
@@ -648,9 +649,20 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
    * reading the disclosure is the yes, and asking a second time would only be
    * a second switch to forget.
    */
+  /**
+   * Access is granted on Android's own page, so the answer arrives while this
+   * step is NOT what Android considers foreground. Asked on returning to the
+   * app AND, until it is granted, once a second while the step is open: on a
+   * device the foreground event alone left this step saying "allow access"
+   * over access that had been granted, and the user stuck on it. The check is
+   * one synchronous native call, and it stops the moment access is there.
+   *
+   * Capturing switches on with it: allowing access after reading the
+   * disclosure is the yes, and asking a second time would only be a second
+   * switch to forget.
+   */
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') return;
+    const check = () => {
       const now = bankAccess();
       if (now.permitted && !now.capturing) {
         try {
@@ -660,10 +672,19 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
           // The row below still says what state it is in.
         }
       }
-      setAccess(now);
+      setAccess((was) =>
+        was.permitted === now.permitted && was.capturing === now.capturing ? was : now
+      );
+    };
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') check();
     });
-    return () => subscription.remove();
-  }, []);
+    const poll = access.permitted ? null : setInterval(check, 1000);
+    return () => {
+      subscription.remove();
+      if (poll) clearInterval(poll);
+    };
+  }, [access.permitted]);
 
   const add = () => {
     const value = draft.trim();

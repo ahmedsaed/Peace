@@ -27,6 +27,7 @@ import { EMPTY_QUERY } from '@/lib/search-query';
 import { useKeyboardOverlap } from '@/lib/layout';
 import { useAssistantStore } from '@/state/assistant';
 import { useMoney } from '@/state/money';
+import { useAi } from '@/state/ai';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSetting } from '@/state/settings';
 
@@ -62,6 +63,7 @@ export default function AssistantScreen() {
    */
   const keyboard = useKeyboardOverlap();
   const enabled = useSetting('assistantEnabled');
+  const ai = useAi();
   const homeCurrency = useSetting('homeCurrency');
   const money = useMoney();
 
@@ -74,7 +76,6 @@ export default function AssistantScreen() {
   const pendingUndo = useAssistantStore((s) => s.pendingUndo);
   const { load, loadOlder, send, retry, stop, decide, reset, undo, clearUndo } = useAssistantStore.getState();
 
-  const hasKey = useGeminiKeyStore((state) => state.hasKey);
   const refreshKey = useGeminiKeyStore((state) => state.refresh);
   const [draft, setDraft] = useState('');
   const [drill, setDrill] = useState<Drill | null>(null);
@@ -156,11 +157,13 @@ export default function AssistantScreen() {
     });
   };
 
-  if (!enabled || hasKey === false) {
+  // `ai.penny` needs all three: a key, Use AI, and her own switch. The gate
+  // names whichever is missing, in that order — a key comes before anything.
+  if (ai.hasKey !== null && !ai.penny) {
     return (
       <View className="flex-1 bg-ground" testID="assistant-screen">
         <StackHeader title="Penny" />
-        <Gate reason={!enabled ? 'off' : 'no-key'} />
+        <Gate reason={ai.blocked ?? (enabled ? 'no-key' : 'off')} />
       </View>
     );
   }
@@ -333,20 +336,34 @@ export default function AssistantScreen() {
   );
 }
 
-function Gate({ reason }: { reason: 'off' | 'no-key' }) {
+const GATES = {
+  'ai-off': {
+    title: 'AI is switched off',
+    body: 'Turn on “Use AI” in Settings. While it is off, nothing is sent to Google.',
+    href: '/settings',
+  },
+  off: {
+    title: 'Penny is switched off',
+    body: 'Turn it on in Settings › Penny. To answer, it sends what it reads from your ledger to Google’s Gemini.',
+    href: '/settings/ai/penny',
+  },
+  'no-key': {
+    title: 'Add a Gemini key first',
+    body: 'Penny runs on your own Gemini API key, kept on this device. Add it in Settings, under AI.',
+    href: '/settings',
+  },
+} as const;
+
+/** Why Penny cannot answer, and the one place that fixes it. */
+function Gate({ reason }: { reason: keyof typeof GATES }) {
+  const gate = GATES[reason];
   return (
     <View className="flex-1 items-center justify-center gap-3 px-8" testID={`assistant-gate-${reason}`}>
       <Icon name="sparkle" size={32} color={palette.accent} />
-      <Text className="text-center text-base font-semibold text-ink">
-        {reason === 'off' ? 'Penny is switched off' : 'Add a Gemini key first'}
-      </Text>
-      <Text className="text-center text-sm leading-5 text-muted">
-        {reason === 'off'
-          ? 'Turn it on in Settings. To answer, it sends what it reads from your ledger to Google’s Gemini.'
-          : 'Penny runs on your own Gemini API key, kept on this device.'}
-      </Text>
+      <Text className="text-center text-base font-semibold text-ink">{gate.title}</Text>
+      <Text className="text-center text-sm leading-5 text-muted">{gate.body}</Text>
       <Pressable
-        onPress={() => router.push('/settings')}
+        onPress={() => router.push(gate.href)}
         testID="assistant-open-settings"
         className="mt-2 rounded-lg bg-accent px-5 py-2.5 active:opacity-80">
         <Text className="text-sm font-semibold text-accent-ink">Open Settings</Text>

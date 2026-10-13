@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+
+import { Icon } from '@/components/icon';
 
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
+import palette from '@/constants/palette';
 import { GeminiError, listModels, type GeminiModel } from '@/lib/gemini';
 import { getGeminiKey } from '@/lib/secrets';
 
@@ -68,23 +71,45 @@ export function ModelRow({
     return rows;
   }, [models, value]);
 
+  /**
+   * ONE ROW: the label, and a field that shows the model and opens the list.
+   *
+   * It used to be the name on one line and a "Change model" button on the next
+   * — two controls for one value, and the button said nothing about what it
+   * would change. A field that holds its own value is the shape everybody
+   * already knows from every dropdown they have used. The id is shown rather
+   * than the display name because the id is what gets called, and two similar
+   * names would leave you unsure which one you are running.
+   */
   return (
     <View>
-      <View className="mb-2 flex-row items-center justify-between">
-        <Text className="text-sm text-muted">{label}</Text>
-        <Text className="text-sm text-ink" testID={`${testIDPrefix}-state`}>
-          {value}
-        </Text>
+      <View className="flex-row items-center gap-3">
+        <Text className="text-[15px] text-ink">{label}</Text>
+        <Pressable
+          onPress={open}
+          disabled={listing}
+          testID={`${testIDPrefix}-edit`}
+          accessibilityRole="button"
+          accessibilityLabel={`${label}: ${value}. Choose another`}
+          className={`flex-1 flex-row items-center gap-2 rounded-lg border border-line px-3 py-2 active:bg-raised ${
+            listing ? 'opacity-60' : ''
+          }`}>
+          <Text
+            className="flex-1 text-right text-sm text-ink"
+            numberOfLines={1}
+            testID={`${testIDPrefix}-state`}>
+            {listing ? 'Loading models…' : value}
+          </Text>
+          {listing ? (
+            <ActivityIndicator size="small" color={palette.muted} />
+          ) : (
+            // A chevron turned down: the "this opens a list" mark of a dropdown.
+            <View style={{ transform: [{ rotate: '90deg' }] }}>
+              <Icon name="chevron" size={12} color={palette.muted} />
+            </View>
+          )}
+        </Pressable>
       </View>
-
-      <Pressable
-        onPress={open}
-        disabled={listing}
-        testID={`${testIDPrefix}-edit`}
-        accessibilityRole="button"
-        className={`rounded-lg border border-line px-4 py-2.5 active:opacity-80 ${listing ? 'opacity-40' : ''}`}>
-        <Text className="text-sm font-semibold text-muted">{listing ? 'Loading models…' : 'Change model'}</Text>
-      </Pressable>
       {error ? (
         <Text className="mt-2 text-xs text-expense" testID={`${testIDPrefix}-error`}>
           {error}

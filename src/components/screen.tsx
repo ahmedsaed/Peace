@@ -7,6 +7,7 @@ import { Icon } from '@/components/icon';
 import { Wordmark } from '@/components/wordmark';
 import palette from '@/constants/palette';
 import { addMonths, formatPeriod, type Period } from '@/lib/period';
+import { useAi } from '@/state/ai';
 import { useSetting, useSettingsStore } from '@/state/settings';
 
 /** Header icon button. 44px square: the Material minimum touch target. */
@@ -74,8 +75,8 @@ function HideAmountsButton() {
  * in Settings, beside the sentence saying what it sends to Google.
  */
 function AssistantButton() {
-  const enabled = useSetting('assistantEnabled');
-  if (!enabled) return null;
+  // Only when Penny can actually answer: a key, Use AI, and her own switch.
+  if (!useAi().penny) return null;
   return (
     <HeaderButton
       icon="sparkle"

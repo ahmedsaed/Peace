@@ -206,10 +206,14 @@ appId: dev.merope.peace.oss
     id: "nav-menu"
 - tapOn:
     id: "drawer-settings"
+- tapOn:
+    id: "settings-section-reports"
 - assertVisible:
     id: "setting-carry-over"
 - tapOn:
     id: "setting-carry-over"
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 # No month-next here: the Records tab kept September while we were away, and
@@ -245,7 +249,11 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "drawer-settings"
 - tapOn:
+    id: "settings-section-reports"
+- tapOn:
     id: "setting-carry-over"
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 - assertVisible:

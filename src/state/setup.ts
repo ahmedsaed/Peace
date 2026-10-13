@@ -63,3 +63,10 @@ export function useCompleteStep(): (step: SetupStep) => void {
     [update]
   );
 }
+
+/** What a bank-message row says it is doing — shared with the Settings index. */
+export function describeBank(access: { permitted: boolean; capturing: boolean }, senders: string[]) {
+  if (!access.permitted || !access.capturing) return 'Off';
+  if (senders.length === 0) return 'Listening, but no bank named';
+  return `Reading ${senders.length === 1 ? senders[0] : `${senders.length} banks`}`;
+}

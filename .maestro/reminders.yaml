@@ -29,6 +29,8 @@ appId: dev.merope.peace.oss
     id: "drawer-settings"
 - assertVisible:
     id: "settings-screen"
+- tapOn:
+    id: "settings-section-reminders"
 
 - scrollUntilVisible:
     element:
@@ -138,6 +140,12 @@ appId: dev.merope.peace.oss
     id: "nav-menu"
 - tapOn:
     id: "drawer-settings"
+# The index says it is on without being opened — read from the same setting.
+- assertVisible:
+    id: "settings-section-reminders-summary"
+    text: "Every evening at .*"
+- tapOn:
+    id: "settings-section-reminders"
 - scrollUntilVisible:
     element:
       id: "reminder-next"
@@ -168,3 +176,10 @@ appId: dev.merope.peace.oss
 - assertNotVisible:
     id: "reminder-time"
 - takeScreenshot: 05-reminder-off-again
+
+# Off on the index too.
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-section-reminders-summary"
+    text: "Off"
