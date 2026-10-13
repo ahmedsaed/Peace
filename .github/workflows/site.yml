@@ -1,0 +1,76 @@
+name: Website
+
+# peace.merope.dev — the static site in site/, served by GitHub Pages.
+#
+# It lives in the app's repository, not on a branch of its own, so a change to
+# what the app sends off the phone and the change to the privacy policy that
+# describes it can land in ONE pull request. Pull requests that touch the site
+# get a build check; a merge to main deploys it.
+on:
+  pull_request:
+    paths: ['site/**', 'docs/screenshots/**', '.github/workflows/site.yml']
+  push:
+    branches: [main]
+    paths: ['site/**', 'docs/screenshots/**', 'assets/images/**', '.github/workflows/site.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run build
+
+      # A policy reading "[SUPPORT EMAIL]" looks finished and is not, and Play
+      # links to it. Building with placeholders is fine — a PR can be reviewed
+      # half-written — but publishing one is refused.
+      - name: Refuse to publish placeholders
+        if: github.event_name != 'pull_request'
+        run: |
+          if grep -nE '\[[A-Z][A-Z ]+\]' content/privacy.md; then
+            echo "::error::content/privacy.md still has placeholders (above). Fill them in before the site is published."
+            exit 1
+          fi
+
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/out
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

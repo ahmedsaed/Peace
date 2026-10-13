@@ -2,6 +2,9 @@
 module.exports = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/jest-setup.js'],
+  // The website is its own Next.js project with its own package.json; jest's
+  // module map would otherwise see two packages and warn about the collision.
+  modulePathIgnorePatterns: ['<rootDir>/site/'],
   // RN ships untranspiled ESM; these packages must go through babel.
   // `@noble/hashes` is ESM-only too — without it here, `seal.ts` fails to parse
   // with "Cannot use import statement outside a module", which reads like a

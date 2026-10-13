@@ -260,6 +260,16 @@ alive next to the emulator it starves the system, and the first symptom is Andro
 "System UI isn't responding" dialog swallowing every `adb shell input tap` — which looks like the
 app ignoring input. `pkill -f GradleDaemon`.
 
+## Website
+
+`site/` is **peace.merope.dev**: a Next.js app exported to static HTML and deployed to GitHub Pages
+by `.github/workflows/site.yml` on every merge to `main` that touches it. It is its own npm project
+(`cd site && npm ci && npm run build`, output in `site/out/`) and the app's tsconfig, eslint and jest
+all skip it. Screenshots and the logo are copied in from `docs/screenshots/` and `assets/images/` at
+build time, never committed twice. **The privacy policy is `site/content/privacy.md`** — a change
+that makes the app send something new changes that file in the same PR, and the deploy refuses to
+publish it while a `[PLACEHOLDER]` remains.
+
 ## Hard rules
 
 - **Money is integer minor units.** `amount_minor` is a signed integer (negative = money out).

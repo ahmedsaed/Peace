@@ -1,0 +1,490 @@
+/*
+ * The app's "Ledger" palette (docs/design-system.md), so the site and the app
+ * read as one thing. Dark only, like the app.
+ */
+:root {
+  --ground: #17140f;
+  --surface: #241f17;
+  --raised: #302818;
+  --line: #2e271d;
+  --ink: #efe4ce;
+  --muted: #9a8e79;
+  --accent: #e3a33c;
+  --accent-ink: #17140f;
+  --income: #8fbf6a;
+  --expense: #e5806a;
+  --transfer: #75a8c4;
+
+  --gutter: 16px;
+  --max: 1080px;
+  --radius: 14px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.05em 0.35em;
+}
+
+.wrap {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* --- header --- */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.site-header .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 60px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.brand img {
+  width: 32px;
+  height: 32px;
+}
+
+.wordmark {
+  font-size: 26px;
+  line-height: 1;
+  /* The script face sits low; this matches the app's own correction. */
+  padding-bottom: 4px;
+}
+
+.site-nav {
+  display: flex;
+  gap: 20px;
+  font-size: 15px;
+}
+
+.site-nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.site-nav a:hover {
+  color: var(--ink);
+}
+
+@media (max-width: 560px) {
+  .site-nav .optional {
+    display: none;
+  }
+}
+
+/* --- hero --- */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 48px;
+  align-items: center;
+  padding: 72px 0 56px;
+}
+
+.hero h1 {
+  font-size: clamp(34px, 6vw, 56px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+}
+
+.hero h1 em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.lede {
+  font-size: 19px;
+  color: var(--muted);
+  margin: 0 0 28px;
+  max-width: 34em;
+}
+
+.ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+  border: 1px solid var(--line);
+}
+
+.button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.button.ghost {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.button.soon {
+  color: var(--muted);
+  background: transparent;
+  border-style: dashed;
+  cursor: default;
+}
+
+.fineprint {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 14px;
+}
+
+.phone {
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 8px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  max-width: 340px;
+  margin: 0 auto;
+}
+
+.phone img {
+  border-radius: 21px;
+}
+
+@media (max-width: 820px) {
+  .hero {
+    grid-template-columns: 1fr;
+    padding: 40px 0 32px;
+    gap: 36px;
+  }
+
+  .hero .phone {
+    max-width: 280px;
+  }
+}
+
+/* --- sections --- */
+
+section {
+  /* Clear the sticky header when reached through #features or #privacy. */
+  scroll-margin-top: 60px;
+  padding: 56px 0;
+  border-top: 1px solid var(--line);
+}
+
+.eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 8px;
+}
+
+h2 {
+  font-size: clamp(26px, 4vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+}
+
+h3 {
+  font-size: 20px;
+  margin: 0 0 10px;
+}
+
+.section-intro {
+  color: var(--muted);
+  max-width: 40em;
+  margin: 0 0 32px;
+}
+
+/* A feature: words beside a screenshot, alternating sides on wide screens. */
+.feature {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 48px;
+  align-items: center;
+  padding: 32px 0;
+}
+
+.feature.flip {
+  grid-template-columns: 300px 1fr;
+}
+
+.feature.flip .feature-shot {
+  order: -1;
+}
+
+.feature ul {
+  margin: 0;
+  padding-left: 1.1em;
+}
+
+.feature li {
+  margin: 6px 0;
+}
+
+.feature li::marker {
+  color: var(--accent);
+}
+
+.optional-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 10px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+@media (max-width: 820px) {
+  .feature,
+  .feature.flip {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .feature.flip .feature-shot {
+    order: 0;
+  }
+
+  .feature-shot {
+    max-width: 280px;
+    margin: 0 auto;
+  }
+}
+
+/* Smaller screenshots in a row, for the "also" features. */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.gallery figure {
+  margin: 0;
+}
+
+.gallery figcaption {
+  font-size: 15px;
+  margin-top: 12px;
+}
+
+.gallery figcaption span {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.gallery img {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 820px) {
+  .gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .gallery {
+    grid-template-columns: 1fr;
+    max-width: 280px;
+    margin: 0 auto;
+  }
+}
+
+/* --- cards and tables --- */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+th {
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+.off {
+  color: var(--income);
+  font-weight: 600;
+}
+
+/* --- long-form pages (privacy, data) --- */
+
+.prose {
+  max-width: 44em;
+  padding: 48px 0 72px;
+}
+
+.prose h1 {
+  font-size: clamp(30px, 5vw, 42px);
+  line-height: 1.1;
+  margin: 0 0 12px;
+}
+
+.prose h2 {
+  font-size: 24px;
+  margin: 40px 0 12px;
+}
+
+.prose h3 {
+  margin: 28px 0 8px;
+}
+
+.prose p,
+.prose li {
+  color: var(--ink);
+}
+
+.prose li {
+  margin: 6px 0;
+}
+
+.prose table {
+  margin: 16px 0;
+  display: block;
+  overflow-x: auto;
+}
+
+/* --- footer --- */
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding: 32px 0 48px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.site-footer .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  justify-content: space-between;
+}
+
+.site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.site-footer a {
+  color: var(--muted);
+}
