@@ -1,0 +1,26 @@
+# Every permission the release manifest may request. scripts/check-permissions.sh
+# fails the build on anything else, so a library that quietly adds one is caught
+# in the PR that brought it — before Play's review or a user does.
+#
+# Adding a line here is a decision, not a fix: update docs/site/privacy.md (and
+# data-safety.md if data now leaves the phone) in the same PR. Removing one that
+# a library adds is `expo.android.blockedPermissions` in app.json.
+
+# Gemini, Drive, exchange rates, the update check (privacy.md)
+android.permission.INTERNET
+android.permission.ACCESS_NETWORK_STATE
+
+# Receipt photos, only on tapping the camera button
+android.permission.CAMERA
+
+# The daily reminder: a local notification, rebuilt after a reboot
+android.permission.POST_NOTIFICATIONS
+android.permission.RECEIVE_BOOT_COMPLETED
+android.permission.VIBRATE
+
+# WorkManager (the background Drive backup)
+android.permission.WAKE_LOCK
+android.permission.FOREGROUND_SERVICE
+
+# androidx.core's guard for its own unexported receivers; named after the app id
+*.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION

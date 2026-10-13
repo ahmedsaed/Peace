@@ -138,6 +138,14 @@ jobs:
         # the C++ compile time versus building all four.
         run: ./gradlew app:assembleRelease -x lint -x test -PreactNativeArchitectures=${{ inputs.abi }}
 
+      # Every permission the release requests is one somebody approved. Most
+      # arrive from libraries — ShortcutBadger alone brought twenty launcher
+      # permissions nothing here used — and Play's review and the privacy
+      # policy both answer for all of them. Adding one is a line in
+      # scripts/allowed-permissions.txt and a matching change to the policy.
+      - name: Check requested permissions
+        run: scripts/check-permissions.sh
+
       # An assertion, not a log line: if the secrets were present, the APK MUST
       # carry our certificate. Without this check a misconfigured secret would
       # silently fall back to debug signing and produce an APK that cannot
