@@ -1,4 +1,4 @@
-package com.ahmed.peace.notifications
+package dev.merope.peace.notifications
 
 import android.content.Context
 import org.json.JSONArray

@@ -14,7 +14,7 @@
 import { useEffect } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
-import { buildInfo } from '@/lib/build-info';
+import { buildInfo, selfUpdates } from '@/lib/build-info';
 import { fetchLatestRelease, updateAvailable } from '@/lib/update-check';
 import { formatVersion } from '@/lib/version';
 import { useSettingsStore } from '@/state/settings';
@@ -38,13 +38,16 @@ export function UpdateNotice() {
           url: settings.latestReleaseUrl,
         }
       : null;
-  const available = updateAvailable(buildInfo.buildNumber, latest);
+  // The Play build never asks GitHub and never offers a download: Play delivers
+  // its updates. It still renders the version line below, which is this
+  // component's other job.
+  const available = selfUpdates && updateAvailable(buildInfo.buildNumber, latest);
 
   useEffect(() => {
     const due = Date.now() - settings.lastUpdateCheckAt > CHECK_EVERY_MS;
     // A dev build reports no build number and would ask forever about a
     // release it can never be behind.
-    if (!due || buildInfo.buildNumber <= 0) return;
+    if (!selfUpdates || !due || buildInfo.buildNumber <= 0) return;
 
     let cancelled = false;
     void (async () => {

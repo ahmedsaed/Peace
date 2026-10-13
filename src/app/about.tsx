@@ -3,7 +3,7 @@ import { Image, ScrollView, Text, View } from 'react-native';
 import { StackHeader } from '@/components/screen';
 import { UpdateRow } from '@/components/update-row';
 import { Wordmark } from '@/components/wordmark';
-import { buildInfo, packageName } from '@/lib/build-info';
+import { buildInfo, packageName, selfUpdates } from '@/lib/build-info';
 import { formatCommit, formatVersion } from '@/lib/version';
 
 /**
@@ -66,7 +66,7 @@ export default function AboutScreen() {
             you about a newer build without being asked and says nothing the
             rest of the time — which is right, and leaves no way to tell "you
             are up to date" from "the check is broken". */}
-        <UpdateRow />
+        {selfUpdates ? <UpdateRow /> : null}
       </ScrollView>
     </View>
   );

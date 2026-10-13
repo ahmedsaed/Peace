@@ -1,4 +1,4 @@
-appId: com.ahmed.peace
+appId: dev.merope.peace.oss
 ---
 # The keypad's layout settings reach the record screen, and the keys still type
 # what they say after moving.

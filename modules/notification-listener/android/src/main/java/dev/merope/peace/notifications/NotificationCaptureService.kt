@@ -1,4 +1,4 @@
-package com.ahmed.peace.notifications
+package dev.merope.peace.notifications
 
 import android.app.Notification
 import android.provider.Telephony
