@@ -23,7 +23,8 @@ import { budgetFraction, budgetPercent, budgetState, remainingMinor } from '@/li
 import { useKeyboardHeight } from '@/lib/layout';
 import { minorToMajor, parseAmountToMinor } from '@/lib/money';
 import { testIdSlug as slug } from '@/lib/id';
-import { formatPeriod, currentPeriod, type Period } from '@/lib/period';
+import { formatPeriod, type Period } from '@/lib/period';
+import { usePeriodState } from '@/state/period';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
@@ -40,7 +41,7 @@ const EMPTY: BudgetSummary = {
 
 export default function BudgetsScreen() {
   const homeCurrency = useSetting('homeCurrency');
-  const [period, setPeriod] = useState(currentPeriod());
+  const [period, setPeriod] = usePeriodState();
   const [summary, setSummary] = useState<BudgetSummary>(EMPTY);
   const [offer, setOffer] = useState<SuggestionSet>({ suggestions: [], monthsWithData: 0, basis: 'none' });
   const [copyFrom, setCopyFrom] = useState<Period | null>(null);

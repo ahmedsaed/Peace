@@ -1,0 +1,123 @@
+appId: dev.merope.peace.oss
+---
+# Months that start on payday (Settings › Money › Month starts on).
+#
+# ONE setting has to move every screen that thinks in months, together — a
+# Records header that says "Sep 25 – Oct 24" over a Budgets screen still
+# counting October is two screens disagreeing about the same money. So the
+# setting is changed once and then asserted on THREE other screens.
+#
+# Which side of a boundary a particular record falls is NOT asserted here: the
+# emulator's date moves every run, so that is pinned down exactly, against
+# fixed dates, in src/db/repo/month-start.test.ts and src/lib/period.test.ts.
+# What only a device can show is that the screens all follow.
+- launchApp:
+    clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# A record today: whatever the start day, today is inside the current month.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-0"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£50.00"
+# Calendar months: a month's name and year.
+- assertVisible:
+    id: "month-label"
+    text: "[A-Z][a-z]+ [0-9]{4}"
+
+# --- start months on the 25th ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-money"
+- tapOn:
+    id: "setting-month-start"
+- assertVisible:
+    id: "sheet-month-start"
+- scrollUntilVisible:
+    element:
+      text: "25th"
+    direction: DOWN
+- takeScreenshot: 01-month-start-sheet
+- tapOn: "25th"
+- assertVisible:
+    id: "setting-month-start"
+    text: ".*The 25th.*"
+# The week start sits beside it, chosen the same way.
+- tapOn:
+    id: "setting-week-start-sunday"
+- takeScreenshot: 02-money-settings
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-section-money-summary"
+    text: ".*months start on the 25th"
+- tapOn:
+    id: "nav-back"
+
+# THE ASSERTIONS THAT MATTER: three different screens, all counting the same
+# payday month — and saying which days it covers.
+- assertVisible:
+    id: "month-label"
+    text: "[A-Z][a-z]{2} 25 – [A-Z][a-z]{2} 24, [0-9]{4}"
+- assertVisible:
+    id: "summary-expense"
+    text: "-E£50.00"
+- takeScreenshot: 03-records-payday-month
+
+- tapOn:
+    id: "tab-budgets"
+- assertVisible:
+    id: "month-label"
+    text: "[A-Z][a-z]{2} 25 – [A-Z][a-z]{2} 24, [0-9]{4}"
+
+- tapOn:
+    id: "tab-analysis"
+- assertVisible:
+    id: "month-label"
+    text: "[A-Z][a-z]{2} 25 – [A-Z][a-z]{2} 24, [0-9]{4}"
+- assertVisible:
+    id: "analysis-donut"
+
+# --- and back to calendar months, everywhere ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-money"
+- tapOn:
+    id: "setting-month-start"
+- scrollUntilVisible:
+    element:
+      text: "1st · calendar months"
+    direction: UP
+- tapOn: "1st · calendar months"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "month-label"
+    text: "[A-Z][a-z]+ [0-9]{4}"
+- tapOn:
+    id: "tab-index"
+- assertVisible:
+    id: "month-label"
+    text: "[A-Z][a-z]+ [0-9]{4}"

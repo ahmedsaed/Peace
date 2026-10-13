@@ -20,7 +20,8 @@ import { tagBreakdown, type TagTotal } from '@/db/repo/tags';
 import type { CategoryKind } from '@/db/repo/spend';
 import { rankSlices, type RankedSlice } from '@/lib/analysis';
 import { testIdSlug as slug } from '@/lib/id';
-import { currentPeriod, formatPeriod, parsePeriod, type Period } from '@/lib/period';
+import { formatPeriod, parsePeriod, type Period } from '@/lib/period';
+import { usePeriodState } from '@/state/period';
 import { useSetting } from '@/state/settings';
 import { useMoney, type Money } from '@/state/money';
 
@@ -39,7 +40,7 @@ export default function AnalysisScreen() {
   const money = useMoney();
   const homeCurrency = useSetting('homeCurrency');
   const carryOver = useSetting('carryOver');
-  const [period, setPeriod] = useState(currentPeriod());
+  const [period, setPeriod] = usePeriodState();
   const [kind, setKind] = useState<CategoryKind>('expense');
   const [breakdown, setBreakdown] = useState<Breakdown>(EMPTY);
   const [flow, setFlow] = useState<CashFlowPoint[]>([]);

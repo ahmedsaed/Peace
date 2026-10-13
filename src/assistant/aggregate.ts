@@ -1,5 +1,6 @@
 import type { LedgerFact } from '../db/repo/ledger-query';
 import { ToolInputError } from './dates';
+import { isPeriodStart, parsePeriod, periodBounds, periodOf, startOfWeek } from '../lib/period';
 
 /**
  * Summing ledger facts into groups. Pure, so every rule here is unit-tested.
@@ -87,34 +88,34 @@ function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-/** Monday-based weeks, the convention almost everywhere this app is used. */
-function startOfWeek(date: Date): Date {
-  const day = startOfDay(date);
-  const offset = (day.getDay() + 6) % 7;
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate() - offset);
-}
+// Weeks start on the configured weekday and months on the configured day, both
+// from `lib/period.ts` — so "October" here is the October the screens show.
 
 type TimeUnit = 'month' | 'week' | 'day';
 
 function unitStart(date: Date, unit: TimeUnit): Date {
-  if (unit === 'month') return new Date(date.getFullYear(), date.getMonth(), 1);
+  if (unit === 'month') return periodBounds(periodOf(date)).start;
   if (unit === 'week') return startOfWeek(date);
   return startOfDay(date);
 }
 
 function nextUnit(date: Date, unit: TimeUnit): Date {
-  if (unit === 'month') return new Date(date.getFullYear(), date.getMonth() + 1, 1);
+  if (unit === 'month') return periodBounds(periodOf(date)).end;
   if (unit === 'week') return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 7);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 }
 
 function unitKey(date: Date, unit: TimeUnit): string {
-  if (unit === 'month') return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
+  if (unit === 'month') return periodOf(date);
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function unitLabel(date: Date, unit: TimeUnit): string {
-  if (unit === 'month') return `${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
+  if (unit === 'month') {
+    // Named like the screens name it: 25 Sep – 24 Oct is "Oct".
+    const { year, month } = parsePeriod(periodOf(date));
+    return `${MONTHS_SHORT[month - 1]} ${year}`;
+  }
   const day = `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
   return unit === 'week' ? `Week of ${day}` : day;
 }
@@ -308,14 +309,16 @@ export function inBucket(fact: LedgerFact, groupBy: GroupBy, bucket: Bucket): bo
 }
 
 /**
- * How many whole calendar months a span covers, or null when it does not
- * start and end on month boundaries — an "average per month" over a span
- * that ends a week into October would quietly count that week as a month.
+ * How many whole months a span covers, or null when it does not start and end
+ * on month boundaries — an "average per month" over a span that ends a week
+ * into October would quietly count that week as a month. Months as the screens
+ * see them: payday to payday when the month starts on the 25th.
  */
 export function wholeMonths(start: Date | null, end: Date | null): number | null {
   if (!start || !end) return null;
-  const aligned = (d: Date) => d.getDate() === 1 && d.getHours() === 0 && d.getMinutes() === 0;
-  if (!aligned(start) || !aligned(end)) return null;
-  const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  if (!isPeriodStart(start) || !isPeriodStart(end)) return null;
+  const from = parsePeriod(periodOf(start));
+  const to = parsePeriod(periodOf(end));
+  const months = (to.year - from.year) * 12 + (to.month - from.month);
   return months > 0 ? months : null;
 }
