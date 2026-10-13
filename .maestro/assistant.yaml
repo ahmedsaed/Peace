@@ -36,6 +36,14 @@ appId: dev.merope.peace.oss
     id: "drawer-settings"
 - tapOn:
     id: "settings-section-ai"
+# The AI page holds the key; Penny is one of the three features under it.
+- assertVisible:
+    id: "settings-ai-penny"
+- tapOn:
+    id: "settings-ai-penny"
+# No key yet, so the page says so at the top, with the way to fix it.
+- assertVisible:
+    id: "key-notice"
 
 - scrollUntilVisible:
     element:
@@ -61,7 +69,9 @@ appId: dev.merope.peace.oss
 - takeScreenshot: 02-assistant-on-no-key
 
 # --- the setting is read on OTHER screens: the header and the drawer ---
-# Back twice: the AI page, then the Settings index.
+# Back three times: Penny's page, the AI page, the Settings index.
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 - tapOn:
@@ -84,11 +94,14 @@ appId: dev.merope.peace.oss
 - takeScreenshot: 03-assistant-gate
 - tapOn:
     id: "assistant-open-settings"
-# Straight to the page that holds the switch, not the Settings index.
+# The gate is about the missing KEY, so it opens the AI page, where the key
+# goes — not the Settings index.
 - assertVisible:
     id: "settings-ai"
 
 # --- off again: every way in is gone ---
+- tapOn:
+    id: "settings-ai-penny"
 - scrollUntilVisible:
     element:
       id: "assistant-enabled"
@@ -97,6 +110,9 @@ appId: dev.merope.peace.oss
     id: "assistant-enabled"
 - assertNotVisible:
     id: "assistant-needs-key"
+# Penny's page, then the AI page.
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 # Back on the assistant screen we came from, which now says it is off.
@@ -121,20 +137,20 @@ appId: dev.merope.peace.oss
     id: "drawer-settings"
 - tapOn:
     id: "settings-section-ai"
+# Penny on, from its own page, so its card has a key to ask for.
+- tapOn:
+    id: "settings-ai-penny"
 - scrollUntilVisible:
     element:
       id: "assistant-enabled"
     direction: DOWN
 - tapOn:
     id: "assistant-enabled"
-- scrollUntilVisible:
-    element:
-      id: "assistant-needs-key"
-    direction: DOWN
-- scrollUntilVisible:
-    element:
-      id: "gemini-key-edit"
-    direction: UP
+- assertVisible:
+    id: "assistant-needs-key"
+# Back to the AI page, which owns the key.
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "gemini-key-edit"
 - tapOn:
@@ -157,7 +173,7 @@ appId: dev.merope.peace.oss
 - takeScreenshot: 04-assistant-key-refused
 - tapOn:
     id: "gemini-key-cancel"
-- scrollUntilVisible:
-    element:
-      id: "assistant-needs-key"
-    direction: DOWN
+- tapOn:
+    id: "settings-ai-penny"
+- assertVisible:
+    id: "assistant-needs-key"

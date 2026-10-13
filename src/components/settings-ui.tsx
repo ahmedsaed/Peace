@@ -1,9 +1,11 @@
+import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { Segmented } from '@/components/form';
 import { StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
+import { useGeminiKeyStore } from '@/state/gemini-key';
 
 /**
  * The parts every Settings page is built from.
@@ -247,5 +249,34 @@ export function Row({
       className={`${className} active:bg-raised`}>
       {body}
     </Pressable>
+  );
+}
+
+/**
+ * "This runs on the Gemini key, which is not set" — at the top of every AI
+ * feature's page, with the way to fix it.
+ *
+ * The key lives on the AI page, one level up, so a feature page that only said
+ * "needs a key" would send somebody hunting. Nothing at all once a key exists:
+ * a notice that is always there stops being read.
+ */
+export function KeyNotice() {
+  const router = useRouter();
+  const hasKey = useGeminiKeyStore((state) => state.hasKey);
+  if (hasKey !== false) return null;
+  return (
+    <View className="flex-row items-center gap-3 rounded-xl border border-line px-4 py-3" testID="key-notice">
+      <Icon name="key" size={18} color={palette.muted} />
+      <Text className="flex-1 text-sm leading-5 text-muted">
+        Runs on your Gemini key, which is not set yet.
+      </Text>
+      <Pressable
+        onPress={() => router.navigate('/settings/ai')}
+        testID="key-notice-add"
+        accessibilityRole="button"
+        className="rounded-full bg-accent px-4 py-2 active:opacity-80">
+        <Text className="text-sm font-semibold text-accent-ink">Add a key</Text>
+      </Pressable>
+    </View>
   );
 }

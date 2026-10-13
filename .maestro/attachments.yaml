@@ -108,8 +108,11 @@ appId: dev.merope.peace.oss
 # user may not have found. The row appears only once there is something in it.
 - tapOn:
     id: "nav-menu"
+# Backup & export lives under Settings › Your data, not in the side menu.
 - tapOn:
-    id: "drawer-export"
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-backup"
 - assertVisible:
     id: "export-screen"
 - assertNotVisible:

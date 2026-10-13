@@ -49,18 +49,20 @@ export default function SettingsIndex() {
   const reminder = s.remindersOn
     ? `Every evening at ${formatTimeLabel(onDay(new Date(), { hour: s.reminderHour, minute: s.reminderMinute }))}`
     : 'Off';
+  // One line for all three features that run on the key: what is on, or why
+  // nothing can be.
+  const on = [
+    s.assistantEnabled ? 'Penny' : null,
+    access.permitted && access.capturing ? 'bank messages' : null,
+  ].filter(Boolean);
   const ai =
     hasKey === null
       ? ' '
-      : hasKey
-        ? `Key saved${s.assistantEnabled ? ' · Penny on' : ''}`
-        : 'No key — reading and Penny are off';
-  const bank =
-    access.permitted && access.capturing
-      ? s.bankSenders.length === 0
-        ? 'Listening, but no bank named'
-        : `Reading ${s.bankSenders.length === 1 ? s.bankSenders[0] : `${s.bankSenders.length} banks`}`
-      : 'Off';
+      : !hasKey
+        ? 'No key yet — receipts, bank messages and Penny are off'
+        : on.length === 0
+          ? 'Key saved · receipts'
+          : `Key saved · receipts, ${on.join(', ')}`;
   const backup = s.driveAccount ? `Google Drive · ${describeCadence(s.driveCadence)}` : 'Your own copies';
   const { done, total } = setupProgress(facts);
 
@@ -95,7 +97,7 @@ export default function SettingsIndex() {
           />
         </Section>
 
-        <Section title="While you are away">
+        <Section title="Help from Peace">
           <SectionLink
             {...SECTIONS.reminder}
             title="Reminder"
@@ -105,17 +107,10 @@ export default function SettingsIndex() {
           />
           <SectionLink
             {...SECTIONS.ai}
-            title="AI — receipts and Penny"
+            title="AI — receipts, bank messages, Penny"
             summary={ai}
             onPress={go('/settings/ai')}
             testID="settings-section-ai"
-          />
-          <SectionLink
-            {...SECTIONS.bank}
-            title="Bank messages"
-            summary={bank}
-            onPress={go('/settings/bank')}
-            testID="settings-section-bank"
             last
           />
         </Section>

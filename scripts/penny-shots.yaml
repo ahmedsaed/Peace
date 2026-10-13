@@ -21,8 +21,11 @@ appId: dev.merope.peace.oss
 # --- the demo ledger, restored the way a person would ---
 - tapOn:
     id: "nav-menu"
+# Backup & export lives under Settings › Your data, not in the side menu.
 - tapOn:
-    id: "drawer-export"
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-backup"
 - scrollUntilVisible:
     element:
       id: "restore-pick"
@@ -40,14 +43,11 @@ appId: dev.merope.peace.oss
 - extendedWaitUntil:
     visible: ".*records in the ledger.*"
     timeout: 30000
+# Back to the Settings index, where Backup & export lives.
 - tapOn:
     id: "nav-back"
 
 # --- a key, and consent (after the restore, which replaces settings) ---
-- tapOn:
-    id: "nav-menu"
-- tapOn:
-    id: "drawer-settings"
 - tapOn:
     id: "settings-section-ai"
 - scrollUntilVisible:
@@ -66,12 +66,14 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "gemini-key-save"
-- scrollUntilVisible:
-    element:
-      id: "assistant-enabled"
-    direction: DOWN
+# Penny has a page of its own under AI.
+- tapOn:
+    id: "settings-ai-penny"
 - tapOn:
     id: "assistant-enabled"
+# Penny's page, AI, the Settings index.
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 - tapOn:

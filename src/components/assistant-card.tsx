@@ -82,7 +82,7 @@ export function AssistantCard() {
           </View>
         ) : hasKey === false ? (
           <Text className="mt-3 text-xs text-expense" testID="assistant-needs-key">
-            Add a Gemini key above to use it.
+            It needs a Gemini key to answer — add one on the AI page.
           </Text>
         ) : null
       ) : null}

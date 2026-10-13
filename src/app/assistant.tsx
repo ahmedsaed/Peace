@@ -342,11 +342,11 @@ function Gate({ reason }: { reason: 'off' | 'no-key' }) {
       </Text>
       <Text className="text-center text-sm leading-5 text-muted">
         {reason === 'off'
-          ? 'Turn it on in Settings › AI. To answer, it sends what it reads from your ledger to Google’s Gemini.'
+          ? 'Turn it on in Settings › AI › Penny. To answer, it sends what it reads from your ledger to Google’s Gemini.'
           : 'Penny runs on your own Gemini API key, kept on this device.'}
       </Text>
       <Pressable
-        onPress={() => router.push('/settings/ai')}
+        onPress={() => router.push(reason === 'off' ? '/settings/ai/penny' : '/settings/ai')}
         testID="assistant-open-settings"
         className="mt-2 rounded-lg bg-accent px-5 py-2.5 active:opacity-80">
         <Text className="text-sm font-semibold text-accent-ink">Open Settings</Text>

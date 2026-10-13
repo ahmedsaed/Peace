@@ -16,15 +16,17 @@ import { useSetting } from '@/state/settings';
  * What lives in the side menu, and what does not.
  *
  * The five tabs are the app's *content*; the tab bar owns them. The drawer
- * holds the things you touch a handful of times a year — settings, getting your
- * data out — which is exactly why they should not spend a tab slot. Duplicating
+ * holds the things you touch a handful of times a year — which is exactly why
+ * they should not spend a tab slot. Backup & export lives under Settings › Your
+ * data, beside the other things about your data, rather than here as well:
+ * two ways to one screen is one more thing to wonder about. Duplicating
  * the tabs in here would only give two answers to "where is Budgets".
  */
 const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: string }[] = [
   {
     icon: 'settings',
     label: 'Settings',
-    hint: 'Currency, carry-over, API key',
+    hint: 'Currency, keypad, AI, backups',
     href: '/settings',
     testID: 'drawer-settings',
   },
@@ -48,13 +50,6 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
     hint: 'Target allocation and rebalancing',
     href: '/portfolio',
     testID: 'drawer-portfolio',
-  },
-  {
-    icon: 'export',
-    label: 'Export & backup',
-    hint: 'CSV out, full backup and restore',
-    href: '/export',
-    testID: 'drawer-export',
   },
   {
     icon: 'info',

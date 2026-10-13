@@ -38,10 +38,9 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "gemini-key-save"
-- scrollUntilVisible:
-    element:
-      id: "assistant-enabled"
-    direction: DOWN
+# Penny has a page of its own under AI.
+- tapOn:
+    id: "settings-ai-penny"
 - tapOn:
     id: "assistant-enabled"
 - scrollUntilVisible:

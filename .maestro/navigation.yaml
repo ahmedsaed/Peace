@@ -35,8 +35,9 @@ tags:
 - tapOn:
     id: "nav-menu"
 - assertVisible: "Settings"
-- assertVisible: "Export & backup"
 - assertVisible: "About"
+# Backup & export lives under Settings › Your data, not here as well.
+- assertNotVisible: "Export & backup"
 # The tagline is a CLAIM, and it has to match what the app does. Disconnected,
 # nothing does leave the phone; connecting Drive changes the sentence, because
 # copy that contradicts the screen it sits on is worse than copy saying less.
@@ -96,13 +97,18 @@ tags:
 # the ledger count. The export flow covers the files themselves.
 - tapOn:
     id: "nav-menu"
+# Backup & export lives under Settings › Your data, not in the side menu.
 - tapOn:
-    id: "drawer-export"
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-backup"
 - assertVisible:
     id: "export-screen"
 - assertVisible:
     id: "export-count"
     text: "[0-9]+ records? in the ledger."
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 
