@@ -1,7 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
 
 import type { Op } from '@/lib/calculator';
+import { keypadRows, type KeypadCell } from '@/lib/keypad-layout';
 import { byDensity, type Density } from '@/lib/layout';
+import { useSetting } from '@/state/settings';
 
 export type KeyPress =
   | { kind: 'digit'; value: string }
@@ -10,17 +12,11 @@ export type KeyPress =
   | { kind: 'equals' };
 
 /**
- * Operators occupy the left column and digits a 3x4 block to their right —
- * the reference app's layout, and the reason it is fast one-handed: the thumb
- * never crosses the keypad to reach `+`.
+ * Operators occupy one edge column and digits a 3x4 block beside them — the
+ * reference app's layout, and the reason it is fast one-handed: the thumb never
+ * crosses the keypad to reach `+`. Which edge, and which way up the digits go,
+ * are settings; the grid itself is `keypadRows` in src/lib/keypad-layout.ts.
  */
-const ROWS: { op: Op; digits: string[] }[] = [
-  { op: '+', digits: ['7', '8', '9'] },
-  { op: '-', digits: ['4', '5', '6'] },
-  { op: '*', digits: ['1', '2', '3'] },
-  { op: '/', digits: ['0', '.', '='] },
-];
-
 const OP_LABEL: Record<Op, string> = { '+': '+', '-': '−', '*': '×', '/': '÷' };
 
 /**
@@ -102,51 +98,63 @@ export function Keypad({
    */
   equalsLabel?: string;
 }) {
-  return (
-    <View testID="keypad">
-      {ROWS.map(({ op, digits }) => (
-        <View key={op} className="flex-row">
+  const order = useSetting('keypadDigits');
+  const side = useSetting('keypadOperators');
+
+  // testIDs name the key, never its position, so a flow typing `key-1` types a
+  // one in every layout.
+  const key = (cell: KeypadCell) => {
+    switch (cell.kind) {
+      case 'op':
+        return (
           <Key
-            label={OP_LABEL[op]}
+            key={cell.op}
+            label={OP_LABEL[cell.op]}
             variant="op"
             density={density}
-            testID={`key-op-${OP_TESTID[op]}`}
-            onPress={() => onKey({ kind: 'op', value: op })}
+            testID={`key-op-${OP_TESTID[cell.op]}`}
+            onPress={() => onKey({ kind: 'op', value: cell.op })}
           />
-          {digits.map((d) => {
-            if (d === '.') {
-              return (
-                <Key
-                  key={d}
-                  label="."
-                  density={density}
-                  testID="key-dot"
-                  onPress={() => onKey({ kind: 'dot' })}
-                />
-              );
-            }
-            if (d === '=') {
-              return (
-                <Key
-                  key={d}
-                  label={equalsLabel}
-                  variant="op"
-                  density={density}
-                  testID="key-equals"
-                  onPress={() => onKey({ kind: 'equals' })}
-                />
-              );
-            }
-            return (
-              <Key
-                key={d}
-                label={d}
-                density={density}
-                testID={`key-${d}`}
-                onPress={() => onKey({ kind: 'digit', value: d })}
-              />
-            );
-          })}
+        );
+      case 'dot':
+        return (
+          <Key
+            key="."
+            label="."
+            density={density}
+            testID="key-dot"
+            onPress={() => onKey({ kind: 'dot' })}
+          />
+        );
+      case 'equals':
+        return (
+          <Key
+            key="="
+            label={equalsLabel}
+            variant="op"
+            density={density}
+            testID="key-equals"
+            onPress={() => onKey({ kind: 'equals' })}
+          />
+        );
+      case 'digit':
+        return (
+          <Key
+            key={cell.value}
+            label={cell.value}
+            density={density}
+            testID={`key-${cell.value}`}
+            onPress={() => onKey({ kind: 'digit', value: cell.value })}
+          />
+        );
+    }
+  };
+
+  return (
+    <View testID="keypad">
+      {keypadRows(order, side).map((row, i) => (
+        <View key={i} className="flex-row">
+          {row.map(key)}
         </View>
       ))}
     </View>
