@@ -13,7 +13,7 @@
  * send every text message the user receives to Google.
  */
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Pressable, Switch, Text, TextInput, View } from 'react-native';
 
@@ -94,6 +94,17 @@ export function BankMessagesCard() {
     });
     return () => subscription.remove();
   }, [refresh]);
+
+  /**
+   * And on every return to THIS PAGE.
+   *
+   * Turning the switch on without access goes through setup's disclosure,
+   * which sends the user to Android and back. The foreground event above fires
+   * while setup is still on top — before setup has switched capture on — so
+   * this card read "off" and never looked again, and the user landed back on a
+   * switch that disagreed with what they had just done.
+   */
+  useFocusEffect(refresh);
 
   const senders = settings.bankSenders;
 

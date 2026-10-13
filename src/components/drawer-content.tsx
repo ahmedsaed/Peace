@@ -25,13 +25,6 @@ import { useSetting } from '@/state/settings';
  */
 const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: string }[] = [
   {
-    icon: 'settings',
-    label: 'Settings',
-    hint: 'Currency, keypad, AI, backups',
-    href: '/settings',
-    testID: 'drawer-settings',
-  },
-  {
     icon: 'refresh',
     label: 'Recurring',
     hint: 'Standing orders and instalments',
@@ -51,6 +44,13 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
     hint: 'Target allocation and rebalancing',
     href: '/portfolio',
     testID: 'drawer-portfolio',
+  },
+  {
+    icon: 'settings',
+    label: 'Settings',
+    hint: 'Currency, keypad, AI, backups',
+    href: '/settings',
+    testID: 'drawer-settings',
   },
   {
     icon: 'info',

@@ -43,7 +43,8 @@ export function ReceiptsCard() {
       </View>
 
       {enabled ? (
-        <View className="mt-4 border-t border-line pt-4">
+        // No divider of its own: the rules editor draws the line above itself.
+        <View className="mt-4">
           <PromptEditor
             label="Your rules"
             hint="Anything about your own receipts the model could not work out — a shop it keeps misreading, a charge that should not count. Most people need none."
