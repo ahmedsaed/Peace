@@ -1,7 +1,9 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Pacifico } from 'next/font/google';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+
+import { HOME_DESCRIPTION, HOME_TITLE, pageMeta, SITE_NAME, SITE_URL } from '@/lib/meta';
 
 import './globals.css';
 
@@ -11,19 +13,19 @@ import './globals.css';
 const pacifico = Pacifico({ weight: '400', subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://peace.merope.dev'),
-  title: {
-    default: 'Peace — an expense tracker that keeps its mouth shut',
-    template: '%s · Peace',
-  },
-  description:
-    'A local-first expense tracker for Android. Every record lives on your phone: no account, no server, no ads, no analytics.',
-  icons: { icon: '/icon.png' },
-  openGraph: {
-    title: 'Peace — an expense tracker that keeps its mouth shut',
-    description: 'A local-first expense tracker for Android. No account, no server, no ads, no analytics.',
-    images: ['/screenshots/records.png'],
-  },
+  metadataBase: new URL(SITE_URL),
+  title: { default: HOME_TITLE, template: `%s · ${SITE_NAME}` },
+  applicationName: SITE_NAME,
+  authors: [{ name: 'Merope', url: 'https://merope.dev' }],
+  creator: 'Merope',
+  icons: { icon: '/icon.png', apple: '/icon.png' },
+  // Every page sets its own through pageMeta(); this covers any that forgets.
+  ...pageMeta({ description: HOME_DESCRIPTION, path: '/', card: 'home' }),
+};
+
+export const viewport: Viewport = {
+  themeColor: '#17140f',
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

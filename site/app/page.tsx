@@ -1,5 +1,27 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+
+import { HOME_DESCRIPTION, pageMeta, SITE_URL } from '@/lib/meta';
+
+export const metadata: Metadata = pageMeta({ description: HOME_DESCRIPTION, path: '/', card: 'home' });
+
+// What a search engine reads as "this page is about an app". Price 0 because
+// it is free; no rating, because there are no reviews yet and inventing one
+// is the kind of thing this site exists not to do.
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Peace',
+  description: HOME_DESCRIPTION,
+  url: SITE_URL,
+  image: `${SITE_URL}/og/home.png`,
+  applicationCategory: 'FinanceApplication',
+  operatingSystem: 'Android',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  license: 'https://www.gnu.org/licenses/gpl-3.0.html',
+  author: { '@type': 'Organization', name: 'Merope', url: 'https://merope.dev' },
+};
 
 const RELEASES = 'https://github.com/ahmedsaed/Peace/releases/latest';
 
@@ -46,9 +68,11 @@ function Feature({
 export default function Home() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <div className="wrap">
         <div className="hero">
           <div>
+            <p className="eyebrow">Peace of mind. Piece of cake.</p>
             <h1>
               An expense tracker that <em>keeps its mouth shut.</em>
             </h1>
@@ -89,7 +113,7 @@ export default function Home() {
 
           <Feature
             eyebrow="Recording"
-            title="Four taps and a thumb."
+            title="Four taps and a thumb. Piece of cake."
             shot="record"
             alt="The add-record screen: account and category pickers, a note field, and the calculator keypad"
           >
@@ -219,7 +243,7 @@ export default function Home() {
       <section id="privacy">
         <div className="wrap">
           <p className="eyebrow">Private by default</p>
-          <h2>Nothing leaves your phone until you turn something on.</h2>
+          <h2>Peace of mind: nothing leaves your phone until you turn something on.</h2>
           <p className="section-intro">
             There is no Peace account and no Peace server. The few things that can talk to the internet are each
             off until you switch them on, and each one is listed on <Link href="/data/">Your data</Link>.

@@ -1,11 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-export const metadata: Metadata = {
+import { pageMeta } from '@/lib/meta';
+
+export const metadata: Metadata = pageMeta({
   title: 'Your data',
   description:
     'Everything Peace can send off your phone, when, and to whom — and everything it keeps on the phone instead.',
-};
+  path: '/data/',
+  card: 'data',
+});
 
 /**
  * The plain-language version of the Play Store's Data safety section. Every row

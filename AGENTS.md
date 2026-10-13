@@ -270,6 +270,14 @@ build time, never committed twice. **The privacy policy is `site/content/privacy
 that makes the app send something new changes that file in the same PR, and the deploy refuses to
 publish it while a `[PLACEHOLDER]` remains.
 
+**Every page's metadata goes through `pageMeta` in `site/lib/meta.ts`.** Next merges metadata
+shallowly, so a page that sets its own title but not its own `openGraph` unfurls with the HOME page's
+title. The social cards are drawn at build time by `site/app/og/[card]/route.tsx` from the real
+screenshots (so regenerating screenshots updates them) and written as `/og/<page>.png` — NOT through
+Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pages serves as
+`application/octet-stream`, and Facebook and LinkedIn refuse to unfurl that. The marketing lines are
+"Peace of mind. Piece of cake." — reuse them rather than inventing new taglines.
+
 ## Hard rules
 
 - **Money is integer minor units.** `amount_minor` is a signed integer (negative = money out).

@@ -7,3 +7,6 @@ next-env.d.ts
 public/screenshots/
 public/logo-mark.png
 public/icon.png
+# Written by `next dev` on every start.
+AGENTS.md
+CLAUDE.md
