@@ -60,6 +60,21 @@ tags:
     direction: DOWN
 - tapOn:
     id: "settings-ai-receipts"
+# The rules are simply THERE — no "Add rules" to tap — and they save when the
+# edit ends: leave the page, come back, and they are still written.
+- assertVisible:
+    id: "receipt-guidance-input"
+- tapOn:
+    id: "receipt-guidance-input"
+- inputText: "Leave out tips."
+- hideKeyboard
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "settings-ai-receipts"
+- assertVisible:
+    id: "receipt-guidance-input"
+    text: "Leave out tips."
 - tapOn:
     id: "receipts-enabled"
 - assertVisible:

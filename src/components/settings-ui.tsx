@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { Segmented } from '@/components/form';
 import { StackHeader } from '@/components/screen';
 import palette from '@/constants/palette';
+import { useKeyboardOverlap } from '@/lib/layout';
 import { useAi } from '@/state/ai';
 
 /**
@@ -42,10 +44,26 @@ export function SettingsPage({
   testID: string;
   children: React.ReactNode;
 }) {
+  /**
+   * Room for the keyboard. On an edge-to-edge Android the window does not
+   * resize for it, so a field at the foot of a page — every AI feature's
+   * rules — would be typed into blind. Padded by the overlap, and scrolled to
+   * the end when the keyboard arrives: the editable things sit last.
+   */
+  const keyboard = useKeyboardOverlap();
+  const scroller = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (keyboard > 0) scroller.current?.scrollToEnd({ animated: true });
+  }, [keyboard]);
+
   return (
     <View className="flex-1 bg-ground" testID={testID}>
       <StackHeader title={title} />
-      <ScrollView contentContainerClassName="px-4 pb-12 pt-4" keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scroller}
+        contentContainerClassName="px-4 pb-12 pt-4"
+        contentContainerStyle={{ paddingBottom: 48 + keyboard }}
+        keyboardShouldPersistTaps="handled">
         {intro ? (
           <View className="mb-6 flex-row items-start gap-4 px-1">
             <View
