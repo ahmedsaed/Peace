@@ -9,7 +9,6 @@ export default function PennySettings() {
       title="Penny"
       emblem="sparkle"
       color={SECTIONS.ai.color}
-      intro="Ask about your spending in plain words. Penny answers from your own ledger, and every amount it gives is one your screens would show."
       testID="settings-ai-penny-page">
       <KeyNotice />
       <AssistantCard />

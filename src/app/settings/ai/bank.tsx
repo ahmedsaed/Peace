@@ -8,7 +8,6 @@ export default function BankSettings() {
     <SettingsPage
       title="Bank messages"
       {...SECTIONS.bank}
-      intro="Your bank's payment alerts, offered as records to approve. Only messages from banks you name are read, with your Gemini key — everything else is ignored as it arrives."
       testID="settings-bank">
       <KeyNotice />
       <BankMessagesCard />

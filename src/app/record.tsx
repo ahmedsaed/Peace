@@ -228,9 +228,11 @@ export default function RecordScreen() {
 
   const defaultAccountId = useSetting('defaultAccountId');
   const geminiModel = useSetting('geminiModel');
-  // Settings › Use AI. Off: no reading button, and the photograph shortcut
-  // only photographs.
-  const aiEnabled = useSetting('aiEnabled');
+  // Settings › Use AI, and Receipts within it. Either off: no reading button,
+  // and the photograph shortcut only photographs.
+  const useAi = useSetting('aiEnabled');
+  const receiptsOn = useSetting('receiptsEnabled');
+  const aiEnabled = useAi && receiptsOn;
   const receiptGuidance = useSetting('receiptGuidance');
 
   // A transfer can be opened from either leg; the form always presents it as

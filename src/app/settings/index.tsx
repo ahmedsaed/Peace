@@ -143,7 +143,7 @@ export default function SettingsIndex() {
             emblem="camera"
             color={SECTIONS.ai.color}
             title="Receipts"
-            summary={feature('Read when you photograph one on a record')}
+            summary={!s.receiptsEnabled && ai ? 'Off' : feature('Read when you photograph one on a record')}
             onPress={go('/settings/ai/receipts')}
             testID="settings-ai-receipts"
             dim={!ai}

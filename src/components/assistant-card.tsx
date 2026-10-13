@@ -38,8 +38,7 @@ export function AssistantCard() {
     <View className="rounded-xl bg-surface p-4" testID="assistant-card">
       <View className="flex-row items-center gap-3">
         <View className="flex-1">
-          <Text className="mb-1 text-base font-semibold text-ink">Penny</Text>
-          <Text className="text-sm leading-5 text-muted">
+          <Text className="text-[15px] leading-6 text-ink">
             Your assistant. Ask about your money in plain words — Penny only changes anything once you
             approve it.
           </Text>
@@ -82,7 +81,7 @@ export function AssistantCard() {
           </View>
         ) : hasKey === false ? (
           <Text className="mt-3 text-xs text-expense" testID="assistant-needs-key">
-            It needs a Gemini key to answer — add one on the AI page.
+            It needs a Gemini key to answer — add one in Settings, under AI.
           </Text>
         ) : null
       ) : null}

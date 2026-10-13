@@ -95,6 +95,15 @@ export const SETTING_DEFAULTS = {
    */
   aiEnabled: true as boolean,
   /**
+   * Read receipts with AI — on its own, so somebody who wants Penny or bank
+   * messages need not have a reading button on every photo they attach.
+   *
+   * ON by default for the same reason as `aiEnabled`: it only does anything
+   * once there is a key, and turning a feature off on upgrade would be the app
+   * changing its mind behind somebody's back.
+   */
+  receiptsEnabled: true as boolean,
+  /**
    * The assistant — a chat that answers from the ledger. OFF until switched on.
    *
    * Off by default for the same reason the bank sender list starts empty:

@@ -1,0 +1,89 @@
+appId: dev.merope.peace.oss
+---
+# Settings › AI › Receipts is a real switch, not a stored preference: with it
+# off, a photo attached to a record has NO reading button — while the photo
+# itself still attaches. Asserted on the record screen, a different screen from
+# the one that holds the switch.
+#
+# The photo gets onto the phone with `addMedia`, which puts it in the gallery
+# where the system file picker can see it. No key is needed: the button's
+# presence is what is under test, and tapping it is the receipt-read flow's job.
+- launchApp:
+    clearState: true
+    # Skip the welcome screens and keep the fixture currency (lib/first-run.ts).
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+- addMedia:
+    - "../scripts/fixtures/receipt-usd.jpg"
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- on (the default): an attached photo carries the reading button ---
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "attach-file"
+# The Files app's "Recent" grid. Tap the file NAME, the first match: the tile
+# around it also holds a preview control, and every run's addMedia adds
+# another copy ("receipt-usd (1).jpg").
+- extendedWaitUntil:
+    visible: "receipt-usd.*\\.jpg"
+    timeout: 20000
+- tapOn:
+    text: "receipt-usd.*\\.jpg"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "attachment-read-.*"
+    timeout: 15000
+- takeScreenshot: 01-read-button
+- tapOn:
+    id: "record-cancel"
+
+# --- off ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-ai-receipts"
+- tapOn:
+    id: "receipts-enabled"
+- assertVisible:
+    id: "receipts-off"
+# The rules belong to a running feature, and are gone with it.
+- assertNotVisible:
+    id: "receipt-guidance"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-ai-receipts-summary"
+    text: "Off"
+- tapOn:
+    id: "nav-back"
+
+# THE ASSERTION THAT MATTERS: the same photo, attached the same way, and no
+# button to read it with.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "attach-file"
+# The Files app's "Recent" grid. Tap the file NAME, the first match: the tile
+# around it also holds a preview control, and every run's addMedia adds
+# another copy ("receipt-usd (1).jpg").
+- extendedWaitUntil:
+    visible: "receipt-usd.*\\.jpg"
+    timeout: 20000
+- tapOn:
+    text: "receipt-usd.*\\.jpg"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "attachment-.*"
+    timeout: 15000
+- assertNotVisible:
+    id: "attachment-read-.*"
+- takeScreenshot: 02-no-read-button

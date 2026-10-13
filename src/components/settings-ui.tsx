@@ -34,7 +34,11 @@ export function SettingsPage({
   title: string;
   emblem: string;
   color: string;
-  intro: string;
+  /**
+   * What the section is for. Left out on a feature page whose own switch
+   * already says it — the same sentence twice is one too many.
+   */
+  intro?: string;
   testID: string;
   children: React.ReactNode;
 }) {
@@ -42,14 +46,16 @@ export function SettingsPage({
     <View className="flex-1 bg-ground" testID={testID}>
       <StackHeader title={title} />
       <ScrollView contentContainerClassName="px-4 pb-12 pt-4" keyboardShouldPersistTaps="handled">
-        <View className="mb-6 flex-row items-start gap-4 px-1">
-          <View
-            className="h-12 w-12 items-center justify-center rounded-full"
-            style={{ backgroundColor: color }}>
-            <Icon name={emblem} size={22} color={palette.ink} />
+        {intro ? (
+          <View className="mb-6 flex-row items-start gap-4 px-1">
+            <View
+              className="h-12 w-12 items-center justify-center rounded-full"
+              style={{ backgroundColor: color }}>
+              <Icon name={emblem} size={22} color={palette.ink} />
+            </View>
+            <Text className="flex-1 text-sm leading-5 text-muted">{intro}</Text>
           </View>
-          <Text className="flex-1 text-sm leading-5 text-muted">{intro}</Text>
-        </View>
+        ) : null}
         <View className="gap-6">{children}</View>
       </ScrollView>
     </View>
