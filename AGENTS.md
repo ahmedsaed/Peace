@@ -87,6 +87,14 @@ data between them is backup and restore. An unknown `PEACE_FLAVOR` throws rather
 JS reads the flavor through `flavor` / `selfUpdates` in `src/lib/build-info.ts`; put a per-flavor
 difference behind one small module per concern, never as `if (flavor === …)` across screens.
 
+**The Play upload is an AAB, built on request.** Actions › **Play bundle** › Run workflow builds
+`flavor: play` through the same `build-apk.yml` every PR uses and hands back `peace-play-…aab` as
+an artifact; nothing builds or uploads one automatically, because every upload burns its
+versionCode for good. The bundle is signed with our release key acting as the **upload key** —
+Play App Signing re-signs it, which is the whole reason the play build's OAuth client takes Play's
+SHA-1. Locally: `PEACE_FLAVOR=play npx expo prebuild --platform android --clean`, then
+`./gradlew app:bundleRelease` in `android/`.
+
 **Changing the application id makes a new app.** Builds before 1.16 were `com.ahmed.peace`; that
 install does not upgrade into either flavor, it sits beside them until uninstalled. **Each id and
 signing key also needs its own Android OAuth client** in Google Cloud, or Drive sign-in fails with

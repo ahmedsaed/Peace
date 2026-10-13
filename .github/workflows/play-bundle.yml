@@ -1,0 +1,41 @@
+name: Play bundle
+
+# The AAB for the Play Console, built on request.
+#
+# MANUAL ON PURPOSE. Every merge publishes a GitHub release, and that is fine
+# because a release is free to ignore; an upload to Play is not — it takes a
+# review, burns a versionCode for good, and goes to testers' phones. So the
+# bundle is built when somebody means to upload one, from whatever ref they
+# choose, and handed back as an artifact to upload in Play Console.
+#
+# Same reusable build as the PR and the release (see build-apk.yml): the play
+# flavor changes the application id and the output format and nothing else.
+on:
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    uses: ./.github/workflows/build-apk.yml
+    with:
+      flavor: play
+    secrets: inherit
+
+  summary:
+    name: Upload instructions
+    needs: bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Say what was built
+        env:
+          VERSION: ${{ needs.bundle.outputs.version }}
+          BUILD: ${{ needs.bundle.outputs.build-number }}
+        run: |
+          {
+            echo "## Peace $VERSION (build $BUILD) — Play bundle"
+            echo
+            echo "Download the \`peace-play-…\` artifact below, unzip it, and upload the \`.aab\` in"
+            echo "Play Console › Test and release › (track) › Create new release."
+            echo
+            echo "versionCode **$BUILD** is used up the moment Play accepts it; the next upload"
+            echo "must come from a later commit."
+          } >> "$GITHUB_STEP_SUMMARY"
