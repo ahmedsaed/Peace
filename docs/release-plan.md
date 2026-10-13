@@ -56,7 +56,12 @@ reads the version. Code that differs per flavor sits behind one small module per
 - [x] UI copy: remove region-specific examples (bank names, E£ in hints and placeholders)
 - [ ] About screen: Peace by Merope, links to `peace.merope.dev` and the source
       ("Made by · Merope" shipped in 1.15.1; the links wait for the website to exist)
-- [ ] Review Penny's system prompt and default category set for anything that assumes one person or one country
+- [x] Review Penny's system prompt and default category set for anything that assumes one person or one country
+      — reviewed in 1.16.3. Penny's prompt, the receipt prompt and the bank-message prompt assume no
+      country, bank or currency (the home currency is passed in). The default categories are generic;
+      "Telephone" became "Phone" for new installs (existing ledgers keep their names — seeding never
+      overwrites). The one regional default left is `homeCurrency: 'EGP'`, which onboarding replaces
+      by design.
 
 ## Phase 2 — Customisation
 

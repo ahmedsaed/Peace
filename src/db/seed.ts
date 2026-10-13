@@ -35,7 +35,7 @@ const EXPENSE: [slug: string, name: string, icon: string, color: string][] = [
   ['home', 'Home', 'house', '#6B5B4A'],
   ['education', 'Education', 'book', '#2F6FA8'],
   ['car', 'Car', 'car', '#6B4CA8'],
-  ['telephone', 'Telephone', 'phone', '#2F6FA8'],
+  ['telephone', 'Phone', 'phone', '#2F6FA8'],
   ['travel', 'Travel', 'plane', '#2F8A78'],
   ['gifts', 'Gifts', 'gift', '#9C2D6B'],
   ['pets', 'Pets', 'paw', '#C99A2E'],
