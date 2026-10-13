@@ -4,9 +4,23 @@ name: Build APK
 # same way. A release built by a second, drifting copy of these steps is worth
 # less than no release at all — it would be a different artifact from the one
 # that was reviewed.
+#
+# The Play bundle goes through here too, for the same reason: `flavor: play`
+# swaps the application id and the output format and NOTHING ELSE, so what Play
+# receives is built by the steps every PR has already exercised.
 on:
   workflow_call:
     inputs:
+      flavor:
+        description: >
+          oss (default) is the APK for GitHub Releases, signed with our key.
+          play is an AAB for the Play Console: signed with the same key acting as
+          the UPLOAD key — Play App Signing re-signs it with Google's key, which
+          is why the play build's Drive OAuth client takes the SHA-1 from Play
+          Console rather than ours. An AAB is not installable, so it never goes
+          on a GitHub release.
+        type: string
+        default: oss
       abi:
         description: >
           Which ABI to build. arm64-v8a is a phone; x86_64 is the emulator, and
@@ -15,6 +29,7 @@ on:
           and then dies at startup with "couldn't find DSO to load:
           libreactnative.so", which reads like a broken native module rather
           than an ABI mismatch.
+          Ignored for the play flavor, which carries every ABI Play serves.
         type: string
         default: arm64-v8a
     outputs:
@@ -33,9 +48,13 @@ on:
 
 jobs:
   apk:
-    name: Build APK
+    name: Build ${{ inputs.flavor == 'play' && 'AAB' || 'APK' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    env:
+      # Read by app.config.js. An unknown value throws there, so a typo in a
+      # caller fails the prebuild instead of quietly building the oss app.
+      PEACE_FLAVOR: ${{ inputs.flavor }}
     outputs:
       version: ${{ steps.identity.outputs.version }}
       build-number: ${{ steps.identity.outputs.build-number }}
@@ -92,8 +111,14 @@ jobs:
           # which the release workflow globs for.
           SUFFIX=""
           [ "${{ inputs.abi }}" = "arm64-v8a" ] || SUFFIX="-${{ inputs.abi }}"
-          echo "artifact=peace-$VERSION-build$BUILD$SUFFIX" >> "$GITHUB_OUTPUT"
-          echo "Building Peace $VERSION (build $BUILD) for ${{ inputs.abi }} from $(git rev-parse --short HEAD)"
+          if [ "$PEACE_FLAVOR" = "play" ]; then
+            # Named for the flavor so it cannot be mistaken for the GitHub APK.
+            echo "artifact=peace-play-$VERSION-build$BUILD" >> "$GITHUB_OUTPUT"
+            echo "Building Peace $VERSION (build $BUILD), Play bundle, from $(git rev-parse --short HEAD)"
+          else
+            echo "artifact=peace-$VERSION-build$BUILD$SUFFIX" >> "$GITHUB_OUTPUT"
+            echo "Building Peace $VERSION (build $BUILD) for ${{ inputs.abi }} from $(git rev-parse --short HEAD)"
+          fi
 
       # android/ is gitignored — it is generated from app.json plus the config
       # plugins, so CI has to produce it rather than check it out.
@@ -136,7 +161,22 @@ jobs:
         # ONE ABI, whichever was asked for: arm64 covers every phone since ~2017
         # and x86_64 is what the emulator runs, and building one roughly quarters
         # the C++ compile time versus building all four.
+        if: ${{ inputs.flavor != 'play' }}
         run: ./gradlew app:assembleRelease -x lint -x test -PreactNativeArchitectures=${{ inputs.abi }}
+
+      # Every ABI Play serves, in one bundle: Play splits it per device, so the
+      # size cost is ours and never a user's. 32-bit ARM stays in because cheap
+      # phones still ship 32-bit userspace; x86 (32-bit) is gone from Play's
+      # device catalogue in practice and would only add compile time.
+      - name: Build release AAB
+        if: ${{ inputs.flavor == 'play' }}
+        env:
+          ORG_GRADLE_PROJECT_PEACE_STORE_FILE: ${{ env.PEACE_STORE_FILE }}
+          ORG_GRADLE_PROJECT_PEACE_STORE_PASSWORD: ${{ secrets.PEACE_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_PEACE_KEY_ALIAS: ${{ secrets.PEACE_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_PEACE_KEY_PASSWORD: ${{ secrets.PEACE_KEY_PASSWORD }}
+        working-directory: android
+        run: ./gradlew app:bundleRelease -x lint -x test -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64
 
       # Every permission the release requests is one somebody approved. Most
       # arrive from libraries — ShortcutBadger alone brought twenty launcher
@@ -158,6 +198,21 @@ jobs:
           SIGNED: ${{ env.PEACE_STORE_FILE }}
         run: |
           set -o pipefail
+
+          # A bundle is JAR-signed, so keytool reads it where apksigner cannot.
+          # The upload key has to be OURS: Play rejects an upload signed with
+          # anything else, and a debug-signed bundle is a wasted 20-minute build.
+          if [ "$PEACE_FLAVOR" = "play" ]; then
+            AAB=android/app/build/outputs/bundle/release/app-release.aab
+            [ -n "$SIGNED" ] || { echo "::error::A Play bundle needs the signing secrets — there is no debug fallback for an upload."; exit 1; }
+            keytool -printcert -jarfile "$AAB" | tee /dev/stderr | grep -q "CN=Peace" || {
+              echo "::error::The bundle is not signed with the upload key."
+              exit 1
+            }
+            echo "bundle signed with the upload key"
+            exit 0
+          fi
+
           APK=android/app/build/outputs/apk/release/app-release.apk
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1)
 
@@ -185,12 +240,17 @@ jobs:
       # identifiable on disk weeks later.
       - name: Name the APK for humans
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk \
-             "${{ steps.identity.outputs.artifact }}.apk"
+          if [ "$PEACE_FLAVOR" = "play" ]; then
+            cp android/app/build/outputs/bundle/release/app-release.aab \
+               "${{ steps.identity.outputs.artifact }}.aab"
+          else
+            cp android/app/build/outputs/apk/release/app-release.apk \
+               "${{ steps.identity.outputs.artifact }}.apk"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.identity.outputs.artifact }}
-          path: ${{ steps.identity.outputs.artifact }}.apk
+          path: ${{ steps.identity.outputs.artifact }}.${{ inputs.flavor == 'play' && 'aab' || 'apk' }}
           retention-days: 30
           if-no-files-found: error
