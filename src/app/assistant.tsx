@@ -25,9 +25,9 @@ import { searchRecords } from '@/db/repo/search';
 import { AttachmentError } from '@/lib/attachment';
 import { EMPTY_QUERY } from '@/lib/search-query';
 import { useKeyboardOverlap } from '@/lib/layout';
-import { getGeminiKey } from '@/lib/secrets';
 import { useAssistantStore } from '@/state/assistant';
 import { useMoney } from '@/state/money';
+import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSetting } from '@/state/settings';
 
 /**
@@ -74,7 +74,8 @@ export default function AssistantScreen() {
   const pendingUndo = useAssistantStore((s) => s.pendingUndo);
   const { load, loadOlder, send, retry, stop, decide, reset, undo, clearUndo } = useAssistantStore.getState();
 
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const hasKey = useGeminiKeyStore((state) => state.hasKey);
+  const refreshKey = useGeminiKeyStore((state) => state.refresh);
   const [draft, setDraft] = useState('');
   const [drill, setDrill] = useState<Drill | null>(null);
   /** Files waiting to go with the next message. Already on disk; only rows wait. */
@@ -92,13 +93,9 @@ export default function AssistantScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      let alive = true;
       setFocusTick((n) => n + 1);
-      void getGeminiKey().then((key) => alive && setHasKey(key !== null));
-      return () => {
-        alive = false;
-      };
-    }, [])
+      void refreshKey();
+    }, [refreshKey])
   );
 
   // Inverted: the list's first item sits at the bottom, by the composer.

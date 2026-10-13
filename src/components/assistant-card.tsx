@@ -12,30 +12,26 @@
  */
 
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
 import { ModelRow } from '@/components/model-picker';
 import palette from '@/constants/palette';
-import { getGeminiKey } from '@/lib/secrets';
+import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSettingsStore } from '@/state/settings';
 
 export function AssistantCard() {
   const enabled = useSettingsStore((state) => state.settings.assistantEnabled);
   const model = useSettingsStore((state) => state.settings.assistantModel);
   const update = useSettingsStore((state) => state.update);
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
-
-  // On focus: the key is added in the card above, on this same screen, and
-  // the row below has to notice without a restart.
+  // A store, not a read on focus: the key is added in the card above, on this
+  // same screen, so no focus change ever comes to re-read it.
+  const hasKey = useGeminiKeyStore((state) => state.hasKey);
+  const refreshKey = useGeminiKeyStore((state) => state.refresh);
   useFocusEffect(
     useCallback(() => {
-      let alive = true;
-      void getGeminiKey().then((key) => alive && setHasKey(key !== null));
-      return () => {
-        alive = false;
-      };
-    }, [])
+      void refreshKey();
+    }, [refreshKey])
   );
 
   return (
@@ -52,9 +48,6 @@ export function AssistantCard() {
           value={enabled}
           onValueChange={(next) => {
             update('assistantEnabled', next);
-            // The key card above sets the key; re-read it so the row below
-            // reflects one added a moment ago.
-            void getGeminiKey().then((key) => setHasKey(key !== null));
           }}
           testID="assistant-enabled"
           accessibilityLabel="Use Penny"

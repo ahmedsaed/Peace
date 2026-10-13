@@ -22,7 +22,8 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { ModelRow } from '@/components/model-picker';
 import palette from '@/constants/palette';
-import { getGeminiKey, maskKey, setGeminiKey } from '@/lib/secrets';
+import { getGeminiKey, maskKey } from '@/lib/secrets';
+import { useGeminiKeyStore } from '@/state/gemini-key';
 import { runBankCatchUp } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
 
@@ -30,6 +31,7 @@ export function GeminiKeyCard() {
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
 
+  const saveKey = useGeminiKeyStore((state) => state.save);
   const [saved, setSaved] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -55,7 +57,8 @@ export function GeminiKeyCard() {
     setBusy(true);
     setError(null);
     try {
-      await setGeminiKey(draft);
+      // Through the store, so Penny's card below learns of it on this screen.
+      await saveKey(draft);
       setSaved(await getGeminiKey());
       setEditing(false);
       setDraft('');
@@ -81,7 +84,7 @@ export function GeminiKeyCard() {
     } finally {
       setBusy(false);
     }
-  }, [draft, settings.bankSenders, settings.homeCurrency, settings.geminiModel, settings.bankGuidance]);
+  }, [draft, saveKey, settings.bankSenders, settings.homeCurrency, settings.geminiModel, settings.bankGuidance]);
 
   return (
     <View className="rounded-xl bg-surface p-4" testID="gemini-card">
