@@ -1,3 +1,5 @@
+import type { DigitOrder, OperatorSide } from './keypad-layout';
+
 /**
  * Preference definitions and their text codec.
  *
@@ -199,6 +201,16 @@ export const SETTING_DEFAULTS = {
    * here.
    */
   remindOnQuietDays: false as boolean,
+  /**
+   * 7-8-9 on top (`calculator`) or 1-2-3 on top (`phone`).
+   *
+   * A preference of the hands, not of taste: somebody who types amounts on a
+   * dialler all day presses the wrong key on a calculator layout, and a wrong
+   * digit is the most expensive mistake the record screen can make.
+   */
+  keypadDigits: 'calculator' as DigitOrder,
+  /** Which edge of the keypad the + − × ÷ column sits on. */
+  keypadOperators: 'left' as OperatorSide,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
