@@ -1,10 +1,17 @@
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useRef } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
-import { useKeyboardOverlap } from '@/lib/layout';
+import { Icon } from "@/components/icon";
+import palette from "@/constants/palette";
+import { useKeyboardOverlap } from "@/lib/layout";
 
 /**
  * The shape every setup step shares.
@@ -41,31 +48,63 @@ export function StepFrame({
 }) {
   const keyboard = useKeyboardOverlap();
   const insets = useSafeAreaInsets();
+  const scroller = useRef<ScrollView>(null);
+
+  /**
+   * While the keyboard is up, keep the FOOT of the step in view.
+   *
+   * The window does not resize for the keyboard on an edge-to-edge Android, so
+   * the actions lift by hand (below) and the content area shrinks — and a field
+   * that sat comfortably above the fold is now under the keys. Every step puts
+   * its text fields last, so the end is where the typing is. Re-run when the
+   * content grows, because that is how an error under a field arrives: below
+   * the fold, unseen, unless something brings it up.
+   */
+  const reveal = () => {
+    if (keyboard > 0) scroller.current?.scrollToEnd({ animated: true });
+  };
+  useEffect(reveal, [keyboard]);
 
   return (
     <View className="flex-1" testID={testID}>
       <ScrollView
+        ref={scroller}
+        onContentSizeChange={reveal}
         className="flex-1"
         contentContainerClassName="px-6 pb-6 pt-4"
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+      >
         <Animated.View entering={ZoomIn.duration(360).springify().damping(14)}>
           <View
             className="h-16 w-16 items-center justify-center rounded-full"
-            style={{ backgroundColor: color }}>
+            style={{ backgroundColor: color }}
+          >
             <Icon name={emblem} size={30} color={palette.ink} />
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(320).delay(60)} className="mt-6">
+        <Animated.View
+          entering={FadeInDown.duration(320).delay(60)}
+          className="mt-6"
+        >
           {eyebrow ? (
-            <Text className="mb-2 text-[11px] uppercase tracking-widest text-muted">{eyebrow}</Text>
+            <Text className="mb-2 text-[11px] uppercase tracking-widest text-muted">
+              {eyebrow}
+            </Text>
           ) : null}
-          <Text className="text-[28px] font-semibold leading-9 text-ink">{title}</Text>
-          {body ? <Text className="mt-3 text-base leading-6 text-muted">{body}</Text> : null}
+          <Text className="text-[28px] font-semibold leading-9 text-ink">
+            {title}
+          </Text>
+          {body ? (
+            <Text className="mt-3 text-base leading-6 text-muted">{body}</Text>
+          ) : null}
         </Animated.View>
 
         {children ? (
-          <Animated.View entering={FadeInDown.duration(320).delay(140)} className="mt-7">
+          <Animated.View
+            entering={FadeInDown.duration(320).delay(140)}
+            className="mt-7"
+          >
             {children}
           </Animated.View>
         ) : null}
@@ -74,7 +113,8 @@ export function StepFrame({
       <Animated.View
         entering={FadeIn.duration(300).delay(200)}
         className="gap-1 border-t border-line bg-ground px-6 pt-4"
-        style={{ paddingBottom: Math.max(insets.bottom, 12) + 4 + keyboard }}>
+        style={{ paddingBottom: Math.max(insets.bottom, 12) + 4 + keyboard }}
+      >
         {actions}
       </Animated.View>
     </View>
@@ -104,9 +144,10 @@ export function PrimaryButton({
       accessibilityRole="button"
       accessibilityState={{ disabled: inert, busy }}
       className={`h-14 flex-row items-center justify-center gap-2 rounded-2xl bg-accent active:opacity-80 ${
-        disabled ? 'opacity-40' : ''
-      }`}>
-      {busy ? <ActivityIndicator color={palette['accent-ink']} /> : null}
+        disabled ? "opacity-40" : ""
+      }`}
+    >
+      {busy ? <ActivityIndicator color={palette["accent-ink"]} /> : null}
       <Text className="text-base font-semibold text-accent-ink">{label}</Text>
     </Pressable>
   );
@@ -127,7 +168,8 @@ export function SecondaryButton({
       onPress={onPress}
       testID={testID}
       accessibilityRole="button"
-      className="mt-1 h-12 items-center justify-center rounded-2xl border border-line active:bg-surface">
+      className="mt-1 h-12 items-center justify-center rounded-2xl border border-line active:bg-surface"
+    >
       <Text className="text-[15px] text-ink">{label}</Text>
     </Pressable>
   );
@@ -138,7 +180,7 @@ export function SecondaryButton({
  * and must never be hard to hit.
  */
 export function QuietButton({
-  label = 'Not now',
+  label = "Not now",
   onPress,
   testID,
 }: {
@@ -151,23 +193,60 @@ export function QuietButton({
       onPress={onPress}
       testID={testID}
       accessibilityRole="button"
-      className="h-11 items-center justify-center active:opacity-60">
+      className="h-11 items-center justify-center active:opacity-60"
+    >
       <Text className="text-[15px] text-muted">{label}</Text>
     </Pressable>
   );
 }
 
+/**
+ * What went wrong with ONE field, directly beneath it.
+ *
+ * Not a note at the foot of the step: on a small phone with the keyboard up,
+ * the foot is below the fold, and an error nobody can see is a button that
+ * appears to do nothing. Pair it with `fieldBorder` so the field itself says
+ * which one is wrong.
+ */
+export function FieldError({
+  message,
+  testID,
+}: {
+  message: string | null;
+  testID: string;
+}) {
+  if (!message) return null;
+  return (
+    <Text
+      className="mt-2 px-1 text-sm leading-5 text-expense"
+      testID={testID}
+      accessibilityLiveRegion="polite"
+    >
+      {message}
+    </Text>
+  );
+}
+
+/** A field's outline: red while it holds the error, invisible otherwise. */
+export const fieldBorder = (bad: boolean) =>
+  bad ? "border border-expense" : "border border-transparent";
+
 /** A small line under the controls: what just happened, or why it did not. */
 export function Note({
-  tone = 'muted',
+  tone = "muted",
   children,
   testID,
 }: {
-  tone?: 'muted' | 'good' | 'bad';
+  tone?: "muted" | "good" | "bad";
   children: React.ReactNode;
   testID?: string;
 }) {
-  const color = tone === 'good' ? 'text-income' : tone === 'bad' ? 'text-expense' : 'text-muted';
+  const color =
+    tone === "good"
+      ? "text-income"
+      : tone === "bad"
+        ? "text-expense"
+        : "text-muted";
   return (
     <Text className={`mt-3 text-sm leading-5 ${color}`} testID={testID}>
       {children}

@@ -1,47 +1,68 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { getLocales } from 'expo-localization';
-import { useEffect, useMemo, useState } from 'react';
-import { AppState, Image, Linking, Pressable, Text, TextInput, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-
-import { Icon } from '@/components/icon';
-import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
-import { KeypadPreview } from '@/components/setup/keypad-preview';
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { getLocales } from "expo-localization";
+import { useEffect, useMemo, useState } from "react";
 import {
+  AppState,
+  Image,
+  Linking,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+
+import { Icon } from "@/components/icon";
+import { PickerSheet, type PickerOption } from "@/components/picker-sheet";
+import { KeypadPreview } from "@/components/setup/keypad-preview";
+import {
+  FieldError,
+  fieldBorder,
   Note,
   PrimaryButton,
   QuietButton,
   SecondaryButton,
   StepFrame,
-} from '@/components/setup/frame';
-import { Wordmark } from '@/components/wordmark';
-import palette from '@/constants/palette';
-import { openListenerSettings, setCapturing } from '@/db/bank-inbox';
-import { db } from '@/db/client';
-import { adoptCurrency, listAccountsWithBalance, updateAccount } from '@/db/repo/accounts';
-import { CURRENCIES, currencyName } from '@/lib/currencies';
-import { detectCurrency } from '@/lib/first-run';
-import { connect } from '@/lib/google-auth';
-import { minorToMajor, parseAmountToMinor } from '@/lib/money';
-import { formatTimeLabel } from '@/lib/period';
-import { onDay } from '@/lib/reminder';
-import { SETUP_STEPS, STEP_LABELS, stepDone, type SetupFacts, type SetupStep } from '@/lib/setup';
-import { useGeminiKeyStore } from '@/state/gemini-key';
-import { useMoney } from '@/state/money';
-import { requestReminderPermission, syncReminders } from '@/state/reminders';
-import { bankAccess } from '@/state/setup';
-import { useSettingsStore } from '@/state/settings';
+} from "@/components/setup/frame";
+import { Wordmark } from "@/components/wordmark";
+import palette from "@/constants/palette";
+import { openListenerSettings, setCapturing } from "@/db/bank-inbox";
+import { db } from "@/db/client";
+import {
+  adoptCurrency,
+  listAccountsWithBalance,
+  updateAccount,
+} from "@/db/repo/accounts";
+import { CURRENCIES, currencyName } from "@/lib/currencies";
+import { detectCurrency } from "@/lib/first-run";
+import { GeminiError } from "@/lib/gemini";
+import { connect } from "@/lib/google-auth";
+import { minorToMajor, parseAmountToMinor } from "@/lib/money";
+import { formatTimeLabel } from "@/lib/period";
+import { onDay } from "@/lib/reminder";
+import {
+  SETUP_STEPS,
+  STEP_LABELS,
+  stepDone,
+  type SetupFacts,
+  type SetupStep,
+} from "@/lib/setup";
+import { useGeminiKeyStore } from "@/state/gemini-key";
+import { useMoney } from "@/state/money";
+import { requestReminderPermission, syncReminders } from "@/state/reminders";
+import { bankAccess } from "@/state/setup";
+import { useSettingsStore } from "@/state/settings";
 
 /** Each step's colour, from the category palette (docs/design-system.md). */
-const COLOR: Record<SetupStep | 'done', string> = {
-  currency: '#C99A2E',
-  accounts: '#2E7D46',
-  keypad: '#3B4E9E',
-  reminder: '#6B4CA8',
-  ai: '#2F8A78',
-  bank: '#2F6FA8',
-  backup: '#6E8B3D',
-  done: '#2E7D46',
+const COLOR: Record<SetupStep | "done", string> = {
+  currency: "#C99A2E",
+  accounts: "#2E7D46",
+  keypad: "#3B4E9E",
+  reminder: "#6B4CA8",
+  ai: "#2F8A78",
+  bank: "#2F6FA8",
+  backup: "#6E8B3D",
+  done: "#2E7D46",
 };
 
 export type StepProps = {
@@ -57,19 +78,19 @@ export type StepProps = {
 
 const PROMISES = [
   {
-    icon: 'shield',
-    title: 'Lives on this phone',
-    body: 'No account and no server. Your records stay here.',
+    icon: "shield",
+    title: "Lives on this phone",
+    body: "No account and no server. Your records stay here.",
   },
   {
-    icon: 'key',
-    title: 'Nothing leaves unless you say so',
-    body: 'Reminders, AI and backups are each off until you turn them on.',
+    icon: "key",
+    title: "Nothing leaves unless you say so",
+    body: "Reminders, AI and backups are each off until you turn them on.",
   },
   {
-    icon: 'heart',
-    title: 'Free, and open source',
-    body: 'No ads, no tracking, no subscription.',
+    icon: "heart",
+    title: "Free, and open source",
+    body: "No ads, no tracking, no subscription.",
   },
 ];
 
@@ -85,13 +106,20 @@ export function WelcomeStep({
   return (
     <View className="flex-1" testID="setup-welcome">
       <View className="flex-row justify-end px-4 pt-2">
-        <QuietButton label="Skip setup" onPress={onSkipAll} testID="setup-skip-all" />
+        <QuietButton
+          label="Skip setup"
+          onPress={onSkipAll}
+          testID="setup-skip-all"
+        />
       </View>
 
       <View className="flex-1 justify-center px-8">
-        <Animated.View entering={FadeInDown.duration(500)} className="items-center">
+        <Animated.View
+          entering={FadeInDown.duration(500)}
+          className="items-center"
+        >
           <Image
-            source={require('../../../assets/images/logo-mark.png')}
+            source={require("../../../assets/images/logo-mark.png")}
             style={{ width: 88, height: 88 }}
             accessibilityIgnoresInvertColors
           />
@@ -108,21 +136,33 @@ export function WelcomeStep({
             <Animated.View
               key={promise.title}
               entering={FadeInDown.duration(420).delay(250 + i * 110)}
-              className="flex-row gap-4">
+              className="flex-row gap-4"
+            >
               <View className="h-11 w-11 items-center justify-center rounded-full bg-surface">
                 <Icon name={promise.icon} size={20} color={palette.ink} />
               </View>
               <View className="flex-1">
-                <Text className="text-[15px] font-semibold text-ink">{promise.title}</Text>
-                <Text className="mt-0.5 text-sm leading-5 text-muted">{promise.body}</Text>
+                <Text className="text-[15px] font-semibold text-ink">
+                  {promise.title}
+                </Text>
+                <Text className="mt-0.5 text-sm leading-5 text-muted">
+                  {promise.body}
+                </Text>
               </View>
             </Animated.View>
           ))}
         </View>
       </View>
 
-      <Animated.View entering={FadeInDown.duration(420).delay(650)} className="gap-1 px-6 pb-6">
-        <PrimaryButton label="Get started" onPress={onStart} testID="setup-start" />
+      <Animated.View
+        entering={FadeInDown.duration(420).delay(650)}
+        className="gap-1 px-6 pb-6"
+      >
+        <PrimaryButton
+          label="Get started"
+          onPress={onStart}
+          testID="setup-start"
+        />
         <QuietButton
           label="I have a backup to restore"
           onPress={onRestore}
@@ -149,13 +189,18 @@ export function CurrencyStep({ eyebrow, onDone, onSkip }: StepProps) {
     const listed = CURRENCIES.some((c) => c.code === home)
       ? CURRENCIES
       : [{ code: home, name: currencyName(home) }, ...CURRENCIES];
-    return listed.map((c) => ({ id: c.code, label: c.name, icon: 'cash', detail: c.code }));
+    return listed.map((c) => ({
+      id: c.code,
+      label: c.name,
+      icon: "cash",
+      detail: c.code,
+    }));
   }, [home]);
 
   const choose = (code: string) => {
     // The starter accounts were seeded in the guess; they follow the correction.
     adoptCurrency(db, home, code);
-    update('homeCurrency', code);
+    update("homeCurrency", code);
     setPicking(false);
   };
 
@@ -176,14 +221,19 @@ export function CurrencyStep({ eyebrow, onDone, onSkip }: StepProps) {
           />
           <QuietButton onPress={onSkip} testID="setup-currency-skip" />
         </>
-      }>
+      }
+    >
       <Pressable
         onPress={() => setPicking(true)}
         testID="setup-currency-change"
         accessibilityRole="button"
         accessibilityLabel={`${currencyName(home)}, change`}
-        className="rounded-2xl bg-surface p-5 active:bg-raised">
-        <Text className="text-[34px] font-semibold text-ink" style={{ fontVariant: ['tabular-nums'] }}>
+        className="rounded-2xl bg-surface p-5 active:bg-raised"
+      >
+        <Text
+          className="text-[34px] font-semibold text-ink"
+          style={{ fontVariant: ["tabular-nums"] }}
+        >
           {money(1234500, home)}
         </Text>
         <View className="mt-3 flex-row items-center justify-between">
@@ -192,7 +242,10 @@ export function CurrencyStep({ eyebrow, onDone, onSkip }: StepProps) {
               {currencyName(home)}
             </Text>
             <Text className="text-xs text-muted">
-              {home} · {home === detected ? 'from your phone\u2019s region' : 'your choice'}
+              {home} ·{" "}
+              {home === detected
+                ? "from your phone\u2019s region"
+                : "your choice"}
             </Text>
           </View>
           <View className="flex-row items-center gap-1">
@@ -217,11 +270,18 @@ export function CurrencyStep({ eyebrow, onDone, onSkip }: StepProps) {
 
 // --------------------------------------------------------------- accounts --
 
-type Draft = { id: string; name: string; opening: string; currency: string; icon: string; color: string };
+type Draft = {
+  id: string;
+  name: string;
+  opening: string;
+  currency: string;
+  icon: string;
+  color: string;
+};
 
 /** An opening balance as the text it would have been typed as. */
 const asTyped = (minor: number, currency: string) =>
-  minor === 0 ? '' : String(minorToMajor(minor, currency));
+  minor === 0 ? "" : String(minorToMajor(minor, currency));
 
 export function AccountsStep({ eyebrow, onDone, onSkip }: StepProps) {
   const [drafts, setDrafts] = useState<Draft[]>(() =>
@@ -230,33 +290,52 @@ export function AccountsStep({ eyebrow, onDone, onSkip }: StepProps) {
       name: a.name,
       opening: asTyped(a.openingBalance, a.currency),
       currency: a.currency,
-      icon: a.icon ?? 'wallet',
+      icon: a.icon ?? "wallet",
       color: a.color ?? palette.raised,
-    }))
+    })),
   );
-  const [error, setError] = useState<string | null>(null);
+  /** Which field of which account is wrong — the outline goes on THAT one. */
+  const [problem, setProblem] = useState<{
+    id: string;
+    field: "name" | "opening";
+    message: string;
+  } | null>(null);
 
-  const edit = (id: string, patch: Partial<Draft>) =>
+  const edit = (id: string, patch: Partial<Draft>) => {
     setDrafts((all) => all.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+    if (problem?.id === id) setProblem(null);
+  };
 
   const save = () => {
-    setError(null);
+    setProblem(null);
     const parsed = drafts.map((d) => ({
       ...d,
-      openingMinor: d.opening.trim() === '' ? 0 : parseAmountToMinor(d.opening, d.currency),
+      openingMinor:
+        d.opening.trim() === "" ? 0 : parseAmountToMinor(d.opening, d.currency),
     }));
-    const bad = parsed.find((d) => d.openingMinor === null);
-    if (bad) {
-      setError(`"${bad.opening}" is not an amount.`);
+    const nameless = parsed.find((d) => d.name.trim() === "");
+    if (nameless) {
+      setProblem({
+        id: nameless.id,
+        field: "name",
+        message: "An account needs a name.",
+      });
       return;
     }
-    const nameless = parsed.find((d) => d.name.trim() === '');
-    if (nameless) {
-      setError('Every account needs a name.');
+    const bad = parsed.find((d) => d.openingMinor === null);
+    if (bad) {
+      setProblem({
+        id: bad.id,
+        field: "opening",
+        message: `"${bad.opening}" is not an amount. Use digits, with a point for any decimals.`,
+      });
       return;
     }
     for (const d of parsed) {
-      updateAccount(db, d.id, { name: d.name, openingBalance: d.openingMinor ?? 0 });
+      updateAccount(db, d.id, {
+        name: d.name,
+        openingBalance: d.openingMinor ?? 0,
+      });
     }
     onDone();
   };
@@ -271,49 +350,67 @@ export function AccountsStep({ eyebrow, onDone, onSkip }: StepProps) {
       testID="setup-accounts"
       actions={
         <>
-          <PrimaryButton label="Save accounts" onPress={save} testID="setup-accounts-save" />
+          <PrimaryButton
+            label="Save accounts"
+            onPress={save}
+            testID="setup-accounts-save"
+          />
           <QuietButton onPress={onSkip} testID="setup-accounts-skip" />
         </>
-      }>
+      }
+    >
       <View className="gap-3">
-        {drafts.map((d, i) => (
-          <View key={d.id} className="flex-row items-center gap-3 rounded-2xl bg-surface p-3">
-            <View
-              className="h-11 w-11 items-center justify-center rounded-full"
-              style={{ backgroundColor: d.color }}>
-              <Icon name={d.icon} size={20} color={palette.ink} />
-            </View>
-            <TextInput
-              value={d.name}
-              onChangeText={(name) => edit(d.id, { name })}
-              placeholder="Name"
-              placeholderTextColor={palette.muted}
-              className="flex-1 py-2 text-base text-ink"
-              testID={`setup-account-name-${i}`}
-            />
-            <View className="w-32 flex-row items-center rounded-xl bg-ground px-3">
-              <TextInput
-                value={d.opening}
-                onChangeText={(opening) => edit(d.id, { opening })}
-                placeholder="0"
-                placeholderTextColor={palette.muted}
-                keyboardType="decimal-pad"
-                className="flex-1 py-2.5 text-right text-base text-ink"
-                style={{ fontVariant: ['tabular-nums'] }}
-                testID={`setup-account-opening-${i}`}
+        {drafts.map((d, i) => {
+          const bad = problem?.id === d.id ? problem : null;
+          return (
+            <View key={d.id}>
+              <View className="flex-row items-center gap-3 rounded-2xl bg-surface p-3">
+                <View
+                  className="h-11 w-11 items-center justify-center rounded-full"
+                  style={{ backgroundColor: d.color }}
+                >
+                  <Icon name={d.icon} size={20} color={palette.ink} />
+                </View>
+                <TextInput
+                  value={d.name}
+                  onChangeText={(name) => edit(d.id, { name })}
+                  placeholder="Name"
+                  placeholderTextColor={palette.muted}
+                  className={`flex-1 rounded-xl px-2 py-2 text-base text-ink ${fieldBorder(bad?.field === "name")}`}
+                  testID={`setup-account-name-${i}`}
+                />
+                <View
+                  className={`w-32 flex-row items-center rounded-xl bg-ground px-3 ${fieldBorder(
+                    bad?.field === "opening",
+                  )}`}
+                >
+                  <TextInput
+                    value={d.opening}
+                    onChangeText={(opening) => edit(d.id, { opening })}
+                    placeholder="0"
+                    placeholderTextColor={palette.muted}
+                    keyboardType="decimal-pad"
+                    className="flex-1 py-2.5 text-right text-base text-ink"
+                    style={{ fontVariant: ["tabular-nums"] }}
+                    testID={`setup-account-opening-${i}`}
+                  />
+                  <Text className="ml-1.5 text-xs text-muted">
+                    {d.currency}
+                  </Text>
+                </View>
+              </View>
+              <FieldError
+                message={bad?.message ?? null}
+                testID={`setup-account-error-${i}`}
               />
-              <Text className="ml-1.5 text-xs text-muted">{d.currency}</Text>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
-      {error ? (
-        <Note tone="bad" testID="setup-accounts-error">
-          {error}
-        </Note>
-      ) : (
-        <Note>Cards, savings and accounts in other currencies can be added from the Accounts tab.</Note>
-      )}
+      <Note>
+        Cards, savings and accounts in other currencies can be added from the
+        Accounts tab.
+      </Note>
     </StepFrame>
   );
 }
@@ -335,25 +432,30 @@ export function KeypadStep({ eyebrow, onDone, onSkip }: StepProps) {
       testID="setup-keypad"
       actions={
         <>
-          <PrimaryButton label="Continue" onPress={onDone} testID="setup-keypad-confirm" />
+          <PrimaryButton
+            label="Continue"
+            onPress={onDone}
+            testID="setup-keypad-confirm"
+          />
           <QuietButton onPress={onSkip} testID="setup-keypad-skip" />
         </>
-      }>
+      }
+    >
       <View className="flex-row gap-3">
         <KeypadPreview
           digits="calculator"
           operators={operators}
-          selected={digits !== 'phone'}
+          selected={digits !== "phone"}
           label="Calculator"
-          onPress={() => update('keypadDigits', 'calculator')}
+          onPress={() => update("keypadDigits", "calculator")}
           testID="setup-keypad-calculator"
         />
         <KeypadPreview
           digits="phone"
           operators={operators}
-          selected={digits === 'phone'}
+          selected={digits === "phone"}
           label="Phone"
-          onPress={() => update('keypadDigits', 'phone')}
+          onPress={() => update("keypadDigits", "phone")}
           testID="setup-keypad-phone"
         />
       </View>
@@ -362,18 +464,23 @@ export function KeypadStep({ eyebrow, onDone, onSkip }: StepProps) {
         + − × ÷ go on the
       </Text>
       <View className="flex-row rounded-xl bg-surface p-1">
-        {(['left', 'right'] as const).map((side) => (
+        {(["left", "right"] as const).map((side) => (
           <Pressable
             key={side}
-            onPress={() => update('keypadOperators', side)}
+            onPress={() => update("keypadOperators", side)}
             testID={`setup-keypad-operators-${side}`}
             accessibilityRole="radio"
             accessibilityState={{ selected: operators === side }}
             className={`flex-1 items-center rounded-lg py-2.5 ${
-              operators === side ? 'bg-raised' : ''
-            }`}>
-            <Text className={operators === side ? 'font-semibold text-ink' : 'text-muted'}>
-              {side === 'left' ? 'Left' : 'Right'}
+              operators === side ? "bg-raised" : ""
+            }`}
+          >
+            <Text
+              className={
+                operators === side ? "font-semibold text-ink" : "text-muted"
+              }
+            >
+              {side === "left" ? "Left" : "Right"}
             </Text>
           </Pressable>
         ))}
@@ -404,7 +511,7 @@ export function ReminderStep({ eyebrow, onDone, onSkip }: StepProps) {
     setBusy(true);
     try {
       const granted = await requestReminderPermission();
-      update('remindersOn', granted);
+      update("remindersOn", granted);
       await syncReminders();
       if (granted) onDone();
       else setRefused(true);
@@ -431,15 +538,22 @@ export function ReminderStep({ eyebrow, onDone, onSkip }: StepProps) {
           />
           <QuietButton onPress={onSkip} testID="setup-reminder-skip" />
         </>
-      }>
+      }
+    >
       <Pressable
         onPress={() => setPicking(true)}
         testID="setup-reminder-time"
         accessibilityRole="button"
-        className="flex-row items-center justify-between rounded-2xl bg-surface p-5 active:bg-raised">
+        className="flex-row items-center justify-between rounded-2xl bg-surface p-5 active:bg-raised"
+      >
         <View>
-          <Text className="text-xs uppercase tracking-widest text-muted">Every evening at</Text>
-          <Text className="mt-1 text-[34px] font-semibold text-ink" style={{ fontVariant: ['tabular-nums'] }}>
+          <Text className="text-xs uppercase tracking-widest text-muted">
+            Every evening at
+          </Text>
+          <Text
+            className="mt-1 text-[34px] font-semibold text-ink"
+            style={{ fontVariant: ["tabular-nums"] }}
+          >
             {formatTimeLabel(when)}
           </Text>
         </View>
@@ -450,8 +564,8 @@ export function ReminderStep({ eyebrow, onDone, onSkip }: StepProps) {
       </Pressable>
       {refused ? (
         <Note tone="bad" testID="setup-reminder-refused">
-          Android did not allow notifications, so the reminder stays off. You can allow them later
-          from Settings.
+          Android did not allow notifications, so the reminder stays off. You
+          can allow them later from Settings.
         </Note>
       ) : (
         <Note>Android will ask whether Peace may send notifications.</Note>
@@ -464,8 +578,8 @@ export function ReminderStep({ eyebrow, onDone, onSkip }: StepProps) {
           is24Hour={false}
           onValueChange={(_event: unknown, picked: Date) => {
             setPicking(false);
-            update('reminderHour', picked.getHours());
-            update('reminderMinute', picked.getMinutes());
+            update("reminderHour", picked.getHours());
+            update("reminderMinute", picked.getMinutes());
           }}
           onDismiss={() => setPicking(false)}
         />
@@ -476,12 +590,12 @@ export function ReminderStep({ eyebrow, onDone, onSkip }: StepProps) {
 
 // --------------------------------------------------------------------- ai --
 
-const KEY_PAGE = 'https://aistudio.google.com/apikey';
+const KEY_PAGE = "https://aistudio.google.com/apikey";
 
 export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
   const save = useGeminiKeyStore((s) => s.save);
   const hasKey = useGeminiKeyStore((s) => s.hasKey);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -492,8 +606,14 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
       await save(draft.trim());
       onDone();
     } catch (e) {
-      console.warn('[setup] saving the Gemini key failed', e);
-      setError('The key could not be saved on this phone. Try again, or add it later in Settings.');
+      if (e instanceof GeminiError) {
+        setError(e.message);
+      } else {
+        console.warn("[setup] saving the Gemini key failed", e);
+        setError(
+          "The key could not be saved on this phone. Try again, or add it later in Settings.",
+        );
+      }
     } finally {
       setBusy(false);
     }
@@ -510,15 +630,16 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
       actions={
         <>
           <PrimaryButton
-            label="Save key"
+            label={busy ? "Checking the key…" : "Save key"}
             onPress={submit}
-            disabled={draft.trim() === ''}
+            disabled={draft.trim() === ""}
             busy={busy}
             testID="setup-ai-save"
           />
           <QuietButton onPress={onSkip} testID="setup-ai-skip" />
         </>
-      }>
+      }
+    >
       {hasKey ? (
         <Note tone="good" testID="setup-ai-present">
           A key is already saved. Paste a new one to replace it.
@@ -526,30 +647,34 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
       ) : null}
       <TextInput
         value={draft}
-        onChangeText={setDraft}
+        onChangeText={(next) => {
+          setDraft(next);
+          setError(null);
+        }}
         placeholder="Paste your API key"
         placeholderTextColor={palette.muted}
         autoCapitalize="none"
         autoCorrect={false}
         secureTextEntry
-        className="rounded-2xl bg-surface px-4 py-4 text-base text-ink"
+        className={`rounded-2xl bg-surface px-4 py-4 text-base text-ink ${fieldBorder(!!error)}`}
         testID="setup-ai-key"
       />
+      <FieldError message={error} testID="setup-ai-error" />
       <Pressable
         onPress={() => void Linking.openURL(KEY_PAGE)}
         testID="setup-ai-get-key"
         accessibilityRole="link"
-        className="mt-3 flex-row items-center gap-1 self-start py-1 active:opacity-60">
-        <Text className="text-sm text-accent">Get a key from Google AI Studio</Text>
+        className="mt-3 flex-row items-center gap-1 self-start py-1 active:opacity-60"
+      >
+        <Text className="text-sm text-accent">
+          Get a key from Google AI Studio
+        </Text>
         <Icon name="chevron" size={12} color={palette.accent} />
       </Pressable>
-      {error ? (
-        <Note tone="bad" testID="setup-ai-error">
-          {error}
-        </Note>
-      ) : (
-        <Note>Kept in this phone&apos;s secure storage. It is never written into a backup.</Note>
-      )}
+      <Note>
+        Checked with Google before it is saved, then kept in this phone&apos;s
+        secure storage — never in a backup.
+      </Note>
     </StepFrame>
   );
 }
@@ -569,20 +694,20 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
  */
 const DISCLOSURE = [
   {
-    title: 'What Peace can see',
-    body: 'Android grants notification access as one permission, so while it is allowed Peace receives every notification posted on this phone.',
+    title: "What Peace can see",
+    body: "Android grants notification access as one permission, so while it is allowed Peace receives every notification posted on this phone.",
   },
   {
-    title: 'What it keeps',
-    body: 'Only notifications from the bank senders you name below. Everything else is ignored as it arrives and never stored.',
+    title: "What it keeps",
+    body: "Only notifications from the bank senders you name below. Everything else is ignored as it arrives and never stored.",
   },
   {
-    title: 'Where it goes',
+    title: "Where it goes",
     body: "The text of a matching message is sent to Google Gemini, with your own API key, to read the amount and where it was spent. Nothing goes to Merope or anyone else.",
   },
   {
-    title: 'How long',
-    body: 'A message stays on this phone until you approve or dismiss the record it suggests, then it is deleted. Turn this off at any time in Settings.',
+    title: "How long",
+    body: "A message stays on this phone until you approve or dismiss the record it suggests, then it is deleted. Turn this off at any time in Settings.",
   },
 ];
 
@@ -591,7 +716,7 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
   const update = useSettingsStore((s) => s.update);
   const hasKey = useGeminiKeyStore((s) => s.hasKey);
   const [access, setAccess] = useState(bankAccess);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState("");
 
   /**
    * Access is granted on Android's own page, so the answer arrives on the way
@@ -600,8 +725,8 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
    * a second switch to forget.
    */
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') return;
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next !== "active") return;
       const now = bankAccess();
       if (now.permitted && !now.capturing) {
         try {
@@ -618,16 +743,20 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
 
   const add = () => {
     const value = draft.trim();
-    setDraft('');
-    if (value === '' || senders.some((s) => s.toLowerCase() === value.toLowerCase())) return;
-    update('bankSenders', [...senders, value]);
+    setDraft("");
+    if (
+      value === "" ||
+      senders.some((s) => s.toLowerCase() === value.toLowerCase())
+    )
+      return;
+    update("bankSenders", [...senders, value]);
   };
 
   const allow = () => {
     try {
       openListenerSettings();
     } catch (e) {
-      console.warn('[setup] could not open notification access settings', e);
+      console.warn("[setup] could not open notification access settings", e);
     }
   };
 
@@ -643,7 +772,7 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
         access.permitted ? (
           <>
             <PrimaryButton
-              label={senders.length === 0 ? 'Name a bank first' : 'Done'}
+              label={senders.length === 0 ? "Name a bank first" : "Done"}
               onPress={onDone}
               disabled={senders.length === 0}
               testID="setup-bank-done"
@@ -660,12 +789,21 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
             <QuietButton onPress={onSkip} testID="setup-bank-skip" />
           </>
         )
-      }>
-      <View className="rounded-2xl border border-line bg-surface" testID="setup-bank-disclosure">
+      }
+    >
+      <View
+        className="rounded-2xl border border-line bg-surface"
+        testID="setup-bank-disclosure"
+      >
         {DISCLOSURE.map((item, i) => (
-          <View key={item.title} className={`p-4 ${i > 0 ? 'border-t border-line' : ''}`}>
+          <View
+            key={item.title}
+            className={`p-4 ${i > 0 ? "border-t border-line" : ""}`}
+          >
             <Text className="text-sm font-semibold text-ink">{item.title}</Text>
-            <Text className="mt-1 text-sm leading-5 text-muted">{item.body}</Text>
+            <Text className="mt-1 text-sm leading-5 text-muted">
+              {item.body}
+            </Text>
           </View>
         ))}
       </View>
@@ -674,14 +812,23 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
         Banks to read
       </Text>
       {senders.length > 0 ? (
-        <View className="mb-2 flex-row flex-wrap gap-2" testID="setup-bank-senders">
+        <View
+          className="mb-2 flex-row flex-wrap gap-2"
+          testID="setup-bank-senders"
+        >
           {senders.map((sender) => (
             <Pressable
               key={sender}
-              onPress={() => update('bankSenders', senders.filter((s) => s !== sender))}
+              onPress={() =>
+                update(
+                  "bankSenders",
+                  senders.filter((s) => s !== sender),
+                )
+              }
               accessibilityRole="button"
               accessibilityLabel={`Remove ${sender}`}
-              className="flex-row items-center gap-1.5 rounded-full bg-raised px-3 py-1.5 active:opacity-70">
+              className="flex-row items-center gap-1.5 rounded-full bg-raised px-3 py-1.5 active:opacity-70"
+            >
               <Text className="text-sm text-ink">{sender}</Text>
               <Icon name="close" size={10} color={palette.muted} />
             </Pressable>
@@ -705,20 +852,27 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
           onPress={add}
           testID="setup-bank-sender-add"
           accessibilityRole="button"
-          className="justify-center rounded-xl border border-line px-4 active:bg-surface">
+          className="justify-center rounded-xl border border-line px-4 active:bg-surface"
+        >
           <Text className="text-[15px] text-ink">Add</Text>
         </Pressable>
       </View>
 
       {access.permitted ? (
         <Note tone="good" testID="setup-bank-granted">
-          Notification access is allowed{access.capturing ? ' and Peace is listening.' : '.'}
+          Notification access is allowed
+          {access.capturing ? " and Peace is listening." : "."}
         </Note>
       ) : (
-        <Note>Android opens its notification access page. Find Peace there and switch it on.</Note>
+        <Note>
+          Android opens its notification access page. Find Peace there and
+          switch it on.
+        </Note>
       )}
       {hasKey === false ? (
-        <Note>Messages wait, unread, until there is an AI key to read them with.</Note>
+        <Note>
+          Messages wait, unread, until there is an AI key to read them with.
+        </Note>
       ) : null}
     </StepFrame>
   );
@@ -738,12 +892,14 @@ export function BackupStep({ eyebrow, onDone, onSkip }: StepProps) {
     setError(null);
     try {
       const email = await connect();
-      update('driveAccount', email);
-      if (cadence === 'off') update('driveCadence', 'weekly');
+      update("driveAccount", email);
+      if (cadence === "off") update("driveCadence", "weekly");
       onDone();
     } catch (e) {
-      console.warn('[setup] Drive connection failed', e);
-      setError(e instanceof Error ? e.message : 'Google Drive could not be connected.');
+      console.warn("[setup] Drive connection failed", e);
+      setError(
+        e instanceof Error ? e.message : "Google Drive could not be connected.",
+      );
     } finally {
       setBusy(false);
     }
@@ -760,7 +916,11 @@ export function BackupStep({ eyebrow, onDone, onSkip }: StepProps) {
       actions={
         <>
           {account ? (
-            <PrimaryButton label="Continue" onPress={onDone} testID="setup-backup-continue" />
+            <PrimaryButton
+              label="Continue"
+              onPress={onDone}
+              testID="setup-backup-continue"
+            />
           ) : (
             <PrimaryButton
               label="Back up to Google Drive"
@@ -778,7 +938,8 @@ export function BackupStep({ eyebrow, onDone, onSkip }: StepProps) {
           )}
           <QuietButton onPress={onSkip} testID="setup-backup-skip" />
         </>
-      }>
+      }
+    >
       <View className="gap-3">
         <BackupOption
           icon="cloud"
@@ -805,7 +966,15 @@ export function BackupStep({ eyebrow, onDone, onSkip }: StepProps) {
   );
 }
 
-function BackupOption({ icon, title, body }: { icon: string; title: string; body: string }) {
+function BackupOption({
+  icon,
+  title,
+  body,
+}: {
+  icon: string;
+  title: string;
+  body: string;
+}) {
   return (
     <View className="flex-row gap-3 rounded-2xl bg-surface p-4">
       <Icon name={icon} size={20} color={palette.muted} />
@@ -819,7 +988,13 @@ function BackupOption({ icon, title, body }: { icon: string; title: string; body
 
 // ------------------------------------------------------------------- done --
 
-export function DoneStep({ facts, onFinish }: { facts: SetupFacts; onFinish: () => void }) {
+export function DoneStep({
+  facts,
+  onFinish,
+}: {
+  facts: SetupFacts;
+  onFinish: () => void;
+}) {
   const left = SETUP_STEPS.filter((step) => !stepDone(step, facts)).length;
   return (
     <StepFrame
@@ -828,29 +1003,45 @@ export function DoneStep({ facts, onFinish }: { facts: SetupFacts; onFinish: () 
       title="You're all set."
       body={
         left === 0
-          ? 'Everything is set up. Peace of mind — and from here, a piece of cake.'
-          : 'Whatever you left for later waits on the Records screen, one tap away.'
+          ? "Everything is set up. Peace of mind — and from here, a piece of cake."
+          : "Whatever you left for later waits on the Records screen, one tap away."
       }
       testID="setup-done"
-      actions={<PrimaryButton label="Start recording" onPress={onFinish} testID="setup-finish" />}>
+      actions={
+        <PrimaryButton
+          label="Start recording"
+          onPress={onFinish}
+          testID="setup-finish"
+        />
+      }
+    >
       <View className="overflow-hidden rounded-2xl bg-surface">
         {SETUP_STEPS.map((step, i) => {
           const done = stepDone(step, facts);
           return (
             <View
               key={step}
-              className={`flex-row items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-line' : ''}`}>
+              className={`flex-row items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-line" : ""}`}
+            >
               <View
                 className={`h-6 w-6 items-center justify-center rounded-full ${
-                  done ? 'bg-income' : 'bg-line'
-                }`}>
-                {done ? <Icon name="check" size={14} color={palette.ground} /> : null}
+                  done ? "bg-income" : "bg-line"
+                }`}
+              >
+                {done ? (
+                  <Icon name="check" size={14} color={palette.ground} />
+                ) : null}
               </View>
-              <Text className={`flex-1 text-[15px] ${done ? 'text-ink' : 'text-muted'}`}>
+              <Text
+                className={`flex-1 text-[15px] ${done ? "text-ink" : "text-muted"}`}
+              >
                 {STEP_LABELS[step]}
               </Text>
-              <Text className="text-xs text-muted" testID={`setup-summary-${step}`}>
-                {done ? 'Done' : 'Later'}
+              <Text
+                className="text-xs text-muted"
+                testID={`setup-summary-${step}`}
+              >
+                {done ? "Done" : "Later"}
               </Text>
             </View>
           );

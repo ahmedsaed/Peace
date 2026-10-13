@@ -103,11 +103,12 @@ appId: dev.merope.peace.oss
 - assertNotVisible:
     id: "nav-assistant"
 
-# --- a key added on the SAME screen reaches Penny's card at once ---
-# The card used to read the key on focus, and saving a key two cards above it is
-# not a focus change: it went on saying "Add a Gemini key above" under a saved
-# key until the switch was flipped off and on. A made-up key is enough — saving
-# one calls nothing, and nothing here asks Penny a question.
+# --- a made-up key is CHECKED, refused, and not saved ---
+# Saving asks Google to list models with the key first. A made-up one is
+# refused (or, on a runner with no network, cannot be checked) — either way the
+# editor says so, nothing is stored, and Penny's card still asks for a key.
+# That the card updates the moment a REAL key lands is covered by
+# `src/state/gemini-key.test.ts`, since no flow here holds a real key.
 - tapOn:
     id: "nav-menu"
 - tapOn:
@@ -138,13 +139,17 @@ appId: dev.merope.peace.oss
     direction: DOWN
 - tapOn:
     id: "gemini-key-save"
+- extendedWaitUntil:
+    visible:
+      id: "gemini-key-error"
+    timeout: 20000
 - assertVisible:
     id: "gemini-key-state"
-    text: ".*0000"
+    text: "Not set"
+- takeScreenshot: 04-assistant-key-refused
+- tapOn:
+    id: "gemini-key-cancel"
 - scrollUntilVisible:
     element:
-      id: "assistant-open"
+      id: "assistant-needs-key"
     direction: DOWN
-- assertNotVisible:
-    id: "assistant-needs-key"
-- takeScreenshot: 04-assistant-key-added

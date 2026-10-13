@@ -346,6 +346,64 @@ export async function listModels(
   }
 }
 
+/**
+ * Prove a key works before it is kept.
+ *
+ * A key is saved once and used weeks later, from a receipt or a bank message,
+ * so a typo accepted here surfaces as a failure in some OTHER feature, long
+ * after anyone remembers pasting it. Listing models costs nothing and needs
+ * only the key, which makes it the cheapest question Google will answer about
+ * one.
+ *
+ * Every refusal is worded about the KEY, because that is what the person is
+ * holding: `describeFailure` says "check it in Settings", which is useless to
+ * somebody standing in Settings with the key in their hand.
+ *
+ * A rate-limited key is a valid key, so 429 passes. Anything that is not an
+ * answer — offline, a timeout, Google down — refuses too, but says it is the
+ * CHECK that failed rather than the key: saving something unverified is
+ * exactly the trap this exists to close.
+ */
+export async function checkGeminiKey(
+  apiKey: string,
+  { timeoutMs = 15_000, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
+): Promise<void> {
+  const key = apiKey.trim();
+  if (key === '') throw new GeminiError('Paste a key first.');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetchImpl(`${BASE_URL}?pageSize=1`, {
+      headers: { 'x-goog-api-key': key },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    console.warn('[gemini] checking the key failed', error);
+    throw new GeminiError(
+      'Could not reach Google to check the key. Check your connection and try again.',
+      true
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (response.ok || response.status === 429) return;
+
+  const body = await response.json().catch(() => null);
+  console.warn('[gemini] key refused', response.status, reasonOf(body));
+  if (reasonOf(body) === 'SERVICE_DISABLED') {
+    throw new GeminiError(
+      'Google knows that key, but the Gemini API is not turned on for its project.'
+    );
+  }
+  if (response.status >= 500) {
+    throw new GeminiError('Google could not check the key just now. Try again in a minute.', true);
+  }
+  throw new GeminiError('Google did not accept that key. Check that you copied all of it.');
+}
+
 export type ReadOptions = {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
