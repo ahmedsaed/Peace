@@ -488,3 +488,66 @@ tr:last-child td {
 .site-footer a {
   color: var(--muted);
 }
+
+/* --- /store/ --------------------------------------------------------------- */
+
+.prose.store-intro {
+  padding-bottom: 8px;
+}
+
+.store-heading {
+  font-size: 20px;
+  margin: 48px 0 16px;
+}
+
+.store-grid {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 20px;
+  align-items: start;
+  margin-top: 24px;
+}
+
+.store-grid.shots {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  margin-bottom: 64px;
+}
+
+.store-asset {
+  margin: 0;
+}
+
+.store-asset img {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.store-asset figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.store-asset figcaption span {
+  color: var(--muted);
+}
+
+@media (max-width: 560px) {
+  .store-grid {
+    grid-template-columns: 1fr;
+  }
+  .store-asset:not(.wide) {
+    max-width: 180px;
+  }
+  .store-grid.shots {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .store-grid.shots .store-asset {
+    max-width: none;
+  }
+}
