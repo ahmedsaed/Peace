@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { ImageResponse } from 'next/og';
+
+import { accent, dataUri, fonts, Glow, ground, ink, muted, Phone, words } from './render';
 
 /**
  * The 1200×630 card a link to this site unfurls into, rendered to a PNG at
@@ -12,47 +11,8 @@ import { ImageResponse } from 'next/og';
  * the app's real screenshots: when `npm run shots` replaces them, every card
  * follows on the next build instead of advertising a screen that no longer
  * exists.
- *
- * Satori reads TTF/OTF/WOFF but not WOFF2, which is why the fonts come from
- * @fontsource's `.woff` files rather than from next/font.
  */
 export const cardSize = { width: 1200, height: 630 };
-
-// The app's "Ledger" palette, as in globals.css.
-const ground = '#17140f';
-const surface = '#241f17';
-const line = '#2e271d';
-const ink = '#efe4ce';
-const muted = '#9a8e79';
-const accent = '#e3a33c';
-
-const site = process.cwd();
-const read = (path: string) => readFileSync(join(site, path));
-const dataUri = (path: string) => `data:image/png;base64,${read(path).toString('base64')}`;
-const font = (pkg: string, file: string) => read(`node_modules/@fontsource/${pkg}/files/${file}`);
-
-const words = (text: string) => text.split(' ').filter(Boolean);
-
-function Phone({ shot, rotate, top }: { shot: string; rotate: number; top: number }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        position: 'absolute',
-        top,
-        padding: 8,
-        borderRadius: 30,
-        border: `1px solid ${line}`,
-        background: surface,
-        transform: `rotate(${rotate}deg)`,
-        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.5)',
-      }}
-    >
-      {/* Screenshots are 540×1200; the bottom is cut off by the card's edge. */}
-      <img src={dataUri(`public/screenshots/${shot}.png`)} width={270} height={600} style={{ borderRadius: 22 }} />
-    </div>
-  );
-}
 
 type Card = {
   /** Small caps line above the title; omitted on the home card. */
@@ -115,19 +75,7 @@ export function socialCard({ eyebrow, title, highlight, stacked, subtitle, shots
           overflow: 'hidden',
         }}
       >
-        {/* A warm glow behind the phones, so they do not float on flat black. */}
-        <div
-          style={{
-            position: 'absolute',
-            right: -160,
-            top: -120,
-            width: 760,
-            height: 760,
-            // Fades out at 70% of the corner distance, i.e. inside the square,
-            // so the gradient's box never shows as an edge.
-            background: 'radial-gradient(circle at center, rgba(227,163,60,0.2) 0%, rgba(227,163,60,0) 70%)',
-          }}
-        />
+        <Glow size={760} style={{ right: -160, top: -120 }} />
 
         <div
           style={{
@@ -194,22 +142,17 @@ export function socialCard({ eyebrow, title, highlight, stacked, subtitle, shots
 
         <div style={{ display: 'flex', position: 'relative', flex: 1 }}>
           <div style={{ display: 'flex', position: 'absolute', left: 150 }}>
-            <Phone shot={shots[0]} rotate={8} top={70} />
+            <Phone src={dataUri(`public/screenshots/${shots[0]}.png`)} width={270} rotate={8} style={{ top: 70 }} />
           </div>
           <div style={{ display: 'flex', position: 'absolute', left: 0 }}>
-            <Phone shot={shots[1]} rotate={-4} top={110} />
+            <Phone src={dataUri(`public/screenshots/${shots[1]}.png`)} width={270} rotate={-4} style={{ top: 110 }} />
           </div>
         </div>
       </div>
     ),
     {
       ...cardSize,
-      fonts: [
-        { name: 'Roboto', data: font('roboto', 'roboto-latin-400-normal.woff'), weight: 400 },
-        { name: 'Roboto', data: font('roboto', 'roboto-latin-700-normal.woff'), weight: 700 },
-        { name: 'Roboto', data: font('roboto', 'roboto-latin-900-normal.woff'), weight: 900 },
-        { name: 'Pacifico', data: font('pacifico', 'pacifico-latin-400-normal.woff'), weight: 400 },
-      ],
+      fonts: fonts(),
     },
   );
 }

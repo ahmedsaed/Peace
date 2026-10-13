@@ -319,7 +319,7 @@ function AccountRow({
 
       <View className="flex-1">
         <Text className="text-base text-ink">{account.name}</Text>
-        <Text className="text-xs capitalize text-muted" testID={`account-sub-${account.id}`}>
+        <Text className="text-xs text-muted" testID={`account-sub-${account.id}`}>
           {accountSubtitle(account, money)}
         </Text>
       </View>
@@ -340,7 +340,12 @@ function accountSubtitle(account: Row, money: Money): string {
     ? availableCredit(account.balanceMinor, account.creditLimit)
     : null;
 
-  if (available === null) return `${account.type} · ${account.currency}`;
+  // The type is capitalised HERE rather than with a `capitalize` class: that
+  // capitalises every word, and a card's line came out "$4,770.00 Of $5,000.00
+  // Available" — in the store screenshot, of all places.
+  if (available === null) {
+    return `${account.type.charAt(0).toUpperCase()}${account.type.slice(1)} · ${account.currency}`;
+  }
   return `${money(available, account.currency)} of ${money(
     account.creditLimit ?? 0,
     account.currency
