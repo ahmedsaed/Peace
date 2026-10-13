@@ -3,6 +3,7 @@
  */
 import { EMPTY_QUERY, type SearchQuery } from '../../lib/search-query';
 import { createTestDb, type TestDb } from '../../test/db';
+import { localNoon as on } from '../../test/dates';
 import { createAccount } from './accounts';
 import { createCategory } from './categories';
 import { searchRecords } from './search';
@@ -12,7 +13,6 @@ const q = (over: Partial<SearchQuery> = {}): SearchQuery => ({ ...EMPTY_QUERY, .
 
 /** 17 June 2026, so every relative range in the tests is deterministic. */
 const NOW = new Date(2026, 5, 17, 12, 0);
-const on = (year: number, month: number, day: number) => new Date(year, month - 1, day, 12, 0);
 
 const search = (db: TestDb, query: SearchQuery, over = {}) =>
   searchRecords(db, query, { homeCurrency: 'EGP', now: NOW, ...over });

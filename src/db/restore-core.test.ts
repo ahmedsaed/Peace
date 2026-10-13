@@ -6,13 +6,18 @@
  * function was called.
  */
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
 import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
 
-import * as schema from './schema';
+import {
+  createFileDb as makeDb,
+  migrate,
+  MIGRATIONS_DIR,
+  migrationFiles,
+  tempDir,
+  type FileDb,
+} from '../test/db';
 import {
   BACKUP_TABLES,
   copyFromBackup,
@@ -27,16 +32,9 @@ import { accountId, catId, seedDefaults } from './seed';
 import { ensureTag, setRecordTags } from './repo/tags';
 import { createRecord, createTransfer } from './repo/transactions';
 
-const MIGRATIONS = path.resolve(__dirname, '../../drizzle');
-
-/** The migration files, oldest first — the order the app applies them in. */
-function migrationFiles(): string[] {
-  return fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
-}
-
 /** Tables a given migration file creates. */
 function tablesCreatedBy(file: string): string[] {
-  const sql = fs.readFileSync(path.join(MIGRATIONS, file), 'utf8');
+  const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
   return [...sql.matchAll(/CREATE TABLE `([^`]+)`/g)].map((m) => m[1]);
 }
 
@@ -53,36 +51,8 @@ function migrationsBefore(table: string): number {
   return index;
 }
 
-/** Migrate a database, optionally stopping partway to simulate an old build. */
-function migrate(sqlite: Database.Database, upTo = Infinity) {
-  sqlite.pragma('foreign_keys = ON');
-  const files = migrationFiles().slice(0, upTo);
-  for (const file of files) {
-    for (const statement of fs.readFileSync(path.join(MIGRATIONS, file), 'utf8').split('--> statement-breakpoint')) {
-      const trimmed = statement.trim();
-      if (trimmed) sqlite.exec(trimmed);
-    }
-  }
-  // Drizzle's own bookkeeping table, which validateBackup compares.
-  sqlite.exec(
-    'CREATE TABLE IF NOT EXISTS __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)'
-  );
-  for (let i = 0; i < files.length; i++) {
-    sqlite.prepare('INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)').run(`m${i}`, i);
-  }
-}
-
-/** A real database on disk, because ATTACH cannot reach an in-memory one. */
-function makeDb(name: string, upTo = Infinity) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peace-restore-'));
-  const file = path.join(dir, name);
-  const sqlite = new Database(file);
-  migrate(sqlite, upTo);
-  return { sqlite, db: drizzle(sqlite, { schema }), file };
-}
-
 /** Fill a database with a ledger worth losing. */
-function fill(target: ReturnType<typeof makeDb>, note: string) {
+function fill(target: FileDb, note: string) {
   seedDefaults(target.db);
   createRecord(target.db, {
     type: 'expense',
@@ -104,8 +74,8 @@ function fill(target: ReturnType<typeof makeDb>, note: string) {
 }
 
 describe('restore', () => {
-  let live: ReturnType<typeof makeDb>;
-  let backup: ReturnType<typeof makeDb>;
+  let live: FileDb;
+  let backup: FileDb;
 
   beforeEach(() => {
     live = makeDb('live.db');
@@ -197,7 +167,7 @@ describe('restore', () => {
 });
 
 describe('restore — refusing rather than half-doing it', () => {
-  let live: ReturnType<typeof makeDb>;
+  let live: FileDb;
 
   beforeEach(() => {
     live = makeDb('live.db');
@@ -205,7 +175,7 @@ describe('restore — refusing rather than half-doing it', () => {
   afterEach(() => live.sqlite.close());
 
   it('rejects a file that is not a Peace backup', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peace-notours-'));
+    const dir = tempDir('peace-notours-');
     const file = path.join(dir, 'other.db');
     const other = new Database(file);
     other.exec('CREATE TABLE songs (id INTEGER PRIMARY KEY)');
@@ -217,10 +187,10 @@ describe('restore — refusing rather than half-doing it', () => {
   });
 
   it('rejects a backup from a newer version instead of dropping its data', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peace-newer-'));
+    const dir = tempDir('peace-newer-');
     const file = path.join(dir, 'newer.db');
     const newer = new Database(file);
-    migrate(newer);
+    migrate(newer, { bookkeeping: true });
     newer.prepare('INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)').run('future', 999);
     newer.close();
 
@@ -233,10 +203,10 @@ describe('restore — refusing rather than half-doing it', () => {
    * must leave the ledger exactly as it was, not half replaced.
    */
   it('rolls back completely when the copy fails', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peace-broken-'));
+    const dir = tempDir('peace-broken-');
     const file = path.join(dir, 'broken.db');
     const broken = new Database(file);
-    migrate(broken);
+    migrate(broken, { bookkeeping: true });
     // Same tables, but transactions has nothing in common with ours, so the
     // copy throws after earlier tables have already been deleted and refilled.
     broken.exec('DROP TABLE transactions');
@@ -277,14 +247,14 @@ describe('restore — refusing rather than half-doing it', () => {
  * sentence is, by definition, someone whose data is already gone.
  */
 describe('restore — a backup older than a feature', () => {
-  let live: ReturnType<typeof makeDb>;
-  let old: ReturnType<typeof makeDb>;
+  let live: FileDb;
+  let old: FileDb;
 
   beforeEach(() => {
     live = makeDb('live.db');
     // A build from before tags existed, read out of drizzle/ rather than
     // hardcoded so this keeps meaning "before tags" as migrations pile up.
-    old = makeDb('old.db', migrationsBefore('tags'));
+    old = makeDb('old.db', { upTo: migrationsBefore('tags') });
   });
 
   afterEach(() => {
@@ -295,21 +265,14 @@ describe('restore — a backup older than a feature', () => {
   const attachOld = () => live.sqlite.exec(`ATTACH DATABASE '${old.file}' AS backup`);
 
   it('is a fixture that really predates tags', () => {
-    // Without this the two tests below would pass by restoring an ordinary
-    // backup that happens to have no tags in it.
+    // Without this the test below would pass by restoring an ordinary backup
+    // that happens to have no tags in it.
     expect(tableExists(old.sqlite, 'main', 'tags')).toBe(false);
     expect(tableExists(old.sqlite, 'main', 'transaction_tags')).toBe(false);
     expect(tableExists(live.sqlite, 'main', 'tags')).toBe(true);
   });
 
-  it('accepts it instead of refusing it as a stranger', () => {
-    fill(old, 'from before tags');
-    attachOld();
-
-    expect(() => validateBackup(live.sqlite, 'backup')).not.toThrow();
-  });
-
-  it('restores it, and leaves the tags the old ledger never had', () => {
+  it('accepts it instead of refusing it as a stranger, and leaves the tags the old ledger never had', () => {
     fill(old, 'from before tags');
 
     // The live ledger has tags on a record. They belong to the ledger being
@@ -321,7 +284,7 @@ describe('restore — a backup older than a feature', () => {
     expect(countRows(live.sqlite, 'main', 'transaction_tags')).toBe(1);
 
     attachOld();
-    validateBackup(live.sqlite, 'backup');
+    expect(() => validateBackup(live.sqlite, 'backup')).not.toThrow();
     const copied = copyFromBackup(live.sqlite, 'backup');
 
     expect(copied.transactions).toBe(3);
@@ -337,17 +300,8 @@ describe('restore — a backup older than a feature', () => {
     expect(notes.map((n) => n.note)).not.toContain('about to be lost');
   });
 
-  it('still refuses a database missing a table Peace has always had', () => {
-    // The check that makes the one above safe: optional does not mean nothing
-    // is required, or any database at all would be restored over the ledger.
-    const stranger = makeDb('stranger.db');
-    stranger.sqlite.exec('DROP TABLE budgets');
-    stranger.sqlite.close();
-
-    live.sqlite.exec(`ATTACH DATABASE '${stranger.file}' AS stranger`);
-    expect(() => validateBackup(live.sqlite, 'stranger')).toThrow(/not a Peace backup/);
-    expect(() => validateBackup(live.sqlite, 'stranger')).toThrow(/budgets/);
-  });
+  // The other half — optional does not mean nothing is required — is asserted
+  // for EVERY original table, not one, in restore-compat.test.ts.
 });
 
 /**

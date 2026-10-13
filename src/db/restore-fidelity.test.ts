@@ -19,15 +19,11 @@
  * screen was lying.
  */
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
 
 import { openBackupPayload } from '../lib/backup-payload';
 import { packContainer } from '../lib/container';
-import * as schema from './schema';
+import { createFileDb, tempDir } from '../test/db';
 import { copyFromBackup, validateBackup } from './restore-core';
 import { addAttachment, listAttachments, missingFiles } from './repo/attachments';
 import { accountId, catId, seedDefaults } from './seed';
@@ -47,38 +43,10 @@ import {
 import { periodSummary } from './repo/records';
 import { createRecord, createTransfer } from './repo/transactions';
 
-const MIGRATIONS = path.resolve(__dirname, '../../drizzle');
 const PERIOD = '2026-08';
 const CARD = 'acct-kenana';
 
-function migrate(sqlite: Database.Database) {
-  sqlite.pragma('foreign_keys = ON');
-  const files = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
-  for (const file of files) {
-    for (const statement of fs
-      .readFileSync(path.join(MIGRATIONS, file), 'utf8')
-      .split('--> statement-breakpoint')) {
-      const trimmed = statement.trim();
-      if (trimmed) sqlite.exec(trimmed);
-    }
-  }
-  sqlite.exec(
-    'CREATE TABLE IF NOT EXISTS __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)'
-  );
-  for (let i = 0; i < files.length; i++) {
-    sqlite
-      .prepare('INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)')
-      .run(`m${i}`, i);
-  }
-}
-
-function makeDb(name: string) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peace-fidelity-'));
-  const file = path.join(dir, name);
-  const sqlite = new Database(file);
-  migrate(sqlite);
-  return { sqlite, db: drizzle(sqlite, { schema }), file };
-}
+const makeDb = (name: string) => createFileDb(name, { prefix: 'peace-fidelity-' });
 
 type Db = ReturnType<typeof makeDb>['db'];
 
@@ -445,7 +413,7 @@ describe('a restored ledger still means the same thing', () => {
 
       // Restore stages the unwrapped database and attaches THAT — so this is
       // the same path, not a shortcut around it.
-      const staged = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'peace-container-')), 'r.db');
+      const staged = path.join(tempDir('peace-container-'), 'r.db');
       fs.writeFileSync(staged, payload.database);
 
       live.sqlite.exec(`ATTACH DATABASE '${staged}' AS backup`);

@@ -9,6 +9,7 @@
  * not there.
  */
 import { createTestDb, type TestDb } from '../../test/db';
+import { augustNoon as on } from '../../test/dates';
 import { createAccount, getAccount, listAccountsWithBalance } from './accounts';
 import { entityName, checkDeletion, deleteEntity } from './archive';
 import { createCategory, getCategory, InvariantError } from './categories';
@@ -17,7 +18,6 @@ import { ensureTag, listTags, setRecordTags, tagsForRecord } from './tags';
 import { createRecord, createTransfer } from './transactions';
 import { EMPTY_QUERY, type SearchQuery } from '../../lib/search-query';
 
-const on = (day: number) => new Date(2026, 7, day, 12, 0);
 const q = (over: Partial<SearchQuery>): SearchQuery => ({ ...EMPTY_QUERY, ...over });
 
 function seed() {

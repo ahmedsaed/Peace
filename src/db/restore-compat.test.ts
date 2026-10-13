@@ -21,12 +21,9 @@
  * The fixtures are generated from the schema rather than written out, for the
  * same reason: a fixture built by hand describes the tables somebody remembered.
  */
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-
 import Database from 'better-sqlite3';
 
+import { createFileDb, migrationFiles } from '../test/db';
 import {
   copyFromBackup,
   countRows,
@@ -37,41 +34,9 @@ import {
   type RestoreTable,
 } from './restore-core';
 
-const MIGRATIONS = path.resolve(__dirname, '../../drizzle');
-
-const migrationFiles = (): string[] =>
-  fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
-
-/** Migrate a database as far as `count` migrations — a build from back then. */
-function migrate(sqlite: Database.Database, count = Infinity) {
-  sqlite.pragma('foreign_keys = ON');
-  const files = migrationFiles().slice(0, count);
-  for (const file of files) {
-    for (const statement of fs
-      .readFileSync(path.join(MIGRATIONS, file), 'utf8')
-      .split('--> statement-breakpoint')) {
-      const trimmed = statement.trim();
-      if (trimmed) sqlite.exec(trimmed);
-    }
-  }
-  sqlite.exec(
-    'CREATE TABLE IF NOT EXISTS __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)'
-  );
-  for (let i = 0; i < files.length; i++) {
-    sqlite
-      .prepare('INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)')
-      .run(`m${i}`, i);
-  }
-}
-
-/** A real database on disk, because ATTACH cannot reach an in-memory one. */
-function makeDb(name: string, count = Infinity) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peace-compat-'));
-  const file = path.join(dir, name);
-  const sqlite = new Database(file);
-  migrate(sqlite, count);
-  return { sqlite, file };
-}
+/** A database migrated as far as `count` migrations — a build from back then. */
+const makeDb = (name: string, count = Infinity) =>
+  createFileDb(name, { upTo: count, prefix: 'peace-compat-' });
 
 type Column = {
   name: string;
@@ -295,19 +260,6 @@ describe('a backup from every version of Peace there has ever been', () => {
     }
   });
 
-  it('still refuses a backup from a version NEWER than this build', () => {
-    // The one direction that must keep failing: a newer backup can hold rows
-    // and columns this build knows nothing about, and restoring it would drop
-    // them silently. Older is ordinary; newer is a data loss waiting to happen.
-    const newer = makeDb('newer.db');
-    newer.sqlite
-      .prepare('INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)')
-      .run('future', 999);
-    newer.sqlite.close();
-
-    const live = makeDb('live.db');
-    live.sqlite.exec(`ATTACH DATABASE '${newer.file}' AS backup`);
-    expect(() => validateBackup(live.sqlite, 'backup')).toThrow(/newer version/);
-    live.sqlite.close();
-  });
+  // A backup from a NEWER build is refused in restore-core.test.ts, which is
+  // the one direction that must keep failing.
 });

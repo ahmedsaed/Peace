@@ -3,6 +3,7 @@
  */
 import { EMPTY_QUERY, type SearchQuery } from '../../lib/search-query';
 import { createTestDb, type TestDb } from '../../test/db';
+import { augustNoon as on } from '../../test/dates';
 import { createAccount } from './accounts';
 import { categoryBreakdown } from './analysis';
 import { createCategory, InvariantError } from './categories';
@@ -22,7 +23,6 @@ import {
 } from './tags';
 import { createRecord, createTransfer, deleteRecord } from './transactions';
 
-const on = (day: number) => new Date(2026, 7, day, 12, 0);
 const PERIOD = '2026-08';
 const q = (over: Partial<SearchQuery> = {}): SearchQuery => ({ ...EMPTY_QUERY, ...over });
 
