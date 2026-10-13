@@ -7,7 +7,7 @@
 
 # Peace — Privacy Policy
 
-**Effective [EFFECTIVE DATE]** · Peace is made by Merope ([merope.dev](https://merope.dev)).
+**Effective 13 October 2026** · Peace is made by Merope ([merope.dev](https://merope.dev)).
 
 ## The short version
 
@@ -102,4 +102,4 @@ the top moves.
 
 ## Contact
 
-[SUPPORT EMAIL]
+support@merope.dev
