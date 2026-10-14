@@ -48,6 +48,16 @@ export const CSV_HEADER = [
    * and a space would make "Holiday 2026" two tags on the way back in.
    */
   'tags',
+  /**
+   * Appended. What a foreign-currency record was worth in the home currency
+   * when it was entered — the rate captured on the day, which the ledger keeps
+   * so last year's dollar purchase never changes price. Without it a USD
+   * record could not be imported back: the amount moves the account, and
+   * nothing in the file would say what it cost in pounds. Blank when the
+   * record is in the home currency already.
+   */
+  'home_amount',
+  'home_currency',
 ] as const;
 
 /** Local date and time, split, because a spreadsheet sorts and filters them separately. */
@@ -90,11 +100,19 @@ export function exportRows(db: Db): string[][] {
       isAdjustment: transactions.isAdjustment,
       isRefund: transactions.isRefund,
       reversesId: transactions.reversesId,
+      homeAmountMinor: transactions.homeAmountMinor,
+      homeCurrency: transactions.homeCurrency,
+      // Ordered in a SUBQUERY: SQLite applies an ORDER BY beside group_concat
+      // to nothing at all, so the same record exported its tags in whichever
+      // order they were attached — two exports of one ledger differing for no
+      // reason a person could see, and an import round trip that never matched.
       tagNames: sql<string | null>`(
-        select group_concat(${tags.name}, ';') from ${transactionTags}
-        join ${tags} on ${tags.id} = ${transactionTags.tagId}
-        where ${transactionTags.transactionId} = ${transactions.id}
-        order by ${tags.normalised}
+        select group_concat(name, ';') from (
+          select ${tags.name} as name from ${transactionTags}
+          join ${tags} on ${tags.id} = ${transactionTags.tagId}
+          where ${transactionTags.transactionId} = ${transactions.id}
+          order by ${tags.normalised}
+        )
       )`,
       accountName: accounts.name,
       counterAccountName: counter.name,
@@ -130,8 +148,23 @@ export function exportRows(db: Db): string[][] {
       row.isRefund ? '1' : '',
       row.reversesId ?? '',
       row.tagNames ?? '',
+      ...homeColumns(row),
     ];
   });
+}
+
+/** Blank for a record already in its home currency — there is nothing to say. */
+function homeColumns(row: {
+  currency: string;
+  homeAmountMinor: number | null;
+  homeCurrency: string | null;
+}): [string, string] {
+  if (row.homeAmountMinor === null || !row.homeCurrency) return ['', ''];
+  if (row.homeCurrency.toUpperCase() === row.currency.toUpperCase()) return ['', ''];
+  return [
+    minorToMajor(row.homeAmountMinor, row.homeCurrency).toFixed(decimalsFor(row.homeCurrency)),
+    row.homeCurrency,
+  ];
 }
 
 /** `peace-2026-08-10.csv` — sorts chronologically in a downloads folder. */

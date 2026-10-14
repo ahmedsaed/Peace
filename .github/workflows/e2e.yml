@@ -127,6 +127,9 @@ jobs:
             adb uninstall dev.merope.peace.oss || true
             adb install -r "$APK"
 
+            # Files the flows pick from the system picker (import.yaml).
+            bash scripts/e2e-fixtures.sh
+
             # The flows run against the RELEASE APK, never a dev build:
             # `clearState` wipes the dev client's packager URL and the next
             # launch dies on an embedded bundle a debug build does not have.

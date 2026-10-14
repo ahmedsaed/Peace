@@ -1,0 +1,6 @@
+date,time,type,amount,account,counter_account,category,parent_category,note,tags,is_refund
+2026-08-01,09:00,income,25000,Bank,,Salary,,Imported salary,,
+2026-08-03,13:30,expense,155.50,Cash,,Snacks,Food,Imported snack,trip,
+2026-08-05,,expense,80,Bank,,Clothing,,Returned socks,,1
+2026-08-06,,transfer,300,Bank,Wallet,,,ATM,,
+13/08/2026,,expense,5,Cash,,,,Bad date,,

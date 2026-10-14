@@ -305,6 +305,16 @@ export const transactions = sqliteTable(
       onDelete: 'set null',
     }),
 
+    /**
+     * The CSV import that wrote this row, if one did (`imports.id`).
+     *
+     * What makes an import undoable as ONE batch — after a restart, and after
+     * other records have been added around it. A bare id rather than a foreign
+     * key, like `reverses_id`: the import's own row is deleted by the undo,
+     * and nothing about the money depends on it.
+     */
+    importId: text('import_id'),
+
     occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().default(now),
@@ -321,6 +331,8 @@ export const transactions = sqliteTable(
     // never on a hot path, but a table scan per long press is not worth saving
     // one index on a column that is null for almost every row.
     index('idx_tx_reverses').on(table.reversesId),
+    // "Every row this import wrote" — asked once, by Undo.
+    index('idx_tx_import').on(table.importId),
   ]
 );
 
@@ -779,6 +791,31 @@ export const chatMessages = sqliteTable('chat_messages', {
 });
 
 // ---------------------------------------------------------------------------
+// CSV imports — one row per file brought in, so it can be taken back out
+// ---------------------------------------------------------------------------
+
+/**
+ * An import, kept so it can be UNDONE as a whole (`repo/imports.ts`).
+ *
+ * The records it wrote carry its id in `transactions.import_id`. What it
+ * CREATED to hold them — accounts, categories and tags named in the file that
+ * the ledger did not have — is listed here, because undoing an import that
+ * left "Groceries (2)" and an empty "Revolut" behind would be half an undo.
+ * They are removed only if nothing else has come to use them since.
+ */
+export const imports = sqliteTable('imports', {
+  id: text('id').primaryKey(),
+  /** What the file was called, for "Undo import of peace-2026-10-14.csv". */
+  fileName: text('file_name'),
+  recordCount: integer('record_count').notNull(),
+  /** JSON arrays of ids. */
+  createdAccountIds: text('created_account_ids').notNull().default('[]'),
+  createdCategoryIds: text('created_category_ids').notNull().default('[]'),
+  createdTagIds: text('created_tag_ids').notNull().default('[]'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+});
+
+// ---------------------------------------------------------------------------
 
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
@@ -804,3 +841,4 @@ export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
 export type ChatMessageRow = typeof chatMessages.$inferSelect;
 export type NewChatMessageRow = typeof chatMessages.$inferInsert;
+export type ImportRow = typeof imports.$inferSelect;

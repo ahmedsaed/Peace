@@ -84,6 +84,7 @@ export default function RootLayout() {
             />
             <Stack.Screen name="search" />
             <Stack.Screen name="export" />
+            <Stack.Screen name="import" />
             <Stack.Screen name="portfolio" />
             <Stack.Screen name="recurring" />
             <Stack.Screen name="about" />

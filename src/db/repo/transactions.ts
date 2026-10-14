@@ -54,6 +54,8 @@ export type RecordInput = {
    * a foreign key.
    */
   reversesId?: string | null;
+  /** The CSV import writing this row, so it can be undone as one batch. */
+  importId?: string | null;
 };
 
 export type TransferInput = {
@@ -83,6 +85,14 @@ export type TransferInput = {
    * a foreign key.
    */
   reversesId?: string | null;
+  /** The CSV import writing this transfer — both legs carry it. */
+  importId?: string | null;
+  /**
+   * Ids for the two legs, when they are known already: a Peace export carries
+   * them, and keeping them is what makes importing the same file twice a
+   * no-op rather than a second copy of every transfer.
+   */
+  ids?: { out?: string | null; in?: string | null; pair?: string | null };
 };
 
 function assertAmount(amountMinor: number): void {
@@ -150,6 +160,9 @@ export function createRecord(db: Db, input: RecordInput): Transaction {
       occurredAt: input.occurredAt ?? new Date(),
       recurringRuleId: input.recurringRuleId ?? null,
       reversesId: input.reversesId ?? null,
+      // Named only when set, so an ordinary record never mentions the column —
+      // the restore tests write into ledgers from before it existed.
+      ...(input.importId ? { importId: input.importId } : {}),
     })
     .run();
 
@@ -171,9 +184,9 @@ export function createTransfer(db: Db, input: TransferInput): { out: Transaction
     throw new InvariantError('A transfer needs two different accounts.');
   }
 
-  const pairId = newId();
-  const outId = newId();
-  const inId = newId();
+  const pairId = input.ids?.pair || newId();
+  const outId = input.ids?.out || newId();
+  const inId = input.ids?.in || newId();
   const occurredAt = input.occurredAt ?? new Date();
   const currency = input.currency ?? 'EGP';
   const fxRate = input.fxRate ?? 1;
@@ -185,6 +198,7 @@ export function createTransfer(db: Db, input: TransferInput): { out: Transaction
     occurredAt,
     transferPairId: pairId,
     recurringRuleId: input.recurringRuleId ?? null,
+    ...(input.importId ? { importId: input.importId } : {}),
     // A transfer has no category by definition — it is not spending.
     categoryId: null,
   };

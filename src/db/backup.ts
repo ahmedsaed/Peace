@@ -4,6 +4,7 @@ import { defaultDatabaseDirectory } from 'expo-sqlite';
 
 import { packContainer } from '../lib/container';
 import { toCsvFile } from '../lib/csv';
+import { importTemplate } from '../lib/import-csv';
 import { readReferencedFiles } from './attachments';
 import { DATABASE_NAME, db, sqliteDb } from './client';
 import { attachmentTotalBytes } from './repo/attachments';
@@ -64,6 +65,14 @@ export function csvExport(now = new Date()): Exported {
   const file = stagingFile(exportFilename(now, 'csv'));
   file.create();
   file.write(toCsvFile([[...CSV_HEADER], ...exportRows(db)]));
+  return verify(file);
+}
+
+/** A CSV to start an import from, in the format the importer reads. */
+export function importTemplateFile(homeCurrency: string): Exported {
+  const file = stagingFile('peace-import-template.csv');
+  file.create();
+  file.write(toCsvFile(importTemplate(homeCurrency)));
   return verify(file);
 }
 
