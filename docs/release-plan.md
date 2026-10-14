@@ -50,7 +50,7 @@ reads the version. Code that differs per flavor sits behind one small module per
 ## Phase 1 — De-personalise and polish
 
 - [x] Package name → `dev.merope.peace` (+ `.oss`); new Android OAuth clients for Drive
-      (`oss` client done in 1.16; the `play` client waits for Play's app-signing SHA-1 — Phase 4)
+      (`oss` client done in 1.16; the `play` client registered against Play's app-signing SHA-1 — Phase 4)
 - [x] `homeCurrency` default detected from the device locale (`expo-localization`), confirmed in onboarding
       (1.17 — the detected currency is written once, on a first launch, before Cash and Bank are seeded in it)
 - [x] Card handling worded generally — "installment plan" first, Murabaha as one kind of it, not the headline
@@ -76,9 +76,10 @@ reads the version. Code that differs per flavor sits behind one small module per
 - [x] **Themes**: Ledger, Graphite (true black), Paper and Mist (light), plus Match phone — Settings ›
       Appearance (1.23). Tokens are CSS variables set at the root; literals go through `useTheme()`
       and a test forbids importing the table into a screen. Every theme is checked for contrast and
-      for the income/expense pair under simulated colour blindness — which moved Ledger's expense
-      from salmon to rose, because the original pair was ΔE 5 apart under deuteranopia. Existing
-      installs keep Ledger; new ones follow the phone. Native dialogs follow through night mode.
+      for the income/expense pair under simulated colour blindness. Ledger's expense went to rose for
+      that in 1.23 and back to the salmon red in 1.24 (the rose read as pink); its deuteranopia pair is
+      a recorded waiver in `theme.test.ts`. Existing installs keep Ledger; new ones follow the phone.
+      Native dialogs follow through night mode.
 
 ## Phase 3 — Onboarding
 
@@ -105,15 +106,22 @@ layout on the screens that use them.
 
 - [x] Release builds an **AAB** for Play (`bundleRelease`) alongside the APK for GitHub, through the same reusable workflow
       — on request only: Actions › **Play bundle**, since every upload burns its versionCode
-- [ ] Play App Signing enrolled; upload key kept out of the repo like the current signing key
-- [ ] Drive OAuth: Android client for Play's app-signing SHA-1; consent screen to production with brand verification
+- [x] Play App Signing enrolled; upload key kept out of the repo like the current signing key
+      (2026-10-14. Upload key SHA-1 `56:46:7E:…:0F:7C` is our release key; Play's app-signing key is
+      `6C:21:29:A1:C3:56:6E:9B:93:50:DD:BE:10:4E:CD:CB:52:8A:B7:9A` — use the single "Copy SHA-1" at
+      the top of the page, not "copy all", which also lists the previous and quantum-ready keys)
+- [x] Drive OAuth: Android client for Play's app-signing SHA-1 (`dev.merope.peace`, the `6C:21…` key above),
+      in the same Cloud project as the `oss` client. Drive connect verified on the internal-test build
+      1.23.0 (269), 2026-10-14
+- [ ] OAuth consent screen published to production (in Testing, only listed test users can connect and
+      grants expire after 7 days), with brand verification if Google asks for it
 - [x] Notification-listener **prominent disclosure** screen, consent before deep-linking to settings.
       **Built once, with onboarding** — the onboarding step IS the disclosure, and the Settings card
       opens the same screen for anyone who skipped it. Play reviews closed-test builds too, so this
       must land **before the first AAB is uploaded**, even if the rest of onboarding is not done.
-- [x] Privacy policy + data-safety page on `peace.merope.dev` (`/privacy/`, `/data/`). **Still to do:** fill the
-      Play Data safety form from `site/content/data-safety.md` once the account is approved
-      (Gemini requests, Drive backup, notification contents read on device)
+- [x] Privacy policy + data-safety page on `peace.merope.dev` (`/privacy/`, `/data/`)
+- [x] Play Data safety form filled (2026-10-14): importable as `store/data-safety.csv`, explained in
+      `site/content/data-safety.md`; the deletion URL is `/delete/`
 - [x] Check the merged manifest's alarm permissions (`SCHEDULE_EXACT_ALARM` fine, `USE_EXACT_ALARM` needs a declaration)
       — neither is requested; expo-notifications falls back to inexact alarms
 - [x] Target SDK meets Play's current minimum (36)
@@ -121,7 +129,8 @@ layout on the screens that use them.
 - [x] Sideload → Play migration documented on the website (backup → install → restore) — `/move/`; flip
       `ON_PLAY` in `site/app/move/page.tsx` when the listing is public
 - [ ] Closed testing track: 12+ testers opted in for 14 consecutive days (mandatory — personal account). Testers join through a Google Group and an opt-in link, then install from the Play Store as normal.
-- [ ] Internal testing track for our own devices from day one (does not count towards the 12)
+- [x] Internal testing track for our own devices from day one (does not count towards the 12)
+      — 1.23.0 (269) released to it 2026-10-14
 
 ## Phase 5 — Features before launch
 
