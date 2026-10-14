@@ -29,7 +29,7 @@ must not open it one morning to a cream one.
 | `accent` | `#E3A33C` | `#E9AC48` | `#985A0C` | `#2B65A0` | FAB, active tab, progress fill, links |
 | `accent-ink` | `#17140F` | `#000000` | `#FFFFFF` | `#FFFFFF` | text/icons placed on `accent` |
 | `income` | `#9CC46A` | `#A3CC70` | `#3C6F18` | `#376D19` | money in |
-| `expense` | `#E8788F` | `#F07E97` | `#B03366` | `#B03366` | money out |
+| `expense` | `#E5806A` | `#F07E97` | `#B03366` | `#B03366` | money out |
 | `transfer` | `#75A8C4` | `#7DB3D1` | `#2D6A8F` | `#7A4FB0` | between own accounts |
 
 **Ledger** is the original: warm, low-contrast dark, chosen over a cool teal-slate and a near-black
@@ -48,10 +48,12 @@ under its own ink; each money colour at 4.5:1 on all three surfaces; income and 
 ΔE 20 apart under simulated protanopia, deuteranopia and tritanopia (Machado 2009), and transfer
 at least ΔE 12 from both.
 
-That last check changed Ledger. Its original salmon expense (`#E5806A`) sat ΔE **5** from its
-income under deuteranopia — effectively the same olive — while this document claimed the two were
-"separated by lightness". They were not. Expense moved to rose so the pair sits on opposite ends of
-the blue–yellow axis, which is the one a red–green deficiency keeps.
+Ledger is the one waiver. Its salmon expense (`#E5806A`) sits ΔE **9** from its income under
+deuteranopia, which is close to the same olive. Expense was moved to rose for 1.23.0, which passed,
+and moved back in 1.24.0 because the rose read as pink rather than as money going out. Every red that
+clears 20 against a yellow-green turns pink, so the choice is between the colour and the number. The
+test records the waiver with a floor of 8, so the pair cannot quietly get worse. Rule 1 below carries
+the meaning, and the other three themes clear the bar for anybody who needs the colour to do it.
 
 ## Rules
 
