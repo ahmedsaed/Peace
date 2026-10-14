@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppLockGate } from '@/components/app-lock';
 import palette from '@/constants/palette';
 import { DatabaseProvider } from '@/db/provider';
 import { BankCatchUp } from '@/state/bank';
@@ -88,6 +89,10 @@ export default function RootLayout() {
             <Stack.Screen name="about" />
             <Stack.Screen name="assistant" />
           </Stack>
+          {/* After the navigator, so it covers every screen without being
+              one of them — locking never unmounts a half-typed record. Off
+              unless switched on in Settings › App lock. */}
+          <AppLockGate />
         </DatabaseProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -1,0 +1,107 @@
+appId: dev.merope.peace.oss
+---
+# The app lock against a real screen lock. Run with `npm run e2e:lock`, which
+# sets the device PIN to 1111 first and always clears it afterwards: the rest of
+# the suite expects a phone with no screen lock, and app-lock.yaml asserts it.
+#
+# Android's own prompt is a system window. Maestro reads its hierarchy and
+# types into it like any other field; it cannot be screenshotted (FLAG_SECURE),
+# which is why this asserts on text rather than looking.
+- launchApp:
+    clearState: true
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-section-lock"
+    direction: DOWN
+- tapOn:
+    id: "settings-section-lock"
+- assertNotVisible:
+    id: "lock-notice"
+
+# Turning it on asks first — a lock that has never been opened might not open.
+- tapOn:
+    id: "setting-lock"
+- extendedWaitUntil:
+    visible:
+      text: "Turn on the app lock"
+    timeout: 10000
+- inputText: "1111"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      id: "lock-after-1min"
+    timeout: 10000
+- assertVisible:
+    id: "setting-lock"
+    checked: true
+
+# Locks on any return.
+- tapOn:
+    id: "lock-after-now"
+- pressKey: Home
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible:
+      text: "Unlock Peace"
+    timeout: 10000
+
+# Cancelling leaves the lock screen, not a loop of prompts.
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      id: "app-lock-unlock"
+    timeout: 10000
+- assertNotVisible:
+    text: "Unlock Peace"
+
+- tapOn:
+    id: "app-lock-unlock"
+- extendedWaitUntil:
+    visible:
+      text: "Unlock Peace"
+    timeout: 10000
+- inputText: "1111"
+- pressKey: Enter
+
+# Back exactly where it was — locking never unmounts a screen.
+- extendedWaitUntil:
+    visible:
+      id: "settings-lock"
+    timeout: 10000
+- assertNotVisible:
+    id: "app-lock"
+
+# And the index says so, on a different screen.
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-section-lock-summary"
+    text: "Screen lock · every time"
+
+# A cold start is locked from the first frame.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      text: "Unlock Peace"
+    timeout: 15000
+- inputText: "1111"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 10000

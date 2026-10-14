@@ -16,5 +16,6 @@ export const SECTIONS = {
   ai: { emblem: 'sparkle', color: '#2F8A78' },
   bank: { emblem: 'bank', color: '#2F6FA8' },
   backup: { emblem: 'cloud', color: '#6E8B3D' },
+  lock: { emblem: 'lock', color: '#A8475C' },
   setup: { emblem: 'check', color: '#6B5B4A' },
 } as const;
