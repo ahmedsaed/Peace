@@ -1,0 +1,80 @@
+appId: dev.merope.peace.oss
+---
+# Themes. A fresh install follows the phone; choosing a theme is said on the
+# Settings index — a DIFFERENT screen from the one it was chosen on — and
+# survives a restart. The colours themselves cannot be asserted by a flow:
+# `theme.test.ts` checks every theme's contrast and colour-blind separation,
+# and the screens were looked at in each theme by hand.
+- launchApp:
+    clearState: true
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "settings-screen"
+
+# A new install has no habit to keep, so it follows the phone — and says what
+# that means right now.
+- assertVisible:
+    id: "settings-section-appearance-summary"
+    text: "Match phone · (Ledger|Paper) now"
+
+- tapOn:
+    id: "settings-section-appearance"
+- assertVisible:
+    id: "settings-appearance"
+- assertVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-system"
+
+- tapOn:
+    id: "theme-option-paper"
+- assertVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-paper"
+- assertNotVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-system"
+- back
+
+- assertVisible:
+    id: "settings-section-appearance-summary"
+    text: "Paper"
+
+# Kept across a restart: it is a setting in the ledger, not screen state.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 60000
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "settings-section-appearance-summary"
+    text: "Paper"
+
+# A second choice moves it again — the row is not stuck on the first answer.
+- tapOn:
+    id: "settings-section-appearance"
+- tapOn:
+    id: "theme-option-graphite"
+- back
+- assertVisible:
+    id: "settings-section-appearance-summary"
+    text: "Graphite"

@@ -73,10 +73,12 @@ reads the version. Code that differs per flavor sits behind one small module per
       (1.20 — months start on any day 1–28 and are named after the calendar month holding most of
       them; Records, Budgets, Analysis, carry-forward, search's month chips and Penny all follow.
       The week start reaches the date picker and Penny's week buckets, the only week-shaped things.)
-- [ ] **Themes**: palette → CSS variables (NativeWind `vars()`); Tailwind colours as
-      `rgb(var(--x) / <alpha-value>)`; the ~130 `palette.x` literals go through a `useTheme()` hook;
-      remove the dark-only plugin so a light theme is possible. Every preset is checked for contrast
-      and for the income/expense pair under colour-blindness simulation.
+- [x] **Themes**: Ledger, Graphite (true black), Paper and Mist (light), plus Match phone — Settings ›
+      Appearance (1.23). Tokens are CSS variables set at the root; literals go through `useTheme()`
+      and a test forbids importing the table into a screen. Every theme is checked for contrast and
+      for the income/expense pair under simulated colour blindness — which moved Ledger's expense
+      from salmon to rose, because the original pair was ΔE 5 apart under deuteranopia. Existing
+      installs keep Ledger; new ones follow the phone. Native dialogs follow through night mode.
 
 ## Phase 3 — Onboarding
 

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import { formatBytes } from '@/db/backup';
 import { checkLatestBackup, listDriveBackups, restoreFromDrive, runBackup } from '@/db/drive';
 import { currentCounts, refreshAfterRestore } from '@/db/restore';
@@ -13,6 +12,7 @@ import { assertUsablePassphrase, MIN_PASSPHRASE } from '@/lib/seal';
 import { getPassphrase, setPassphrase } from '@/lib/secrets';
 import { useSetting, useSettingsStore } from '@/state/settings';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 type Busy = 'connect' | 'backup' | 'check' | 'passphrase' | 'list' | 'restore' | null;
 
@@ -30,6 +30,7 @@ type Busy = 'connect' | 'backup' | 'check' | 'passphrase' | 'list' | 'restore' |
  * nobody notices for a month is the only truly bad outcome here.
  */
 export function DriveBackup() {
+  const palette = useTheme();
   const account = useSetting('driveAccount');
   const cadence = useSetting('driveCadence');
   const update = useSettingsStore((state) => state.update);

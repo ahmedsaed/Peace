@@ -23,13 +23,14 @@ describe('firstRunSettings', () => {
       homeCurrency: 'EGP',
       onboardingDone: false,
       setupCard: true,
+      theme: 'system',
     });
   });
 
   it('lets a test harness skip onboarding and pin the currency', () => {
     expect(
       firstRunSettings({ [LAUNCH_ONBOARDING]: 'done', [LAUNCH_CURRENCY]: 'jpy' }, egypt)
-    ).toEqual({ homeCurrency: 'JPY', onboardingDone: true, setupCard: false });
+    ).toEqual({ homeCurrency: 'JPY', onboardingDone: true, setupCard: false, theme: 'system' });
   });
 
   it('ignores a malformed currency extra rather than storing it', () => {

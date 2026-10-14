@@ -17,7 +17,6 @@ import { RecordActions, type ReversalContext } from '@/components/record-actions
 import { RecordRow } from '@/components/record-row';
 import { Snackbar } from '@/components/snackbar';
 import { EmptyState, StackHeader } from '@/components/screen';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { listCategoryTree } from '@/db/repo/categories';
@@ -40,6 +39,7 @@ import {
 } from '@/lib/search-query';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
+import { useTheme } from '@/state/theme';
 
 /**
  * How long to wait after a keystroke before querying.
@@ -56,6 +56,7 @@ const DEBOUNCE_MS = 180;
 const ANY = 'filter-any';
 
 export default function SearchScreen() {
+  const palette = useTheme();
   const money = useMoney();
   const router = useRouter();
   const homeCurrency = useSetting('homeCurrency');
@@ -564,6 +565,7 @@ function FilterRow({
   onPress: () => void;
   testID: string;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -621,6 +623,7 @@ function FilterPanel({
   onClear: () => void;
   canClear: boolean;
 }) {
+  const palette = useTheme();
   const label = (text: string) => (
     <Text className="mb-1.5 text-[10px] uppercase tracking-widest text-muted">{text}</Text>
   );

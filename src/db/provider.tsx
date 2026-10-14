@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import migrations from '../../drizzle/migrations';
-import palette from '../constants/palette';
+import { THEMES } from '../constants/themes';
 import { useLockStore } from '../state/app-lock';
 import { useSettingsStore } from '../state/settings';
 import { sweepOrphans } from './attachments';
@@ -52,6 +52,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         setSetting('homeCurrency', first.homeCurrency);
         setSetting('onboardingDone', first.onboardingDone);
         setSetting('setupCard', first.setupCard);
+        setSetting('theme', first.theme);
       }
 
       seedDefaults(db, getSetting('homeCurrency'));
@@ -115,7 +116,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   if (!success) {
     return (
       <View className="flex-1 items-center justify-center bg-ground">
-        <ActivityIndicator color={palette.accent} />
+        {/* Before settings are read, so before the theme is known: Ledger, as
+            the :root variables are. */}
+        <ActivityIndicator color={THEMES.ledger.colors.accent} />
       </View>
     );
   }

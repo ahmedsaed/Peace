@@ -3,10 +3,10 @@ import { AppState, BackHandler, Image, Modal, Pressable, Text, View } from 'reac
 
 import { Icon } from '@/components/icon';
 import { Wordmark } from '@/components/wordmark';
-import palette from '@/constants/palette';
 import { lockActive, lockDue } from '@/lib/app-lock';
 import { readDeviceLock, unlock, useLockStore } from '@/state/app-lock';
 import { useSettingsStore } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 import { hideFromRecents } from '../../modules/recents-privacy/src/RecentsPrivacyModule';
 
@@ -29,6 +29,7 @@ import { hideFromRecents } from '../../modules/recents-privacy/src/RecentsPrivac
  * frame of somebody's spending to whoever picked the phone up.
  */
 export function AppLockGate() {
+  const palette = useTheme();
   const enabled = useSettingsStore((state) => state.settings.lockEnabled);
   const after = useSettingsStore((state) => state.settings.lockAfter);
   const locked = useLockStore((state) => state.locked);
@@ -111,6 +112,7 @@ export function AppLockGate() {
 }
 
 function LockScreen() {
+  const palette = useTheme();
   const prompting = useLockStore((state) => state.prompting);
   const problem = useLockStore((state) => state.problem);
   return (

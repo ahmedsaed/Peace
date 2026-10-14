@@ -1,6 +1,6 @@
 /*
  * The app's "Ledger" palette (docs/design-system.md), so the site and the app
- * read as one thing. Dark only, like the app.
+ * read as one thing. Dark, in Ledger — the app's original theme.
  */
 :root {
   --ground: #17140f;
@@ -11,8 +11,8 @@
   --muted: #9a8e79;
   --accent: #e3a33c;
   --accent-ink: #17140f;
-  --income: #8fbf6a;
-  --expense: #e5806a;
+  --income: #9cc46a;
+  --expense: #e8788f;
   --transfer: #75a8c4;
 
   --gutter: 16px;

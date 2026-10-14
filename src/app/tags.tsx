@@ -8,7 +8,6 @@ import { EntityActions, type EntityItem } from '@/components/entity-actions';
 import { Snackbar } from '@/components/snackbar';
 import { Icon } from '@/components/icon';
 import { StackHeader } from '@/components/screen';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { checkDeletion, deleteEntity } from '@/db/repo/archive';
 import { InvariantError } from '@/db/repo/categories';
@@ -16,6 +15,7 @@ import { listTags, renameTag, setTagArchived, tagUsage } from '@/db/repo/tags';
 import type { Tag } from '@/db/schema';
 import { recordCount } from '@/lib/entity-actions';
 import { idSlug } from '@/lib/slug';
+import { useTheme } from '@/state/theme';
 
 /**
  * Every tag there is, which no other screen could show.
@@ -241,6 +241,7 @@ function TagRow({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}

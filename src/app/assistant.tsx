@@ -17,7 +17,6 @@ import { TypingIndicator } from '@/components/assistant/typing';
 import { Icon } from '@/components/icon';
 import { HeaderButton, StackHeader } from '@/components/screen';
 import { Snackbar } from '@/components/snackbar';
-import palette from '@/constants/palette';
 import { attachFromCamera, attachFromFiles, type StagedAttachment } from '@/db/attachments';
 import { db } from '@/db/client';
 import type { RecordRow } from '@/db/repo/records';
@@ -30,6 +29,7 @@ import { useMoney } from '@/state/money';
 import { useAi } from '@/state/ai';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSetting } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 /**
  * The assistant: one ongoing conversation about the user's own money.
@@ -53,6 +53,7 @@ const STARTERS = [
 type Drill = { title: string; subtitle?: string; rows: RecordRow[] };
 
 export default function AssistantScreen() {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   /**
    * LIFTED BY HAND. The manifest says `adjustResize`, and on an edge-to-edge
@@ -356,6 +357,7 @@ const GATES = {
 
 /** Why Penny cannot answer, and the one place that fixes it. */
 function Gate({ reason }: { reason: keyof typeof GATES }) {
+  const palette = useTheme();
   const gate = GATES[reason];
   return (
     <View className="flex-1 items-center justify-center gap-3 px-8" testID={`assistant-gate-${reason}`}>
@@ -408,6 +410,7 @@ function ItemView({
   onRecords: (title: string, subtitle: string, rows: RecordRow[]) => void;
   onOpenFile: (file: StagedAttachment) => void;
 }) {
+  const palette = useTheme();
   switch (item.type) {
     case 'user':
       return (

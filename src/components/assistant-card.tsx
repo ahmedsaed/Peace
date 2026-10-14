@@ -16,12 +16,13 @@ import { useCallback } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
 import { ModelRow } from '@/components/model-picker';
-import palette from '@/constants/palette';
 import { useAi } from '@/state/ai';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSettingsStore } from '@/state/settings';
+import { useSwitchColors } from '@/state/theme';
 
 export function AssistantCard() {
+  const switchColors = useSwitchColors();
   // Shown on only when Penny can answer — a key, Use AI and this switch. With
   // no key the switch is off and muted; her own setting is kept for later.
   const ai = useAi();
@@ -53,8 +54,7 @@ export function AssistantCard() {
           disabled={!ai.ready}
           testID="assistant-enabled"
           accessibilityLabel="Use Penny"
-          trackColor={{ false: palette.line, true: palette.accent }}
-          thumbColor={palette.ink}
+          {...switchColors}
         />
       </View>
 

@@ -2,11 +2,11 @@
   "expo": {
     "name": "Peace",
     "slug": "peace",
-    "version": "1.22.0",
+    "version": "1.23.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "peace",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#17140F",
@@ -79,7 +79,7 @@
       ],
       "expo-document-picker",
       "@react-native-community/datetimepicker",
-      "./plugins/with-dark-theme",
+      "./plugins/with-native-theme",
       "./plugins/with-release-signing"
     ],
     "experiments": {

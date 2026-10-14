@@ -1,6 +1,6 @@
 import { Text, type TextStyle } from 'react-native';
 
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 
 /**
  * The app's name, set in Pacifico.
@@ -18,7 +18,7 @@ export const WORDMARK_FONT = 'Pacifico_400Regular';
 
 export function Wordmark({
   size = 26,
-  color = palette.accent,
+  color,
   style,
   testID,
 }: {
@@ -27,6 +27,8 @@ export function Wordmark({
   style?: TextStyle;
   testID?: string;
 }) {
+  const palette = useTheme();
+  color ??= palette.accent;
   return (
     <Text
       testID={testID}

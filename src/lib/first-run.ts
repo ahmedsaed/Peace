@@ -38,6 +38,8 @@ export type FirstRun = {
   onboardingDone: boolean;
   /** The Records card that lists what was skipped. */
   setupCard: boolean;
+  /** A new install follows the phone; an existing one keeps Ledger. */
+  theme: 'system';
 };
 
 export function firstRunSettings(
@@ -52,5 +54,6 @@ export function firstRunSettings(
     // A flow that skipped onboarding is testing something else, and a card
     // above the first record would move every row it taps.
     setupCard: !skip,
+    theme: 'system',
   };
 }

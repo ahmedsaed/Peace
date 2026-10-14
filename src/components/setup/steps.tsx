@@ -17,7 +17,6 @@ import {
   StepFrame,
 } from '@/components/setup/frame';
 import { Wordmark } from '@/components/wordmark';
-import palette from '@/constants/palette';
 import { SECTIONS } from '@/constants/sections';
 import { openListenerSettings, setCapturing } from '@/db/bank-inbox';
 import { db } from '@/db/client';
@@ -35,6 +34,7 @@ import { useMoney } from '@/state/money';
 import { requestReminderPermission, syncReminders } from '@/state/reminders';
 import { bankAccess } from '@/state/setup';
 import { useSettingsStore } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 /** Each step's colour — shared with Settings, so a section looks like its step. */
 const COLOR: Record<SetupStep | 'done', string> = {
@@ -86,6 +86,7 @@ export function WelcomeStep({
   onRestore: () => void;
   onSkipAll: () => void;
 }) {
+  const palette = useTheme();
   return (
     <View className="flex-1" testID="setup-welcome">
       <View className="flex-row justify-end px-4 pt-2">
@@ -140,6 +141,7 @@ export function WelcomeStep({
 // --------------------------------------------------------------- currency --
 
 export function CurrencyStep({ eyebrow, onDone, onSkip }: StepProps) {
+  const palette = useTheme();
   const money = useMoney();
   const home = useSettingsStore((s) => s.settings.homeCurrency);
   const update = useSettingsStore((s) => s.update);
@@ -242,6 +244,7 @@ const asTyped = (minor: number, currency: string) =>
   minor === 0 ? '' : String(minorToMajor(minor, currency));
 
 export function AccountsStep({ eyebrow, onDone, onSkip }: StepProps) {
+  const palette = useTheme();
   const [drafts, setDrafts] = useState<Draft[]>(() =>
     listAccountsWithBalance(db).map((a) => ({
       id: a.id,
@@ -320,7 +323,7 @@ export function AccountsStep({ eyebrow, onDone, onSkip }: StepProps) {
                 <View
                   className="h-11 w-11 items-center justify-center rounded-full"
                   style={{ backgroundColor: d.color }}>
-                  <Icon name={d.icon} size={20} color={palette.ink} />
+                  <Icon name={d.icon} size={20} color="#FFFFFF" />
                 </View>
                 <TextInput
                   value={d.name}
@@ -426,6 +429,7 @@ export function KeypadStep({ eyebrow, onDone, onSkip }: StepProps) {
 // --------------------------------------------------------------- reminder --
 
 export function ReminderStep({ eyebrow, onDone, onSkip }: StepProps) {
+  const palette = useTheme();
   const hour = useSettingsStore((s) => s.settings.reminderHour);
   const minute = useSettingsStore((s) => s.settings.reminderMinute);
   const update = useSettingsStore((s) => s.update);
@@ -522,6 +526,7 @@ export function ReminderStep({ eyebrow, onDone, onSkip }: StepProps) {
 const KEY_PAGE = 'https://aistudio.google.com/apikey';
 
 export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
+  const palette = useTheme();
   const save = useGeminiKeyStore((s) => s.save);
   const hasKey = useGeminiKeyStore((s) => s.hasKey);
   const [draft, setDraft] = useState('');
@@ -637,6 +642,7 @@ const DISCLOSURE = [
 ];
 
 export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
+  const palette = useTheme();
   const senders = useSettingsStore((s) => s.settings.bankSenders);
   const update = useSettingsStore((s) => s.update);
   const hasKey = useGeminiKeyStore((s) => s.hasKey);
@@ -882,6 +888,7 @@ export function BackupStep({ eyebrow, onDone, onSkip }: StepProps) {
 }
 
 function BackupOption({ icon, title, body }: { icon: string; title: string; body: string }) {
+  const palette = useTheme();
   return (
     <View className="flex-row gap-3 rounded-2xl bg-surface p-4">
       <Icon name={icon} size={20} color={palette.muted} />
@@ -896,6 +903,7 @@ function BackupOption({ icon, title, body }: { icon: string; title: string; body
 // ------------------------------------------------------------------- done --
 
 export function DoneStep({ facts, onFinish }: { facts: SetupFacts; onFinish: () => void }) {
+  const palette = useTheme();
   const left = SETUP_STEPS.filter((step) => !stepDone(step, facts)).length;
   return (
     <StepFrame

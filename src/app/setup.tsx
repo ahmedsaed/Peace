@@ -17,10 +17,10 @@ import {
   WelcomeStep,
   type StepProps,
 } from '@/components/setup/steps';
-import palette from '@/constants/palette';
 import { isSetupStep, SETUP_STEPS, type SetupStep } from '@/lib/setup';
 import { useSettingsStore } from '@/state/settings';
 import { useCompleteStep, useSetupFacts } from '@/state/setup';
+import { useTheme } from '@/state/theme';
 
 const STEPS: Record<SetupStep, (props: StepProps) => React.ReactNode> = {
   currency: CurrencyStep,
@@ -51,6 +51,7 @@ const LAST = SETUP_STEPS.length + 1;
  * agreed to anything in.
  */
 export default function SetupScreen() {
+  const palette = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { step: only } = useLocalSearchParams<{ step?: string }>();
@@ -155,6 +156,7 @@ export default function SetupScreen() {
  * half-lit, so the bar says where you are without a number to read.
  */
 function Progress({ index, onBack }: { index: number; onBack: () => void }) {
+  const palette = useTheme();
   return (
     <View className="flex-row items-center gap-3 px-2 pt-1" testID="setup-progress">
       <Pressable

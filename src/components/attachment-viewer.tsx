@@ -18,7 +18,7 @@ import { Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 import { attachmentExists, attachmentUri, type StagedAttachment } from '@/db/attachments';
 import { isImageMime } from '@/lib/attachment';
 import { formatBytes } from '@/db/backup';
@@ -29,6 +29,7 @@ type Props = {
 };
 
 export function AttachmentViewer({ attachment, onClose }: Props) {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
 

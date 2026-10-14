@@ -949,6 +949,22 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   nothing has used since. A new column on `transactions` also broke `restore-core.test.ts`'s
   old-backup fixture — drizzle names every column it knows in an insert — so fixtures for an OLD
   schema are written in raw SQL with the columns that schema had.
+- **A colour on screen comes from the ACTIVE theme — a class name, or `useTheme()`, never the
+  table.** Four themes live in `src/constants/themes.js`; Tailwind colours are CSS variables that
+  `ThemeRoot` (`src/state/theme.tsx`) sets at the root, so `bg-surface` needs nothing. A colour as
+  a VALUE (SVG fill, navigator option, icon `color`) is `const palette = useTheme()` inside the
+  component — a module-level copy is invisible to the React Compiler and stays the old theme's, the
+  same trap as `usePeriodLabel`. `no-static-colours.test.ts` fails a UI file that imports the table.
+  Three things that bit while converting: an icon on a CATEGORY colour is `#FFFFFF`, never `ink`
+  (near-white in Ledger, dark brown in Paper); a light theme's `raised` is DARKER than `surface`,
+  so "one step lighter" is not what it means; and a `Switch` takes `useSwitchColors()`, because an
+  `ink` thumb is a dark blob in a light theme. **Every theme is checked by `theme.test.ts`** —
+  contrast for text and accent, and income against expense under simulated colour blindness — so a
+  new theme or a nudged hex has to pass numbers, not an eye. Android's own dialogs follow the theme
+  through night mode (`Appearance.setColorScheme`) and day/night colour resources from
+  `plugins/with-native-theme.js`. An install from before themes has no row and reads **Ledger**;
+  only a first launch writes `system`. **Flows run in whatever the emulator's night mode picks** —
+  a fresh install follows the phone — so the test AVD, in light mode, runs the suite in Paper.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.

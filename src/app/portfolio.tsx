@@ -3,7 +3,6 @@ import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 
 import { Icon } from '@/components/icon';
 import { StackHeader } from '@/components/screen';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import {
   createAssetClass,
@@ -25,6 +24,7 @@ import {
 } from '@/lib/portfolio';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
+import { useTheme } from '@/state/theme';
 
 /**
  * Keeping an investment portfolio near its target allocation.
@@ -40,6 +40,7 @@ import { useMoney } from '@/state/money';
  * on until you were going to invest anyway.
  */
 export default function PortfolioScreen() {
+  const palette = useTheme();
   const currency = useSetting('homeCurrency');
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((v) => v + 1), []);

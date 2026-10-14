@@ -25,7 +25,7 @@ import { memo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 import { attachmentExists, attachmentUri, type StagedAttachment } from '@/db/attachments';
 import { isImageMime, shortName } from '@/lib/attachment';
 
@@ -84,6 +84,7 @@ const Preview = memo(function Preview({
   onRead?: () => void;
   reading: boolean;
 }) {
+  const palette = useTheme();
   const missing = !attachmentExists(attachment.fileName);
   const image = isImageMime(attachment.mimeType) && !missing;
   const label = attachment.originalName ?? 'Receipt';
@@ -177,6 +178,7 @@ function SquareButton({
   testID: string;
   badge?: number;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}

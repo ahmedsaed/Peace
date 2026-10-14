@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
-import palette from '@/constants/palette';
 import { useKeyboardHeight } from '@/lib/layout';
 import { describeRecurrence, type Frequency, type Recurrence } from '@/lib/recurrence';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 /**
  * How often a record repeats — and NOTHING ELSE.
@@ -55,6 +55,7 @@ export function RepeatSheet({
   onClose: () => void;
   onChange: (repeat: Repeat | null) => void;
 }) {
+  const palette = useTheme();
   const [draft, setDraft] = useState<Repeat>(
     value ?? { frequency: 'monthly', interval: 1, anchorDay: null, endsOn: null }
   );

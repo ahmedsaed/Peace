@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 
 /**
  * What has been put away, at the foot of the list it was put away from.
@@ -36,6 +36,7 @@ export function ArchivedGroup({
   children: React.ReactNode;
   testID: string;
 }) {
+  const palette = useTheme();
   const [open, setOpen] = useState(false);
 
   // Nothing put away, nothing to say. The group appears the moment there is

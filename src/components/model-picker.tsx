@@ -4,9 +4,9 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
-import palette from '@/constants/palette';
 import { GeminiError, listModels, type GeminiModel } from '@/lib/gemini';
 import { getGeminiKey } from '@/lib/secrets';
+import { useTheme } from '@/state/theme';
 
 /**
  * Choosing a Gemini model from the list Google returns for this key.
@@ -35,6 +35,7 @@ export function ModelRow({
   sheetTitle: string;
   testIDPrefix: string;
 }) {
+  const palette = useTheme();
   const [models, setModels] = useState<GeminiModel[] | null>(null);
   const [listing, setListing] = useState(false);
   const [error, setError] = useState<string | null>(null);

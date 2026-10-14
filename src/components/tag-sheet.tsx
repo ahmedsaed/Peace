@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import type { Tag } from '@/db/schema';
 import { useKeyboardHeight } from '@/lib/layout';
 import { isNewTagName, tagKey, tagNameProblem } from '@/lib/tag';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 /**
  * Choosing labels. ONLY choosing them.
@@ -44,6 +44,7 @@ export function TagSheet({
   onClose: () => void;
   testID?: string;
 }) {
+  const palette = useTheme();
   const keyboardHeight = useKeyboardHeight();
   const [draft, setDraft] = useState('');
 
@@ -180,6 +181,7 @@ export function TagChips({
   names: string[];
   onOpen: () => void;
 }) {
+  const palette = useTheme();
   return (
     <View className="mt-2 flex-row flex-wrap items-center gap-1.5" testID="tag-chips">
       {names.map((name) => (

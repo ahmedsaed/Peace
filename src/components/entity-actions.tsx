@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import {
   archiveHint,
   archiveLabel,
@@ -17,6 +16,7 @@ import {
   type EntitySubject,
 } from '@/lib/entity-actions';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 /**
  * One account, category or tag, as everything a long press needs to know.
@@ -282,6 +282,7 @@ function Action({
   testID: string;
   danger?: boolean;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}

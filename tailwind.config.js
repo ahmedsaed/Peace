@@ -1,24 +1,31 @@
-const palette = require('./src/constants/palette.js');
+const { TOKENS, THEMES, cssVariables } = require('./src/constants/themes.js');
 
 /** @type {import('tailwindcss').Config} */
 
 /**
- * Palette: "Ledger" — warm, low-contrast dark. Chosen in Stage 0; see
- * docs/design-system.md for the rationale and the two rejected directions.
+ * Colours are THEMED: every token is a CSS variable, set at the root from the
+ * active theme (src/state/theme.tsx). Values live in src/constants/themes.js;
+ * nothing outside that file hard-codes a hex value for the chrome.
  *
- * Colour values live in src/constants/palette.js so that TypeScript can share
- * them with the places that need literals rather than class names. Nothing
- * outside that file should hard-code a hex value.
+ * `<alpha-value>` keeps opacity modifiers working — `border-expense/40` is the
+ * theme's expense at 40%, whichever theme that is.
  *
- * The app is dark-only, so these are plain colours rather than dark: variants.
+ * The `:root` block is Ledger, so anything drawn before the theme is known —
+ * the database gate, the very first frame — is drawn in the original colours.
  */
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
   theme: {
     extend: {
-      colors: palette,
+      colors: Object.fromEntries(
+        TOKENS.map((token) => [token, `rgb(var(--color-${token}) / <alpha-value>)`])
+      ),
     },
   },
-  plugins: [],
+  plugins: [
+    ({ addBase }) => {
+      addBase({ ':root': cssVariables(THEMES.ledger.colors) });
+    },
+  ],
 };

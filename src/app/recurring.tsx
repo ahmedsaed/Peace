@@ -4,12 +4,12 @@ import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { EmptyState, StackHeader } from '@/components/screen';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { deleteRule, listRules, nextProposalDate, setRuleActive } from '@/db/repo/recurring';
 import { describeRecurrence, fromYmd } from '@/lib/recurrence';
 import { useMoney } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 type Rule = ReturnType<typeof listRules>[number];
 
@@ -142,6 +142,7 @@ function RuleRow({
   first: boolean;
   onLongPress: () => void;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   const schedule = describeRecurrence({
     frequency: rule.frequency,
@@ -267,6 +268,7 @@ function Action({
   testID: string;
   danger?: boolean;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}

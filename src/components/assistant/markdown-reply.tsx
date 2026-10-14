@@ -3,9 +3,10 @@ import { EnrichedMarkdownText, type MarkdownStyle } from 'react-native-enriched-
 
 import { cursorUrl, toDisplayMarkdown } from '@/assistant/display-markdown';
 import type { Figure } from '@/assistant/figures';
-import palette from '@/constants/palette';
 import { AMOUNT_MASK } from '@/lib/money';
+import type { ThemeColors } from '@/lib/theme';
 import { useAmountsHidden, useMoney } from '@/state/money';
+import { useTheme } from '@/state/theme';
 
 /**
  * One of Penny's replies, as native rich text.
@@ -22,55 +23,56 @@ import { useAmountsHidden, useMoney } from '@/state/money';
  * and animated by our patch to the renderer — see `toDisplayMarkdown`.
  */
 
-const STYLE: MarkdownStyle = {
-  paragraph: { fontSize: 15, lineHeight: 22, color: palette.ink, marginTop: 0, marginBottom: 8 },
-  h1: { fontSize: 19, lineHeight: 26, fontWeight: '700', color: palette.ink, marginTop: 4, marginBottom: 6 },
-  h2: { fontSize: 17, lineHeight: 24, fontWeight: '700', color: palette.ink, marginTop: 4, marginBottom: 6 },
-  h3: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: palette.ink, marginTop: 4, marginBottom: 4 },
-  h4: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: palette.ink },
-  h5: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: palette.ink },
-  h6: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: palette.muted },
-  strong: { fontWeight: 'bold', color: palette.ink },
-  em: { fontStyle: 'italic', color: palette.ink },
-  list: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: palette.ink,
-    bulletColor: palette.muted,
-    markerColor: palette.muted,
-    gapWidth: 8,
-    marginLeft: 6,
-    itemSpacing: 2,
-    marginBottom: 8,
-  },
-  blockquote: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: palette.muted,
-    borderColor: palette.line,
-    borderWidth: 3,
-    gapWidth: 10,
-    marginBottom: 8,
-  },
-  code: { color: palette.ink, backgroundColor: palette.raised, borderColor: palette.line, fontSize: 13 },
-  codeBlock: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: palette.ink,
-    backgroundColor: palette.surface,
-    borderColor: palette.line,
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 10,
-    marginBottom: 8,
-  },
-  link: { color: palette.accent, underline: false },
-  thematicBreak: { color: palette.line, height: 1, marginTop: 6, marginBottom: 12 },
-  // The coin cursor's size — it is an inline image as far as layout goes.
-  inlineImage: { size: 14 },
-};
-
-const CURSOR = cursorUrl(palette.accent, palette['accent-ink']);
+/** The reply's styles in one theme's colours. Built per theme, not per render. */
+function markdownStyle(palette: ThemeColors): MarkdownStyle {
+  return {
+    paragraph: { fontSize: 15, lineHeight: 22, color: palette.ink, marginTop: 0, marginBottom: 8 },
+    h1: { fontSize: 19, lineHeight: 26, fontWeight: '700', color: palette.ink, marginTop: 4, marginBottom: 6 },
+    h2: { fontSize: 17, lineHeight: 24, fontWeight: '700', color: palette.ink, marginTop: 4, marginBottom: 6 },
+    h3: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: palette.ink, marginTop: 4, marginBottom: 4 },
+    h4: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: palette.ink },
+    h5: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: palette.ink },
+    h6: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: palette.muted },
+    strong: { fontWeight: 'bold', color: palette.ink },
+    em: { fontStyle: 'italic', color: palette.ink },
+    list: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: palette.ink,
+      bulletColor: palette.muted,
+      markerColor: palette.muted,
+      gapWidth: 8,
+      marginLeft: 6,
+      itemSpacing: 2,
+      marginBottom: 8,
+    },
+    blockquote: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: palette.muted,
+      borderColor: palette.line,
+      borderWidth: 3,
+      gapWidth: 10,
+      marginBottom: 8,
+    },
+    code: { color: palette.ink, backgroundColor: palette.raised, borderColor: palette.line, fontSize: 13 },
+    codeBlock: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: palette.ink,
+      backgroundColor: palette.surface,
+      borderColor: palette.line,
+      borderRadius: 8,
+      borderWidth: 1,
+      padding: 10,
+      marginBottom: 8,
+    },
+    link: { color: palette.accent, underline: false },
+    thematicBreak: { color: palette.line, height: 1, marginTop: 6, marginBottom: 12 },
+    // The coin cursor's size — it is an inline image as far as layout goes.
+    inlineImage: { size: 14 },
+  };
+}
 
 export function MarkdownReply({
   text,
@@ -83,17 +85,20 @@ export function MarkdownReply({
   streaming?: boolean;
   testID?: string;
 }) {
+  const palette = useTheme();
+  const style = useMemo(() => markdownStyle(palette), [palette]);
+  const cursor = useMemo(() => cursorUrl(palette.accent, palette['accent-ink']), [palette]);
   const money = useMoney();
   const hidden = useAmountsHidden();
   const markdown = useMemo(
-    () => toDisplayMarkdown(text, figures, money, { hidden, mask: AMOUNT_MASK, streaming, cursor: CURSOR }),
-    [text, figures, money, hidden, streaming]
+    () => toDisplayMarkdown(text, figures, money, { hidden, mask: AMOUNT_MASK, streaming, cursor }),
+    [text, figures, money, hidden, streaming, cursor]
   );
 
   return (
     <EnrichedMarkdownText
       markdown={markdown}
-      markdownStyle={STYLE}
+      markdownStyle={style}
       // ONE text view for the whole reply, so a selection spans all of it.
       flavor="commonmark"
       selectable

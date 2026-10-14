@@ -302,6 +302,17 @@ export const SETTING_DEFAULTS = {
    * turns it on; dismissing the card, or finishing every step, turns it off.
    */
   setupCard: false as boolean,
+  /**
+   * Which colour theme, or `system` to follow the phone's light/dark setting
+   * (Ledger at night, Paper by day — `SYSTEM_PAIR` in constants/themes.js).
+   *
+   * LEDGER BY DEFAULT, and that is the migration: a ledger from before themes
+   * has no row, and somebody who has looked at the dark app every evening for
+   * a year must not open it one morning to a cream one. A first launch writes
+   * `system` instead (`lib/first-run.ts`), because a new install has no habit
+   * to break and the phone's own setting is the best guess there is.
+   */
+  theme: 'ledger' as string,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

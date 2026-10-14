@@ -13,7 +13,6 @@ import {
 } from '@/components/form';
 import { Icon } from '@/components/icon';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { createAccount, getAccount, updateAccount } from '@/db/repo/accounts';
 import { InvariantError } from '@/db/repo/categories';
@@ -24,6 +23,7 @@ import { accountBalance } from '@/db/repo/adjust';
 import { bpToPercent, hasCardProfile, isLiability, percentToBp } from '@/lib/liability';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
+import { useTheme } from '@/state/theme';
 
 const TYPES: { value: Account['type']; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -41,6 +41,7 @@ const CURRENCY_OPTIONS: PickerOption[] = CURRENCIES.map((c) => ({
 }));
 
 export default function AccountScreen() {
+  const palette = useTheme();
   const money = useMoney();
   const router = useRouter();
   const insets = useSafeAreaInsets();

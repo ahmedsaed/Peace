@@ -16,10 +16,11 @@ import { shareChartCsv, shareChartImage } from '@/assistant/export';
 import type { ChartPoint, ChartSpec } from '@/assistant/tools/types';
 import { Donut } from '@/components/donut';
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import { rankSlices } from '@/lib/analysis';
 import { testIdSlug } from '@/lib/id';
+import type { ThemeColors } from '@/lib/theme';
 import { useMoney } from '@/state/money';
+import { useTheme } from '@/state/theme';
 
 /**
  * A chart the assistant drew, from numbers the app computed.
@@ -36,7 +37,7 @@ import { useMoney } from '@/state/money';
 const HEIGHT = 190;
 const FRAME_PAD = { left: 56, right: 6, top: 10, bottom: 22 };
 
-function barColor(chart: ChartSpec, point: ChartPoint): string {
+function barColor(chart: ChartSpec, point: ChartPoint, palette: ThemeColors): string {
   if (point.color) return point.color;
   if (chart.measure === 'income') return palette.income;
   if (chart.measure === 'expense') return palette.expense;
@@ -137,6 +138,7 @@ function ExportButton({
   onPress: () => void;
   testID: string;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -164,6 +166,7 @@ function XyChart({
   onDrill: (point: ChartPoint) => void;
   testID: string;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   const frame: Frame = { width, height: HEIGHT, ...FRAME_PAD };
   const values = chart.points.map((p) => p.valueMinor);
@@ -203,9 +206,9 @@ function XyChart({
 
         {chart.type === 'line' ? (
           <>
-            <Path d={linePath(points)} stroke={barColor(chart, chart.points[0])} strokeWidth={2} fill="none" />
+            <Path d={linePath(points)} stroke={barColor(chart, chart.points[0], palette)} strokeWidth={2} fill="none" />
             {points.map((p) => (
-              <Circle key={p.index} cx={p.x} cy={p.y} r={3.5} fill={barColor(chart, chart.points[p.index])} />
+              <Circle key={p.index} cx={p.x} cy={p.y} r={3.5} fill={barColor(chart, chart.points[p.index], palette)} />
             ))}
           </>
         ) : (
@@ -217,7 +220,7 @@ function XyChart({
               width={bar.width}
               height={bar.height}
               rx={2}
-              fill={barColor(chart, chart.points[bar.index])}
+              fill={barColor(chart, chart.points[bar.index], palette)}
             />
           ))
         )}
@@ -259,6 +262,7 @@ function DonutChart({
   onDrill: (point: ChartPoint | null) => void;
   testID: string;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   const ranked = rankSlices(
     chart.points.map((p) => ({

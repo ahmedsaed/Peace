@@ -1,13 +1,13 @@
 import { Image, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 
 import { StackHeader } from '@/components/screen';
 import { UpdateRow } from '@/components/update-row';
 import { Wordmark } from '@/components/wordmark';
 import { buildInfo, packageName, selfUpdates } from '@/lib/build-info';
 import { formatCommit, formatVersion } from '@/lib/version';
+import { useTheme } from '@/state/theme';
 
 /**
  * The one drawer destination that is real rather than a placeholder — it has
@@ -49,6 +49,7 @@ const LINKS: { label: string; value: string; url: string; testID: string }[] = [
 ];
 
 export default function AboutScreen() {
+  const palette = useTheme();
   return (
     <View className="flex-1 bg-ground" testID="about-screen">
       <StackHeader title="About" />

@@ -4,7 +4,6 @@ import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 
 import { Icon } from '@/components/icon';
 import { EmptyState, MonthHeader, Screen } from '@/components/screen';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { hasAnyRecords } from '@/db/repo/records';
 import {
@@ -28,6 +27,7 @@ import { usePeriodState, usePeriodLabel } from '@/state/period';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 const EMPTY: BudgetSummary = {
   budgeted: [],
@@ -196,6 +196,7 @@ function Bar({
   state: ReturnType<typeof budgetState>;
   className?: string;
 }) {
+  const palette = useTheme();
   return (
     <View className={`h-1.5 overflow-hidden rounded-full bg-line ${className}`}>
       <View
@@ -520,6 +521,7 @@ function BudgetEditor({
   onSave: (categoryId: string, raw: string) => void;
   onClear: (categoryId: string) => void;
 }) {
+  const palette = useTheme();
   const periodLabel = usePeriodLabel();
   const money = useMoney();
   const keyboardHeight = useKeyboardHeight();

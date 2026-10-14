@@ -1,11 +1,11 @@
 import { Modal, Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import type { Proposal } from '@/db/repo/recurring';
 import { fromYmd } from '@/lib/recurrence';
 import { useMoney } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 /**
  * A record a rule says is due, shown before it exists.
@@ -40,6 +40,7 @@ export function ProposalRow({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   const sign = proposal.type === 'income' ? '' : '-';
 
@@ -157,6 +158,7 @@ function Action({
   testID: string;
   danger?: boolean;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}
