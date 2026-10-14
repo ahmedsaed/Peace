@@ -1,5 +1,7 @@
 import type { DigitOrder, OperatorSide } from './keypad-layout';
 
+export type WeekStart = 'phone' | 'sunday' | 'monday' | 'saturday';
+
 /**
  * Preference definitions and their text codec.
  *
@@ -234,6 +236,24 @@ export const SETTING_DEFAULTS = {
   keypadDigits: 'calculator' as DigitOrder,
   /** Which edge of the keypad the + − × ÷ column sits on. */
   keypadOperators: 'left' as OperatorSide,
+
+  /**
+   * The day each month starts on, 1–28 (`lib/period.ts`).
+   *
+   * For whoever is paid on the 25th: their month runs payday to payday, and a
+   * calendar month splits every budget across two of them. Read by every
+   * screen that thinks in months — Records, Budgets, Analysis, carry-forward,
+   * search's month chips and Penny — through one `periodBounds`, so none of
+   * them can disagree about which month a record is in.
+   */
+  monthStartDay: 1 as number,
+  /**
+   * The first day of the week: the phone's own, or chosen.
+   *
+   * Read by exactly two things, because nothing else in the app is week-shaped:
+   * the calendar in every date picker, and Penny's week-by-week answers.
+   */
+  weekStart: 'phone' as WeekStart,
 
   /**
    * Has this ledger been through the welcome screens?

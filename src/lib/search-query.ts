@@ -12,6 +12,7 @@
  */
 
 import { parseAmountToMinor } from './money';
+import { addMonths, periodBounds, periodOf } from './period';
 
 /** Which side of the ledger. `null` means "all", not "none". */
 export type RecordKind = 'expense' | 'income' | 'transfer';
@@ -190,19 +191,23 @@ export function amountBoundsMinor(
  * to tomorrow because UTC rolled over.
  */
 export function rangeBounds(range: DateRange, now: Date): { start: Date; end: Date } | null {
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  // "This month" is the month the rest of the app calls this month — a payday
+  // month when the month starts on the 25th — or search and Records would
+  // total the same words differently. "This year" stays January to December.
+  const thisMonth = periodOf(now);
 
   switch (range) {
     case 'any':
       return null;
     case 'month':
-      return { start: new Date(year, month, 1), end: new Date(year, month + 1, 1) };
+      return periodBounds(thisMonth);
     case 'quarter':
-      // Three calendar months INCLUDING this one, so in March it reaches back
-      // to 1 January. `new Date(y, -1, 1)` rolls the year over on its own.
-      return { start: new Date(year, month - 2, 1), end: new Date(year, month + 1, 1) };
-    case 'year':
+      // Three months INCLUDING this one, so in March it reaches back to the
+      // start of January's period.
+      return { start: periodBounds(addMonths(thisMonth, -2)).start, end: periodBounds(thisMonth).end };
+    case 'year': {
+      const year = now.getFullYear();
       return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) };
+    }
   }
 }

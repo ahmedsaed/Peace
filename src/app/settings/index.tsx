@@ -10,7 +10,7 @@ import { db } from '@/db/client';
 import { getAccount } from '@/db/repo/accounts';
 import { currencyName } from '@/lib/currencies';
 import { describeCadence } from '@/lib/drive-backup';
-import { formatTimeLabel } from '@/lib/period';
+import { formatTimeLabel, ordinal } from '@/lib/period';
 import { onDay } from '@/lib/reminder';
 import { setupProgress } from '@/lib/setup';
 import { runBankCatchUp } from '@/state/bank';
@@ -103,8 +103,10 @@ export default function SettingsIndex() {
           />
           <SectionLink
             {...SECTIONS.money}
-            title="Money"
-            summary={`${currencyName(s.homeCurrency)} · ${s.homeCurrency}`}
+            title="Money & months"
+            summary={`${currencyName(s.homeCurrency)} · ${s.homeCurrency}${
+              s.monthStartDay === 1 ? '' : ` · months start on the ${ordinal(s.monthStartDay)}`
+            }`}
             onPress={go('/settings/money')}
             testID="settings-section-money"
           />

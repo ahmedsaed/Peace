@@ -68,8 +68,11 @@ reads the version. Code that differs per flavor sits behind one small module per
 
 - [x] **Keypad layout** setting: calculator (7-8-9 on top, current) / phone (1-2-3 on top). `ROWS` in
       `keypad.tsx` becomes two tables. Operators left/right for left-handed use, same setting family.
-- [ ] **First day of week** and **first day of month** (payday budgeting) — reaches `periodBounds`,
+- [x] **First day of week** and **first day of month** (payday budgeting) — reaches `periodBounds`,
       records grouping, budgets, analysis. A flow asserts a month boundary moving on a different screen.
+      (1.20 — months start on any day 1–28 and are named after the calendar month holding most of
+      them; Records, Budgets, Analysis, carry-forward, search's month chips and Penny all follow.
+      The week start reaches the date picker and Penny's week buckets, the only week-shaped things.)
 - [ ] **Themes**: palette → CSS variables (NativeWind `vars()`); Tailwind colours as
       `rgb(var(--x) / <alpha-value>)`; the ~130 `palette.x` literals go through a `useTheme()` hook;
       remove the dark-only plugin so a light theme is possible. Every preset is checked for contrast

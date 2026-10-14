@@ -1,4 +1,12 @@
-import { formatPeriod, periodBounds } from '../lib/period';
+import {
+  addMonths,
+  formatPeriod,
+  isPeriodStart,
+  monthStart,
+  parsePeriod,
+  periodBounds,
+  periodOf,
+} from '../lib/period';
 
 /**
  * Turning what the model says about time into calendar bounds.
@@ -89,17 +97,13 @@ function dayLabel(date: Date): string {
   return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-function monthLabel(date: Date): string {
-  return `${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
-}
-
 /** The day before an exclusive end — the last day the span actually covers. */
 function lastDay(end: Date): Date {
   return new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1);
 }
 
 function isMonthStart(date: Date): boolean {
-  return date.getDate() === 1;
+  return isPeriodStart(date);
 }
 
 export function spanLabel(start: Date | null, end: Date | null): string {
@@ -110,10 +114,18 @@ export function spanLabel(start: Date | null, end: Date | null): string {
   const s = start!;
   const e = end!;
   if (isMonthStart(s) && isMonthStart(e)) {
-    const months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
-    if (months === 1) return formatPeriod(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}`);
-    if (months === 12 && s.getMonth() === 0) return String(s.getFullYear());
-    if (months > 0) return `${monthLabel(s)} – ${monthLabel(lastDay(e))}`;
+    const first = periodOf(s);
+    const { year: y0, month: m0 } = parsePeriod(first);
+    const { year: y1, month: m1 } = parsePeriod(periodOf(e));
+    const months = (y1 - y0) * 12 + (m1 - m0);
+    if (months === 1) return formatPeriod(first);
+    if (months === 12 && m0 === 1 && monthStart() === 1) return String(y0);
+    if (months > 0) {
+      // By period name, not by the calendar date a period happens to start on:
+      // with a 25th start, "Oct – Dec" begins on 25 September.
+      const last = parsePeriod(addMonths(first, months - 1));
+      return `${MONTHS_SHORT[m0 - 1]} ${y0} – ${MONTHS_SHORT[last.month - 1]} ${last.year}`;
+    }
   }
   const last = lastDay(e);
   if (last.getTime() === s.getTime()) return dayLabel(s);

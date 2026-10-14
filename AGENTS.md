@@ -422,6 +422,19 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   timezone, so the same database buckets differently on a phone set to Cairo and on CI set to UTC,
   and an 11pm purchase on the 31st lands in the wrong month. `periodBounds` gets local calendar
   boundaries right and is tested; N indexed range queries cost nothing next to being correct.
+- **A month does not necessarily start on the 1st — never compute one yourself.** Settings › Money ›
+  *Month starts on* runs months from any day 1–28, for people paid on the 25th, and every screen,
+  query, search chip and Penny tool that thinks in months goes through `periodOf` / `periodBounds` in
+  `src/lib/period.ts`, which read that setting. `new Date(y, m, 1)` anywhere else is a second answer to
+  "which month is this record in" — and the miss is silent: the screen it is on simply disagrees with
+  Records by a few days a month. A custom month is NAMED after the calendar month holding most of it
+  (25 Sep – 24 Oct is "October"), so budgets keyed `YYYY-MM` stay attached to the stretch of time
+  people mean. The start day is module state set by the settings store (`configurePeriods`); a test
+  that changes it resets it in `afterEach`. **A component never calls `formatPeriod` directly** — it
+  uses `usePeriodLabel()`: the React Compiler memoises components on their props, so MonthHeader went
+  on saying "October 2026" after the start day moved, because its `period` prop had not changed and
+  the module state behind it is invisible to the compiler. Weeks follow `weekStart` the same way, and only the date
+  picker and Penny's week buckets are week-shaped — do not add a third without the setting reaching it.
 - **A default that only works for someone with history is a dead feature.** `suggestBudgets` first
   averaged the three months *before* the one being budgeted, which returns nothing for a ledger a
   few weeks old — precisely the person who has never set a budget, i.e. the entire audience. It now

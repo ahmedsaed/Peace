@@ -3,7 +3,8 @@ import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import type { AccountPosition } from '@/db/repo/carry';
 import { isLiability, owedDisplay } from '@/lib/liability';
-import { currentPeriod, formatPeriod, shortMonth, type Period } from '@/lib/period';
+import { currentPeriod, shortMonth, type Period } from '@/lib/period';
+import { usePeriodLabel } from '@/state/period';
 import { useMoney, type Money } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
 
@@ -60,6 +61,7 @@ export function PositionSheet({
   expenseMinor: number;
   adjustmentMinor: number;
 }) {
+  const periodLabel = usePeriodLabel();
   const money = useMoney();
   const running = broughtForwardMinor !== null;
   const month = shortMonth(period);
@@ -120,11 +122,11 @@ export function PositionSheet({
                 reads as a forecast of a month that has barely started. */}
             <Text className="mt-1 text-xs text-muted">
               {!running
-                ? `Income less expense in ${formatPeriod(period)}`
+                ? `Income less expense in ${periodLabel(period)}`
                 : period < currentPeriod()
-                  ? `Where you stood at the end of ${formatPeriod(period)}`
+                  ? `Where you stood at the end of ${periodLabel(period)}`
                   : period > currentPeriod()
-                    ? `Where you would stand by the end of ${formatPeriod(period)}`
+                    ? `Where you would stand by the end of ${periodLabel(period)}`
                     : 'What you are holding right now'}
             </Text>
           </View>
@@ -232,7 +234,7 @@ export function PositionSheet({
               figure this month is responsible for; this says what it did. */}
           <View className="mt-4 border-t border-line pt-1">
             <Text className="px-4 pb-1 pt-3 text-[10px] uppercase tracking-widest text-muted">
-              What {formatPeriod(period)} did
+              What {periodLabel(period)} did
             </Text>
             <Line
               label="Income"
@@ -265,7 +267,7 @@ export function PositionSheet({
             ) : null}
             <View className="mx-4 mt-1 flex-row items-center gap-3 border-t border-line pt-2.5">
               <Text className="flex-1 text-sm font-semibold text-ink">
-                {formatPeriod(period)}
+                {periodLabel(period)}
               </Text>
               <Figure
                 minor={incomeMinor + expenseMinor + adjustmentMinor}

@@ -1,4 +1,5 @@
 import type { Account, Category, Tag } from '../db/schema';
+import { formatPeriod, monthStart, ordinal, periodOf } from '../lib/period';
 import { ymd } from './dates';
 
 /**
@@ -24,6 +25,15 @@ export type LedgerShape = {
 
 export function systemPrompt(now: Date, homeCurrency: string, shape: LedgerShape): string {
   const today = `${DAYS[now.getDay()]} ${ymd(now)}`;
+  // Only said when it is true. A month that runs 25 Sep – 24 Oct is what every
+  // screen calls "October", and the tools already count it that way — but a
+  // model told nothing would describe "October" as the 1st to the 31st and
+  // contradict the figure it had just cited.
+  const start = monthStart();
+  const monthNote =
+    start === 1
+      ? ''
+      : `\nThis person's months start on the ${ordinal(start)}: a month is named after the calendar month most of it falls in, so "${formatPeriod(periodOf(now))}" is this month. The tools count months this way; describe them this way too.`;
 
   const tops = shape.categories.filter((c) => !c.parentId);
   const children = (id: string) => shape.categories.filter((c) => c.parentId === id);
@@ -36,7 +46,7 @@ export function systemPrompt(now: Date, homeCurrency: string, shape: LedgerShape
 
   return `You are Penny, the assistant inside Peace, a personal expense tracker. You are warm, plain-spoken and precise — a friend who is good with money, never a salesperson or a lecturer. You answer questions about the user's own money and make changes to their ledger, using the tools provided. Everything you know about their money comes from tools.
 
-Today is ${today}. The home currency is ${homeCurrency}; totals are in it.
+Today is ${today}. The home currency is ${homeCurrency}; totals are in it.${monthNote}
 
 HOW TO WORK
 - Use tools for every figure. Never estimate, remember or do arithmetic on amounts yourself; summarize and show_chart give totals, groupings and changes between periods, and calculate does the sums.

@@ -23,7 +23,8 @@ import { budgetFraction, budgetPercent, budgetState, remainingMinor } from '@/li
 import { useKeyboardHeight } from '@/lib/layout';
 import { minorToMajor, parseAmountToMinor } from '@/lib/money';
 import { testIdSlug as slug } from '@/lib/id';
-import { formatPeriod, currentPeriod, type Period } from '@/lib/period';
+import { type Period } from '@/lib/period';
+import { usePeriodState, usePeriodLabel } from '@/state/period';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
@@ -39,8 +40,9 @@ const EMPTY: BudgetSummary = {
 };
 
 export default function BudgetsScreen() {
+  const periodLabel = usePeriodLabel();
   const homeCurrency = useSetting('homeCurrency');
-  const [period, setPeriod] = useState(currentPeriod());
+  const [period, setPeriod] = usePeriodState();
   const [summary, setSummary] = useState<BudgetSummary>(EMPTY);
   const [offer, setOffer] = useState<SuggestionSet>({ suggestions: [], monthsWithData: 0, basis: 'none' });
   const [copyFrom, setCopyFrom] = useState<Period | null>(null);
@@ -90,7 +92,7 @@ export default function BudgetsScreen() {
             }}
           />
         ) : (
-          <Section title={`Budgeted — ${formatPeriod(period)}`}>
+          <Section title={`Budgeted — ${periodLabel(period)}`}>
             {summary.budgeted.map((row) => (
               <BudgetLine
                 key={row.categoryId}
@@ -364,6 +366,7 @@ function StartHere({
   onUseSuggestions: () => void;
   onCopy: () => void;
 }) {
+  const periodLabel = usePeriodLabel();
   const money = useMoney();
   const router = useRouter();
   if (offer.suggestions.length === 0 && !copyFrom && !hasAnyRecords(db)) {
@@ -389,7 +392,7 @@ function StartHere({
     return (
       <EmptyState
         icon="budgets"
-        title={`No budget for ${formatPeriod(period)}`}
+        title={`No budget for ${periodLabel(period)}`}
         hint="Log a few expenses first — then this screen can suggest a limit per category from what you actually spend."
       />
     );
@@ -403,7 +406,7 @@ function StartHere({
           testID="budget-copy"
           className="mb-3 items-center rounded-lg bg-raised py-3 active:opacity-70">
           <Text className="text-sm font-semibold text-ink">
-            Copy the {formatPeriod(copyFrom)} budget
+            Copy the {periodLabel(copyFrom)} budget
           </Text>
         </Pressable>
       ) : null}
@@ -517,6 +520,7 @@ function BudgetEditor({
   onSave: (categoryId: string, raw: string) => void;
   onClear: (categoryId: string) => void;
 }) {
+  const periodLabel = usePeriodLabel();
   const money = useMoney();
   const keyboardHeight = useKeyboardHeight();
   // Seeded once, from the initialiser, because the component is remounted per
@@ -548,7 +552,7 @@ function BudgetEditor({
               <View className="flex-1">
                 <Text className="text-base font-semibold text-ink">{row.categoryName}</Text>
                 <Text className="text-xs text-muted">
-                  {formatPeriod(period)} · {money(row.spentMinor, homeCurrency)} spent so far
+                  {periodLabel(period)} · {money(row.spentMinor, homeCurrency)} spent so far
                 </Text>
               </View>
             </View>

@@ -1,7 +1,42 @@
 import { create } from 'zustand';
 
+import { getCalendars } from 'expo-localization';
+
 import { getSetting, setSetting } from '@/db/settings';
-import { SETTING_DEFAULTS, type SettingKey, type Settings } from '@/lib/settings';
+import { configurePeriods, type Weekday } from '@/lib/period';
+import { SETTING_DEFAULTS, type SettingKey, type Settings, type WeekStart } from '@/lib/settings';
+
+/**
+ * The phone's first day of the week. expo-localization counts 1 = Sunday;
+ * `Date.getDay()` counts 0 = Sunday. Monday when the phone will not say.
+ */
+function phoneWeekStart(): Weekday {
+  try {
+    const first = getCalendars()[0]?.firstWeekday;
+    return typeof first === 'number' && first >= 1 && first <= 7 ? ((first - 1) as Weekday) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function resolveWeekStart(choice: WeekStart): Weekday {
+  if (choice === 'sunday') return 0;
+  if (choice === 'monday') return 1;
+  if (choice === 'saturday') return 6;
+  return phoneWeekStart();
+}
+
+/**
+ * Hand the period settings to `lib/period.ts`, which every month- and
+ * week-shaped query reads. Here, beside the store, because this is the one
+ * place both settings are read and written — so the two cannot drift.
+ */
+function applyPeriods(settings: Settings): void {
+  configurePeriods({
+    monthStart: settings.monthStartDay,
+    weekStart: resolveWeekStart(settings.weekStart),
+  });
+}
 
 /**
  * Settings, in memory, so a change repaints every screen that depends on it.
@@ -36,12 +71,17 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       // decoding here is how the two would eventually disagree.
       loadedSettings[key] = getSetting(key) as never;
     }
+    applyPeriods(loadedSettings);
     set({ settings: loadedSettings, loaded: true });
   },
 
   update: (key, value) => {
     setSetting(key, value);
-    set((state) => ({ settings: { ...state.settings, [key]: value } }));
+    set((state) => {
+      const settings = { ...state.settings, [key]: value };
+      if (key === 'monthStartDay' || key === 'weekStart') applyPeriods(settings);
+      return { settings };
+    });
   },
 }));
 

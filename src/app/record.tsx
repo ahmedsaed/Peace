@@ -57,7 +57,7 @@ import {
 import { ageInDays, fetchRate, formatRateDate, RateError } from '@/lib/fx';
 import { byDensity, useDensity } from '@/lib/layout';
 import { convertMinor, groupDigits } from '@/lib/money';
-import { formatDayLabel, formatTimeLabel } from '@/lib/period';
+import { formatDayLabel, formatTimeLabel, weekStart } from '@/lib/period';
 import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
 import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
@@ -1553,6 +1553,9 @@ export default function RecordScreen() {
           value={occurredAt}
           mode={picking}
           is24Hour={false}
+          // The calendar's first column follows Settings › Money, like every
+          // other place the app thinks in weeks.
+          firstDayOfWeek={weekStart()}
           onValueChange={onPickDateTime}
           onDismiss={() => setPicking(null)}
         />

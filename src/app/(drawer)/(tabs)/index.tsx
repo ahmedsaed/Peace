@@ -38,7 +38,7 @@ import { linkById, reversedBy } from '@/db/repo/reversal';
 import { dismissCapture, markSaved } from '@/db/repo/bank-captures';
 import type { BankCapture } from '@/db/schema';
 import { createRecord, deleteRecord, restoreRecords } from '@/db/repo/transactions';
-import { currentPeriod } from '@/lib/period';
+import { usePeriodState } from '@/state/period';
 import { useSetting } from '@/state/settings';
 import { useBankInbox } from '@/state/bank';
 import { useUndoStore } from '@/state/undo';
@@ -74,7 +74,7 @@ const isCapture = (row: Row | Proposal | BankCapture): row is BankCapture =>
 export default function RecordsScreen() {
   const money = useMoney();
   const router = useRouter();
-  const [period, setPeriod] = useState(currentPeriod());
+  const [period, setPeriod] = usePeriodState();
   const homeCurrency = useSetting('homeCurrency');
   const carryOver = useSetting('carryOver');
   const showTotal = useSetting('showTotal');
