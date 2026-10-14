@@ -29,7 +29,7 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Lint | `npm run lint` |
 | Boot headless emulator | `npm run emu` |
 | Screenshot the device | `npm run shot -- <name>` → prints PNG path |
-| E2E flows | `npm run e2e` (against a release APK — see below) |
+| E2E flows | `npm run e2e` (against a release APK — see below; pushes `scripts/fixtures/` for the file picker first) |
 | Release APK for your phone | `npm run apk` (arm64) |
 | Release APK for the emulator | `npm run apk:emu` (x86_64) |
 | Regenerate migrations | `npm run db:generate` (after editing `src/db/schema.ts`) |
@@ -933,6 +933,22 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   which would also block the screenshots people take on purpose. The prompt cannot be screenshotted
   (it is a secure window): read it with `uiautomator dump`. `npm run e2e:lock` sets a device PIN,
   runs `.maestro/lock/`, and always clears it, because `app-lock.yaml` asserts a phone with none.
+- **CSV import reads ONE format: Peace's own export.** No column mapping and no per-app presets —
+  people adjust their file once, against `/import/` on the site, and the planner
+  (`lib/import-csv.ts`) stays a pure function with a test per rule. Three of those rules exist
+  because the obvious version is silently wrong: the `type` column decides the side and the amount
+  gives only its SIZE (a refund is a positive expense, and a hand-written "50" lunch is the same as
+  the export's "-50.00"); dates are `YYYY-MM-DD` only, because `03/08/2026` is two valid dates; and
+  amounts are parsed strictly, never through the keypad's `parseAmountToMinor`, which drops commas
+  and truncates decimals. **The export and the import are one contract**: `imports.test.ts`
+  exports a ledger, imports it into a fresh one and demands the second export be byte-identical —
+  which is how the export's unordered tags (`group_concat` ignores an `ORDER BY` beside it) and its
+  missing home value for foreign records were found. Add a column to one and the round trip says
+  whether the other kept up. Every imported row carries `import_id`, and the `imports` row lists
+  what the file CREATED, so Undo removes the batch and only those accounts, categories and tags
+  nothing has used since. A new column on `transactions` also broke `restore-core.test.ts`'s
+  old-backup fixture — drizzle names every column it knows in an insert — so fixtures for an OLD
+  schema are written in raw SQL with the columns that schema had.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.

@@ -57,3 +57,77 @@ export function toCsv(rows: readonly (readonly string[])[]): string {
 export function toCsvFile(rows: readonly (readonly string[])[]): string {
   return toCsv(rows);
 }
+
+/**
+ * CSV reading, to RFC 4180 — the other half of `toCsv`.
+ *
+ * Quoted fields may hold commas, doubled quotes and line breaks, which is
+ * exactly what a note with an address in it produces, so splitting on lines
+ * first and commas second is not an option. CRLF and bare LF both end a row.
+ *
+ * Three concessions to the files people actually have:
+ * - A leading byte-order mark is dropped. Excel writes one, and left in place
+ *   it becomes part of the first header — `﻿date` matches nothing.
+ * - A SEMICOLON delimiter is accepted when the header line has semicolons and
+ *   no commas: spreadsheets in locales that write decimals with a comma save
+ *   CSV that way, and the person holding one did nothing wrong.
+ * - The writer's formula guard is undone: `'=lunch` was written so a
+ *   spreadsheet shows "=lunch" as text, and reading it back must give "=lunch".
+ */
+export function parseCsv(text: string): string[][] {
+  const source = text.startsWith('﻿') ? text.slice(1) : text;
+  const firstLine = source.slice(0, source.search(/\r?\n|$/));
+  const delimiter = !firstLine.includes(',') && firstLine.includes(';') ? ';' : ',';
+
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  let wasQuoted = false;
+
+  const endField = () => {
+    // Quoted or not: the writer guards first and quotes after, so a guarded
+    // note with a comma in it arrives as "'=…, …".
+    row.push(field.startsWith("'=") ? field.slice(1) : field);
+    field = '';
+    wasQuoted = false;
+  };
+  const endRow = () => {
+    endField();
+    rows.push(row);
+    row = [];
+  };
+
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
+    if (quoted) {
+      if (c === '"') {
+        if (source[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += c;
+      }
+    } else if (c === '"' && field === '') {
+      quoted = true;
+      wasQuoted = true;
+    } else if (c === delimiter) {
+      endField();
+    } else if (c === '\r' && source[i + 1] === '\n') {
+      endRow();
+      i++;
+    } else if (c === '\n' || c === '\r') {
+      endRow();
+    } else {
+      field += c;
+    }
+  }
+  // A final row without a trailing newline — and nothing for one with it.
+  if (field !== '' || row.length > 0 || wasQuoted) endRow();
+
+  // Blank lines carry nothing; a spreadsheet leaves them at the end.
+  return rows.filter((r) => !(r.length === 1 && r[0].trim() === ''));
+}

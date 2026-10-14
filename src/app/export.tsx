@@ -1,6 +1,8 @@
+import * as DocumentPicker from 'expo-document-picker';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { DriveBackup } from '@/components/drive-backup';
 import { Icon } from '@/components/icon';
@@ -13,6 +15,7 @@ import {
   csvExport,
   databaseBackup,
   formatBytes,
+  importTemplateFile,
   recordCount,
   saveToFolder,
   type Exported,
@@ -26,10 +29,14 @@ import {
   RestoreError,
   safetyCopy,
 } from '@/db/restore';
+import { db } from '@/db/client';
+import { lastImport, undoImport } from '@/db/repo/imports';
+import type { ImportRow } from '@/db/schema';
+import { formatDayLabel } from '@/lib/period';
 
 type Kind = 'csv' | 'backup';
 type Destination = 'save' | 'share';
-type Busy = `${Kind}-${Destination}` | 'restore' | 'undo' | null;
+type Busy = `${Kind}-${Destination}` | 'restore' | 'undo' | 'template' | null;
 
 /**
  * Export and backup.
@@ -61,6 +68,15 @@ export default function ExportScreen() {
   // file and an undo replaces it, so a stale value would either hide the way
   // back or offer one that no longer exists.
   const [canUndo, setCanUndo] = useState(hasSafetyCopy);
+  const homeCurrency = useSetting('homeCurrency');
+  const router = useRouter();
+  // Re-read on focus: the import screen is pushed from here and comes back.
+  const [imported, setImported] = useState<ImportRow | undefined>(undefined);
+  useFocusEffect(
+    useCallback(() => {
+      setImported(lastImport(db));
+    }, [])
+  );
 
   const build = useCallback(
     async (kind: Kind): Promise<Exported> =>
@@ -200,6 +216,68 @@ export default function ExportScreen() {
     await apply(safetyCopy(), 'undo');
   }, [apply]);
 
+  const onImport = useCallback(async () => {
+    setError(null);
+    setDone(null);
+    // The document picker, COPYING to the cache — never `File.pickFileAsync`
+    // plus a uri handed to the next screen. A content:// uri is a permission
+    // grant held by the object the picker returned; rebuilt from its string
+    // on another screen it is a SecurityException, and its "name" is
+    // `document:33`. The copy is a plain file with the name the person knows.
+    // Unfiltered: Android reports CSV under half a dozen mime types, and a
+    // filter that hides the person's own file is worse than a list with other
+    // things in it.
+    const picked = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      multiple: false,
+      copyToCacheDirectory: true,
+    }).catch(() => null);
+    const asset = picked && !picked.canceled ? picked.assets?.[0] : undefined;
+    if (!asset) return;
+    router.push({ pathname: '/import', params: { uri: asset.uri, name: asset.name } });
+  }, [router]);
+
+  const onTemplate = useCallback(async () => {
+    setBusy('template');
+    setError(null);
+    setDone(null);
+    try {
+      const template = importTemplateFile(homeCurrency);
+      const bytes = await saveToFolder(template.file);
+      setDone(`${template.file.name} · ${formatBytes(bytes)} saved to your chosen folder`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (!/cancel/i.test(message)) setError(message || 'Could not save the template.');
+    } finally {
+      setBusy(null);
+    }
+  }, [homeCurrency]);
+
+  const onUndoImport = useCallback(async (row: ImportRow) => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Undo the import?',
+        `The ${row.recordCount} records added from ${row.fileName ?? 'the file'} will be removed, with any accounts and categories it created that nothing else uses.`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Undo import', style: 'destructive', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) }
+      );
+    });
+    if (!confirmed) return;
+    undoImport(db, row.id);
+    setImported(lastImport(db));
+    // The count the person was shown when importing — records, not rows: a
+    // transfer is two rows and one record, and "5 removed" after "4 imported"
+    // reads as the undo taking something extra.
+    setDone(
+      `Import undone — the ${row.recordCount === 1 ? 'record' : `${row.recordCount} records`} from ${
+        row.fileName ?? 'the file'
+      } ${row.recordCount === 1 ? 'is' : 'are'} gone.`
+    );
+  }, []);
+
   return (
     <View className="flex-1 bg-ground" testID="export-screen">
       <StackHeader title="Export & backup" />
@@ -276,6 +354,55 @@ export default function ExportScreen() {
             <Text className="px-4 pb-4 text-sm text-income" testID="export-done">
               {done}
             </Text>
+          ) : null}
+        </View>
+
+        {/* In, after out: the same format both ways, so the file this screen
+            writes is the file it reads. */}
+        <SectionLabel>Bring records in</SectionLabel>
+        <View className="mb-6 rounded-xl bg-surface p-4" testID="import-card">
+          <Text className="mb-3 text-sm leading-5 text-muted">
+            Add records from a CSV in Peace’s format — your own spreadsheet export, or a file from
+            another app laid out the same way. You see everything before anything is added.
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            <Button
+              label="Import a CSV"
+              working={false}
+              disabled={busy !== null}
+              onPress={() => void onImport()}
+              testID="import-pick"
+              primary
+            />
+            <Button
+              label="Get the template"
+              working={busy === 'template'}
+              disabled={busy !== null}
+              onPress={() => void onTemplate()}
+              testID="import-template"
+            />
+          </View>
+          <Pressable
+            onPress={() => void Linking.openURL('https://peace.merope.dev/import/')}
+            accessibilityRole="link"
+            className="mt-3 self-start">
+            <Text className="text-sm text-accent">How to lay out the file</Text>
+          </Pressable>
+          {imported ? (
+            <View className="mt-4 border-t border-line pt-3" testID="import-last">
+              <Text className="mb-2 text-sm leading-5 text-muted">
+                Last import: {imported.recordCount} {imported.recordCount === 1 ? 'record' : 'records'}
+                {imported.fileName ? ` from ${imported.fileName}` : ''}, {formatDayLabel(imported.createdAt)}.
+              </Text>
+              <Button
+                label="Undo import"
+                working={false}
+                disabled={busy !== null}
+                onPress={() => void onUndoImport(imported)}
+                testID="import-undo"
+                danger
+              />
+            </View>
           ) : null}
         </View>
 

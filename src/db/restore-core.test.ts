@@ -73,6 +73,29 @@ function fill(target: FileDb, note: string) {
   });
 }
 
+/**
+ * The same ledger, written in the OLD schema's own terms.
+ *
+ * Not through `createRecord`: drizzle names every column it knows in an
+ * insert, so the first column added to `transactions` after the fixture's
+ * cut-off (`import_id`) made today's writer unable to write yesterday's
+ * database — and a test about old backups failed over a column old backups
+ * cannot have. Raw SQL with only the columns that have always existed is what
+ * an old build actually wrote.
+ */
+function fillOld(target: FileDb, note: string) {
+  seedDefaults(target.db);
+  const insert = target.sqlite.prepare(
+    `INSERT INTO transactions
+       (id, account_id, category_id, amount_minor, currency, note, occurred_at, transfer_pair_id, counter_account_id)
+     VALUES (?, ?, ?, ?, 'EGP', ?, ?, ?, ?)`
+  );
+  insert.run('old-1', accountId('cash'), catId('restaurants'), -15500, note, Date.parse('2026-08-09T13:00:00'), null, null);
+  const at = Date.parse('2026-08-05T10:00:00');
+  insert.run('old-2', accountId('bank'), null, -100000, null, at, 'pair-1', accountId('cash'));
+  insert.run('old-3', accountId('cash'), null, 100000, null, at, 'pair-1', accountId('bank'));
+}
+
 describe('restore', () => {
   let live: FileDb;
   let backup: FileDb;
@@ -273,7 +296,7 @@ describe('restore — a backup older than a feature', () => {
   });
 
   it('accepts it instead of refusing it as a stranger, and leaves the tags the old ledger never had', () => {
-    fill(old, 'from before tags');
+    fillOld(old, 'from before tags');
 
     // The live ledger has tags on a record. They belong to the ledger being
     // REPLACED, so keeping them would leave labels attached to records that are

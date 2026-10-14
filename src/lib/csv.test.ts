@@ -1,4 +1,4 @@
-import { escapeField, toCsv, toCsvFile } from './csv';
+import { escapeField, parseCsv, toCsv, toCsvFile } from './csv';
 
 describe('escapeField', () => {
   it('leaves ordinary text alone', () => {
@@ -78,5 +78,43 @@ describe('toCsvFile', () => {
 
   it('still writes non-ASCII notes as UTF-8', () => {
     expect(toCsvFile([['note'], ['قهوة']])).toContain('قهوة');
+  });
+});
+
+describe('parseCsv', () => {
+  it('reads what toCsv writes, whatever is in the fields', () => {
+    const rows = [
+      ['date', 'note', 'amount'],
+      ['2026-08-09', 'lunch, with "A"\nand B', '-155.00'],
+      ['2026-08-10', '=SUM(A1)', '12'],
+      ['2026-08-11', '=split, two ways', ''],
+      ['2026-08-12', 'مطعم', '0.5'],
+    ];
+    expect(parseCsv(toCsvFile(rows))).toEqual(rows);
+  });
+
+  it('takes bare LF line endings and a trailing newline', () => {
+    expect(parseCsv('a,b\n1,2\n')).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+    ]);
+  });
+
+  it('drops a byte-order mark, which would otherwise rename the first column', () => {
+    expect(parseCsv('﻿date,amount\r\n2026-08-09,5')[0]).toEqual(['date', 'amount']);
+  });
+
+  it('reads semicolon files when the header has no commas', () => {
+    expect(parseCsv('date;amount\n2026-08-09;5,50')).toEqual([
+      ['date', 'amount'],
+      ['2026-08-09', '5,50'],
+    ]);
+  });
+
+  it('keeps empty fields, and skips blank lines', () => {
+    expect(parseCsv('a,b,c\n\n1,,3\n\n')).toEqual([
+      ['a', 'b', 'c'],
+      ['1', '', '3'],
+    ]);
   });
 });

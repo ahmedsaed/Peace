@@ -1,0 +1,131 @@
+appId: dev.merope.peace.oss
+---
+# CSV import: preview, import, see it elsewhere, undo.
+#
+# `scripts/fixtures/peace-import.csv` is pushed to the device by
+# `scripts/e2e-fixtures.sh`, which `npm run e2e` and the E2E workflow run
+# first. It has four good rows — an income, an expense in a NEW sub-category
+# under Food with a NEW tag, a refund, a transfer into a NEW account — and one
+# row dated 13/08/2026, which must be refused by line number while the rest
+# still import.
+#
+# The proof is on a DIFFERENT screen: the account the file created appears
+# under Accounts, and is gone again after Undo.
+- launchApp:
+    clearState: true
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-backup"
+- scrollUntilVisible:
+    element:
+      id: "import-pick"
+    direction: DOWN
+- assertNotVisible:
+    id: "import-last"
+- tapOn:
+    id: "import-pick"
+
+# The system picker. Its layout is the OS's, so only the file name is used.
+- extendedWaitUntil:
+    visible: "peace-import.csv"
+    timeout: 15000
+- tapOn:
+    text: "peace-import.csv"
+    index: 0
+
+# --- the preview says what WOULD happen, and nothing has happened yet ---
+- extendedWaitUntil:
+    visible:
+      id: "import-count"
+    timeout: 15000
+- assertVisible:
+    id: "import-count"
+    text: "4 records to import"
+- assertVisible:
+    id: "import-span"
+    text: "Aug 01, 2026 – Aug 06, 2026 · 2 expenses, 1 income, 1 transfer"
+- assertVisible: "Wallet · EGP"
+- assertVisible: "Food › Snacks · expense"
+- assertVisible:
+    id: "import-problem-count"
+    text: "1 row can’t be imported — the rest can"
+- assertVisible: ".*Line 6.*not YYYY-MM-DD.*"
+
+- scrollUntilVisible:
+    element:
+      id: "import-confirm"
+    direction: DOWN
+- tapOn:
+    id: "import-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "import-done-count"
+    timeout: 15000
+- assertVisible:
+    id: "import-done-count"
+    text: "4 records imported."
+- tapOn:
+    id: "import-finish"
+
+# Back on Backup & export, the import is remembered and can be undone later.
+- scrollUntilVisible:
+    element:
+      id: "import-last"
+    direction: DOWN
+- assertVisible: "Last import: 4 records from peace-import\\.csv.*"
+
+# --- on a different screen: the account the file created ---
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-screen"
+- assertVisible: "Wallet"
+
+# --- undo, from Backup & export ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-backup"
+- scrollUntilVisible:
+    element:
+      id: "import-undo"
+    direction: DOWN
+- tapOn:
+    id: "import-undo"
+# Android's own dialog: its positive button, whatever case the theme draws it in.
+- assertVisible: "Undo the import\\?"
+- tapOn:
+    text: "(?i)undo import"
+- assertNotVisible:
+    id: "import-last"
+- assertVisible:
+    id: "export-done"
+    text: "Import undone — the 4 records from peace-import\\.csv are gone\\."
+
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "tab-accounts"
+- assertVisible:
+    id: "accounts-screen"
+- assertNotVisible: "Wallet"

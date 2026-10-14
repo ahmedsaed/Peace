@@ -65,6 +65,15 @@ export const CARDS = {
     shots: ['records', 'welcome'],
     alt: 'Moving Peace from the GitHub version to the Google Play version.',
   },
+  import: {
+    eyebrow: 'Importing records',
+    title: 'Bring your history',
+    highlight: 'with you.',
+    stacked: true,
+    subtitle: 'One CSV format — the one Peace exports. Previewed before anything is added, and undoable.',
+    shots: ['search', 'records'],
+    alt: 'Importing records into Peace from a CSV file.',
+  },
 } satisfies Record<string, Card>;
 
 export type CardName = keyof typeof CARDS;

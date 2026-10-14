@@ -85,6 +85,9 @@ export const BACKUP_TABLES = [
   // restored chat still shows the amounts it showed. It points at nothing, so
   // order does not matter.
   { name: 'chat_messages', required: false },
+  // CSV imports, so "Undo import" still works on a restored ledger: the
+  // records carry the import's id, and this row says what it created.
+  { name: 'imports', required: false },
 ] as const;
 
 export type RestoreTable = (typeof BACKUP_TABLES)[number]['name'];

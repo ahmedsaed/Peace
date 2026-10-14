@@ -123,8 +123,10 @@ layout on the screens that use them.
 
 ## Phase 5 — Features before launch
 
-- [ ] **CSV import** — generic column mapping, plus a preset for MyMoney exports. Imports are
-      previewed and undoable as one batch; sides go through `ledgerSide`, never the amount's sign.
+- [x] **CSV import** — ONE format, Peace's own export, documented at `/import/` with a template;
+      no column mapping and no per-app preset (decided 2026-10-14: people adjust their file once).
+      Previewed with every refused row by line, undoable as one batch; the `type` column decides
+      the side, never the amount's sign.
 - [x] **App lock** (biometric / PIN, `expo-local-authentication`) — **off by default**, so nobody pays
       a step they did not ask for. Grace period: immediately / 1 / 5 / 15 minutes (default 1). Uses
       the phone's own lock rather than a Peace PIN, fails open on a phone with none, and blanks the
