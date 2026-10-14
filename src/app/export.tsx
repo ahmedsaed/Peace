@@ -187,9 +187,17 @@ export default function ExportScreen() {
         { cancelable: true, onDismiss: () => resolve(false) }
       );
     });
-    if (!confirmed) return;
-
-    await apply(picked, 'restore');
+    try {
+      if (confirmed) await apply(picked.file, 'restore');
+    } finally {
+      // The picker's copy in the cache — the restore has read it by now, and a
+      // backup with a year of receipts is not small.
+      try {
+        if (picked.file.exists) picked.file.delete();
+      } catch (e) {
+        console.warn('[restore] could not delete the picked copy', e);
+      }
+    }
   }, [apply]);
 
   /**
