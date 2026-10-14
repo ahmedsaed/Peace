@@ -25,6 +25,18 @@ import '@/global.css';
  * the system back gesture instead of being dismissable only by reopening the
  * menu.
  */
+/**
+ * Records sits under anything opened by a LINK. The launcher shortcuts
+ * (plugins/with-shortcuts.js) open `peace://record` straight from the home
+ * screen; without an anchor that record screen is the whole stack, so Save and
+ * Back close the app instead of landing on the list the record was added to.
+ * It also keeps the first-launch redirect in `(drawer)` in force: a shortcut
+ * pressed before setup still goes through setup.
+ */
+export const unstable_settings = {
+  anchor: '(drawer)',
+};
+
 export default function RootLayout() {
   /**
    * The wordmark font, loaded before anything renders.
