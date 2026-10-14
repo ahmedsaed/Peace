@@ -154,6 +154,9 @@ const CHROME_PATHS = {
     'M4 4h4v4H4zM10 4h4v4h-4zM16 4h4v4h-4zM4 10h4v4H4zM10 10h4v4h-4zM16 10h4v4h-4zM4 16h4v4H4zM10 16h4v4h-4zM16 16h4v4h-4z',
   bell: 'M12 2.5a1.5 1.5 0 0 1 1.5 1.5v.7A6 6 0 0 1 18 10.5v4.2l2 2.3v1H4v-1l2-2.3v-4.2a6 6 0 0 1 4.5-5.8V4A1.5 1.5 0 0 1 12 2.5zM9.5 19.5h5a2.5 2.5 0 0 1-5 0z',
   check: 'M9.5 15.6l9.2-9.2 1.8 1.8-11 11-5.6-5.6 1.8-1.8z',
+  // A solid body with an open shackle: the gap inside the shackle is what
+  // makes it a padlock, and it stays open down to 14px.
+  lock: 'M7 10V7a5 5 0 0 1 10 0v3h-2.2V7a2.8 2.8 0 0 0-5.6 0v3H7zM5 10h14v12H5V10z',
 } as const;
 
 /**

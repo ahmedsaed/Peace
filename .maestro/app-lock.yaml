@@ -1,0 +1,54 @@
+appId: dev.merope.peace.oss
+---
+# App lock on a phone with NO screen lock — the test AVD's normal state.
+#
+# Peace uses the phone's own lock, so with none set there is nothing it could
+# ever ask for. What this asserts is the honest version of that: the switch is
+# off and cannot be turned on, the page says why and offers the way to fix it,
+# and the Settings index agrees on a DIFFERENT screen. The lock itself — the
+# prompt, the grace period, the fail-open — needs a PIN on the device and runs
+# from `npm run e2e:lock` (.maestro/lock/).
+- launchApp:
+    clearState: true
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "settings-screen"
+
+# Off by default, said on the index without opening anything.
+- scrollUntilVisible:
+    element:
+      id: "settings-section-lock"
+    direction: DOWN
+- assertVisible:
+    id: "settings-section-lock-summary"
+    text: "Off"
+
+- tapOn:
+    id: "settings-section-lock"
+- assertVisible:
+    id: "settings-lock"
+- assertVisible:
+    id: "lock-notice"
+- assertVisible:
+    id: "lock-notice-open"
+- assertVisible:
+    text: "Needs a screen lock on this phone."
+- assertVisible:
+    id: "setting-lock"
+    enabled: false
+    checked: false
+# No grace period to choose while there is no lock to grant one.
+- assertNotVisible:
+    id: "lock-after-1min"

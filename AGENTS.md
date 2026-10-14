@@ -39,6 +39,7 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Check every flow's testIDs without a device | `npm test -- flows` |
 | E2E without an emulator to hand | Actions › **E2E** › Run workflow (manual) |
 | Assistant against the real Gemini API — **costs money, ask first** | `PEACE_GEMINI_KEY_FILE=<file> npx jest src/assistant/live` |
+| App lock E2E (sets, then clears, a device PIN) | `npm run e2e:lock` (flows in `.maestro/lock/`) |
 | Assistant E2E with a real key — **costs money, ask first** | `PEACE_GEMINI_KEY_FILE=<file> npm run e2e:live` (flows in `.maestro/live/`) |
 | Dev server | `npm start` |
 
@@ -918,6 +919,20 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   with `postInvalidateOnAnimation` from inside its own `draw`, so it costs frames only while it is
   on screen. Its code-highlighting and maths extras are opted out in `package.json`
   (`"enriched-markdown"`) — they download ~200MB of native dependencies nothing here uses.
+- **The app lock is the PHONE'S lock, and it fails OPEN.** No Peace PIN: there is no account to
+  reset one through, so a forgotten PIN would lock somebody out of the only copy of their ledger.
+  And the setting travels in backups, so a ledger restored onto a phone with no screen lock arrives
+  with the lock on and nothing that could satisfy it — `lockActive` treats that as off and Settings
+  says "Paused". Removing a phone's screen lock needs the very credential the prompt asks for, so
+  failing open gives nothing away. Three traps in `components/app-lock.tsx`: Android's own prompt
+  PAUSES the activity, so a departure recorded while `prompting` would relock the instant it
+  unlocked; the lock is decided on return, after Android has already drawn the last frame, so a
+  curtain goes up as the app LEAVES or the ledger flashes before the lock; and a bottom sheet is its
+  own window, which is why the lock screen is a `Modal` too. The recent-apps preview is blanked by
+  `modules/recents-privacy` (`setRecentsScreenshotEnabled`, Android 13+) — never `FLAG_SECURE`,
+  which would also block the screenshots people take on purpose. The prompt cannot be screenshotted
+  (it is a secure window): read it with `uiautomator dump`. `npm run e2e:lock` sets a device PIN,
+  runs `.maestro/lock/`, and always clears it, because `app-lock.yaml` asserts a phone with none.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.

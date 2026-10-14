@@ -115,6 +115,10 @@ export default function YourData() {
             settings and can withdraw it there at any time.
           </li>
           <li>
+            <strong>Fingerprint and face unlock</strong> — for the optional app lock. Android does the checking and
+            tells Peace only whether it matched; your fingerprint never reaches the app.
+          </li>
+          <li>
             <strong>Internet</strong> — for the four connections above.
           </li>
         </ul>

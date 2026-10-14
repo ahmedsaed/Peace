@@ -266,8 +266,11 @@ export default function Home() {
           </p>
           <div className="cards">
             <div className="card">
-              <h3>One tap hides every amount</h3>
-              <p>The eye in the header masks every figure on every screen, for reading your ledger beside someone.</p>
+              <h3>Locked, or just hidden</h3>
+              <p>
+                Lock Peace behind your fingerprint or phone PIN — or tap the eye to mask every figure while you read
+                your ledger beside someone.
+              </p>
             </div>
             <div className="card">
               <h3>Your AI key, your requests</h3>

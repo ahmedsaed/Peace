@@ -1,4 +1,5 @@
 import type { DigitOrder, OperatorSide } from './keypad-layout';
+import type { LockAfter } from './app-lock';
 
 export type WeekStart = 'phone' | 'sunday' | 'monday' | 'saturday';
 
@@ -189,6 +190,24 @@ export const SETTING_DEFAULTS = {
    * promise the stronger thing.
    */
   hideAmounts: false as boolean,
+
+  /**
+   * Ask for the phone's own lock — fingerprint, face, PIN — when Peace opens
+   * (`lib/app-lock.ts`). OFF until asked for, so nobody pays a step on every
+   * launch that they did not choose.
+   *
+   * A setting like any other, so it travels in a backup — and a backup can
+   * land on a phone with no screen lock. That is why the lock fails open when
+   * there is nothing to check, rather than locking for good.
+   */
+  lockEnabled: false as boolean,
+  /**
+   * How long Peace may be away before it asks again. A minute by default:
+   * long enough to take a receipt photo or copy a figure from the bank app
+   * without unlocking twice, short enough that a phone put down on a table is
+   * locked when somebody else picks it up.
+   */
+  lockAfter: '1min' as LockAfter,
 
   /**
    * The nightly nudge to write down what the day cost. OFF until asked for.

@@ -23,6 +23,7 @@
     "expo-image-manipulator": "~57.0.9",
     "expo-image-picker": "~57.0.9",
     "expo-linking": "~57.0.5",
+    "expo-local-authentication": "~57.0.3",
     "expo-localization": "~57.0.2",
     "expo-mcp": "~0.2.1",
     "expo-notifications": "~57.0.20",
@@ -92,6 +93,7 @@
     "shots": "bash scripts/demo-shots.sh",
     "e2e:fast": "maestro test .maestro/ --include-tags=core",
     "e2e:live": "bash scripts/e2e-live.sh",
+    "e2e:lock": "bash scripts/e2e-lock.sh",
     "demo:ledger": "bash scripts/demo-ledger.sh",
     "shots:penny": "bash scripts/penny-shots.sh",
     "postinstall": "patch-package"

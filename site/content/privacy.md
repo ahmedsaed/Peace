@@ -7,7 +7,7 @@
 
 # Peace — Privacy Policy
 
-**Effective 13 October 2026** · Peace is made by Merope ([merope.dev](https://merope.dev)).
+**Effective 14 October 2026** · Peace is made by Merope ([merope.dev](https://merope.dev)).
 
 ## The short version
 
@@ -85,6 +85,7 @@ Play delivers its updates.
 | Camera | Photographing a receipt, only when you tap the camera button |
 | Notifications | The optional daily reminder, scheduled on your phone |
 | Notification access | The optional bank-message reading described above |
+| Fingerprint and face unlock | The optional app lock. Android checks your fingerprint or face itself and tells Peace only whether it matched — Peace never sees or stores it |
 | Internet | The optional features above |
 
 ## Your data, your control

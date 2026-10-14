@@ -8,6 +8,7 @@ import { Section, SectionLink, Toggle } from '@/components/settings-ui';
 import { SECTIONS } from '@/constants/sections';
 import { db } from '@/db/client';
 import { getAccount } from '@/db/repo/accounts';
+import { describeLock } from '@/lib/app-lock';
 import { currencyName } from '@/lib/currencies';
 import { describeCadence } from '@/lib/drive-backup';
 import { formatTimeLabel, ordinal } from '@/lib/period';
@@ -15,6 +16,7 @@ import { onDay } from '@/lib/reminder';
 import { setupProgress } from '@/lib/setup';
 import { runBankCatchUp } from '@/state/bank';
 import { useAi } from '@/state/ai';
+import { readDeviceLock, useLockStore } from '@/state/app-lock';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSettingsStore } from '@/state/settings';
 import { bankAccess, describeBank, useSetupFacts } from '@/state/setup';
@@ -38,6 +40,7 @@ export default function SettingsIndex() {
   const s = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
   const hasKey = useGeminiKeyStore((state) => state.hasKey);
+  const lockDevice = useLockStore((state) => state.device);
   const facts = useSetupFacts();
 
   // Notification access is granted outside this app, and the default account
@@ -47,6 +50,7 @@ export default function SettingsIndex() {
   useFocusEffect(
     useCallback(() => {
       setAccess(bankAccess());
+      void readDeviceLock();
       setAccountName(s.defaultAccountId ? (getAccount(db, s.defaultAccountId)?.name ?? null) : null);
     }, [s.defaultAccountId])
   );
@@ -183,6 +187,13 @@ export default function SettingsIndex() {
             summary={backup}
             onPress={go('/export')}
             testID="settings-section-backup"
+          />
+          <SectionLink
+            {...SECTIONS.lock}
+            title="App lock"
+            summary={describeLock(s.lockEnabled, lockDevice ?? 'secret', s.lockAfter)}
+            onPress={go('/settings/lock')}
+            testID="settings-section-lock"
           />
           <SectionLink
             {...SECTIONS.setup}

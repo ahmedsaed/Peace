@@ -125,8 +125,10 @@ layout on the screens that use them.
 
 - [ ] **CSV import** — generic column mapping, plus a preset for MyMoney exports. Imports are
       previewed and undoable as one batch; sides go through `ledgerSide`, never the amount's sign.
-- [ ] **App lock** (biometric / PIN, `expo-local-authentication`) — **off by default**, so nobody pays
-      a step they did not ask for. Optional grace period ("lock after 5 minutes away").
+- [x] **App lock** (biometric / PIN, `expo-local-authentication`) — **off by default**, so nobody pays
+      a step they did not ask for. Grace period: immediately / 1 / 5 / 15 minutes (default 1). Uses
+      the phone's own lock rather than a Peace PIN, fails open on a phone with none, and blanks the
+      recent-apps preview on Android 13+.
 - [x] **Empty states that teach** — on a ledger with no data, Analysis, Budgets, Portfolio and
       Recurring each say what the screen is for and offer the one action that fills it, instead of
       a blank chart or "No data".

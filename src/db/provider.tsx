@@ -5,6 +5,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 
 import migrations from '../../drizzle/migrations';
 import palette from '../constants/palette';
+import { useLockStore } from '../state/app-lock';
 import { useSettingsStore } from '../state/settings';
 import { sweepOrphans } from './attachments';
 import { forgetHandled } from './repo/bank-captures';
@@ -57,6 +58,10 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       // Loaded here, behind the same gate, so no screen ever renders with the
       // built-in defaults and then flicks to the stored values a frame later.
       useSettingsStore.getState().load();
+      // Locked from the very first frame when the lock is on — decided here,
+      // before any screen renders, rather than by the lock a frame later.
+      // Nothing is subscribed yet, so this is a plain write.
+      useLockStore.getState().setLocked(useSettingsStore.getState().settings.lockEnabled);
 
       /**
        * Collect attachment files nothing points at any more.
