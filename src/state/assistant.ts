@@ -78,6 +78,7 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
     return {
       db,
       homeCurrency: settings.homeCurrency,
+      rules: settings.assistantGuidance,
       now: () => new Date(),
       /**
        * STREAMED, through `expo/fetch`: React Native's own fetch buffers the

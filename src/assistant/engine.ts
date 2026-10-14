@@ -86,6 +86,8 @@ export type ErrorMeta = { message: string; retryable: boolean };
 export type Deps = {
   db: Db;
   homeCurrency: string;
+  /** The user's own instructions, appended to the system prompt. Usually empty. */
+  rules?: string;
   now: () => Date;
   /** One request to the model. Injected so tests can script it. */
   step: (request: { system: string; contents: Content[]; tools: ReturnType<typeof declarations> }) => Promise<Content>;
@@ -295,7 +297,7 @@ export async function run(deps: Deps, signal?: AbortSignal): Promise<RunResult> 
 
     // A user message or a tools row: the model's turn.
     const content = await deps.step({
-      system: systemPrompt(deps.now(), deps.homeCurrency, shape(deps.db)),
+      system: systemPrompt(deps.now(), deps.homeCurrency, shape(deps.db), deps.rules),
       contents: toContents(session, await loadInline(deps, session)),
       tools: declarations(),
     });

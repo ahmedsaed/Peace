@@ -125,6 +125,12 @@ export const SETTING_DEFAULTS = {
    */
   assistantModel: 'gemini-flash-latest' as string,
   /**
+   * Penny's "Your rules": the user's own instructions, appended to her system
+   * prompt after the shipped ones, which still win where the two conflict
+   * (`assistant/prompt.ts`). Empty for almost everybody.
+   */
+  assistantGuidance: '' as string,
+  /**
    * The folder reports were last saved to, as a Storage Access Framework uri.
    *
    * Remembered so "Save" is one tap after the first time. Android keeps the
