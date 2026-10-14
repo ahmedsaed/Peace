@@ -134,8 +134,11 @@ export default function YourData() {
           <li>
             We hold nothing on our side, so there is nothing for us to delete — and no account to close.
           </li>
-          <li>Before you go, Settings › Export gives you everything as CSV or as a full backup.</li>
+          <li>Before you go, Settings › Backup &amp; export gives you everything as CSV or as a full backup.</li>
         </ul>
+        <p>
+          Step by step, including what Google keeps for Gemini: <Link href="/delete/">Deleting your data</Link>.
+        </p>
 
         <p>
           The full detail is in the <Link href="/privacy/">privacy policy</Link>, and the app is free software — every

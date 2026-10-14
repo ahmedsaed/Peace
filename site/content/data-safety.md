@@ -40,8 +40,10 @@ to Google's retention terms, which we do not control.
 
 ## Deletion
 
-Peace holds no user data on any server of ours, so there is no account to delete. The answer in
-the form is the website's deletion section: uninstalling or clearing storage deletes everything on
+Peace holds no user data on any server of ours, so there is no account to delete. The form still
+asks for a "delete data URL" when the answer is Yes: it is **https://peace.merope.dev/delete/**,
+written to Play's three requirements (names the app and developer, gives the steps, says what is
+deleted or kept). In short: uninstalling or clearing storage deletes everything on
 the phone; Drive backups are removed from Google Drive › Settings › *Manage apps*; requests sent
 to Gemini are governed by the user's own API key and Google's terms.
 
