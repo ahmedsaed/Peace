@@ -89,9 +89,14 @@ JS reads the flavor through `flavor` / `selfUpdates` in `src/lib/build-info.ts`;
 difference behind one small module per concern, never as `if (flavor === …)` across screens.
 
 **The Play upload is an AAB, built on request.** Actions › **Play bundle** › Run workflow builds
-`flavor: play` through the same `build-apk.yml` every PR uses and hands back `peace-play-…aab` as
-an artifact; nothing builds or uploads one automatically, because every upload burns its
-versionCode for good. The bundle is signed with our release key acting as the **upload key** —
+`flavor: play` through the same `build-apk.yml` every PR uses, hands back `peace-play-…aab` as an
+artifact, and — unless the track input is `none` — uploads it to that track as a DRAFT, which
+waits for "Roll out" in Play Console. Nothing builds or uploads one automatically, because every
+upload burns its versionCode for good. **There is no key**: Workload Identity Federation lets this
+workflow, in this repo, on `main`, act as the `peace-play-upload` service account for an hour
+(`PLAY_WIF_PROVIDER` and `PLAY_SERVICE_ACCOUNT` are repository VARIABLES, not secrets). That account
+can release to testing tracks of this one app and nothing else; production is a human's click.
+The merope.dev Cloud organisation forbids service-account keys, so do not try to add one. The bundle is signed with our release key acting as the **upload key** —
 Play App Signing re-signs it, which is the whole reason the play build's OAuth client takes Play's
 SHA-1. Locally: `PEACE_FLAVOR=play npx expo prebuild --platform android --clean`, then
 `./gradlew app:bundleRelease` in `android/`.

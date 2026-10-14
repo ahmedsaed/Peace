@@ -10,8 +10,32 @@ name: Play bundle
 #
 # Same reusable build as the PR and the release (see build-apk.yml): the play
 # flavor changes the application id and the output format and nothing else.
+#
+# UPLOADING. With a track chosen, the bundle goes straight to Play — as a DRAFT
+# by default, so nothing reaches a tester until somebody presses "Roll out" in
+# Play Console. There is no key anywhere: Workload Identity Federation lets a
+# run of THIS workflow, in this repo, on main, borrow the `peace-play-upload`
+# service account for an hour (the two `PLAY_*` repository variables say which
+# provider and account). That account holds "Release to testing tracks" for
+# this app and nothing else, so production is unreachable from here by design —
+# promoting a build to production stays a human's click in Play Console.
 on:
   workflow_dispatch:
+    inputs:
+      track:
+        description: Upload to this Play track (alpha is closed testing). "none" only builds.
+        type: choice
+        options: [alpha, internal, none]
+        default: alpha
+      status:
+        description: draft waits for "Roll out" in Play Console; completed releases at once.
+        type: choice
+        options: [draft, completed]
+        default: draft
+      notes:
+        description: Release notes for testers (optional, en-US).
+        type: string
+        required: false
 
 jobs:
   bundle:
@@ -38,4 +62,92 @@ jobs:
             echo
             echo "versionCode **$BUILD** is used up the moment Play accepts it; the next upload"
             echo "must come from a later commit."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  upload:
+    name: Upload to Play (${{ inputs.track }}, ${{ inputs.status }})
+    needs: bundle
+    if: inputs.track != 'none'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # What lets GitHub vouch for this run to Google. No secret is involved.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WIF_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      # The Publishing API, spoken directly: open an edit, upload the bundle
+      # into it, put that versionCode on the track, commit. Four calls, no
+      # third-party action holding the token.
+      - name: Upload the bundle
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+          TRACK: ${{ inputs.track }}
+          STATUS: ${{ inputs.status }}
+          NOTES: ${{ inputs.notes }}
+          VERSION: ${{ needs.bundle.outputs.version }}
+          BUILD: ${{ needs.bundle.outputs.build-number }}
+        run: |
+          set -euo pipefail
+          PKG=dev.merope.peace
+          API="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PKG"
+          AUTH=(-H "Authorization: Bearer $TOKEN")
+          # Every call prints Play's own error on failure: its message names
+          # the actual problem (a missing permission, a used versionCode),
+          # where a bare HTTP status would not.
+          call() {
+            local out
+            if ! out=$(curl -sS --fail-with-body "${AUTH[@]}" "$@"); then
+              echo "::error::Play API call failed: $out" >&2
+              return 1
+            fi
+            printf '%s' "$out"
+          }
+
+          AAB=$(find . -maxdepth 2 -name '*.aab' -print -quit)
+          [ -n "$AAB" ] || { echo "::error::No .aab in the downloaded artifacts."; exit 1; }
+          echo "uploading $AAB"
+
+          EDIT=$(call -X POST "$API/edits" | jq -r .id)
+
+          UPLOADED=$(call -X POST \
+            -H "Content-Type: application/octet-stream" --data-binary @"$AAB" \
+            "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$PKG/edits/$EDIT/bundles?uploadType=media" \
+            | jq -r .versionCode)
+          # The number Play recorded must be the build we think we uploaded.
+          [ "$UPLOADED" = "$BUILD" ] || { echo "::error::Play recorded versionCode $UPLOADED, expected $BUILD."; exit 1; }
+
+          RELEASE=$(jq -n --arg name "$VERSION ($BUILD)" --arg code "$BUILD" --arg status "$STATUS" --arg notes "$NOTES" '
+            {name: $name, versionCodes: [$code], status: $status}
+            + (if $notes == "" then {} else {releaseNotes: [{language: "en-US", text: $notes}]} end)')
+          jq -n --arg track "$TRACK" --argjson release "$RELEASE" '{track: $track, releases: [$release]}' > track.json
+          call -X PUT -H "Content-Type: application/json" \
+            --data @track.json "$API/edits/$EDIT/tracks/$TRACK" > /dev/null
+
+          # Some changes cannot be sent for review by the API (Play says so in
+          # the error); those are committed as pending and sent from the
+          # Publishing overview by hand.
+          if ! OUT=$(call -X POST "$API/edits/$EDIT:commit" 2>&1); then
+            echo "$OUT" >&2
+            echo "$OUT" | grep -q changesNotSentForReview || exit 1
+            call -X POST "$API/edits/$EDIT:commit?changesNotSentForReview=true" > /dev/null
+            echo "::notice::Committed, but not sent for review — send it from Play Console › Publishing overview."
+          fi
+
+          {
+            echo "## Uploaded to Play: $VERSION (build $BUILD)"
+            echo
+            echo "Track **$TRACK**, status **$STATUS**."
+            [ "$STATUS" = draft ] && echo "Open Play Console › Test and release › $TRACK and press **Roll out** when ready." || true
           } >> "$GITHUB_STEP_SUMMARY"
