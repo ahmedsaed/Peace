@@ -968,6 +968,19 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   `plugins/with-native-theme.js`. An install from before themes has no row and reads **Ledger**;
   only a first launch writes `system`. **Flows run in whatever the emulator's night mode picks** —
   a fresh install follows the phone — so the test AVD, in light mode, runs the suite in Paper.
+- **A launcher shortcut is a deep link, and it must name its package.** Both flavors register the
+  `peace` scheme, so a bare `peace://record` on a phone with the GitHub and the Play build opens a
+  chooser, or the other app. `plugins/with-shortcuts.js` writes `targetPackage` from the id being
+  built. The root layout's `anchor: '(drawer)'` is what puts Records under a linked screen; without
+  it Save and Back close the app. Test one with `adb shell am start -a android.intent.action.VIEW -d
+  "peace://record?startAs=income" -n dev.merope.peace.oss/.MainActivity`.
+- **A glyph is not a label.** TalkBack reads `÷` as "division sign", `✓` as "check mark" and a colour
+  swatch as just "button", so anything drawn as a symbol carries an `accessibilityLabel` in words
+  (`flowKeySpoken`, `OP_SPOKEN`, `SWATCH_NAMES`). A row that reads as one fact — a category, its
+  amount, its share — is ONE accessible element with one sentence, and that sentence goes through
+  `useMoney` like the figures it describes. Large text is checked with `adb shell settings put
+  system font_scale 2.0` (and reset to `1.0` after): `densityForHeight` takes the font scale, and
+  text sharing a fixed row (tab labels, keypad digits) caps its growth with `maxFontSizeMultiplier`.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.
