@@ -101,20 +101,23 @@ layout on the screens that use them.
 
 ## Phase 4 — Store requirements
 
-- [ ] Release builds an **AAB** for Play (`bundleRelease`) alongside the APK for GitHub, through the same reusable workflow
+- [x] Release builds an **AAB** for Play (`bundleRelease`) alongside the APK for GitHub, through the same reusable workflow
+      — on request only: Actions › **Play bundle**, since every upload burns its versionCode
 - [ ] Play App Signing enrolled; upload key kept out of the repo like the current signing key
 - [ ] Drive OAuth: Android client for Play's app-signing SHA-1; consent screen to production with brand verification
 - [x] Notification-listener **prominent disclosure** screen, consent before deep-linking to settings.
       **Built once, with onboarding** — the onboarding step IS the disclosure, and the Settings card
       opens the same screen for anyone who skipped it. Play reviews closed-test builds too, so this
       must land **before the first AAB is uploaded**, even if the rest of onboarding is not done.
-- [ ] Privacy policy + data-safety page on `peace.merope.dev`; Data safety form filled to match
+- [x] Privacy policy + data-safety page on `peace.merope.dev` (`/privacy/`, `/data/`). **Still to do:** fill the
+      Play Data safety form from `site/content/data-safety.md` once the account is approved
       (Gemini requests, Drive backup, notification contents read on device)
 - [x] Check the merged manifest's alarm permissions (`SCHEDULE_EXACT_ALARM` fine, `USE_EXACT_ALARM` needs a declaration)
       — neither is requested; expo-notifications falls back to inexact alarms
 - [x] Target SDK meets Play's current minimum (36)
-- [ ] Store listing: screenshots (`npm run shot`), feature graphic, short and long description
-- [ ] Sideload → Play migration documented on the website (backup → install → restore)
+- [x] Store listing: screenshots (`npm run shot`), feature graphic, short and long description — `store/`, graphics at `/store/`
+- [x] Sideload → Play migration documented on the website (backup → install → restore) — `/move/`; flip
+      `ON_PLAY` in `site/app/move/page.tsx` when the listing is public
 - [ ] Closed testing track: 12+ testers opted in for 14 consecutive days (mandatory — personal account). Testers join through a Google Group and an opt-in link, then install from the Play Store as normal.
 - [ ] Internal testing track for our own devices from day one (does not count towards the 12)
 
