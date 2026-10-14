@@ -39,6 +39,10 @@ appId: dev.merope.peace.oss
     clearState: true
     arguments:
       peace.currency: USD
+      # A fresh install follows the phone, and the AVD is in light mode: without
+      # this every image would be Paper. The README and the listing are Ledger;
+      # the other themes are photographed on purpose at the end.
+      peace.theme: ledger
 - extendedWaitUntil:
     visible:
       id: "setup-welcome"
@@ -52,6 +56,7 @@ appId: dev.merope.peace.oss
     arguments:
       peace.onboarding: done
       peace.currency: USD
+      peace.theme: ledger
 
 - extendedWaitUntil:
     visible:
@@ -714,3 +719,111 @@ appId: dev.merope.peace.oss
 - assertVisible: "\\+10.0%"
 - assertVisible: "-10.0%"
 - takeScreenshot: portfolio
+
+# ===========================================================================
+# 10. Themes — the same month in every theme, for the website's themes section
+# ===========================================================================
+# Last, so every theme photographs the SAME ledger: the records and the ring
+# change colour and nothing else does. Ledger goes last as well, so the device
+# is left the way the flow found it.
+- back
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-appearance"
+# The grid is a little taller than the screen; at the foot, every
+# option is whole — including its check, which an assertion needs to see.
+- scroll
+- tapOn:
+    id: "theme-option-graphite"
+- assertVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-graphite"
+- back
+- back
+- assertVisible:
+    id: "home-screen"
+- takeScreenshot: theme-graphite-records
+- tapOn:
+    id: "tab-analysis"
+- takeScreenshot: theme-graphite-analysis
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-appearance"
+# The grid is a little taller than the screen; at the foot, every
+# option is whole — including its check, which an assertion needs to see.
+- scroll
+- tapOn:
+    id: "theme-option-paper"
+- assertVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-paper"
+- back
+- back
+- assertVisible:
+    id: "home-screen"
+- takeScreenshot: theme-paper-records
+- tapOn:
+    id: "tab-analysis"
+- takeScreenshot: theme-paper-analysis
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-appearance"
+# The grid is a little taller than the screen; at the foot, every
+# option is whole — including its check, which an assertion needs to see.
+- scroll
+- tapOn:
+    id: "theme-option-mist"
+- assertVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-mist"
+- back
+- back
+- assertVisible:
+    id: "home-screen"
+- takeScreenshot: theme-mist-records
+- tapOn:
+    id: "tab-analysis"
+- takeScreenshot: theme-mist-analysis
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-appearance"
+# The grid is a little taller than the screen; at the foot, every
+# option is whole — including its check, which an assertion needs to see.
+- scroll
+- tapOn:
+    id: "theme-option-ledger"
+- assertVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-ledger"
+- back
+- back
+- assertVisible:
+    id: "home-screen"
+- takeScreenshot: theme-ledger-records
+- tapOn:
+    id: "tab-analysis"
+- takeScreenshot: theme-ledger-analysis
+- tapOn:
+    id: "tab-index"

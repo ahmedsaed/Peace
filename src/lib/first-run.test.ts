@@ -1,4 +1,4 @@
-import { detectCurrency, firstRunSettings, LAUNCH_CURRENCY, LAUNCH_ONBOARDING } from './first-run';
+import { detectCurrency, firstRunSettings, LAUNCH_CURRENCY, LAUNCH_ONBOARDING, LAUNCH_THEME } from './first-run';
 
 describe('detectCurrency', () => {
   it('takes the first locale that names a currency', () => {
@@ -31,6 +31,11 @@ describe('firstRunSettings', () => {
     expect(
       firstRunSettings({ [LAUNCH_ONBOARDING]: 'done', [LAUNCH_CURRENCY]: 'jpy' }, egypt)
     ).toEqual({ homeCurrency: 'JPY', onboardingDone: true, setupCard: false, theme: 'system' });
+  });
+
+  it('lets a harness pin the theme, and ignores one this build does not have', () => {
+    expect(firstRunSettings({ [LAUNCH_THEME]: 'ledger' }, egypt).theme).toBe('ledger');
+    expect(firstRunSettings({ [LAUNCH_THEME]: 'neon' }, egypt).theme).toBe('system');
   });
 
   it('ignores a malformed currency extra rather than storing it', () => {

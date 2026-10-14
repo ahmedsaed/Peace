@@ -13,6 +13,8 @@ appId: dev.merope.peace.oss
     arguments:
       peace.onboarding: done
       peace.currency: USD
+      # Ledger, as in every listing image — a fresh install follows the phone.
+      peace.theme: ledger
 - extendedWaitUntil:
     visible:
       id: "home-screen"

@@ -208,8 +208,11 @@ screens, and every flow starts from `clearState`, so a flow without the skip die
 Maestro hands `arguments` to the app as intent extras; `modules/launch-extras` reads the `peace.*`
 ones and `src/lib/first-run.ts` honours them ONLY on a ledger opened for the first time, so they
 change nothing on an existing install. The currency is pinned because a fresh install detects it
-from the phone's region, and the fixtures are in pounds. `onboarding.yaml` is the one flow that
-walks setup, and it asserts the choices on the screens that use them.
+from the phone's region, and the fixtures are in pounds. `peace.theme` exists for the same reason
+and is used only by the screenshot flows (`scripts/demo-shots.yaml`, `penny-shots.yaml`): a fresh
+install follows the phone, the AVD is in light mode, and without it every listing image is Paper.
+The E2E flows leave it out on purpose, so the suite runs in a light theme. `onboarding.yaml` is the
+one flow that walks setup, and it asserts the choices on the screens that use them.
 
 **`onboardingDone` defaults to `true`, and that is the migration.** Installs and backups from before
 onboarding have no row for it, and a year-old ledger must not be greeted as new. Only a first

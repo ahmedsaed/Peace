@@ -38,6 +38,9 @@ appId: dev.merope.peace.oss
     childOf:
       id: "theme-option-system"
 
+# The grid is a little taller than the screen: at its foot, the bottom
+# row is whole, check marks included.
+- scroll
 - tapOn:
     id: "theme-option-paper"
 - assertVisible:
