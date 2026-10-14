@@ -8,6 +8,7 @@ the same pull request as the app it describes.
 | Name, short and full description, category, contact | [`listing.md`](listing.md) — `node scripts/check-listing.mjs` checks the lengths |
 | App icon, feature graphic, 8 phone screenshots | built by the website: `https://peace.merope.dev/store/<file>` |
 | Full-resolution captures the graphics are drawn from | [`screenshots/`](screenshots) — written by `npm run shots` |
+| Data safety answers, importable | [`data-safety.csv`](data-safety.csv) — Play Console's own export format, filled in |
 
 ## Regenerating
 
@@ -26,3 +27,14 @@ matching the app the first time a screen changes, and nothing fails when it does
 Play rejects a screenshot whose long side is more than twice the short side, and a modern phone's
 1080×2400 is 2.22. The store images are 1080×1920 — Play's recommended size — with a caption above a
 phone that runs off the bottom edge.
+
+## Data safety
+
+[`data-safety.csv`](data-safety.csv) is Play Console's Data safety export with every answer filled
+in. Import it from **App content › Data safety** (the import option at the top of that page)
+instead of clicking through the form, then read the summary before saving.
+
+The reasoning behind each answer lives in
+[`site/content/data-safety.md`](../site/content/data-safety.md). The CSV is the form; that file says
+why — **change both in the same PR**. Edit the third column (*Response value*) only, and keep the
+file's CRLF line endings: it is Play's format, round-tripped, not ours.

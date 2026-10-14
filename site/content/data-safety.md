@@ -2,7 +2,9 @@
 
 The answers to give in **Play Console › App content › Data safety**, derived from
 [privacy.md](privacy.md). The form and the policy must say the same thing; if one changes, change
-both in the same PR. Google's definitions decide the wording here, not ours:
+both in the same PR. The same answers, in the form Play Console imports, are
+[`store/data-safety.csv`](../../store/data-safety.csv) — that file changes with this one too.
+Google's definitions decide the wording here, not ours:
 
 - **Collected** = transmitted off the device by the app, *including* to a third party such as
   Google's Gemini API, even when we never see it.
@@ -25,7 +27,7 @@ both in the same PR. Google's definitions decide the wording here, not ours:
 |---|---|---|---|---|---|---|
 | **Financial info › Purchase history** | Yes | No | No | Optional | App functionality | Records and ledger figures go to Gemini when Penny answers; the ledger goes to the user's own Drive in a backup |
 | **Financial info › Other financial info** | Yes | No | No | Optional | App functionality | Account and category names in AI requests and backups |
-| **Messages › SMS or MMS** | Yes | No | No | Optional | App functionality | Text of bank messages from senders the user listed, sent to Gemini to be read |
+| **Messages › SMS or MMS** | Yes | No | No | Optional | App functionality | Text of bank SMS from senders the user listed, sent to Gemini to be read. Read from the default SMS app's notifications, never the inbox — but the DATA is SMS, and the form asks about the data |
 | **Photos and videos › Photos** | Yes | No | No | Optional | App functionality | Receipt photos sent to Gemini to be read, and included in Drive backups |
 | **Files and docs** | Yes | No | No | Optional | App functionality | Files attached to a Penny question; the backup file itself |
 | **App activity › Other user-generated content** | Yes | No | No | Optional | App functionality | Notes, questions to Penny |
