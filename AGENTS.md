@@ -761,6 +761,17 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   reclaim, and losing a photo somebody just took is unforgivable); ROWS wait for the save, so
   backing out leaves the ledger untouched like every other field. The file left behind is collected
   by the orphan sweep on launch — a cost paid in bytes, not in receipts.
+- **The camera is Peace's own viewfinder, and it runs only while it is shown.** The camera button,
+  holding + and the Receipt shortcut turn the notes field into `components/inline-camera.tsx`
+  (expo-camera); one press of the shutter attaches the photo with no confirm step — the thumbnail
+  is the confirmation and its ✕ the undo. Opening a record never starts it (Android lights its
+  camera dot and the battery pays), and it closes when the app leaves the foreground. "Camera app"
+  inside it is the old `launchCameraAsync` path, kept for night mode and for a phone where the
+  preview fails. expo-camera is configured with `recordAudioAndroid: false` and
+  `barcodeScannerEnabled: false` (built from source, see `package.json`): a microphone permission
+  would contradict the Data safety form, and the barcode scanner is ML Kit we do not use. The
+  emulator's camera is a test pattern and its stills come out black — a flow can prove the shutter
+  attaches something, only a phone can show the picture.
 - **Downscale a photo before it is stored, never at render time.** A 4MB camera JPEG that reaches
   the disk is 4MB in every backup made from then on. 1600px at quality 0.7 still reads a total and
   a date, and is the difference between a year of receipts weighing 20MB and 400MB — which is the
