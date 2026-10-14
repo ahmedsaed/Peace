@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -40,6 +41,17 @@ export default function TabsLayout() {
           paddingBottom: 6 + insets.bottom,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
+        // Five labels share the width of a phone. Past about 1.3x they
+        // truncate to "Recor…", which helps nobody — the icons and TalkBack
+        // carry the rest.
+        tabBarLabel: ({ color, children }) => (
+          <Text
+            style={{ color, fontSize: 11, fontWeight: '500' }}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.3}>
+            {children}
+          </Text>
+        ),
       }}>
       {TABS.map(({ name, title, icon }) => (
         <Tabs.Screen

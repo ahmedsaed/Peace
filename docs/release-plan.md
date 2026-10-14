@@ -181,8 +181,14 @@ layout on the screens that use them.
 ## Backlog
 
 - Localisation (string extraction first, then Arabic + RTL)
-- Home-screen widget / launcher shortcut for quick add
-- Accessibility pass — TalkBack labels on keypad and charts; large-font scaling against the density system
+- [x] Launcher shortcuts for quick add (1.25): hold the icon for Expense, Income or Receipt — static
+      shortcuts deep-linking into the record screen with Records anchored beneath. A home-screen
+      WIDGET is still open.
+- [x] Accessibility pass (1.25): keypad keys and the `=`/next/save key speak words, the amount is a live
+      region, analysis rows and the six-month bars read as one sentence each (masked like the screen),
+      swatches and icons in the pickers have names. Large text: density divides by the font scale (up
+      to 1.5x, so large text alone never drops to the split-screen layout), and the tab labels, keypad
+      digits and record title cap how far they grow. Checked on the emulator at 1.3x and 2x.
 - Crash visibility through Play Console vitals (no SDK)
 - Store video / demo
 

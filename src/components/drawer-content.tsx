@@ -92,7 +92,10 @@ export function DrawerContent({ navigation }: DrawerContentComponentProps) {
           style={{ width: 40, height: 40 }}
           resizeMode="contain"
         />
-        <View>
+        {/* flex-1, or the tagline is as wide as it likes: at a large font size
+            it ran past the drawer's edge, and with the drawer closed the
+            overflow sat on the left of every screen as a stray "es". */}
+        <View className="flex-1">
           <Wordmark size={24} />
           {/* "Nothing leaves the phone" stops being true the moment Drive is
               connected — and it would sit directly above a card saying when it

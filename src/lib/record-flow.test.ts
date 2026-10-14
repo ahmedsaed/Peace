@@ -1,4 +1,4 @@
-import { flowKeyLabel, nextAction, type FlowState, type Sheet } from './record-flow';
+import { flowKeyLabel, flowKeySpoken, nextAction, type FlowState, type Sheet } from './record-flow';
 
 const base: FlowState = {
   hasPendingOp: false,
@@ -156,5 +156,15 @@ describe('flowKeyLabel', () => {
     expect(flowKeyLabel({ kind: 'save' })).toBe('✓');
     expect(flowKeyLabel({ kind: 'open', sheet: 'account' })).toBe('→');
     expect(flowKeyLabel({ kind: 'incomplete', message: 'x' })).toBe('→');
+  });
+
+  // What TalkBack says for the same key: the action, never the glyph's name.
+  it('says it in words for a screen reader', () => {
+    expect(flowKeySpoken({ kind: 'evaluate' })).toBe('Equals');
+    expect(flowKeySpoken({ kind: 'save' })).toBe('Save');
+    expect(flowKeySpoken({ kind: 'open', sheet: 'category' })).toBe('Next, choose the category');
+    expect(flowKeySpoken({ kind: 'incomplete', message: 'Enter an amount to save' })).toBe(
+      'Next. Enter an amount to save'
+    );
   });
 });
