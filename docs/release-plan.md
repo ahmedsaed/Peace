@@ -113,8 +113,8 @@ layout on the screens that use them.
 - [x] Drive OAuth: Android client for Play's app-signing SHA-1 (`dev.merope.peace`, the `6C:21…` key above),
       in the same Cloud project as the `oss` client. Drive connect verified on the internal-test build
       1.23.0 (269), 2026-10-14
-- [ ] OAuth consent screen published to production (in Testing, only listed test users can connect and
-      grants expire after 7 days), with brand verification if Google asks for it
+- [x] OAuth consent screen published to production (in Testing, only listed test users can connect and
+      grants expire after 7 days), confirmed in production 2026-10-14
 - [x] Notification-listener **prominent disclosure** screen, consent before deep-linking to settings.
       **Built once, with onboarding** — the onboarding step IS the disclosure, and the Settings card
       opens the same screen for anyone who skipped it. Play reviews closed-test builds too, so this
