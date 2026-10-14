@@ -254,17 +254,28 @@ export async function attachFromCamera(): Promise<PickOutcome> {
   });
   if (result.canceled || !result.assets?.[0]) return { cancelled: true };
 
-  const asset = result.assets[0];
-  const shrunk = await downscale(asset.uri);
-  return {
-    cancelled: false,
-    attachment: await stageAttachment({
-      uri: shrunk.uri,
-      mimeType: 'image/jpeg',
-      width: shrunk.width || asset.width,
-      height: shrunk.height || asset.height,
-    }),
-  };
+  return { cancelled: false, attachment: await attachPhoto(result.assets[0]) };
+}
+
+/**
+ * A photo taken by Peace's own viewfinder (`components/inline-camera.tsx`).
+ *
+ * The same path as the camera app's: downscaled once, then staged under its
+ * content hash. The viewfinder's file is in the cache, which Android may
+ * reclaim, so it is copied in straight away like every other capture.
+ */
+export async function attachPhoto(photo: {
+  uri: string;
+  width: number;
+  height: number;
+}): Promise<StagedAttachment> {
+  const shrunk = await downscale(photo.uri);
+  return stageAttachment({
+    uri: shrunk.uri,
+    mimeType: 'image/jpeg',
+    width: shrunk.width || photo.width,
+    height: shrunk.height || photo.height,
+  });
 }
 
 /**

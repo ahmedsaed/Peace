@@ -7,14 +7,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AttachmentBar } from '@/components/attachments';
 import { AttachmentViewer } from '@/components/attachment-viewer';
 import { Icon } from '@/components/icon';
+import { InlineCamera, type CapturedPhoto } from '@/components/inline-camera';
 import { TagChips, TagSheet } from '@/components/tag-sheet';
 import { Keypad, type KeyPress } from '@/components/keypad';
 import {
   attachFromCamera,
   attachFromFiles,
+  attachPhoto,
   attachmentAsBase64,
   stagedFromRows,
   sweepOrphans,
+  type PickOutcome,
   type StagedAttachment,
 } from '@/db/attachments';
 import { listAttachments, syncAttachments } from '@/db/repo/attachments';
@@ -378,6 +381,13 @@ export default function RecordScreen() {
   });
   const [tagSheet, setTagSheet] = useState(false);
   const [attaching, setAttaching] = useState(false);
+  /**
+   * The notes field is showing the camera. Only ever by asking — the camera
+   * button, holding +, the Receipt shortcut — never on opening a record.
+   */
+  const [viewfinder, setViewfinder] = useState(false);
+  /** Read the photo the viewfinder takes: true when it was opened to scan. */
+  const readAfterCapture = useRef(false);
   /** The receipt currently being read, so only its own badge spins. */
   const [readingFile, setReadingFile] = useState<string | null>(null);
   const [picking, setPicking] = useState<'date' | 'time' | null>(null);
@@ -735,12 +745,16 @@ export default function RecordScreen() {
    * and re-enter the screen, and a second tap while the first is still
    * resolving would run two pickers over one piece of state.
    */
-  async function pick(source: 'camera' | 'files'): Promise<StagedAttachment | null> {
+  function pick(source: 'camera' | 'files'): Promise<StagedAttachment | null> {
+    return attach(source === 'camera' ? attachFromCamera : attachFromFiles);
+  }
+
+  async function attach(produce: () => Promise<PickOutcome>): Promise<StagedAttachment | null> {
     if (attaching) return null;
     setAttaching(true);
     setError(null);
     try {
-      const outcome = source === 'camera' ? await attachFromCamera() : await attachFromFiles();
+      const outcome = await produce();
       if (outcome.cancelled) return null;
 
       setAttached((current) =>
@@ -768,6 +782,31 @@ export default function RecordScreen() {
       setAttaching(false);
     }
   }
+
+  /**
+   * The viewfinder's shutter: attach at once, close, and — when it was opened
+   * to scan a receipt — read it. Closing FIRST, so the thumbnail arriving in
+   * the strip is what the person sees next; that thumbnail is the confirmation.
+   */
+  async function onCapture(photo: CapturedPhoto) {
+    setViewfinder(false);
+    const taken = await attach(async () => ({ cancelled: false, attachment: await attachPhoto(photo) }));
+    if (taken && readAfterCapture.current && aiEnabled) await onRead(taken);
+    readAfterCapture.current = false;
+  }
+
+  /** The phone's own camera app, for night mode or a phone where ours fails. */
+  async function onCameraApp() {
+    setViewfinder(false);
+    const taken = await pick('camera');
+    if (taken && readAfterCapture.current && aiEnabled) await onRead(taken);
+    readAfterCapture.current = false;
+  }
+
+  const closeViewfinder = useCallback(() => {
+    setViewfinder(false);
+    readAfterCapture.current = false;
+  }, []);
 
   /**
    * Read a receipt and fill in the form.
@@ -856,13 +895,9 @@ export default function RecordScreen() {
   useEffect(() => {
     if (capture !== '1' || captureStarted.current) return;
     captureStarted.current = true;
-    void (async () => {
-      const taken = await pick('camera');
-      if (taken && aiEnabled) await onRead(taken);
-    })();
-    // Mount only. `pick` and `onRead` are redefined every render and listing
-    // them would re-run the camera on every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // The viewfinder, opened to SCAN: whatever it takes is read straight away.
+    readAfterCapture.current = true;
+    setViewfinder(true);
   }, [capture]);
 
   function onSave() {
@@ -1081,6 +1116,10 @@ export default function RecordScreen() {
   // The note keeps a floor rather than a fixed height: with room it grows like a
   // web textarea, without room it stops at something still usable.
   const noteMinHeight = byDensity(density, { regular: 120, compact: 76, tight: 48 });
+  // The camera takes the note's place but needs more room than an empty note:
+  // below this the shutter and its controls crowd the picture. The scroll view
+  // gives way instead — the same floor-then-scroll rule the note follows.
+  const viewfinderMinHeight = byDensity(density, { regular: 260, compact: 200, tight: 200 });
   // Below this there is not enough height for a labelled picker row AND a note
   // block, so they merge into one line. See the comment at that branch.
   const compact = density === 'tight';
@@ -1183,6 +1222,7 @@ export default function RecordScreen() {
           screen, while still allowing the whole block to scroll when there is
           none. Without it the content container collapses to its content and
           the note's flex-1 has nothing to grow into. */}
+      <View className="flex-1">
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ flexGrow: 1 }}
@@ -1271,7 +1311,7 @@ export default function RecordScreen() {
                 has in a 340dp window. */}
             <AttachmentBar
               attachments={attached}
-              onCamera={() => pick('camera')}
+              onCamera={() => setViewfinder(true)}
               onFiles={() => pick('files')}
               onRemove={(fileName) =>
                 setAttached((current) => current.filter((a) => a.fileName !== fileName))
@@ -1322,6 +1362,13 @@ export default function RecordScreen() {
                 The receipts live INSIDE the same surface, at its foot, so the
                 text field and its attachments read as one control rather than
                 as a toolbar that happens to sit underneath a text box. */}
+            {viewfinder ? (
+              // The notes field BECOMES the camera: same place, same width, and
+              // a floor of its own so the shutter never sits in a sliver.
+              <View className={`mx-4 flex-1 ${gap}`} style={{ minHeight: viewfinderMinHeight }}>
+                <InlineCamera onCapture={onCapture} onClose={closeViewfinder} onCameraApp={onCameraApp} />
+              </View>
+            ) : (
             <View className={`mx-4 flex-1 rounded-lg bg-surface px-4 py-3 ${gap}`}>
               <TextInput
                 value={note}
@@ -1344,7 +1391,7 @@ export default function RecordScreen() {
               />
               <AttachmentBar
                 attachments={attached}
-                onCamera={() => pick('camera')}
+                onCamera={() => setViewfinder(true)}
                 onFiles={() => pick('files')}
                 onRemove={(fileName) =>
                   setAttached((current) => current.filter((a) => a.fileName !== fileName))
@@ -1356,9 +1403,19 @@ export default function RecordScreen() {
                 busy={attaching}
               />
             </View>
+            )}
           </>
         )}
       </ScrollView>
+      {/* In split-screen the note is one line, far too small for a picture, so
+          the camera covers the whole scrolling half instead — pickers and all,
+          which nobody is looking at while photographing a receipt. */}
+      {viewfinder && compact ? (
+        <View className="absolute inset-0 bg-ground px-4 py-1">
+          <InlineCamera onCapture={onCapture} onClose={closeViewfinder} onCameraApp={onCameraApp} />
+        </View>
+      ) : null}
+      </View>
 
       {/* The amount owns a full block now, with the currency it is in on the
           left and — only when that is not the home currency — the rate and what

@@ -1,0 +1,105 @@
+appId: dev.merope.peace.oss
+---
+# The viewfinder in the notes field.
+#
+# Unlike the camera APP, this is Peace's own screen, so a flow can drive it all
+# the way: the emulator's back camera is "emulated" (a test pattern), which is
+# enough to prove a press of the shutter becomes an attachment with no confirm
+# step. What it cannot prove is how a receipt LOOKS through a real lens — focus
+# and low light are checked by hand on a phone.
+- launchApp:
+    clearState: true
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "record-screen"
+
+# Opening a record must NOT start the camera — only asking does.
+- assertNotVisible:
+    id: "inline-camera"
+
+- tapOn:
+    id: "attach-camera"
+# A fresh install has not been asked yet. Maestro usually grants on launch, so
+# this only fires on a device that did not.
+- runFlow:
+    when:
+      visible: "While using the app"
+    commands:
+      - tapOn: "While using the app"
+- extendedWaitUntil:
+    visible:
+      id: "inline-camera-shutter"
+      enabled: true
+    timeout: 20000
+# The notes field is what it replaced.
+- assertNotVisible:
+    id: "record-note"
+- takeScreenshot: 01-viewfinder
+
+# The torch is a toggle and says which way it is.
+- tapOn:
+    id: "inline-camera-torch"
+- assertVisible:
+    id: "inline-camera-torch"
+    selected: true
+- tapOn:
+    id: "inline-camera-torch"
+
+# --- one press: attached, closed, back to the note ---
+- tapOn:
+    id: "inline-camera-shutter"
+- extendedWaitUntil:
+    visible:
+      id: "attachment-previews"
+    timeout: 20000
+- assertNotVisible:
+    id: "inline-camera"
+- assertVisible:
+    id: "record-note"
+- takeScreenshot: 02-attached
+
+# Close without shooting leaves the note as it was.
+- tapOn:
+    id: "attach-camera"
+- extendedWaitUntil:
+    visible:
+      id: "inline-camera-close"
+    timeout: 20000
+- tapOn:
+    id: "inline-camera-close"
+- assertVisible:
+    id: "record-note"
+
+# --- the photo is on the saved record ---
+- tapOn:
+    id: "key-4"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "record-save"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "attachment-indicator"
+
+# --- holding + opens straight into the viewfinder ---
+- longPressOn:
+    id: "fab"
+- extendedWaitUntil:
+    visible:
+      id: "inline-camera-shutter"
+    timeout: 20000
+- tapOn:
+    id: "inline-camera-close"
+- assertVisible:
+    id: "record-note"

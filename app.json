@@ -2,7 +2,7 @@
   "expo": {
     "name": "Peace",
     "slug": "peace",
-    "version": "1.25.0",
+    "version": "1.26.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "peace",
@@ -75,6 +75,13 @@
         {
           "cameraPermission": "Peace uses the camera to photograph a receipt and keep it with the record.",
           "photosPermission": "Peace can attach a photo you have already taken to a record."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
         }
       ],
       "expo-document-picker",

@@ -132,6 +132,9 @@ const CHROME_PATHS = {
   'chat-new':
     'M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-4 4v-4H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm5.8 2.5v3.3H7.5v2.4h3.3v3.3h2.4v-3.3h3.3V8.8h-3.3V5.5z',
   stop: 'M6 6h12v12H6z',
+  // The viewfinder's torch. A SOLID bolt, so it survives the 20px it is drawn
+  // at; on and off are told apart by its colour, not by a second glyph.
+  torch: 'M13.5 2L4.5 13.5h6L9.5 22l9-11.5h-6L13.5 2z',
   /**
    * A TAG, and deliberately NOT the `tag` glyph in the category map below.
    *
