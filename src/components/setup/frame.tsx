@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -67,7 +67,10 @@ export function StepFrame({
         className="flex-1"
         contentContainerClassName="px-6 pb-6 pt-4"
         keyboardShouldPersistTaps="handled">
-        <Animated.View entering={ZoomIn.duration(360).springify().damping(14)}>
+        {/* A plain fade. The emblem used to spring in, and the overshoot read
+            as a wiggle on every step — motion that drew the eye to the one
+            thing on the screen that says nothing. */}
+        <Animated.View entering={FadeIn.duration(300)}>
           <View
             className="h-16 w-16 items-center justify-center rounded-full"
             style={{ backgroundColor: color }}>
