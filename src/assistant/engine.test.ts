@@ -84,6 +84,14 @@ describe('a read-only turn', () => {
     expect(requests[0].system).toContain('Fuel [seed:cat:fuel]');
   });
 
+  it("sends the user's own rules with every step", async () => {
+    const { step, requests } = scripted([[{ text: 'Hello.' }]]);
+    const d = { ...deps(step), rules: 'Answer in Arabic.' };
+    ask(d, 'hi');
+    await run(d);
+    expect(requests[0].system).toContain('Answer in Arabic.');
+  });
+
   it('keeps a chart a tool drew with the tools row, for the screen', async () => {
     const { step } = scripted([
       [call('show_chart', { title: 'Coffee', measure: 'expense', group_by: 'month', category: 'Coffee', from: '2026-08', to: '2026-10' })],

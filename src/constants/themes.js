@@ -53,11 +53,11 @@ const THEMES = {
       accent: '#E3A33C',
       'accent-ink': '#17140F',
       // semantic money colours — never decoration, and always paired with a
-      // +/- sign. Expense leans ROSE rather than salmon so that it and income
-      // sit on opposite ends of the blue–yellow axis, which is the one a
-      // red–green deficiency keeps.
+      // +/- sign. Expense is the original salmon RED, chosen over a rose that
+      // separates better under deuteranopia (theme.test.ts waives that one
+      // pair, and the other themes clear it).
       income: '#9CC46A',
-      expense: '#E8788F',
+      expense: '#E5806A',
       transfer: '#75A8C4',
     },
   },

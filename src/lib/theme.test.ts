@@ -86,6 +86,17 @@ function deltaE(a: string, b: string, m: Matrix | null): number {
 
 // ---------------------------------------------------------------------------
 
+// Pairs that knowingly miss the bar, each with the floor it must still clear,
+// so a waiver is a decision written down and not a way to stop looking.
+//
+// Ledger keeps the salmon red it shipped with. Any red that a deuteranope can
+// tell from its yellow-green income turns pink, and the owner chose the red:
+// the +/- sign still carries the meaning, and Graphite, Paper and Mist all
+// clear 20 for anybody who needs the colour to do it.
+const WAIVED: Record<string, number> = {
+  'ledger/deuteranopia': 8,
+};
+
 const themes = THEME_IDS.map((id) => [id, themeColors(id)] as const);
 
 describe.each(themes)('the %s theme', (_id, c: ThemeColors) => {
@@ -127,7 +138,8 @@ describe.each(themes)('the %s theme', (_id, c: ThemeColors) => {
     'tells income from expense under %s',
     (deficiency) => {
       const m = deficiency ? DEFICIENCIES[deficiency as keyof typeof DEFICIENCIES] : null;
-      expect(deltaE(c.income, c.expense, m)).toBeGreaterThanOrEqual(20);
+      const floor = WAIVED[`${_id}/${deficiency}`] ?? 20;
+      expect(deltaE(c.income, c.expense, m)).toBeGreaterThanOrEqual(floor);
     }
   );
 

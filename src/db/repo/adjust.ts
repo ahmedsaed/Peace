@@ -106,3 +106,31 @@ export function reconcileAccount(
 
   return db.select().from(transactions).where(eq(transactions.id, rowId)).get()!;
 }
+
+/**
+ * "This account holds X today" — the answer setup asks for.
+ *
+ * On an account with NO records the two readings agree, and the figure is the
+ * opening balance: a fresh ledger should not start with a correction row
+ * saying the wallet was filled from nowhere on the day it was set up. Once
+ * there is history — a restored backup, an import, a ledger somebody used
+ * before finishing setup — the opening balance is the start of that history,
+ * and rewriting it would move every month since. So the difference goes in as
+ * a dated correction instead, exactly as "Update balance" would write it.
+ */
+export function setBalanceToday(db: Db, accountId: string, targetMinor: number): void {
+  const used = db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(eq(transactions.accountId, accountId))
+    .limit(1)
+    .get();
+  if (used) {
+    reconcileAccount(db, accountId, targetMinor);
+    return;
+  }
+  if (!Number.isInteger(targetMinor)) {
+    throw new InvariantError('A balance must be an integer number of minor units.');
+  }
+  db.update(accounts).set({ openingBalance: targetMinor }).where(eq(accounts.id, accountId)).run();
+}

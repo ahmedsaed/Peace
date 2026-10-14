@@ -3,13 +3,14 @@
  */
 import { createTestDb, type TestDb } from '../../test/db';
 import { localNoon as on } from '../../test/dates';
-import { accountBalance, previewReconcile, reconcileAccount } from './adjust';
-import { createAccount, listAccountsWithBalance } from './accounts';
+import { accountBalance, previewReconcile, reconcileAccount, setBalanceToday } from './adjust';
+import { createAccount, getAccount, listAccountsWithBalance } from './accounts';
 import { broughtForward } from './carry';
 import { categoryBreakdown } from './analysis';
 import { createCategory, InvariantError } from './categories';
 import { periodSummary } from './records';
 import { createRecord, createTransfer } from './transactions';
+import { transactions } from '../schema';
 import { listBudgets, setBudget } from './budgets';
 
 function seed() {
@@ -210,5 +211,33 @@ describe('reconciling keeps the screens in agreement', () => {
     const total = listAccountsWithBalance(db).reduce((sum, a) => sum + a.balanceMinor, 0);
 
     expect(bf.amountMinor + august.balanceMinor).toBe(total);
+  });
+});
+
+describe('setBalanceToday', () => {
+  it('sets the opening balance of an account with no records', () => {
+    const db = seed();
+    setBalanceToday(db, 'bank', 42_000);
+    expect(getAccount(db, 'bank')?.openingBalance).toBe(42_000);
+    expect(db.select().from(transactions).all()).toHaveLength(0);
+  });
+
+  // A restored ledger: the opening balance is where its history starts, and
+  // moving it would move every month since.
+  it('writes a correction on an account with history, leaving the opening balance alone', () => {
+    const db = seed();
+    spend(db, 'a', 25_000, on(2026, 8, 3), 'bank');
+    setBalanceToday(db, 'bank', 70_000);
+    expect(getAccount(db, 'bank')?.openingBalance).toBe(100_000);
+    expect(accountBalance(db, 'bank')).toBe(70_000);
+    const rows = db.select().from(transactions).all();
+    expect(rows.find((r) => r.isAdjustment)?.amountMinor).toBe(-5_000);
+  });
+
+  it('writes nothing when the figure is already right', () => {
+    const db = seed();
+    spend(db, 'a', 25_000, on(2026, 8, 3), 'bank');
+    setBalanceToday(db, 'bank', 75_000);
+    expect(db.select().from(transactions).all()).toHaveLength(1);
   });
 });

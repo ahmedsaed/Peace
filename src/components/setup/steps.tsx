@@ -21,6 +21,7 @@ import { SECTIONS } from '@/constants/sections';
 import { openListenerSettings, setCapturing } from '@/db/bank-inbox';
 import { db } from '@/db/client';
 import { adoptCurrency, listAccountsWithBalance, updateAccount } from '@/db/repo/accounts';
+import { accountBalance, setBalanceToday } from '@/db/repo/adjust';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
 import { detectCurrency } from '@/lib/first-run';
 import { GeminiError } from '@/lib/gemini';
@@ -233,27 +234,37 @@ export function CurrencyStep({ eyebrow, onDone, onSkip }: StepProps) {
 type Draft = {
   id: string;
   name: string;
+  /** What it holds TODAY, as typed. Not the opening balance — see `save`. */
   opening: string;
+  /** The same figure as the ledger has it, so an untouched field writes nothing. */
+  nowMinor: number;
   currency: string;
   icon: string;
   color: string;
 };
 
-/** An opening balance as the text it would have been typed as. */
+/** A balance as the text it would have been typed as. */
 const asTyped = (minor: number, currency: string) =>
   minor === 0 ? '' : String(minorToMajor(minor, currency));
 
 export function AccountsStep({ eyebrow, onDone, onSkip }: StepProps) {
   const palette = useTheme();
   const [drafts, setDrafts] = useState<Draft[]>(() =>
-    listAccountsWithBalance(db).map((a) => ({
-      id: a.id,
-      name: a.name,
-      opening: asTyped(a.openingBalance, a.currency),
-      currency: a.currency,
-      icon: a.icon ?? 'wallet',
-      color: a.color ?? palette.raised,
-    }))
+    // The CURRENT balance, not the opening one. On a fresh ledger they are the
+    // same; after a restore the opening balance is usually zero and the money
+    // is in the records, so showing it put a 0 beside every account.
+    listAccountsWithBalance(db).map((a) => {
+      const nowMinor = accountBalance(db, a.id);
+      return {
+        id: a.id,
+        name: a.name,
+        opening: asTyped(nowMinor, a.currency),
+        nowMinor,
+        currency: a.currency,
+        icon: a.icon ?? 'wallet',
+        color: a.color ?? palette.raised,
+      };
+    })
   );
   /** Which field of which account is wrong — the outline goes on THAT one. */
   const [problem, setProblem] = useState<{
@@ -292,10 +303,8 @@ export function AccountsStep({ eyebrow, onDone, onSkip }: StepProps) {
       return;
     }
     for (const d of parsed) {
-      updateAccount(db, d.id, {
-        name: d.name,
-        openingBalance: d.openingMinor ?? 0,
-      });
+      updateAccount(db, d.id, { name: d.name });
+      if (d.openingMinor !== d.nowMinor) setBalanceToday(db, d.id, d.openingMinor ?? 0);
     }
     onDone();
   };

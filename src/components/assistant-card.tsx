@@ -16,6 +16,7 @@ import { useCallback } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
 import { ModelRow } from '@/components/model-picker';
+import { PromptEditor } from '@/components/prompt-editor';
 import { useAi } from '@/state/ai';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSettingsStore } from '@/state/settings';
@@ -28,6 +29,7 @@ export function AssistantCard() {
   const ai = useAi();
   const enabled = ai.penny;
   const model = useSettingsStore((state) => state.settings.assistantModel);
+  const guidance = useSettingsStore((state) => state.settings.assistantGuidance);
   const update = useSettingsStore((state) => state.update);
   // Re-read on focus: the key is saved on another page of Settings.
   const refreshKey = useGeminiKeyStore((state) => state.refresh);
@@ -72,6 +74,14 @@ export function AssistantCard() {
             onChange={(id) => update('assistantModel', id)}
             sheetTitle="Penny's model"
             testIDPrefix="assistant-model"
+          />
+          <PromptEditor
+            label="Your rules"
+            hint="Anything Penny should always keep in mind about you and your money — how to answer, what to leave out. Read at the start of every reply. Most people need none."
+            example={'Keep answers to two or three lines.\nMy salary arrives on the 25th; budget questions mean from then.'}
+            value={guidance}
+            onChange={(next) => update('assistantGuidance', next)}
+            testID="assistant-guidance"
           />
           <Pressable
             onPress={() => router.push('/assistant')}
