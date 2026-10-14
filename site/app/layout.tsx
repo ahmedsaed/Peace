@@ -58,6 +58,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <nav aria-label="Footer">
               <Link href="/data/">Your data</Link>
               <Link href="/privacy/">Privacy policy</Link>
+              <Link href="/move/">Moving to Play</Link>
               <a href="https://github.com/ahmedsaed/Peace">Source code</a>
             </nav>
           </div>

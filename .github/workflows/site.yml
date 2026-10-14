@@ -30,7 +30,11 @@ jobs:
       run:
         working-directory: site
     steps:
+      # Full history: the sitemap dates each page by its last commit, and a
+      # shallow clone would stamp every page with today.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

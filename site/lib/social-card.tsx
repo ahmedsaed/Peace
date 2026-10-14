@@ -56,6 +56,15 @@ export const CARDS = {
     shots: ['search', 'record'],
     alt: 'The Peace privacy policy.',
   },
+  move: {
+    eyebrow: 'Moving to Google Play',
+    title: 'Same ledger,',
+    highlight: 'new install.',
+    stacked: true,
+    subtitle: 'From the GitHub version to the Play version: back up, install, restore.',
+    shots: ['records', 'welcome'],
+    alt: 'Moving Peace from the GitHub version to the Google Play version.',
+  },
 } satisfies Record<string, Card>;
 
 export type CardName = keyof typeof CARDS;
