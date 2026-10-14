@@ -210,6 +210,14 @@ jobs:
               exit 1
             }
             echo "bundle signed with the upload key"
+            # R8 renames every class, so a crash in Play Console is unreadable
+            # without this map. Play reads it from inside the bundle; a bundle
+            # without it would ship crash reports nobody can decode.
+            unzip -l "$AAB" | grep -q "BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map" || {
+              echo "::error::The bundle carries no R8 mapping file."
+              exit 1
+            }
+            echo "bundle carries its R8 mapping"
             exit 0
           fi
 
@@ -253,4 +261,15 @@ jobs:
           name: ${{ steps.identity.outputs.artifact }}
           path: ${{ steps.identity.outputs.artifact }}.${{ inputs.flavor == 'play' && 'aab' || 'apk' }}
           retention-days: 30
+          if-no-files-found: error
+
+      # The R8 map for THIS build. Names in a stack trace from a GitHub install
+      # are scrambled and only this file turns them back; Play keeps its own
+      # copy from inside the bundle. Kept longer than the build, because a
+      # crash gets reported weeks after the install.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.identity.outputs.artifact }}-mapping
+          path: android/app/build/outputs/mapping/release/mapping.txt
+          retention-days: 90
           if-no-files-found: error

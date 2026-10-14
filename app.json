@@ -2,7 +2,7 @@
   "expo": {
     "name": "Peace",
     "slug": "peace",
-    "version": "1.26.0",
+    "version": "1.26.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "peace",
@@ -82,6 +82,16 @@
         {
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-dontwarn com.google.mlkit.vision.barcode.**\n-dontwarn com.google.mlkit.vision.codescanner.**\n-dontwarn com.google.mlkit.vision.common.**"
+          }
         }
       ],
       "expo-document-picker",
