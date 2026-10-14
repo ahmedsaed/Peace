@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 
 import { HOME_DESCRIPTION, pageMeta, SITE_URL } from '@/lib/meta';
 
+import { ThemeShowcase } from './theme-showcase';
+
 export const metadata: Metadata = pageMeta({ description: HOME_DESCRIPTION, path: '/', card: 'home' });
 
 // What a search engine reads as "this page is about an app". Price 0 because
@@ -210,6 +212,8 @@ export default function Home() {
           </Feature>
         </div>
       </section>
+
+      <ThemeShowcase />
 
       <section>
         <div className="wrap">

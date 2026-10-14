@@ -3,10 +3,10 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import { setupProgress, STEP_LABELS } from '@/lib/setup';
 import { useSetting, useSettingsStore } from '@/state/settings';
 import { useSetupFacts } from '@/state/setup';
+import { useTheme } from '@/state/theme';
 
 /**
  * "Finish setting up" — what setup left for later, one tap from each.
@@ -18,6 +18,7 @@ import { useSetupFacts } from '@/state/setup';
  * there is nothing left — or for good, from its close button.
  */
 export function SetupCard() {
+  const palette = useTheme();
   const router = useRouter();
   const visible = useSetting('setupCard');
   const update = useSettingsStore((s) => s.update);

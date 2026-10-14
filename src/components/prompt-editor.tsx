@@ -24,7 +24,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 
 export function PromptEditor({
   label,
@@ -43,6 +43,7 @@ export function PromptEditor({
   onChange: (next: string) => void;
   testID: string;
 }) {
+  const palette = useTheme();
   const [draft, setDraft] = useState(value);
   const [saved, setSaved] = useState(false);
 

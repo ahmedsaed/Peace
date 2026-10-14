@@ -2,7 +2,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Linking, Pressable, Switch, Text, View } from 'react-native';
 
-import palette from '@/constants/palette';
 import { describeNext, onDay } from '@/lib/reminder';
 import { formatTimeLabel } from '@/lib/period';
 import {
@@ -12,6 +11,7 @@ import {
   syncReminders,
 } from '@/state/reminders';
 import { useSettingsStore } from '@/state/settings';
+import { useSwitchColors } from '@/state/theme';
 
 /**
  * The nightly reminder, and what Android is actually doing about it.
@@ -30,6 +30,7 @@ import { useSettingsStore } from '@/state/settings';
  * feature is most prone to, and visibility is the only defence against it.
  */
 export function ReminderCard() {
+  const switchColors = useSwitchColors();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
 
@@ -157,8 +158,7 @@ export function ReminderCard() {
           onValueChange={(on) => void toggle(on)}
           testID="reminder-toggle"
           accessibilityLabel="Remind me"
-          trackColor={{ false: palette.line, true: palette.accent }}
-          thumbColor={palette.ink}
+          {...switchColors}
         />
       </View>
 
@@ -183,8 +183,7 @@ export function ReminderCard() {
               onValueChange={(next) => void setQuiet(next)}
               testID="reminder-quiet-toggle"
               accessibilityLabel="Even on quiet days"
-              trackColor={{ false: palette.line, true: palette.accent }}
-              thumbColor={palette.ink}
+              {...switchColors}
             />
           </View>
 

@@ -42,6 +42,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/#features" className="optional">
                 Features
               </Link>
+              <Link href="/#themes" className="optional">
+                Themes
+              </Link>
               <Link href="/data/">Your data</Link>
               <Link href="/privacy/">Privacy</Link>
             </nav>

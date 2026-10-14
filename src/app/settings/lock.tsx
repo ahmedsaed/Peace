@@ -4,11 +4,11 @@ import { Linking, Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { Choice, Section, SettingsPage, Toggle } from '@/components/settings-ui';
-import palette from '@/constants/palette';
 import { SECTIONS } from '@/constants/sections';
 import { LOCK_AFTER, type LockAfter } from '@/lib/app-lock';
 import { confirmOwner, readDeviceLock, useLockStore } from '@/state/app-lock';
 import { useSettingsStore } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 /**
  * Settings › App lock.
@@ -19,6 +19,7 @@ import { useSettingsStore } from '@/state/settings';
  * quietly disable it for next time.
  */
 export default function LockSettings() {
+  const palette = useTheme();
   const enabled = useSettingsStore((state) => state.settings.lockEnabled);
   const after = useSettingsStore((state) => state.settings.lockAfter);
   const update = useSettingsStore((state) => state.update);

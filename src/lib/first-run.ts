@@ -1,3 +1,5 @@
+import { isThemeId, type ThemeSetting } from './theme';
+
 /**
  * What a ledger opened for the very first time starts with.
  *
@@ -10,6 +12,11 @@
 /** Launch extras a test harness can pass (Maestro `launchApp: arguments`). */
 export const LAUNCH_ONBOARDING = 'peace.onboarding';
 export const LAUNCH_CURRENCY = 'peace.currency';
+/**
+ * Pins the theme. The screenshot flow needs it: a fresh install follows the
+ * phone, and the test AVD is in light mode, so every image would come out Paper.
+ */
+export const LAUNCH_THEME = 'peace.theme';
 
 type Locale = { currencyCode: string | null };
 
@@ -32,12 +39,19 @@ export function detectCurrency(locales: readonly Locale[]): string {
   return 'USD';
 }
 
+/** A theme a harness named, if it is one this build has. */
+function askedTheme(value: string | undefined): ThemeSetting {
+  return value && (value === 'system' || isThemeId(value)) ? value : 'system';
+}
+
 export type FirstRun = {
   homeCurrency: string;
   /** False unless a harness asked to skip; a person always sees the welcome. */
   onboardingDone: boolean;
   /** The Records card that lists what was skipped. */
   setupCard: boolean;
+  /** A new install follows the phone; an existing one keeps Ledger. */
+  theme: ThemeSetting;
 };
 
 export function firstRunSettings(
@@ -52,5 +66,6 @@ export function firstRunSettings(
     // A flow that skipped onboarding is testing something else, and a card
     // above the first record would move every row it taps.
     setupCard: !skip,
+    theme: askedTheme(extras[LAUNCH_THEME]),
   };
 }

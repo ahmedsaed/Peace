@@ -1,12 +1,12 @@
 import { Modal, Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import type { RecordRow } from '@/db/repo/records';
 import type { ReversalLink } from '@/db/repo/reversal';
 import { canDuplicate, canRefund, canReverse } from '@/lib/record-actions';
 import { useMoney, type Money } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 /**
  * Everything this sheet knows about how the row relates to others.
@@ -268,6 +268,7 @@ function Link({
   onPress: () => void;
   testID: string;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -303,6 +304,7 @@ function Action({
   testID: string;
   danger?: boolean;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}

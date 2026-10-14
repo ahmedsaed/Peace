@@ -22,7 +22,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { ModelRow } from '@/components/model-picker';
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 import { GeminiError } from '@/lib/gemini';
 import { getGeminiKey, maskKey } from '@/lib/secrets';
 import { useGeminiKeyStore } from '@/state/gemini-key';
@@ -33,6 +33,7 @@ import { useSettingsStore } from '@/state/settings';
  * The key and the model, as rows inside Settings' AI section.
  */
 export function GeminiKeyRows() {
+  const palette = useTheme();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
 

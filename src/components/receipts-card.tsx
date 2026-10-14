@@ -10,11 +10,12 @@
 import { Switch, Text, View } from 'react-native';
 
 import { PromptEditor } from '@/components/prompt-editor';
-import palette from '@/constants/palette';
+import { useSwitchColors } from '@/state/theme';
 import { useAi } from '@/state/ai';
 import { useSettingsStore } from '@/state/settings';
 
 export function ReceiptsCard() {
+  const switchColors = useSwitchColors();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
   // What the switch SHOWS is whether reading can run — a key, Use AI and this
@@ -37,8 +38,7 @@ export function ReceiptsCard() {
           disabled={!ai.ready}
           testID="receipts-enabled"
           accessibilityLabel="Read receipts"
-          trackColor={{ false: palette.line, true: palette.accent }}
-          thumbColor={palette.ink}
+          {...switchColors}
         />
       </View>
 

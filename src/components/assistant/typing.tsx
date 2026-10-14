@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Animated, Easing, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 
 /**
  * Penny's coin — the one sign that Penny is working.
@@ -18,6 +18,7 @@ import palette from '@/constants/palette';
  * a chart that just arrived.
  */
 export function Coin({ size = 14 }: { size?: number }) {
+  const palette = useTheme();
   // State, not a ref: created once, and readable during render without the
   // compiler objecting — an Animated.Value is never replaced, only driven.
   const [opacity] = useState(() => new Animated.Value(1));

@@ -5,7 +5,6 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Donut } from '@/components/donut';
 import { Icon } from '@/components/icon';
 import { EmptyState, MonthHeader, Screen } from '@/components/screen';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import {
   cashFlow,
@@ -24,6 +23,7 @@ import { parsePeriod, type Period } from '@/lib/period';
 import { usePeriodState, usePeriodLabel } from '@/state/period';
 import { useSetting } from '@/state/settings';
 import { useMoney, type Money } from '@/state/money';
+import { useTheme } from '@/state/theme';
 
 const EMPTY: Breakdown = {
   slices: [],
@@ -36,6 +36,7 @@ const EMPTY: Breakdown = {
 const CASH_FLOW_MONTHS = 6;
 
 export default function AnalysisScreen() {
+  const palette = useTheme();
   const periodLabel = usePeriodLabel();
   const router = useRouter();
   const money = useMoney();
@@ -309,6 +310,7 @@ function CashFlow({
   carryOver: boolean;
   startingMinor: number;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   const peak = cashFlowPeak(points);
   const running = runningTotals(
@@ -494,6 +496,7 @@ function TagTotals({
   homeCurrency: string;
   onSelect: (id: string) => void;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   if (totals.length === 0) return null;
 

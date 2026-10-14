@@ -1,10 +1,10 @@
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import type { BankCapture } from '@/db/schema';
 import { useMoney } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 /**
  * A bank message, shown in the records list before it is a record.
@@ -32,6 +32,7 @@ export function BankRow({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   const reading = capture.status === 'pending';
   const sign = capture.direction === 'in' ? '' : '-';
@@ -203,6 +204,7 @@ function Action({
   testID: string;
   danger?: boolean;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}

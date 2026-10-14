@@ -1,40 +1,65 @@
 # Design system
 
-Dark only. Tokens live in [`tailwind.config.js`](../tailwind.config.js) — nothing outside that
-file hard-codes a hex value, so re-theming stays a one-file change.
+Four themes, chosen in Settings › Appearance, plus **Match phone** (Ledger at night, Paper by day).
+Colour values live in [`src/constants/themes.js`](../src/constants/themes.js) — nothing outside
+that file hard-codes a chrome colour, so a new theme is one entry there.
 
-## Palette: "Ledger"
+**How a colour reaches the screen.** Every Tailwind colour is a CSS variable
+(`bg-surface` → `rgb(var(--color-surface) / <alpha-value>)`), and `ThemeRoot`
+([`src/state/theme.tsx`](../src/state/theme.tsx)) sets the variables once, at the root, from the
+active theme. A colour needed as a VALUE — an SVG fill, a navigator option, an icon's `color` —
+comes from `useTheme()`. Never import the table into a screen: a module-level colour is invisible to
+the React Compiler and stays the old theme's until something else re-renders.
+`no-static-colours.test.ts` enforces this.
 
-Warm, low-contrast. MyMoney's warmth without copying its olive-and-cream. Chosen over two
-alternatives — a cool teal-slate ("Delta") and a near-black high-contrast direction ("Graphite") —
-because an expense tracker is used late at night as often as in daylight, and this is the easiest
-of the three to look at in the dark.
+**Who gets which.** A fresh install follows the phone. An install from before themes has no
+setting and reads the default, **Ledger** — somebody who has looked at the dark app every evening
+must not open it one morning to a cream one.
 
-| Token | Hex | Role |
-|---|---|---|
-| `ground` | `#17140F` | app background |
-| `surface` | `#241F17` | headers, tab bar, cards |
-| `raised` | `#302818` | sheets, menus, pressed rows |
-| `line` | `#2E271D` | hairline separators |
-| `ink` | `#EFE4CE` | primary text |
-| `muted` | `#9A8E79` | secondary text, inactive tabs, placeholders |
-| `accent` | `#E3A33C` | FAB, active tab, progress fill |
-| `accent-ink` | `#17140F` | text/icons placed on `accent` |
-| `income` | `#8FBF6A` | money in |
-| `expense` | `#E5806A` | money out |
-| `transfer` | `#75A8C4` | between own accounts |
+## Themes
 
-The neutrals are warm-biased on purpose. A pure grey reads as unconsidered; these carry a faint
-brown so the ground feels chosen rather than inherited.
+| Token | Ledger | Graphite | Paper | Mist | Role |
+|---|---|---|---|---|---|
+| `ground` | `#17140F` | `#000000` | `#F4EEE3` | `#EDF0F3` | app background |
+| `surface` | `#241F17` | `#121212` | `#FFFDF8` | `#FFFFFF` | headers, tab bar, cards, sheets |
+| `raised` | `#302818` | `#1F1F1F` | `#EAE1D1` | `#E1E6EB` | inputs, chips, selected segment, pressed rows |
+| `line` | `#2E271D` | `#262626` | `#E2D8C6` | `#D5DBE2` | hairline separators |
+| `ink` | `#EFE4CE` | `#F2F2F0` | `#2A231A` | `#1C232B` | primary text |
+| `muted` | `#9A8E79` | `#A3A39D` | `#6B5F4C` | `#566170` | secondary text, inactive tabs, placeholders |
+| `accent` | `#E3A33C` | `#E9AC48` | `#985A0C` | `#2B65A0` | FAB, active tab, progress fill, links |
+| `accent-ink` | `#17140F` | `#000000` | `#FFFFFF` | `#FFFFFF` | text/icons placed on `accent` |
+| `income` | `#9CC46A` | `#A3CC70` | `#3C6F18` | `#376D19` | money in |
+| `expense` | `#E8788F` | `#F07E97` | `#B03366` | `#B03366` | money out |
+| `transfer` | `#75A8C4` | `#7DB3D1` | `#2D6A8F` | `#7A4FB0` | between own accounts |
+
+**Ledger** is the original: warm, low-contrast dark, chosen over a cool teal-slate and a near-black
+high-contrast direction because an expense tracker is used late at night as often as in daylight.
+The neutrals are warm-biased on purpose — a pure grey reads as unconsidered. **Graphite** is that
+rejected near-black direction, kept for OLED screens. **Paper** is Ledger in daylight. **Mist** is a
+cool light theme in blue.
+
+**A light theme inverts the surface order.** In a dark theme each surface is lighter than the one
+beneath it. In a light one cards are the LIGHTEST thing, and `raised` is a step DARKER than the card
+— otherwise an input on a card, a selected segment or a pressed row would be invisible.
+
+**Every theme is checked, not eyeballed** ([`src/lib/theme.test.ts`](../src/lib/theme.test.ts)):
+ink at 7:1 and muted at 4.5:1 on `ground`, `surface` and `raised`; the accent at 4.5:1 as text and
+under its own ink; each money colour at 4.5:1 on all three surfaces; income and expense at least
+ΔE 20 apart under simulated protanopia, deuteranopia and tritanopia (Machado 2009), and transfer
+at least ΔE 12 from both.
+
+That last check changed Ledger. Its original salmon expense (`#E5806A`) sat ΔE **5** from its
+income under deuteranopia — effectively the same olive — while this document claimed the two were
+"separated by lightness". They were not. Expense moved to rose so the pair sits on opposite ends of
+the blue–yellow axis, which is the one a red–green deficiency keeps.
 
 ## Rules
 
 **1. Colour is never the only signal for money direction.**
 Always render an explicit `+` or `−`. Roughly one man in twelve has red–green colour deficiency,
-and the amount is the most important element on screen. The three money colours are also separated
-by *lightness*, not just hue — under deuteranopia `income` and `expense` both drift toward olive,
-and that lightness gap is what keeps them apart. Verify with a colour-blindness simulator, not by
-eye.
+and the amount is the most important element on screen. The money colours must still differ for
+him: income leans yellow-green and expense rose, so under deuteranopia they land on opposite ends
+of the blue–yellow axis. Verify with the simulation in `theme.test.ts`, not by eye.
 
 **2. Transfer is a third colour because it is a third thing.**
 Money moving between your own accounts is neither income nor expense. It must never be summed into
@@ -47,7 +72,9 @@ it stops signalling, and the interface loses its only strong affordance.
 **4. Category colours are data, not theme.**
 Each category stores its own `color`. These saturated circles carry nearly all the colour in the
 app, which is precisely what lets the chrome stay quiet — the trick MyMoney gets right, and why
-its muted shell never feels drab. They do not change if the palette changes.
+its muted shell never feels drab. They do not change with the theme, and neither does what sits on
+them: an icon on a category circle is always white (`#FFFFFF`), never `ink`, which is near-white
+in a dark theme and dark brown in a light one.
 
 Default category palette, all tested against `ground`:
 
@@ -162,17 +189,21 @@ Two things about this that are easy to get wrong:
 
 Android dialogs (date/time pickers, system alerts) inherit the **Android theme**, not our tokens.
 Expo generates `AppTheme` with a `Theme.AppCompat.DayNight` parent, which follows the phone's
-dark-mode setting — so on a phone in light mode the date picker rendered as a bright white sheet in
-the middle of a dark app. `app.json`'s `userInterfaceStyle: "dark"` does *not* fix this; it drives
-the JS colour scheme only.
+dark-mode setting — so a Ledger screen on a phone in light mode got a bright white date picker.
 
-[`plugins/with-dark-theme.js`](../plugins/with-dark-theme.js) repoints the parent at
-`Theme.AppCompat.NoActionBar` (the dark variant). It is a config plugin because `android/` is
-regenerated by `expo prebuild`, which would undo a direct edit to `styles.xml`.
+The parent STAYS DayNight, and `ThemeRoot` forces the app's night mode to match the theme with
+`Appearance.setColorScheme` — lifted (`'unspecified'`) under Match phone, which is also what lets
+`useColorScheme` report the phone's real setting. AppCompat then resolves `values-night/` for a dark
+theme and `values/` for a light one. [`plugins/with-native-theme.js`](../plugins/with-native-theme.js)
+writes `peace_*` colour resources into both — Ledger's at night, Paper's by day — and points the
+dialogs at them. A resource cannot change at runtime, so Graphite's dialogs are Ledger's and Mist's
+are Paper's: the right lightness, if not the exact shade. It also sets `colorAccent` on `AppTheme`
+itself, or a system alert's buttons are AppCompat's teal. It is a config plugin because `android/`
+is regenerated by `expo prebuild`, which would undo a direct edit to `styles.xml`.
 
 ### Theming the date and time dialogs
 
-Dark is not the same as themed. With only the parent swapped, the pickers still drew their
+Night mode is not the same as themed. With only the parent right, the pickers still drew their
 selection ring, header band and buttons in the platform's default blue-on-grey — the one thing on
 screen that was not ours.
 

@@ -6,7 +6,7 @@
     "assets": "node scripts/copy-assets.mjs",
     "dev": "npm run assets && next dev",
     "build": "npm run assets && next build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "npm run assets && tsc --noEmit"
   },
   "dependencies": {
     "marked": "18.0.14",

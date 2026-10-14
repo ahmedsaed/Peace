@@ -18,4 +18,5 @@ export const SECTIONS = {
   backup: { emblem: 'cloud', color: '#6E8B3D' },
   lock: { emblem: 'lock', color: '#A8475C' },
   setup: { emblem: 'check', color: '#6B5B4A' },
+  appearance: { emblem: 'sun', color: '#9C2D6B' },
 } as const;

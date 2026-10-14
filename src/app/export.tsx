@@ -9,7 +9,6 @@ import { Icon } from '@/components/icon';
 import { StackHeader } from '@/components/screen';
 import { backupDue, describeAge } from '@/lib/drive-backup';
 import { useSetting } from '@/state/settings';
-import palette from '@/constants/palette';
 import {
   backupContents,
   csvExport,
@@ -33,6 +32,7 @@ import { db } from '@/db/client';
 import { lastImport, undoImport } from '@/db/repo/imports';
 import type { ImportRow } from '@/db/schema';
 import { formatDayLabel } from '@/lib/period';
+import { useTheme } from '@/state/theme';
 
 type Kind = 'csv' | 'backup';
 type Destination = 'save' | 'share';
@@ -187,9 +187,17 @@ export default function ExportScreen() {
         { cancelable: true, onDismiss: () => resolve(false) }
       );
     });
-    if (!confirmed) return;
-
-    await apply(picked, 'restore');
+    try {
+      if (confirmed) await apply(picked.file, 'restore');
+    } finally {
+      // The picker's copy in the cache — the restore has read it by now, and a
+      // backup with a year of receipts is not small.
+      try {
+        if (picked.file.exists) picked.file.delete();
+      } catch (e) {
+        console.warn('[restore] could not delete the picked copy', e);
+      }
+    }
   }, [apply]);
 
   /**
@@ -478,6 +486,7 @@ function ExportRow({
   busy: Busy;
   onPress: (kind: Kind, destination: Destination) => void;
 }) {
+  const palette = useTheme();
   const anyBusy = busy !== null;
 
   return (

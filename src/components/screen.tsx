@@ -5,11 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { Wordmark } from '@/components/wordmark';
-import palette from '@/constants/palette';
 import { addMonths, type Period } from '@/lib/period';
 import { useAi } from '@/state/ai';
 import { usePeriodLabel } from '@/state/period';
 import { useSetting, useSettingsStore } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 /** Header icon button. 44px square: the Material minimum touch target. */
 export function HeaderButton({
@@ -23,6 +23,7 @@ export function HeaderButton({
   onPress: () => void;
   testID: string;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -249,6 +250,7 @@ export function SummaryTrio({
    */
   onBalancePress?: () => void;
 }) {
+  const palette = useTheme();
   const cell = (label: string, value: string, tone: string, testID: string) => (
     <View className="flex-1 items-center">
       <Text className="mb-0.5 text-[10px] uppercase tracking-widest text-muted">{label}</Text>
@@ -380,6 +382,7 @@ export function EmptyState({
   action?: { label: string; onPress: () => void; testID: string };
   testID?: string;
 }) {
+  const palette = useTheme();
   return (
     <View className="flex-1 items-center justify-center gap-3 px-10 py-8" testID={testID}>
       {teach ? (

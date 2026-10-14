@@ -18,7 +18,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState, Pressable, Switch, Text, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
+import { useSwitchColors, useTheme } from '@/state/theme';
 import { isCapturing, isPermitted, setCapturing } from '@/db/bank-inbox';
 import { PromptEditor } from '@/components/prompt-editor';
 import { useAi } from '@/state/ai';
@@ -49,6 +49,8 @@ function safeIsCapturing(): boolean {
 }
 
 export function BankMessagesCard() {
+  const palette = useTheme();
+  const switchColors = useSwitchColors();
   const router = useRouter();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
@@ -163,8 +165,7 @@ export function BankMessagesCard() {
           disabled={!ai.ready}
           testID="bank-enabled"
           accessibilityLabel="Read bank messages"
-          trackColor={{ false: palette.line, true: palette.accent }}
-          thumbColor={palette.ink}
+          {...switchColors}
         />
       </View>
 

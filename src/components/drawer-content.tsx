@@ -7,10 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { UpdateNotice } from '@/components/update-notice';
 import { Wordmark } from '@/components/wordmark';
-import palette from '@/constants/palette';
 import { backupDue, describeAge } from '@/lib/drive-backup';
 import type { Settings } from '@/lib/settings';
 import { useSetting } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 /**
  * What lives in the side menu, and what does not.
@@ -62,6 +62,7 @@ const ITEMS: { icon: string; label: string; hint: string; href: Href; testID: st
 
 
 export function DrawerContent({ navigation }: DrawerContentComponentProps) {
+  const palette = useTheme();
   const insets = useSafeAreaInsets();
   // No Penny here: she has her own button in every tab's header, and a second
   // way to one screen is one more thing to wonder about.
@@ -163,6 +164,7 @@ function BackupCard({
   lastBackupAt: number;
   onPress: () => void;
 }) {
+  const palette = useTheme();
   const [now] = useState(() => Date.now());
   const overdue = lastBackupAt > 0 && backupDue({ cadence, lastBackupAt }, now);
 

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Modal, Pressable, Text, TextInput, View } from 'react-native';
 
-import palette from '@/constants/palette';
 import { useKeyboardHeight } from '@/lib/layout';
 import {
   isLiability,
@@ -12,6 +11,7 @@ import {
 import { parseAmountToMinor } from '@/lib/money';
 import { useMoney } from '@/state/money';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 type Mode = 'owed' | 'available';
 
@@ -47,6 +47,7 @@ export function ReconcileSheet({
   onClose: () => void;
   onConfirm: (targetMinor: number) => void;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   const keyboardHeight = useKeyboardHeight();
   const liability = isLiability(accountType);

@@ -4,8 +4,8 @@ import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import { useKeyboardOverlap } from '@/lib/layout';
+import { useTheme } from '@/state/theme';
 
 /**
  * The shape every setup step shares.
@@ -71,7 +71,7 @@ export function StepFrame({
           <View
             className="h-16 w-16 items-center justify-center rounded-full"
             style={{ backgroundColor: color }}>
-            <Icon name={emblem} size={30} color={palette.ink} />
+            <Icon name={emblem} size={30} color="#FFFFFF" />
           </View>
         </Animated.View>
 
@@ -114,6 +114,7 @@ export function PrimaryButton({
   busy?: boolean;
   testID: string;
 }) {
+  const palette = useTheme();
   const inert = disabled || busy;
   return (
     <Pressable

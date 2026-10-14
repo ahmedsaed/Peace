@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 
 /**
  * Five tabs, mirroring the information architecture documented in
@@ -18,6 +18,7 @@ const TABS: { name: string; title: string; icon: string }[] = [
 ];
 
 export default function TabsLayout() {
+  const palette = useTheme();
   // Setting an explicit tabBarStyle height opts out of the automatic safe-area
   // handling, so the inset has to be added back by hand — otherwise the labels
   // sit underneath Android's gesture pill and become unreadable.

@@ -1,6 +1,6 @@
 /*
  * The app's "Ledger" palette (docs/design-system.md), so the site and the app
- * read as one thing. Dark only, like the app.
+ * read as one thing. Dark, in Ledger — the app's original theme.
  */
 :root {
   --ground: #17140f;
@@ -11,8 +11,8 @@
   --muted: #9a8e79;
   --accent: #e3a33c;
   --accent-ink: #17140f;
-  --income: #8fbf6a;
-  --expense: #e5806a;
+  --income: #9cc46a;
+  --expense: #e8788f;
   --transfer: #75a8c4;
 
   --gutter: 16px;
@@ -549,5 +549,309 @@ tr:last-child td {
   }
   .store-grid.shots .store-asset {
     max-width: none;
+  }
+}
+
+/* --- themes ---------------------------------------------------------------
+ * The section repaints itself in the theme being looked at. ThemeShowcase sets
+ * --t-* from the app's own table; re-pointing the site's tokens at them inside
+ * the section is what makes the eyebrow, the heading, the phones' frames and
+ * the tiles follow without a rule of their own. Colour properties transition;
+ * custom properties do not need to.
+ */
+
+.themes {
+  --ground: var(--t-ground);
+  --surface: var(--t-surface);
+  --raised: var(--t-raised);
+  --line: var(--t-line);
+  --ink: var(--t-ink);
+  --muted: var(--t-muted);
+  --accent: var(--t-accent);
+  --accent-ink: var(--t-accent-ink);
+  background: var(--ground);
+  color: var(--ink);
+  overflow: hidden;
+  transition:
+    background-color 0.6s ease,
+    color 0.6s ease;
+}
+
+.themes h2,
+.themes .eyebrow,
+.themes .section-intro,
+.themes .phone,
+.themes-tile,
+.themes-strip code,
+.themes-token,
+.themes-proof {
+  transition:
+    background-color 0.6s ease,
+    border-color 0.6s ease,
+    color 0.6s ease,
+    box-shadow 0.6s ease;
+}
+
+.themes-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.themes-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.themes-tile {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.themes-tile:hover {
+  border-color: var(--muted);
+}
+
+.themes-tile.selected {
+  border-color: var(--accent);
+}
+
+.themes-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.themes-tile > :first-child {
+  grid-row: span 2;
+}
+
+.themes-tile-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.themes-tile-blurb {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* The match-phone tile spans the row: it is a rule, not a fifth look. */
+.themes-tile-system {
+  grid-column: 1 / -1;
+}
+
+/* A theme in miniature: its ground, a card with a line of text and a figure in
+   and out, and the accent as the add button. */
+.themes-swatch {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  border: 1px solid;
+  padding: 6px;
+  display: block;
+}
+
+.themes-swatch > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.themes-swatch i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.themes-swatch i:nth-child(1) {
+  width: 22px;
+}
+
+.themes-swatch i:nth-child(2) {
+  width: 14px;
+}
+
+.themes-swatch i:nth-child(3) {
+  width: 18px;
+}
+
+.themes-swatch b {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.themes-dots {
+  display: flex;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.themes-dots span {
+  flex: 1;
+}
+
+/* The tokens of the theme on show, with their hex values. */
+.themes-strip {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 6px;
+}
+
+.themes-strip li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.themes-chip {
+  display: block;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  transition: background-color 0.6s ease;
+}
+
+.themes-token {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.themes-strip code {
+  font-size: 10px;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.themes-proof {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 52ch;
+}
+
+/* Two phones: the breakdown behind and to the right, the records in front. */
+.themes-phones {
+  position: relative;
+  height: 640px;
+}
+
+.themes-phone {
+  position: absolute;
+  width: 280px;
+  left: 4%;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+
+.themes-phone-back {
+  left: auto;
+  right: 0;
+  top: 56px;
+  z-index: 1;
+  transform: rotate(4deg);
+  opacity: 0.92;
+}
+
+.themes[data-dark='false'] .themes-phone {
+  box-shadow: 0 30px 70px rgba(60, 45, 20, 0.22);
+}
+
+.themes-frames {
+  position: relative;
+  aspect-ratio: 540 / 1200;
+}
+
+.themes-frames img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.themes-frames img.on {
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .themes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .themes-phones {
+    height: 520px;
+    max-width: 440px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .themes-phone {
+    width: 220px;
+    left: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .themes-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .themes-strip {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .themes-phones {
+    height: 440px;
+  }
+
+  .themes-phone {
+    width: 180px;
+  }
+
+  .themes-phone-back {
+    top: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .themes,
+  .themes *,
+  .themes-frames img {
+    transition: none !important;
   }
 }

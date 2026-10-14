@@ -1,7 +1,7 @@
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { Icon, ICON_NAMES } from '@/components/icon';
-import palette from '@/constants/palette';
+import { useTheme } from '@/state/theme';
 
 /** The default category palette from docs/design-system.md. */
 export const SWATCHES = [
@@ -45,6 +45,7 @@ export function TextField({
   maxLength?: number;
   keyboardType?: 'default' | 'numeric';
 }) {
+  const palette = useTheme();
   return (
     <TextInput
       value={value}
@@ -142,6 +143,7 @@ export function IconPicker({
   color: string;
   onChange: (next: string) => void;
 }) {
+  const palette = useTheme();
   // Wraps rather than scrolls horizontally. A horizontal strip hid two thirds of
   // the set behind a gesture nobody thinks to make, on a form with empty space
   // below it — you cannot choose from a list you do not know is there.

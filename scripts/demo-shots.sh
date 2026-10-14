@@ -39,7 +39,9 @@ SRC=$(ls -td "$HOME"/.maestro/tests/*/demo-shots/takeScreenshot 2>/dev/null | he
 [ -n "$SRC" ] || { echo "no screenshots produced — the flow must have failed early"; exit 1; }
 
 # The names README.md references. Changing one means editing both.
-SHOTS=(welcome records record budgets analysis search accounts actions recurring portfolio)
+SHOTS=(welcome records record budgets analysis search accounts actions recurring portfolio
+  theme-ledger-records theme-ledger-analysis theme-graphite-records theme-graphite-analysis
+  theme-paper-records theme-paper-analysis theme-mist-records theme-mist-analysis)
 
 for name in "${SHOTS[@]}"; do
   if [ ! -f "$SRC/$name.png" ]; then
@@ -48,8 +50,9 @@ for name in "${SHOTS[@]}"; do
   fi
   cp "$SRC/$name.png" "$DEST/$name.png"
   # Full resolution for the store: its framed screenshots are 1080 wide, and
-  # drawing them from the halved copies would upscale every one.
-  cp "$SRC/$name.png" "store/screenshots/$name.png"
+  # drawing them from the halved copies would upscale every one. The theme
+  # shots are the website's alone.
+  [[ $name == theme-* ]] || cp "$SRC/$name.png" "store/screenshots/$name.png"
 done
 
 # Halve the pixels. At 1080x2400 each shot is ~300 KB and renders in a README

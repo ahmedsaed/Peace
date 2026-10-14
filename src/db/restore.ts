@@ -1,3 +1,4 @@
+import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { openBackupPayload, type BackupPayload } from '../lib/backup-payload';
@@ -206,13 +207,28 @@ function databaseFile(): File {
   return found;
 }
 
-/** Pick a backup file. Returns null when the user backs out. */
-export async function pickBackup(): Promise<File | null> {
+/**
+ * Pick a backup file. Returns null when the user backs out.
+ *
+ * Through the document picker, COPYING to the cache — the same choice CSV
+ * import made, for the same reason. `File.pickFileAsync` hands back a
+ * content:// file whose `name` is the provider's document id, so the
+ * confirmation asked whether to replace everything "with the contents of
+ * msf:18": the one sentence before an irreversible-looking action, naming a
+ * file nobody has ever seen. The copy carries the name the person knows. The
+ * caller deletes it once the restore is done with it.
+ */
+export async function pickBackup(): Promise<{ file: File; name: string } | null> {
   // Deliberately unfiltered: Android frequently reports a `.db` as
   // `application/octet-stream` or gives it no type at all, and a mime filter
   // would hide the user's own backup from them.
-  const result = await File.pickFileAsync();
-  return result.canceled ? null : result.result;
+  const picked = await DocumentPicker.getDocumentAsync({
+    type: '*/*',
+    multiple: false,
+    copyToCacheDirectory: true,
+  });
+  const asset = picked.canceled ? undefined : picked.assets?.[0];
+  return asset ? { file: new File(asset.uri), name: asset.name } : null;
 }
 
 /** Ledger size, for the confirmation that says what is about to be replaced. */

@@ -6,11 +6,11 @@ import { saveReport, type SavedReport } from '@/assistant/export';
 import type { ReportSpec } from '@/assistant/tools/types';
 import { Icon } from '@/components/icon';
 import { RecordRow } from '@/components/record-row';
-import palette from '@/constants/palette';
 import { formatBytes } from '@/db/backup';
 import type { RecordRow as Row } from '@/db/repo/records';
 import { useMoney } from '@/state/money';
 import { useSetting, useSettingsStore } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 /**
  * The approval card: the one thing standing between a model's guess and the
@@ -35,6 +35,7 @@ export function ProposalCard({
   onDecide: (approve: boolean) => void;
   testID: string;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   const [armed, setArmed] = useState(false);
   const { preview, status } = proposal;
@@ -164,6 +165,7 @@ export function RecordsCard({
  * — "it worked" is a folder and a number, not a claim.
  */
 export function ReportCard({ report, testID }: { report: ReportSpec; testID: string }) {
+  const palette = useTheme();
   const folderUri = useSetting('reportFolderUri');
   const update = useSettingsStore((state) => state.update);
   const [busy, setBusy] = useState(false);

@@ -5,13 +5,13 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { StackHeader } from '@/components/screen';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { applyImport, ledgerSnapshot, undoImport } from '@/db/repo/imports';
 import { parseCsv } from '@/lib/csv';
 import { idsInFile, planImport, type ImportPlan, type NewCategory } from '@/lib/import-csv';
 import { formatDayLabel } from '@/lib/period';
 import { useSetting } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 /** Bigger than any ledger anyone types by hand; a file this size is something else. */
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -41,6 +41,7 @@ type State =
  * ledger with a single tap.
  */
 export default function ImportScreen() {
+  const palette = useTheme();
   const router = useRouter();
   const { uri, name } = useLocalSearchParams<{ uri?: string; name?: string }>();
   const homeCurrency = useSetting('homeCurrency');

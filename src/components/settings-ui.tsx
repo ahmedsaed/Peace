@@ -5,9 +5,9 @@ import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import { Segmented } from '@/components/form';
 import { StackHeader } from '@/components/screen';
-import palette from '@/constants/palette';
 import { useKeyboardOverlap } from '@/lib/layout';
 import { useAi } from '@/state/ai';
+import { useSwitchColors, useTheme } from '@/state/theme';
 
 /**
  * The parts every Settings page is built from.
@@ -69,7 +69,7 @@ export function SettingsPage({
             <View
               className="h-12 w-12 items-center justify-center rounded-full"
               style={{ backgroundColor: color }}>
-              <Icon name={emblem} size={22} color={palette.ink} />
+              <Icon name={emblem} size={22} color="#FFFFFF" />
             </View>
             <Text className="flex-1 text-sm leading-5 text-muted">{intro}</Text>
           </View>
@@ -132,6 +132,7 @@ export function SectionLink({
   dim?: boolean;
   last?: boolean;
 }) {
+  const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -144,7 +145,7 @@ export function SectionLink({
       <View
         className="h-10 w-10 items-center justify-center rounded-full"
         style={{ backgroundColor: color, opacity: dim ? 0.4 : 1 }}>
-        <Icon name={emblem} size={18} color={palette.ink} />
+        <Icon name={emblem} size={18} color="#FFFFFF" />
       </View>
       <View className="flex-1">
         <Text className="text-[15px] text-ink">{title}</Text>
@@ -216,6 +217,7 @@ export function Toggle({
   disabled?: boolean;
   last?: boolean;
 }) {
+  const switchColors = useSwitchColors();
   return (
     <View
       className={`flex-row items-center gap-3 px-4 py-3.5 ${last ? '' : 'border-b border-line'}`}>
@@ -229,8 +231,7 @@ export function Toggle({
         disabled={disabled}
         testID={testID}
         accessibilityLabel={label}
-        trackColor={{ false: palette.line, true: palette.accent }}
-        thumbColor={palette.ink}
+        {...switchColors}
       />
     </View>
   );
@@ -259,6 +260,7 @@ export function Row({
   testID: string;
   last?: boolean;
 }) {
+  const palette = useTheme();
   const className = `flex-row items-center gap-3 px-4 py-3.5 ${
     last ? '' : 'border-b border-line'
   }`;
@@ -307,6 +309,7 @@ export function Row({
  * notice that is always there stops being read.
  */
 export function AiNotice() {
+  const palette = useTheme();
   const router = useRouter();
   const { blocked } = useAi();
   if (blocked === null) return null;

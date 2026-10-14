@@ -2,10 +2,10 @@ import { Image } from 'expo-image';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import { attachmentExists, attachmentUri, type StagedAttachment } from '@/db/attachments';
 import { isImageMime, shortName } from '@/lib/attachment';
 import { SheetPanel } from '@/components/sheet-panel';
+import { useTheme } from '@/state/theme';
 
 /**
  * Files in the conversation — picking them, previewing them before they are
@@ -29,6 +29,7 @@ function Thumb({
   onPress: () => void;
   testID?: string;
 }) {
+  const palette = useTheme();
   const missing = !attachmentExists(file.fileName);
   const image = isImageMime(file.mimeType) && !missing;
   const label = file.originalName ?? (image ? 'Photo' : 'Document');
@@ -69,6 +70,7 @@ export function PendingFiles({
   onOpen: (file: StagedAttachment) => void;
   onRemove: (fileName: string) => void;
 }) {
+  const palette = useTheme();
   if (files.length === 0) return null;
   return (
     <ScrollView
@@ -125,6 +127,7 @@ export function AttachMenu({
   onFiles: () => void;
   onClose: () => void;
 }) {
+  const palette = useTheme();
   const row = (icon: string, label: string, hint: string, onPress: () => void, testID: string) => (
     <Pressable
       onPress={onPress}

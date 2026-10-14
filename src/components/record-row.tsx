@@ -1,10 +1,10 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import type { RecordRow as Row } from '@/db/repo/records';
 import { formatTags } from '@/lib/tag';
 import { useMoney } from '@/state/money';
+import { useTheme } from '@/state/theme';
 
 /**
  * One line in the records list.
@@ -22,6 +22,7 @@ export function RecordRow({
   onPress?: () => void;
   onLongPress?: () => void;
 }) {
+  const palette = useTheme();
   const money = useMoney();
   // A correction is its own kind of row. Rendered like an expense it would read
   // as a mystery purchase in a category you never chose — which is exactly the
@@ -105,8 +106,10 @@ export function RecordRow({
       <View
         className="h-9 w-9 items-center justify-center rounded-full"
         style={{
+          // A correction's circle is the chrome's own quiet fill rather than a
+          // category colour, so it follows the theme; the rest are data.
           backgroundColor: row.isAdjustment
-            ? '#2E271D'
+            ? palette.raised
             : row.isTransfer
               ? '#2F6FA8'
               : (row.categoryColor ?? '#6B5B4A'),
@@ -114,7 +117,7 @@ export function RecordRow({
         <Icon
           name={row.isAdjustment ? 'refresh' : row.isTransfer ? 'transfer' : (row.categoryIcon ?? 'dots')}
           size={17}
-          color="#FFFFFF"
+          color={row.isAdjustment ? palette.ink : '#FFFFFF'}
         />
         {/**
          * A REFUND, marked on the tile rather than only in words.

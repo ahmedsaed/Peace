@@ -208,8 +208,11 @@ screens, and every flow starts from `clearState`, so a flow without the skip die
 Maestro hands `arguments` to the app as intent extras; `modules/launch-extras` reads the `peace.*`
 ones and `src/lib/first-run.ts` honours them ONLY on a ledger opened for the first time, so they
 change nothing on an existing install. The currency is pinned because a fresh install detects it
-from the phone's region, and the fixtures are in pounds. `onboarding.yaml` is the one flow that
-walks setup, and it asserts the choices on the screens that use them.
+from the phone's region, and the fixtures are in pounds. `peace.theme` exists for the same reason
+and is used only by the screenshot flows (`scripts/demo-shots.yaml`, `penny-shots.yaml`): a fresh
+install follows the phone, the AVD is in light mode, and without it every listing image is Paper.
+The E2E flows leave it out on purpose, so the suite runs in a light theme. `onboarding.yaml` is the
+one flow that walks setup, and it asserts the choices on the screens that use them.
 
 **`onboardingDone` defaults to `true`, and that is the migration.** Installs and backups from before
 onboarding have no row for it, and a year-old ledger must not be greeted as new. Only a first
@@ -949,6 +952,22 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   nothing has used since. A new column on `transactions` also broke `restore-core.test.ts`'s
   old-backup fixture — drizzle names every column it knows in an insert — so fixtures for an OLD
   schema are written in raw SQL with the columns that schema had.
+- **A colour on screen comes from the ACTIVE theme — a class name, or `useTheme()`, never the
+  table.** Four themes live in `src/constants/themes.js`; Tailwind colours are CSS variables that
+  `ThemeRoot` (`src/state/theme.tsx`) sets at the root, so `bg-surface` needs nothing. A colour as
+  a VALUE (SVG fill, navigator option, icon `color`) is `const palette = useTheme()` inside the
+  component — a module-level copy is invisible to the React Compiler and stays the old theme's, the
+  same trap as `usePeriodLabel`. `no-static-colours.test.ts` fails a UI file that imports the table.
+  Three things that bit while converting: an icon on a CATEGORY colour is `#FFFFFF`, never `ink`
+  (near-white in Ledger, dark brown in Paper); a light theme's `raised` is DARKER than `surface`,
+  so "one step lighter" is not what it means; and a `Switch` takes `useSwitchColors()`, because an
+  `ink` thumb is a dark blob in a light theme. **Every theme is checked by `theme.test.ts`** —
+  contrast for text and accent, and income against expense under simulated colour blindness — so a
+  new theme or a nudged hex has to pass numbers, not an eye. Android's own dialogs follow the theme
+  through night mode (`Appearance.setColorScheme`) and day/night colour resources from
+  `plugins/with-native-theme.js`. An install from before themes has no row and reads **Ledger**;
+  only a first launch writes `system`. **Flows run in whatever the emulator's night mode picks** —
+  a fresh install follows the phone — so the test AVD, in light mode, runs the suite in Paper.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.

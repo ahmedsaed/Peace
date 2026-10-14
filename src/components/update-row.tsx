@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import palette from '@/constants/palette';
 import { buildInfo } from '@/lib/build-info';
 import {
   describeUpdate,
@@ -11,6 +10,7 @@ import {
   type Release,
 } from '@/lib/update-check';
 import { useSettingsStore } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
 const REPO = 'ahmedsaed/Peace';
 
@@ -37,6 +37,7 @@ type State =
   | { kind: 'failed'; reason: string };
 
 export function UpdateRow() {
+  const palette = useTheme();
   const update = useSettingsStore((state) => state.update);
   const [state, setState] = useState<State>({ kind: 'idle' });
 

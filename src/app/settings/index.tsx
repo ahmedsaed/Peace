@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, useColorScheme, View } from 'react-native';
 
 import { GeminiKeyRows } from '@/components/gemini-key';
 import { StackHeader } from '@/components/screen';
@@ -19,6 +19,7 @@ import { useAi } from '@/state/ai';
 import { readDeviceLock, useLockStore } from '@/state/app-lock';
 import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSettingsStore } from '@/state/settings';
+import { describeTheme } from '@/lib/theme';
 import { bankAccess, describeBank, useSetupFacts } from '@/state/setup';
 
 /**
@@ -42,6 +43,7 @@ export default function SettingsIndex() {
   const hasKey = useGeminiKeyStore((state) => state.hasKey);
   const lockDevice = useLockStore((state) => state.device);
   const facts = useSetupFacts();
+  const phone = useColorScheme();
 
   // Notification access is granted outside this app, and the default account
   // can be renamed elsewhere — both are re-read when the page comes back.
@@ -120,6 +122,13 @@ export default function SettingsIndex() {
             summary={reports}
             onPress={go('/settings/reports')}
             testID="settings-section-reports"
+          />
+          <SectionLink
+            {...SECTIONS.appearance}
+            title="Appearance"
+            summary={describeTheme(s.theme, phone === 'unspecified' ? null : phone)}
+            onPress={go('/settings/appearance')}
+            testID="settings-section-appearance"
           />
           <SectionLink
             {...SECTIONS.reminder}

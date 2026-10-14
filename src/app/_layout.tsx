@@ -6,11 +6,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLockGate } from '@/components/app-lock';
-import palette from '@/constants/palette';
 import { DatabaseProvider } from '@/db/provider';
 import { BankCatchUp } from '@/state/bank';
 import { DriveCatchUp } from '@/state/drive';
 import { ReminderSchedule } from '@/state/reminders';
+import { ThemeRoot, useTheme } from '@/state/theme';
 
 import '@/global.css';
 
@@ -47,55 +47,71 @@ export default function RootLayout() {
     // rather than a missing provider.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        {/* The app is dark-only, so the status bar is always light-on-dark. */}
+        {/* Until the theme is known — while the database opens — the screen
+            is Ledger, so its icons are light. ThemeRoot's own StatusBar
+            mounts later and wins. */}
         <StatusBar style="light" />
         <DatabaseProvider>
-          {/* Backs up to Drive if one is due. Renders nothing, blocks nothing,
-              and swallows every failure — see the file for why the app being
-              opened IS the scheduler rather than a fallback behind one. */}
-          <DriveCatchUp />
-          {/* Drains whatever the notification listener captured while the app
-              was closed, and reads it. Renders nothing, blocks nothing, and
-              swallows every failure — a message left unread is read next time. */}
-          <BankCatchUp />
-          {/* Re-arms the nightly reminder with what is waiting right now. The
-              counts are frozen when a notification is SCHEDULED — no JS runs
-              when one fires — so every return to the foreground lays the
-              window down again. Renders nothing and swallows every failure. */}
-          <ReminderSchedule />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: palette.ground },
-            }}>
-            <Stack.Screen name="(drawer)" />
-            <Stack.Screen name="setup" options={{ animation: 'fade' }} />
-            <Stack.Screen
-              name="record"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen
-              name="account"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen
-              name="category"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen name="search" />
-            <Stack.Screen name="export" />
-            <Stack.Screen name="import" />
-            <Stack.Screen name="portfolio" />
-            <Stack.Screen name="recurring" />
-            <Stack.Screen name="about" />
-            <Stack.Screen name="assistant" />
-          </Stack>
-          {/* After the navigator, so it covers every screen without being
-              one of them — locking never unmounts a half-typed record. Off
-              unless switched on in Settings › App lock. */}
-          <AppLockGate />
+          {/* Inside the database gate: the theme is a setting, and settings
+              are loaded there. */}
+          <ThemeRoot>
+            <Shell />
+          </ThemeRoot>
         </DatabaseProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+/** Everything that draws, in the active theme. */
+function Shell() {
+  const palette = useTheme();
+  return (
+    <>
+      {/* Backs up to Drive if one is due. Renders nothing, blocks nothing,
+          and swallows every failure — see the file for why the app being
+          opened IS the scheduler rather than a fallback behind one. */}
+      <DriveCatchUp />
+      {/* Drains whatever the notification listener captured while the app
+          was closed, and reads it. Renders nothing, blocks nothing, and
+          swallows every failure — a message left unread is read next time. */}
+      <BankCatchUp />
+      {/* Re-arms the nightly reminder with what is waiting right now. The
+          counts are frozen when a notification is SCHEDULED — no JS runs
+          when one fires — so every return to the foreground lays the
+          window down again. Renders nothing and swallows every failure. */}
+      <ReminderSchedule />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: palette.ground },
+        }}>
+        <Stack.Screen name="(drawer)" />
+        <Stack.Screen name="setup" options={{ animation: 'fade' }} />
+        <Stack.Screen
+          name="record"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="account"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="category"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen name="search" />
+        <Stack.Screen name="export" />
+        <Stack.Screen name="import" />
+        <Stack.Screen name="portfolio" />
+        <Stack.Screen name="recurring" />
+        <Stack.Screen name="about" />
+        <Stack.Screen name="assistant" />
+      </Stack>
+      {/* After the navigator, so it covers every screen without being
+          one of them — locking never unmounts a half-typed record. Off
+          unless switched on in Settings › App lock. */}
+      <AppLockGate />
+    </>
   );
 }

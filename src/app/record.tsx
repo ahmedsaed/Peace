@@ -24,7 +24,6 @@ import { GeminiError, readReceipt } from '@/lib/gemini';
 import { isEmptyReading, matchCategory, receiptNote } from '@/lib/receipt';
 import { getGeminiKey } from '@/lib/secrets';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
-import palette from '@/constants/palette';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { InvariantError, listCategoryTree } from '@/db/repo/categories';
@@ -69,6 +68,7 @@ import { hasCardProfile, isLiability } from '@/lib/liability';
 import { useAi } from '@/state/ai';
 import { useSetting } from '@/state/settings';
 import { useMoney } from '@/state/money';
+import { useTheme } from '@/state/theme';
 
 type RecordType = 'income' | 'expense' | 'transfer';
 
@@ -79,6 +79,7 @@ const TYPES: { value: RecordType; label: string }[] = [
 ];
 
 export default function RecordScreen() {
+  const palette = useTheme();
   const money = useMoney();
   const router = useRouter();
   const insets = useSafeAreaInsets();
