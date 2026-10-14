@@ -57,7 +57,7 @@ import { ageInDays, fetchRate, formatRateDate, RateError } from '@/lib/fx';
 import { byDensity, useDensity } from '@/lib/layout';
 import { convertMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel, weekStart } from '@/lib/period';
-import { flowKeyLabel, nextAction, type Sheet } from '@/lib/record-flow';
+import { flowKeyLabel, flowKeySpoken, nextAction, type Sheet } from '@/lib/record-flow';
 import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
 import { CURRENCIES } from '@/lib/currencies';
@@ -1116,7 +1116,13 @@ export default function RecordScreen() {
             `pointerEvents="none"` because it now overlays the whole row and
             would otherwise swallow taps aimed at the buttons underneath. */}
         <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
-          <Text className="text-sm font-medium text-muted" testID="record-title">
+          {/* Capped, and one line: it shares the row with Cancel, Repeat and
+              Save, and at the phone's largest text it ran into them. */}
+          <Text
+            className="text-sm font-medium text-muted"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.3}
+            testID="record-title">
             {/* Names the ACTION you are in, not the row that will result.
                 Duplicating a refund still produces a refund, but "Refund" here
                 would leave you wondering which of the two things you tapped. */}
@@ -1384,6 +1390,10 @@ export default function RecordScreen() {
             adjustsFontSizeToFit
             // The calculator's `entry` stays raw; grouping is display only, and
             // must never be parsed back.
+            // Announced as it changes, so somebody typing on the keypad with
+            // TalkBack hears what the amount has become, not only the key.
+            accessibilityLabel={`Amount, ${groupDigits(calc.entry)} ${entryCurrency}`}
+            accessibilityLiveRegion="polite"
             testID="amount-display">
             {groupDigits(calc.entry)}
           </Text>
@@ -1524,7 +1534,12 @@ export default function RecordScreen() {
           to CHANGE it in order to REMOVE it, which is a strange way in. */}
 
       <View className="mx-3">
-        <Keypad onKey={onKey} density={density} equalsLabel={flowKeyLabel(flow)} />
+        <Keypad
+          onKey={onKey}
+          density={density}
+          equalsLabel={flowKeyLabel(flow)}
+          equalsSpoken={flowKeySpoken(flow)}
+        />
       </View>
 
       {/* Surface fill and radius match the account and category pickers, so the

@@ -99,6 +99,30 @@ export function nextAction(state: FlowState): FlowAction {
  * with the action so the next press is never a surprise: `=` finishes a sum,
  * `✓` writes the record, `→` moves on.
  */
+/**
+ * The same key, SPOKEN. TalkBack reads the glyphs literally — "check mark",
+ * "rightwards arrow" — which names a shape, not what the press will do, and a
+ * press that can save a record has to say so before it is made.
+ */
+const SHEET_SPOKEN: Record<Sheet, string> = {
+  account: 'choose the account',
+  toAccount: 'choose where it goes',
+  category: 'choose the category',
+};
+
+export function flowKeySpoken(action: FlowAction): string {
+  switch (action.kind) {
+    case 'evaluate':
+      return 'Equals';
+    case 'save':
+      return 'Save';
+    case 'open':
+      return `Next, ${SHEET_SPOKEN[action.sheet]}`;
+    case 'incomplete':
+      return `Next. ${action.message}`;
+  }
+}
+
 export function flowKeyLabel(action: FlowAction): string {
   switch (action.kind) {
     case 'evaluate':

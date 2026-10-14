@@ -25,7 +25,16 @@ export type Density = 'regular' | 'compact' | 'tight';
  * (amount + keypad + date/time) is about 250dp at `tight`, which leaves usable
  * room for the scrollable part below ~520dp. Above ~680dp nothing needs to give.
  */
-export function densityForHeight(height: number): Density {
+export function densityForHeight(height: number, fontScale = 1): Density {
+  // LARGE TEXT IS LESS ROOM. The pinned block is mostly text — the amount, the
+  // keys, the date — so at 1.3x font it needs about 1.3x the height, and a
+  // full phone at that size has what a much shorter one has at 1x. Only ever
+  // scaled DOWN: a font set smaller than default must not buy a roomier layout
+  // than the window can actually hold. And never past compact on its own:
+  // `tight` is for a window that is SHORT — it folds the note to one line and
+  // the pickers to bare icons — and at 2x text on a whole phone that left half
+  // the screen empty while hiding the labels large text is for.
+  height = height / Math.min(Math.max(1, fontScale), 1.5);
   if (height >= 680) return 'regular';
   if (height >= 520) return 'compact';
   return 'tight';
@@ -33,8 +42,8 @@ export function densityForHeight(height: number): Density {
 
 /** React Native reports window (not screen) size, which is what split-screen changes. */
 export function useDensity(): Density {
-  const { height } = useWindowDimensions();
-  return densityForHeight(height);
+  const { height, fontScale } = useWindowDimensions();
+  return densityForHeight(height, fontScale);
 }
 
 /** Picks the value for the current density from a full table. */

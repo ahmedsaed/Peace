@@ -6,6 +6,24 @@ describe('densityForHeight', () => {
     expect(densityForHeight(2000)).toBe('regular');
   });
 
+  // Large text needs the room a shorter window would lack. 800dp at the
+  // phone's largest common sizes is not a "whole phone" for the keypad.
+  it('gives large text the density of a shorter window', () => {
+    expect(densityForHeight(800, 1)).toBe('regular');
+    expect(densityForHeight(800, 1.3)).toBe('compact');
+    expect(densityForHeight(800, 2)).toBe('compact');
+  });
+
+  // Only a short window is tight; large text alone stops at compact.
+  it('leaves tight to split-screen', () => {
+    expect(densityForHeight(800, 3)).toBe('compact');
+    expect(densityForHeight(340, 2)).toBe('tight');
+  });
+
+  it('never makes a layout roomier for small text', () => {
+    expect(densityForHeight(600, 0.85)).toBe('compact');
+  });
+
   it('treats a half-height split-screen window as tight', () => {
     // A 6.1" phone in split-screen portrait, minus the system bars.
     expect(densityForHeight(340)).toBe('tight');

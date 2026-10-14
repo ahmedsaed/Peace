@@ -18,6 +18,8 @@ export type KeyPress =
  * are settings; the grid itself is `keypadRows` in src/lib/keypad-layout.ts.
  */
 const OP_LABEL: Record<Op, string> = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+/** What TalkBack says. Read literally, `÷` is "division sign" and `.` is "dot". */
+const OP_SPOKEN: Record<Op, string> = { '+': 'Plus', '-': 'Minus', '*': 'Times', '/': 'Divided by' };
 
 /**
  * testIDs must be regex-safe. Maestro matches ids as REGULAR EXPRESSIONS, so an
@@ -53,12 +55,15 @@ const KEY_TEXT: Record<Density, string> = {
 
 function Key({
   label,
+  spoken = label,
   onPress,
   variant = 'digit',
   testID,
   density,
 }: {
   label: string;
+  /** The accessibility label, when the glyph is not the word. */
+  spoken?: string;
   onPress: () => void;
   variant?: 'digit' | 'op';
   testID: string;
@@ -69,12 +74,16 @@ function Key({
       onPress={onPress}
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={spoken}
       className={`flex-1 items-center justify-center rounded-lg active:opacity-60 ${byDensity(
         density,
         KEY_GAP
       )} ${byDensity(density, KEY_PAD)} ${variant === 'op' ? 'bg-raised' : 'bg-surface'}`}>
       <Text
+        // Scales with the phone's font size, but only so far: twelve keys share
+        // a fixed grid, and a 2x digit stops fitting its key. The amount above
+        // the keypad is where a large-text reader reads what was typed.
+        maxFontSizeMultiplier={1.4}
         className={`${byDensity(density, KEY_TEXT)} ${
           variant === 'op' ? 'font-semibold text-accent' : 'text-ink'
         }`}>
@@ -88,6 +97,7 @@ export function Keypad({
   onKey,
   density = 'regular',
   equalsLabel = '=',
+  equalsSpoken = 'Equals',
 }: {
   onKey: (press: KeyPress) => void;
   density?: Density;
@@ -97,6 +107,8 @@ export function Keypad({
    * "save" action once there is nothing to evaluate, so it has to say which.
    */
   equalsLabel?: string;
+  /** The same, for TalkBack — see `flowKeySpoken`. */
+  equalsSpoken?: string;
 }) {
   const order = useSetting('keypadDigits');
   const side = useSetting('keypadOperators');
@@ -110,6 +122,7 @@ export function Keypad({
           <Key
             key={cell.op}
             label={OP_LABEL[cell.op]}
+            spoken={OP_SPOKEN[cell.op]}
             variant="op"
             density={density}
             testID={`key-op-${OP_TESTID[cell.op]}`}
@@ -121,6 +134,7 @@ export function Keypad({
           <Key
             key="."
             label="."
+            spoken="Decimal point"
             density={density}
             testID="key-dot"
             onPress={() => onKey({ kind: 'dot' })}
@@ -131,6 +145,7 @@ export function Keypad({
           <Key
             key="="
             label={equalsLabel}
+            spoken={equalsSpoken}
             variant="op"
             density={density}
             testID="key-equals"

@@ -19,6 +19,26 @@ export const SWATCHES = [
   '#6B5B4A',
 ];
 
+/**
+ * What TalkBack calls each swatch. A colour circle has no text, so without a
+ * name every one of them is announced as "button" and the picker is twelve
+ * identical choices.
+ */
+const SWATCH_NAMES: Record<string, string> = {
+  '#B03A3A': 'Red',
+  '#C2622C': 'Orange',
+  '#C99A2E': 'Mustard',
+  '#6E8B3D': 'Olive',
+  '#2E7D46': 'Green',
+  '#2F8A78': 'Teal',
+  '#2F6FA8': 'Blue',
+  '#3B4E9E': 'Indigo',
+  '#6B4CA8': 'Purple',
+  '#9C2D6B': 'Plum',
+  '#A8475C': 'Rose',
+  '#6B5B4A': 'Brown',
+};
+
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View className="mb-4">
@@ -122,7 +142,9 @@ export function ColorPicker({
           key={swatch}
           onPress={() => onChange(swatch)}
           testID={`swatch-${swatch.slice(1)}`}
-          accessibilityRole="button"
+          accessibilityRole="radio"
+          accessibilityLabel={SWATCH_NAMES[swatch] ?? 'Colour'}
+          accessibilityState={{ selected: value === swatch }}
           // The selected swatch gets a ring rather than a tick: a checkmark on a
           // saturated circle is hard to read, and the ring keeps the colour itself
           // unobstructed, which is the thing being chosen.
@@ -154,7 +176,10 @@ export function IconPicker({
           key={name}
           onPress={() => onChange(name)}
           testID={`icon-${name}`}
-          accessibilityRole="button"
+          accessibilityRole="radio"
+          // The slug is the only name a glyph has; "fast-food" reads fine.
+          accessibilityLabel={name.replace(/-/g, ' ')}
+          accessibilityState={{ selected: value === name }}
           className={`h-11 w-11 items-center justify-center rounded-full ${
             value === name ? 'border-2 border-ink' : ''
           }`}

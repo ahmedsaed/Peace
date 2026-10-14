@@ -254,7 +254,14 @@ function SliceRow({
   const fraction = totalMinor > 0 ? slice.amountMinor / totalMinor : 0;
 
   return (
-    <View className="border-b border-line px-4 py-2.5" testID={`analysis-row-${id}`}>
+    // ONE stop for TalkBack, not three: read apart, "Food", "$256.00" and
+    // "37.1%" are fragments that only make sense in the order a sighted person
+    // takes them in at a glance.
+    <View
+      className="border-b border-line px-4 py-2.5"
+      testID={`analysis-row-${id}`}
+      accessible
+      accessibilityLabel={`${slice.label}, ${money(slice.amountMinor, homeCurrency)}, ${slice.percent.toFixed(1)} percent`}>
       <View className="flex-row items-center gap-3">
         <View
           className="h-8 w-8 items-center justify-center rounded-full"
@@ -312,6 +319,7 @@ function CashFlow({
 }) {
   const palette = useTheme();
   const money = useMoney();
+  const periodLabel = usePeriodLabel();
   const peak = cashFlowPeak(points);
   const running = runningTotals(
     startingMinor,
@@ -335,7 +343,17 @@ function CashFlow({
           const { month } = parsePeriod(point.period);
           const isCurrent = point.period === current;
           return (
-            <View key={point.period} className="flex-1 items-center">
+            // A bar is a height, which a screen reader cannot see. Each month
+            // is read as one sentence carrying the amounts the heights stand
+            // for — through `money`, so a hidden ledger stays hidden here too.
+            <View
+              key={point.period}
+              className="flex-1 items-center"
+              accessible
+              accessibilityLabel={`${periodLabel(point.period)}: income ${money(
+                point.incomeMinor,
+                homeCurrency
+              )}, spending ${money(point.expenseMinor, homeCurrency)}`}>
               {/* Both halves are scaled to the same peak, or they would be in
                   different units and the comparison would be a lie. */}
               <View style={{ height: BAR_MAX }} className="w-full items-center justify-end">
