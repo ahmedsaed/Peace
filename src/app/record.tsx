@@ -60,7 +60,7 @@ import { ageInDays, fetchRate, formatRateDate, RateError } from '@/lib/fx';
 import { byDensity, useDensity } from '@/lib/layout';
 import { convertMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel, weekStart } from '@/lib/period';
-import { flowKeyLabel, flowKeySpoken, nextAction, type Sheet } from '@/lib/record-flow';
+import { flowKeyFace, flowKeySpoken, nextAction, type Sheet } from '@/lib/record-flow';
 import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
 import { CURRENCIES } from '@/lib/currencies';
@@ -1594,7 +1594,7 @@ export default function RecordScreen() {
         <Keypad
           onKey={onKey}
           density={density}
-          equalsLabel={flowKeyLabel(flow)}
+          equalsFace={flowKeyFace(flow)}
           equalsSpoken={flowKeySpoken(flow)}
         />
       </View>

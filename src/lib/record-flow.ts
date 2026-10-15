@@ -93,13 +93,6 @@ export function nextAction(state: FlowState): FlowAction {
 }
 
 /**
- * What the key should say it will do.
- *
- * A key labelled `=` that silently saves a record is a trap. The label changes
- * with the action so the next press is never a surprise: `=` finishes a sum,
- * `✓` writes the record, `→` moves on.
- */
-/**
  * The same key, SPOKEN. TalkBack reads the glyphs literally — "check mark",
  * "rightwards arrow" — which names a shape, not what the press will do, and a
  * press that can save a record has to say so before it is made.
@@ -123,13 +116,36 @@ export function flowKeySpoken(action: FlowAction): string {
   }
 }
 
-export function flowKeyLabel(action: FlowAction): string {
+/**
+ * What the key should SHOW it will do.
+ *
+ * A key labelled `=` that silently saves a record is a trap, so the face
+ * changes with the action. A bare `→` said only "something comes next"; the
+ * key now wears the icon of the thing the press opens — the Accounts tab's
+ * card, the Categories tab's tag — and a check for save, so the next press is
+ * never a surprise. `=` stays text: it finishes a sum, and every calculator
+ * spells it that way. The arrow is left only for the one case with nothing to
+ * open: an amount still to type.
+ */
+export type FlowKeyFace =
+  | { kind: 'text'; text: string }
+  | { kind: 'icon'; icon: 'accounts' | 'categories' | 'check' };
+
+const SHEET_ICON: Record<Sheet, 'accounts' | 'categories'> = {
+  account: 'accounts',
+  toAccount: 'accounts',
+  category: 'categories',
+};
+
+export function flowKeyFace(action: FlowAction): FlowKeyFace {
   switch (action.kind) {
     case 'evaluate':
-      return '=';
+      return { kind: 'text', text: '=' };
     case 'save':
-      return '✓';
-    default:
-      return '→';
+      return { kind: 'icon', icon: 'check' };
+    case 'open':
+      return { kind: 'icon', icon: SHEET_ICON[action.sheet] };
+    case 'incomplete':
+      return { kind: 'text', text: '→' };
   }
 }
