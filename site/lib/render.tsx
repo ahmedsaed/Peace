@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ReactNode } from 'react';
 
 /**
  * What every generated image shares: the palette, the fonts, and a phone.
@@ -24,6 +25,12 @@ const read = (path: string) => readFileSync(join(site, path));
 /** A PNG as a data URI. Paths are relative to `site/`. */
 export const dataUri = (path: string) => `data:image/png;base64,${read(path).toString('base64')}`;
 
+/** A PNG's pixel size, from its header — Satori needs it to place an image. */
+export const pngSize = (path: string) => {
+  const png = read(path);
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+};
+
 const font = (pkg: string, file: string) => read(`node_modules/@fontsource/${pkg}/files/${file}`);
 
 export const fonts = () => [
@@ -41,11 +48,15 @@ export const words = (text: string) => text.split(' ').filter(Boolean);
  */
 export function Phone({
   src,
+  screen,
   width,
   rotate = 0,
   style,
 }: {
-  src: string;
+  /** A screenshot to show… */
+  src?: string;
+  /** …or a screen drawn here, at `width` wide and 9:20 like the screenshots. */
+  screen?: ReactNode;
   width: number;
   rotate?: number;
   style?: Record<string, string | number>;
@@ -66,12 +77,26 @@ export function Phone({
         ...style,
       }}
     >
-      <img
-        src={src}
-        width={width}
-        height={Math.round((width * 20) / 9)}
-        style={{ borderRadius: Math.round(width * 0.08) }}
-      />
+      {screen ? (
+        <div
+          style={{
+            display: 'flex',
+            width,
+            height: Math.round((width * 20) / 9),
+            borderRadius: Math.round(width * 0.08),
+            overflow: 'hidden',
+          }}
+        >
+          {screen}
+        </div>
+      ) : (
+        <img
+          src={src}
+          width={width}
+          height={Math.round((width * 20) / 9)}
+          style={{ borderRadius: Math.round(width * 0.08) }}
+        />
+      )}
     </div>
   );
 }

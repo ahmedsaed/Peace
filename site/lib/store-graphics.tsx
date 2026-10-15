@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-import { accent, dataUri, fonts, ground, ink, muted, Phone, words } from './render';
+import { accent, dataUri, fonts, ground, ink, muted, Phone, pngSize, words } from './render';
 
 /**
  * The Play Store listing's graphics, drawn at build time and published under
@@ -19,11 +19,61 @@ import { accent, dataUri, fonts, ground, ink, muted, Phone, words } from './rend
 
 const raw = (name: string) => dataUri(`../store/screenshots/${name}.png`);
 
+/**
+ * A home screen with the widgets on it, `width` px wide (designed at 1080).
+ *
+ * The widgets are the REAL renders, cropped off the emulator by
+ * `npm run shots:widgets` with their corners already transparent; only the
+ * wallpaper and the arrangement are drawn here. A launcher's own furniture —
+ * a clock, a search bar, other apps' icons — is left out on purpose: it would
+ * be somebody else's interface in our listing, and none of it is Peace.
+ */
+export function HomeScreen({ width }: { width: number }) {
+  const scale = width / 1080;
+  const widget = (name: string, left: number, top: number) => {
+    const path = `../store/screenshots/widget-${name}.png`;
+    const size = pngSize(path);
+    return (
+      <img
+        src={dataUri(path)}
+        width={Math.round(size.width * scale)}
+        height={Math.round(size.height * scale)}
+        style={{ position: 'absolute', left: Math.round(left * scale), top: Math.round(top * scale) }}
+      />
+    );
+  };
+  return (
+    <div
+      style={{
+        display: 'flex',
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        // A wallpaper in the app's own warm dark, lit from the top corner.
+        backgroundImage: `radial-gradient(circle at 20% 8%, #5a4526 0%, #2b2217 38%, ${ground} 75%)`,
+      }}
+    >
+      {/* Centred down the screen, 60px apart — at the 1080 the crops are
+          taken at. The store shot shows the top three; the site, all four. */}
+      {widget('balance', 67, 250)}
+      {widget('budget', 67, 898)}
+      {widget('balance-compact', 67, 1546)}
+      {widget('quick', 67, 1879)}
+    </div>
+  );
+}
+
+/** The home screen on its own, 1080×2400, for the website's feature section. */
+export function homeScreenImage() {
+  return new ImageResponse(<HomeScreen width={1080} />, { width: 1080, height: 2400 });
+}
+
 export const SHOT_SIZE = { width: 1080, height: 1920 };
 export const FEATURE_SIZE = { width: 1024, height: 500 };
 export const ICON_SIZE = { width: 512, height: 512 };
 
 type StoreShot = {
+  /** A capture in store/screenshots, or `home`: the widgets on a home screen. */
   shot: string;
   title: string;
   /** Trailing words of the title in the accent colour. */
@@ -55,6 +105,12 @@ export const STORE_SHOTS: StoreShot[] = [
     subtitle: 'A calculator keypad that walks you from the amount to saved.',
   },
   {
+    shot: 'home',
+    title: 'On your',
+    highlight: 'home screen.',
+    subtitle: 'Your balance and budget at a glance, and a spend added in one tap.',
+  },
+  {
     shot: 'budgets',
     title: 'Know what',
     highlight: "is left.",
@@ -72,12 +128,7 @@ export const STORE_SHOTS: StoreShot[] = [
     highlight: 'adding up.',
     subtitle: 'Cash, bank and cards — and a card reads as what you owe.',
   },
-  {
-    shot: 'search',
-    title: 'Find anything,',
-    highlight: 'with a total.',
-    subtitle: 'Filter by category, account, date or amount.',
-  },
+
   {
     shot: 'recurring',
     title: 'Bills that',
@@ -163,7 +214,11 @@ export function storeShot(index: number) {
         {/* Bleeds off the bottom edge on purpose: the top of a screen is the
             part that says what it is, and a whole phone shrunk to fit is a
             screenshot nobody can read at listing size. */}
-        <Phone src={raw(shot)} width={760} style={{ top: 600 }} />
+        {shot === 'home' ? (
+          <Phone screen={<HomeScreen width={760} />} width={760} style={{ top: 600 }} />
+        ) : (
+          <Phone src={raw(shot)} width={760} style={{ top: 600 }} />
+        )}
       </div>
     ),
     { ...SHOT_SIZE, fonts: fonts() },

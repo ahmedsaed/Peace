@@ -98,6 +98,7 @@
     "e2e:lock": "bash scripts/e2e-lock.sh",
     "demo:ledger": "bash scripts/demo-ledger.sh",
     "shots:penny": "bash scripts/penny-shots.sh",
+    "shots:widgets": "bash scripts/widget-shots.sh",
     "postinstall": "patch-package"
   },
   "private": true,

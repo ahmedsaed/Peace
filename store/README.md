@@ -15,7 +15,14 @@ the same pull request as the app it describes.
 1. `npm run apk:emu`, install it on the emulator, then `npm run shots`. That replays
    `scripts/demo-shots.yaml` — an invented month **in US dollars** with no country's shops in it — and
    writes the halved copies to `docs/screenshots/` (README, website) and the full-size ones here.
-2. Build the site (`cd site && npm run build`). The store graphics land in `site/out/store/`, and a
+2. The widgets cannot be placed by a flow — a launcher is driven by drags — so their capture is
+   by hand, once: with the dollar month on the emulator, place Budget, Balance stretched to 4×2,
+   Balance at 4×1 and Quick add on the home screen, then run `npm run shots:widgets` on each page.
+   It crops each widget by its own view id into `widget-*.png` here, corners transparent; the
+   website composes them onto a home screen (`HomeScreen` in `site/lib/store-graphics.tsx`), which
+   is screenshot 3 and the site's "On the home screen" section. Nothing but the wallpaper and the
+   arrangement is drawn — the widgets are the real renders.
+3. Build the site (`cd site && npm run build`). The store graphics land in `site/out/store/`, and a
    merge to `main` publishes them.
 
 The graphics are generated, never edited by hand: captions live in `STORE_SHOTS` in
