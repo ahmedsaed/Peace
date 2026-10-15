@@ -33,7 +33,7 @@ on:
         options: [draft, completed]
         default: draft
       notes:
-        description: Release notes for testers (optional, en-US).
+        description: Release notes (en-US). Empty takes this version's entry in src/constants/whats-new.json.
         type: string
         required: false
 
@@ -74,6 +74,13 @@ jobs:
       # What lets GitHub vouch for this run to Google. No secret is involved.
       id-token: write
     steps:
+      # Only the release notes: the in-app What's new list is also what Play
+      # shows, so the two never say different things.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: src/constants/whats-new.json
+          sparse-checkout-cone-mode: false
+
       - uses: actions/download-artifact@v4
         with:
           pattern: '*'
@@ -114,6 +121,11 @@ jobs:
             fi
             printf '%s' "$out"
           }
+
+          if [ -z "$NOTES" ]; then
+            NOTES=$(jq -r --arg v "$VERSION" '.[] | select(.version == $v) | .notes | map("• " + .) | join("\n")' src/constants/whats-new.json)
+          fi
+          echo "release notes: ${NOTES:-(none)}"
 
           AAB=$(find . -maxdepth 2 -name '*.aab' -print -quit)
           [ -n "$AAB" ] || { echo "::error::No .aab in the downloaded artifacts."; exit 1; }

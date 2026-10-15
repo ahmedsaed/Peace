@@ -17,6 +17,11 @@ export const LAUNCH_CURRENCY = 'peace.currency';
  * phone, and the test AVD is in light mode, so every image would come out Paper.
  */
 export const LAUNCH_THEME = 'peace.theme';
+/**
+ * Pretends the install last saw this version's release notes, so a flow can
+ * open on the What's new sheet without upgrading anything.
+ */
+export const LAUNCH_WHATS_NEW = 'peace.whatsnew';
 
 type Locale = { currencyCode: string | null };
 
@@ -52,11 +57,14 @@ export type FirstRun = {
   setupCard: boolean;
   /** A new install follows the phone; an existing one keeps Ledger. */
   theme: ThemeSetting;
+  /** The running version: a new install has nothing to catch up on. */
+  whatsNewSeen: string;
 };
 
 export function firstRunSettings(
   extras: Record<string, string>,
-  locales: readonly Locale[]
+  locales: readonly Locale[],
+  version = ''
 ): FirstRun {
   const asked = extras[LAUNCH_CURRENCY]?.toUpperCase();
   const skip = extras[LAUNCH_ONBOARDING] === 'done';
@@ -67,5 +75,6 @@ export function firstRunSettings(
     // above the first record would move every row it taps.
     setupCard: !skip,
     theme: askedTheme(extras[LAUNCH_THEME]),
+    whatsNewSeen: extras[LAUNCH_WHATS_NEW] ?? version,
   };
 }

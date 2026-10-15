@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLockGate } from '@/components/app-lock';
+import { WhatsNewOnLaunch } from '@/components/whats-new';
 import { DatabaseProvider } from '@/db/provider';
 import { CONTENT_MAX_WIDTH } from '@/lib/layout';
 import { BankCatchUp } from '@/state/bank';
@@ -136,6 +137,9 @@ function Shell() {
       </Stack>
       </View>
       </View>
+      {/* Release notes, once after an update. Before the lock, so a locked
+          app shows the lock on top and the notes after it. */}
+      <WhatsNewOnLaunch />
       {/* After the navigator, so it covers every screen without being
           one of them — locking never unmounts a half-typed record. Off
           unless switched on in Settings › App lock. */}

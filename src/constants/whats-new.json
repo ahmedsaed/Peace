@@ -1,0 +1,38 @@
+[
+  {
+    "version": "1.31.0",
+    "notes": [
+      "After an update, Peace now shows what changed — like this. Find it again any time in About."
+    ]
+  },
+  {
+    "version": "1.30.1",
+    "notes": [
+      "Retaking setup with an AI key already saved now lets you continue past that step."
+    ]
+  },
+  {
+    "version": "1.30.0",
+    "notes": [
+      "Setup now asks how Peace should look: match your phone, or pick Ledger, Graphite, Paper or Mist by seeing them."
+    ]
+  },
+  {
+    "version": "1.29.0",
+    "notes": [
+      "Attach a PDF invoice or a text file to a record and Peace reads the amount from it, the same as a receipt photo."
+    ]
+  },
+  {
+    "version": "1.28.0",
+    "notes": [
+      "Home-screen widgets: this month's budget, your balances, and a quick-add button."
+    ]
+  },
+  {
+    "version": "1.26.0",
+    "notes": [
+      "The camera opens right inside the notes field. One press of the shutter attaches the receipt."
+    ]
+  }
+]

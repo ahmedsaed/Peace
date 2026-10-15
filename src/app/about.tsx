@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 
 import { StackHeader } from '@/components/screen';
 import { UpdateRow } from '@/components/update-row';
+import { WhatsNewSheet } from '@/components/whats-new';
 import { Wordmark } from '@/components/wordmark';
 import { buildInfo, packageName, selfUpdates } from '@/lib/build-info';
 import { formatCommit, formatVersion } from '@/lib/version';
+import { recentNotes } from '@/lib/whats-new';
 import { useTheme } from '@/state/theme';
 
 /**
@@ -50,6 +53,8 @@ const LINKS: { label: string; value: string; url: string; testID: string }[] = [
 
 export default function AboutScreen() {
   const palette = useTheme();
+  const [notes, setNotes] = useState(false);
+  const recent = recentNotes(buildInfo.version);
   return (
     <View className="flex-1 bg-ground" testID="about-screen">
       <StackHeader title="About" />
@@ -82,6 +87,18 @@ export default function AboutScreen() {
           ))}
         </View>
 
+        {/* The release notes again, for whoever dismissed them too quickly. */}
+        {recent.length > 0 ? (
+          <Pressable
+            onPress={() => setNotes(true)}
+            testID="about-whats-new"
+            accessibilityRole="button"
+            className="mt-4 flex-row items-center gap-3 rounded-xl bg-surface px-4 py-3.5 active:bg-raised">
+            <Text className="flex-1 text-sm text-ink">What&apos;s new</Text>
+            <Icon name="chevron" size={12} color={palette.muted} />
+          </Pressable>
+        ) : null}
+
         {/* Where Peace lives outside the app. Opened in the browser, never
             fetched — this screen still sends nothing until a row is tapped. */}
         <View className="mt-4 overflow-hidden rounded-xl bg-surface">
@@ -110,6 +127,7 @@ export default function AboutScreen() {
             are up to date" from "the check is broken". */}
         {selfUpdates ? <UpdateRow /> : null}
       </ScrollView>
+      <WhatsNewSheet entries={recent} visible={notes} onClose={() => setNotes(false)} />
     </View>
   );
 }

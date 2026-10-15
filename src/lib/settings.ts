@@ -319,6 +319,15 @@ export const SETTING_DEFAULTS = {
    * to break and the phone's own setting is the best guess there is.
    */
   theme: 'ledger' as string,
+  /**
+   * The last version whose release notes were shown (`lib/whats-new.ts`).
+   *
+   * EMPTY BY DEFAULT, and that is the migration: an install from before the
+   * sheet existed has no row, and gets the running release's notes alone. A
+   * first launch writes the running version, so a new install — which has
+   * just been through setup — is shown nothing.
+   */
+  whatsNewSeen: '' as string,
 };
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
