@@ -17,6 +17,7 @@ import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONObject
@@ -47,15 +48,20 @@ internal object WidgetRenderer {
   private const val TAG = "PeaceWidget"
 
   /**
-   * Accounts appear only once the Balance widget is taller than its default
-   * 4×2 (about 224dp on a Pixel): at that size it is the figure and the quick
-   * bar, which is how most people will use it. Above it, the rows fill what
-   * is left under the quick bar — the header, figure, month line, quick bar
-   * and padding take about 162dp.
+   * Below this height (dp) the Balance widget is ONE ROW — its default 4×1 —
+   * and uses the compact layout: the figure and three round buttons.
    */
-  private const val ACCOUNTS_FROM_DP = 236
+  private const val COMPACT_BELOW_DP = 150
+
+  /**
+   * In the full layout the header, figure, month line, quick bar and padding
+   * take about 162dp; accounts fill the rest, 22dp each at least, and
+   * "and N more" is a short 16dp line rather than a row of its own. A Pixel's
+   * 4×2 (≈224dp) fits two accounts and that line; 4×3 about six.
+   */
   private const val BALANCE_TOP_DP = 162
-  private const val ACCOUNT_ROW_DP = 26
+  private const val ACCOUNT_ROW_DP = 22
+  private const val MORE_LINE_DP = 16
   private const val MAX_ACCOUNT_ROWS = 6
 
   private class Palette(o: JSONObject) {
@@ -200,6 +206,7 @@ internal object WidgetRenderer {
   // -------------------------------------------------------------- balance --
 
   private fun balance(context: Context, s: Snapshot?, now: Long, night: Boolean, heightDp: Int): RemoteViews {
+    if (heightDp < COMPACT_BELOW_DP) return balanceCompact(context, s, now, night)
     val rv = RemoteViews(context.packageName, R.layout.peace_widget_balance)
     val paint = Painter(rv, s?.theme, night)
     frame(context, rv, paint, s, now)
@@ -214,26 +221,63 @@ internal object WidgetRenderer {
     }
 
     figures(rv, paint, b.amount, b.tone, b.beside, b.foot)
-    val rows =
-      if (heightDp < ACCOUNTS_FROM_DP) 0
-      else ((heightDp - BALANCE_TOP_DP) / ACCOUNT_ROW_DP).coerceIn(0, MAX_ACCOUNT_ROWS)
-    accounts(rv, paint, s.accounts, rows)
+    accounts(rv, paint, s.accounts, accountsThatFit(s.accounts.size, heightDp - BALANCE_TOP_DP))
     return rv
   }
 
   /**
-   * As many accounts as `rows` allows. When there are more, the last row
-   * becomes "and N more" — a list that silently stops looks complete.
+   * One row: "OCTOBER · NOW" over the figure, the buttons beside it. A notice
+   * has no room for a sentence here, so it is the short form of the same one.
    */
-  private fun accounts(rv: RemoteViews, paint: Painter, list: List<Account>, rows: Int) {
-    val show = rows > 0 && list.isNotEmpty()
+  private fun balanceCompact(context: Context, s: Snapshot?, now: Long, night: Boolean): RemoteViews {
+    val rv = RemoteViews(context.packageName, R.layout.peace_widget_balance_compact)
+    val paint = Painter(rv, s?.theme, night)
+    clicks(context, rv)
+    paint.tint(R.id.widget_bg) { it.surface }
+    buttons(paint)
+    paint.text(R.id.month) { it.muted }
+
+    val b = s?.balance
+    val short =
+      when {
+        s == null -> "Open Peace once"
+        now >= s.endsAt -> "Open Peace to update"
+        b == null -> "Peace is locked"
+        else -> null
+      }
+    if (short != null || b == null) {
+      rv.setTextViewText(R.id.month, monthLabel(s, now))
+      rv.setTextViewText(R.id.amount, short ?: "Peace is locked")
+      rv.setTextViewTextSize(R.id.amount, TypedValue.COMPLEX_UNIT_SP, 15f)
+      paint.text(R.id.amount) { it.ink }
+      return rv
+    }
+    rv.setTextViewText(R.id.month, "${s?.month ?: ""} · ${b.beside}")
+    rv.setTextViewText(R.id.amount, b.amount)
+    paint.text(R.id.amount) { tone(it, b.tone) }
+    return rv
+  }
+
+  /**
+   * How many accounts to list in `spaceDp`. All of them when they fit;
+   * otherwise as many as fit ABOVE the "and N more" line, because a list that
+   * silently stops looks complete.
+   */
+  private fun accountsThatFit(count: Int, spaceDp: Int): Int {
+    if (spaceDp < ACCOUNT_ROW_DP) return 0
+    if (count * ACCOUNT_ROW_DP <= spaceDp && count <= MAX_ACCOUNT_ROWS) return count
+    return ((spaceDp - MORE_LINE_DP) / ACCOUNT_ROW_DP).coerceIn(0, MAX_ACCOUNT_ROWS)
+  }
+
+  /** The first `fits` accounts, then "and N more" for the rest. */
+  private fun accounts(rv: RemoteViews, paint: Painter, list: List<Account>, fits: Int) {
+    val show = fits > 0 && list.isNotEmpty()
     rv.setViewVisibility(R.id.accounts, if (show) View.VISIBLE else View.GONE)
     // The spacer takes the slack only when the accounts do not, so without
     // them the quick bar sits at the foot as it does on the Budget widget.
     rv.setViewVisibility(R.id.spacer, if (show) View.GONE else View.VISIBLE)
     if (!show) return
 
-    val fits = if (list.size > rows) rows - 1 else list.size
     for (i in 0 until MAX_ACCOUNT_ROWS) {
       val row = ACCOUNT_ROWS[i]
       if (i >= fits) {

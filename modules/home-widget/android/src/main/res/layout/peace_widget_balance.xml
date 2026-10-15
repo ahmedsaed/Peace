@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Balance: the running position (the Records header's third cell) and the
-  month's two sides, the quick bar right under them, and the accounts in
-  whatever height is left. At its default 4×2 there is no room for accounts,
-  so the quick bar sits at the foot; stretched taller, the accounts appear
-  below it, as many as fit (WidgetRenderer counts them from the real size).
+  Balance at two rows and taller: the running position (the Records header's
+  third cell) and the month's two sides, the quick bar right under them, and
+  the accounts filling the height that is left — as many as fit, counted by
+  WidgetRenderer from the widget's real size. One row tall it is
+  peace_widget_balance_compact instead.
 
   Colours are Ledger's and the text a sample: this is also the picker preview.
 -->
@@ -251,7 +251,9 @@
             </FrameLayout>
         </LinearLayout>
 
-        <!-- Up to six accounts, then "and N more". Fixed rows, each with ids
+        <!-- Up to six accounts, then "and N more". Each visible row takes an
+             equal share of the height, so a few accounts spread down the card
+             rather than leaving the foot of it empty. Fixed rows, each with ids
              of its own so RemoteViews can address it, rather than a collection
              widget: six is all a home screen holds, and a RemoteViewsService
              would be a second component to keep alive for a short list. -->
@@ -267,7 +269,9 @@
             <LinearLayout
                 android:id="@+id/acc_1"
                 android:layout_width="match_parent"
-                android:layout_height="26dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:visibility="gone">
@@ -304,7 +308,9 @@
             <LinearLayout
                 android:id="@+id/acc_2"
                 android:layout_width="match_parent"
-                android:layout_height="26dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:visibility="gone">
@@ -341,7 +347,9 @@
             <LinearLayout
                 android:id="@+id/acc_3"
                 android:layout_width="match_parent"
-                android:layout_height="26dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:visibility="gone">
@@ -378,7 +386,9 @@
             <LinearLayout
                 android:id="@+id/acc_4"
                 android:layout_width="match_parent"
-                android:layout_height="26dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:visibility="gone">
@@ -415,7 +425,9 @@
             <LinearLayout
                 android:id="@+id/acc_5"
                 android:layout_width="match_parent"
-                android:layout_height="26dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:visibility="gone">
@@ -452,7 +464,9 @@
             <LinearLayout
                 android:id="@+id/acc_6"
                 android:layout_width="match_parent"
-                android:layout_height="26dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:visibility="gone">
@@ -489,11 +503,11 @@
             <TextView
                 android:id="@+id/acc_more"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_height="16dp"
+                android:gravity="center_vertical"
                 android:maxLines="1"
                 android:textColor="#9A8E79"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>

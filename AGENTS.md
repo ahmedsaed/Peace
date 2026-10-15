@@ -1002,7 +1002,10 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   widget, so the wordmark is a pre-drawn white PNG. **Only RemoteViews' allowed classes inflate**:
   a plain `<View>` spacer made the whole Balance widget "Can't load widget" — use a FrameLayout,
   and check `adb logcat | grep AppWidgetHostView` when one will not load. The Balance widget is
-  drawn per id, because how many accounts fit depends on that widget's own height. **A FORCE-STOPPED app's widgets show a grey
+  drawn per id and picks its layout from that widget's own height: one row tall is
+  `peace_widget_balance_compact`, taller is the full layout with as many accounts as fit. A
+  compact layout must still contain every id the renderer paints (a hidden one will do), or
+  RemoteViews fails the whole widget. **A FORCE-STOPPED app's widgets show a grey
   placeholder after a theme or dark-mode change** until it is opened — Android, not a bug; do not
   force-stop when checking one. Place one on the emulator by long-pressing the home screen ›
   Widgets › search "Peace".
