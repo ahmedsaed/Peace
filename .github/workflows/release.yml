@@ -89,6 +89,10 @@ jobs:
             NOTES=$(git log -20 --pretty='- %s')
           fi
 
+          # This version's lines from the in-app What's new list, when it has any.
+          WHATS_NEW=$(jq -r --arg v "$VERSION" '.[] | select(.version == $v) | .notes | map("- " + .) | join("\n")' src/constants/whats-new.json 2>/dev/null || true)
+          [ -n "$WHATS_NEW" ] && WHATS_NEW=$(printf "## What's new\n\n%s\n" "$WHATS_NEW")
+
           cat > notes.md <<EOF
           Peace ${VERSION} (build ${BUILD})
 
@@ -98,6 +102,8 @@ jobs:
 
           Commit: \`$(git rev-parse --short HEAD)\`
           Android versionCode: \`${BUILD}\`
+
+          ${WHATS_NEW}
 
           ## Changes
 

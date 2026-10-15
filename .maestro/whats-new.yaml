@@ -1,0 +1,55 @@
+appId: dev.merope.peace.oss
+---
+# What's new. An install that last saw an OLD version opens on the release
+# notes; dismissing them is for good, and About opens them again. The harness
+# pretends the old version (`peace.whatsnew`) because a flow cannot upgrade.
+# Which entries are listed is `lib/whats-new.test.ts`'s job; this proves the
+# sheet arrives, leaves, stays gone, and is reachable again.
+- launchApp:
+    clearState: true
+    arguments:
+      peace.onboarding: done
+      peace.currency: EGP
+      peace.whatsnew: "1.0.0"
+
+- extendedWaitUntil:
+    visible:
+      id: "whats-new-sheet"
+    timeout: 90000
+# More than one release since 1.0.0, newest first.
+- assertVisible:
+    id: "whats-new-entry-0"
+- assertVisible:
+    id: "whats-new-entry-1"
+- takeScreenshot: 01-whats-new
+- tapOn:
+    id: "whats-new-done"
+- assertNotVisible:
+    id: "whats-new-sheet"
+- assertVisible:
+    id: "home-screen"
+
+# Seen is kept in the ledger: a restart does not bring it back.
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+- assertNotVisible:
+    id: "whats-new-sheet"
+
+# ...and About is the way back to it.
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-about"
+- assertVisible:
+    id: "about-screen"
+- tapOn:
+    id: "about-whats-new"
+- assertVisible:
+    id: "whats-new-entry-0"
+- tapOn:
+    id: "whats-new-done"
+- assertVisible:
+    id: "about-screen"

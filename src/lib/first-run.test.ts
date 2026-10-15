@@ -1,4 +1,11 @@
-import { detectCurrency, firstRunSettings, LAUNCH_CURRENCY, LAUNCH_ONBOARDING, LAUNCH_THEME } from './first-run';
+import {
+  detectCurrency,
+  firstRunSettings,
+  LAUNCH_CURRENCY,
+  LAUNCH_ONBOARDING,
+  LAUNCH_THEME,
+  LAUNCH_WHATS_NEW,
+} from './first-run';
 
 describe('detectCurrency', () => {
   it('takes the first locale that names a currency', () => {
@@ -24,13 +31,21 @@ describe('firstRunSettings', () => {
       onboardingDone: false,
       setupCard: true,
       theme: 'system',
+      whatsNewSeen: '',
     });
+  });
+
+  it('marks the running release as seen, unless a harness asks otherwise', () => {
+    expect(firstRunSettings({}, egypt, '1.31.0').whatsNewSeen).toBe('1.31.0');
+    expect(firstRunSettings({ [LAUNCH_WHATS_NEW]: '1.0.0' }, egypt, '1.31.0').whatsNewSeen).toBe(
+      '1.0.0'
+    );
   });
 
   it('lets a test harness skip onboarding and pin the currency', () => {
     expect(
       firstRunSettings({ [LAUNCH_ONBOARDING]: 'done', [LAUNCH_CURRENCY]: 'jpy' }, egypt)
-    ).toEqual({ homeCurrency: 'JPY', onboardingDone: true, setupCard: false, theme: 'system' });
+    ).toEqual({ homeCurrency: 'JPY', onboardingDone: true, setupCard: false, theme: 'system', whatsNewSeen: '' });
   });
 
   it('lets a harness pin the theme, and ignores one this build does not have', () => {

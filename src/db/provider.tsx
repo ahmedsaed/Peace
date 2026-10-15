@@ -11,6 +11,7 @@ import { sweepOrphans } from './attachments';
 import { forgetHandled } from './repo/bank-captures';
 import { db } from './client';
 import { readLaunchExtras } from '../../modules/launch-extras/src/LaunchExtrasModule';
+import { buildInfo } from '../lib/build-info';
 import { firstRunSettings } from '../lib/first-run';
 import { accounts } from './schema';
 import { seedDefaults } from './seed';
@@ -48,11 +49,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
        * ledger changes nothing.
        */
       if (db.select({ id: accounts.id }).from(accounts).limit(1).all().length === 0) {
-        const first = firstRunSettings(readLaunchExtras(), getLocales());
+        const first = firstRunSettings(readLaunchExtras(), getLocales(), buildInfo.version);
         setSetting('homeCurrency', first.homeCurrency);
         setSetting('onboardingDone', first.onboardingDone);
         setSetting('setupCard', first.setupCard);
         setSetting('theme', first.theme);
+        setSetting('whatsNewSeen', first.whatsNewSeen);
       }
 
       seedDefaults(db, getSetting('homeCurrency'));

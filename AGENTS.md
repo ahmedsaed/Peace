@@ -135,6 +135,14 @@ releases. Every skipped bump makes the one number a person actually reads mean l
 `versionCode` moves on its own with every commit, which is what makes this easy to forget: the
 About screen keeps changing, so nothing ever looks stale.
 
+**A bump that a person would notice gets an entry in `src/constants/whats-new.json`**, in the same
+PR: one to three plain sentences, written for the person holding the phone, never commit-speak.
+That file is the in-app What's new sheet (shown once after an update, and from About), the Play
+release notes (`play-bundle.yml` reads it when the notes input is empty) and the head of the GitHub
+release — one source, so the three cannot disagree. A version with no entry shows no sheet, which
+is right for a fix nobody would see. `whats-new.test.ts` holds the shape, the order, and Play's
+500-character limit, which Play enforces only after the upload has burned its versionCode.
+
 Three ways this breaks:
 
 - **`npm run apk` does not refresh the version.** `versionCode` is baked into
