@@ -603,13 +603,19 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
       testID="setup-ai"
       actions={
         <>
-          <PrimaryButton
-            label={busy ? 'Checking the key…' : 'Save key'}
-            onPress={submit}
-            disabled={draft.trim() === ''}
-            busy={busy}
-            testID="setup-ai-save"
-          />
+          {/* A key already saved IS this step done — like a connected Drive on
+              the backup step. Save only when something has been pasted. */}
+          {hasKey && draft.trim() === '' ? (
+            <PrimaryButton label="Continue" onPress={onDone} testID="setup-ai-continue" />
+          ) : (
+            <PrimaryButton
+              label={busy ? 'Checking the key…' : 'Save key'}
+              onPress={submit}
+              disabled={draft.trim() === ''}
+              busy={busy}
+              testID="setup-ai-save"
+            />
+          )}
           <QuietButton onPress={onSkip} testID="setup-ai-skip" />
         </>
       }>
