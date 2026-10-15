@@ -181,7 +181,7 @@ layout on the screens that use them.
 ## Backlog
 
 - Localisation (string extraction first, then Arabic + RTL)
-- [x] Launcher shortcuts for quick add (1.25): hold the icon for Expense, Income or Receipt — static
+- [x] Launcher shortcuts for quick add (1.25): hold the icon for Expense, Receipt or Penny (Income until 1.27) — static
       shortcuts deep-linking into the record screen with Records anchored beneath. A home-screen
       WIDGET is still open.
 - [x] Accessibility pass (1.25): keypad keys and the `=`/next/save key speak words, the amount is a live
