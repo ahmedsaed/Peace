@@ -1,5 +1,5 @@
 /**
- * Reading a receipt photo into the fields of a record.
+ * Reading a receipt or invoice — a photo, a PDF or text — into the fields of a record.
  *
  * THE MODEL IS A TYPIST, NOT AN ACCOUNTANT. Everything it returns is treated as
  * text somebody typed badly: parsed, range-checked, and dropped if it does not
@@ -99,11 +99,12 @@ export function buildPrompt(categoryNames: string[], guidance = ''): string {
   const list = categoryNames.length > 0 ? categoryNames.join(', ') : 'none';
   const mine = guidance.trim();
   return [
-    'You are reading a photograph of a receipt or invoice for an expense tracker.',
+    'You are reading a receipt or invoice for an expense tracker: a photograph,',
+    'a PDF, or its text.',
     'Return only what you can actually see. Use null for anything unreadable,',
     'missing, or that you would be guessing at — a null is far more useful here',
     'than a plausible invention, because the person will be checking these',
-    'numbers against the paper in their hand.',
+    'numbers against the document in front of them.',
     '',
     FIELD_RULES,
     ...(mine === '' ? [] : ['', "The account holder's own rules, which override the above:", mine]),

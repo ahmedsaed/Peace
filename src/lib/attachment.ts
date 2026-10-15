@@ -40,9 +40,11 @@ const EXTENSIONS: Record<string, string> = {
   'image/heic': 'heic',
   'image/heif': 'heif',
   'application/pdf': 'pdf',
+  // An e-receipt pasted into a note app, an order confirmation saved as text.
+  'text/plain': 'txt',
 };
 
-/** What the document picker offers. Images and PDFs — invoices arrive as both. */
+/** What the document picker offers. Images, PDFs and text — receipts arrive as all three. */
 export const ACCEPTED_MIME = Object.keys(EXTENSIONS);
 
 /**
@@ -108,6 +110,52 @@ export function isImageMime(mime: string): boolean {
 /** Everything else is rendered as a labelled tile rather than a thumbnail. */
 export function isPdfMime(mime: string): boolean {
   return mime === 'application/pdf';
+}
+
+export function isTextMime(mime: string): boolean {
+  return mime === 'text/plain';
+}
+
+/**
+ * Whether "read this" can be offered on a file: a photo, a PDF or text. The
+ * model takes all three, and the read button is shown on exactly these, so a
+ * button that can never work is never drawn.
+ */
+export function isReadableMime(mime: string): boolean {
+  return isImageMime(mime) || isPdfMime(mime) || isTextMime(mime);
+}
+
+/**
+ * How much of a text file goes to the model. A receipt is a few hundred
+ * characters; a file of tens of thousands is not a receipt, and sending all of
+ * it would cost the user's key for nothing.
+ */
+export const MAX_TEXT_CHARS = 20_000;
+
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * A text attachment's bytes, read back as UTF-8 text.
+ *
+ * Text goes to the model as TEXT rather than as an inline file: plain text in
+ * the prompt is the one input every model reads, and it is cut to
+ * `MAX_TEXT_CHARS`. Decoded here, by hand, so it does not depend on which of
+ * `atob` and `Buffer` a given JavaScript engine happens to provide.
+ */
+export function base64ToText(base64: string, maxChars = MAX_TEXT_CHARS): string {
+  const clean = base64.replace(/[^A-Za-z0-9+/]/g, '');
+  const bytes = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let n = 0;
+  for (let i = 0; i < clean.length; i += 4) {
+    const quad = [0, 1, 2, 3].map((k) => BASE64.indexOf(clean[i + k] ?? 'A'));
+    const value = (quad[0] << 18) | (quad[1] << 12) | (quad[2] << 6) | quad[3];
+    const present = Math.min(4, clean.length - i);
+    if (present > 1) bytes[n++] = (value >> 16) & 255;
+    if (present > 2) bytes[n++] = (value >> 8) & 255;
+    if (present > 3) bytes[n++] = value & 255;
+  }
+  const text = new TextDecoder('utf-8').decode(bytes.subarray(0, n)).replace(/^\uFEFF/, '');
+  return text.length > maxChars ? `${text.slice(0, maxChars)}\n[…the rest of the file was left out]` : text;
 }
 
 export function extensionFor(mime: string): string {

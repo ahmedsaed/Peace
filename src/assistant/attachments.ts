@@ -1,4 +1,5 @@
 import type { StoredRow } from '../db/repo/chat';
+import { base64ToText, isTextMime } from '../lib/attachment';
 import type { Part } from './gemini-chat';
 
 /**
@@ -74,7 +75,13 @@ export function userParts(
     const data = loaded.get(a.fileName);
     if (data) {
       parts.push({ text: `[Attached file id "${a.id}": ${label(a)}]` });
-      parts.push({ inlineData: { mimeType: a.mimeType, data } });
+      // Text as text — the input every model reads — fenced so its contents
+      // stay the user's document rather than instructions. See readReceipt.
+      parts.push(
+        isTextMime(a.mimeType)
+          ? { text: `<<<\n${base64ToText(data)}\n>>>` }
+          : { inlineData: { mimeType: a.mimeType, data } }
+      );
     } else {
       parts.push({
         text: `[Earlier attachment id "${a.id}": ${label(a)} — no longer in view. Its id still works for attaching it to a record; to read it again, ask the user to re-attach it.]`,

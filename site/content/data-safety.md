@@ -29,7 +29,7 @@ Google's definitions decide the wording here, not ours:
 | **Financial info › Other financial info** | Yes | No | No | Optional | App functionality | Account and category names in AI requests and backups |
 | **Messages › SMS or MMS** | Yes | No | No | Optional | App functionality | Text of bank SMS from senders the user listed, sent to Gemini to be read. Read from the default SMS app's notifications, never the inbox — but the DATA is SMS, and the form asks about the data |
 | **Photos and videos › Photos** | Yes | No | No | Optional | App functionality | Receipt photos sent to Gemini to be read, and included in Drive backups |
-| **Files and docs** | Yes | No | No | Optional | App functionality | Files attached to a Penny question; the backup file itself |
+| **Files and docs** | Yes | No | No | Optional | App functionality | Files attached to a Penny question; PDF and text receipts sent to Gemini to be read; the backup file itself |
 | **App activity › Other user-generated content** | Yes | No | No | Optional | App functionality | Notes, questions to Penny |
 
 **Not collected** (answer *No* for each): Location, Personal info (name, email, user IDs —

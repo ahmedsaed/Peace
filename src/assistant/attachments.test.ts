@@ -10,7 +10,7 @@ import { applyWrite, prepareWrite } from './tools';
 import { buildLedger, ctxFor, NOW, type Ledger } from './test-ledger';
 
 const file = (n: number, mimeType = 'image/jpeg'): Omit<ChatAttachment, 'id'> => ({
-  fileName: `${String(n).padStart(64, 'a')}.${mimeType === 'application/pdf' ? 'pdf' : 'jpg'}`,
+  fileName: `${String(n).padStart(64, 'a')}.${mimeType === 'application/pdf' ? 'pdf' : mimeType === 'text/plain' ? 'txt' : 'jpg'}`,
   originalName: mimeType === 'application/pdf' ? `invoice-${n}.pdf` : null,
   mimeType,
   byteSize: 1000 + n,
@@ -54,6 +54,15 @@ describe('attaching files to a question', () => {
     const [content] = toContents([row], new Map([[file(1).fileName, 'BASE64']]));
     expect(content.parts[0].text).toContain(`"file${row.seq}-1"`);
     expect(content.parts[1]).toEqual({ inlineData: { mimeType: 'image/jpeg', data: 'BASE64' } });
+  });
+
+  // Text reaches Penny as text, fenced: the prompt tells her what is between
+  // the markers is the document, never instructions.
+  it('hands over a text file as its fenced contents', () => {
+    const row = ask(writer(), 'log this', [file(1, 'text/plain')]);
+    const data = Buffer.from('Order total: 23.40').toString('base64');
+    const [content] = toContents([row], new Map([[file(1, 'text/plain').fileName, data]]));
+    expect(content.parts[1]).toEqual({ text: '<<<\nOrder total: 23.40\n>>>' });
   });
 });
 

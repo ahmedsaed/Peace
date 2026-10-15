@@ -27,7 +27,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { Icon } from '@/components/icon';
 import { useTheme } from '@/state/theme';
 import { attachmentExists, attachmentUri, type StagedAttachment } from '@/db/attachments';
-import { isImageMime, shortName } from '@/lib/attachment';
+import { isImageMime, isReadableMime, shortName } from '@/lib/attachment';
 
 export const PREVIEW_SIZE = 56;
 /**
@@ -87,6 +87,7 @@ const Preview = memo(function Preview({
   const palette = useTheme();
   const missing = !attachmentExists(attachment.fileName);
   const image = isImageMime(attachment.mimeType) && !missing;
+  const readable = isReadableMime(attachment.mimeType) && !missing;
   const label = attachment.originalName ?? 'Receipt';
 
   return (
@@ -138,12 +139,12 @@ const Preview = memo(function Preview({
       {/**
        * "Read this one."
        *
-       * Only on an IMAGE that is actually there — a PDF cannot be photographed
-       * into a total by this path, and a missing file has nothing to read. An
+       * On a photo, a PDF or a text file that is actually there — the three the
+       * model takes (`isReadableMime`). A missing file has nothing to read. An
        * affordance that is present but cannot work is the thing that teaches
        * you to stop trusting the app.
        */}
-      {image && onRead ? (
+      {readable && onRead ? (
         <Pressable
           onPress={onRead}
           disabled={reading}

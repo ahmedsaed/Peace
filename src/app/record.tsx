@@ -850,7 +850,7 @@ export default function RecordScreen() {
       );
 
       if (isEmptyReading(reading)) {
-        setError('Nothing could be read from that photo. Enter it by hand.');
+        setError('Nothing could be read from that file. Enter it by hand.');
         return;
       }
 

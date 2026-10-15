@@ -48,7 +48,8 @@ export function AttachmentViewer({ attachment, onClose }: Props) {
       }
       await Sharing.shareAsync(attachmentUri(attachment.fileName), {
         mimeType: attachment.mimeType,
-        UTI: 'com.adobe.pdf',
+        // iOS only; Android goes by the mime type above.
+        UTI: attachment.mimeType === 'text/plain' ? 'public.plain-text' : 'com.adobe.pdf',
       });
     } catch (e) {
       // Friendly sentence for the user, the real error for whoever fixes it.

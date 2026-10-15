@@ -25,7 +25,7 @@ is off until you do. They are listed below, with exactly what each one sends and
 
 If you add your own **Gemini API key** in Settings, Peace can:
 
-- **Read a receipt** you photograph or pick: the image is sent to Google's Gemini API.
+- **Read a receipt or invoice** you photograph or pick: the photo, PDF or text file is sent to Google's Gemini API.
 - **Read a bank message** (see *Bank notifications* below): the message's text, the names of your
   accounts and categories, and any reading rules you wrote are sent to Gemini.
 - **Answer questions with Penny**, the assistant, which is a separate switch in Settings: your

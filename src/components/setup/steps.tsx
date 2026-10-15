@@ -568,7 +568,7 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
       color={COLOR.ai}
       eyebrow={eyebrow}
       title="Let AI do the typing"
-      body="Photograph a receipt and the amount fills itself in. Bank alerts become records to approve. Ask Penny where the money went. All of it runs on your own Google Gemini key — free to create, and only Google sees what you send."
+      body="Photograph a receipt or pick an invoice, and the amount fills itself in. Bank alerts become records to approve. Ask Penny where the money went. All of it runs on your own Google Gemini key — free to create, and only Google sees what you send."
       testID="setup-ai"
       actions={
         <>
