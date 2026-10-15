@@ -39,14 +39,19 @@ export type Money = (
  */
 export function useMoney(): Money {
   const hidden = useSetting('hideAmounts');
+  return useCallback<Money>((minor, currency, opts) => moneyFor(hidden)(minor, currency, opts), [hidden]);
+}
 
-  return useCallback(
-    (minor: number, currency?: string, opts?: { showSign?: boolean; locale?: string }) => {
-      const formatted = formatMinor(minor, currency, opts);
-      return hidden ? maskFormatted(formatted) : formatted;
-    },
-    [hidden]
-  );
+/**
+ * The same formatter outside a component — the home-screen widget's snapshot,
+ * written as the app leaves the foreground. Same mask, same rule: a figure
+ * that reaches the home screen goes through here or not at all.
+ */
+export function moneyFor(hidden: boolean): Money {
+  return (minor, currency, opts) => {
+    const formatted = formatMinor(minor, currency, opts);
+    return hidden ? maskFormatted(formatted) : formatted;
+  };
 }
 
 /**

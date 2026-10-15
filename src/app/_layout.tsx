@@ -11,6 +11,7 @@ import { BankCatchUp } from '@/state/bank';
 import { DriveCatchUp } from '@/state/drive';
 import { ReminderSchedule } from '@/state/reminders';
 import { ThemeRoot, useTheme } from '@/state/theme';
+import { WidgetSync } from '@/state/widget';
 
 import '@/global.css';
 
@@ -93,6 +94,9 @@ function Shell() {
           when one fires — so every return to the foreground lays the
           window down again. Renders nothing and swallows every failure. */}
       <ReminderSchedule />
+      {/* Writes the home-screen widget's snapshot on launch and whenever the
+          app leaves the foreground. Renders nothing, swallows every failure. */}
+      <WidgetSync />
       <Stack
         screenOptions={{
           headerShown: false,

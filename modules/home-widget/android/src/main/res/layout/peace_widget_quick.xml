@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The quick bar: the three launcher shortcuts, one tap each, no figures. It
+  needs no snapshot to be useful, so it works from the moment it is placed.
+  Colours are Ledger's as the preview; WidgetRenderer sets the real ones.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/peace_widget_round"
+        android:tint="#241F17"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:padding="8dp">
+
+        <FrameLayout
+            android:id="@+id/btn_expense"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:contentDescription="New expense">
+
+            <ImageView
+                android:id="@+id/btn_expense_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/peace_widget_tile"
+                android:tint="#E3A33C"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:id="@+id/btn_expense_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/peace_widget_plus"
+                android:tint="#17140F"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btn_receipt"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_weight="0.7"
+            android:contentDescription="Photograph a receipt">
+
+            <ImageView
+                android:id="@+id/btn_receipt_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/peace_widget_tile"
+                android:tint="#302818"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:id="@+id/btn_receipt_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/peace_widget_camera"
+                android:tint="#EFE4CE"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btn_penny"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_weight="0.7"
+            android:contentDescription="Ask Penny">
+
+            <ImageView
+                android:id="@+id/btn_penny_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/peace_widget_tile"
+                android:tint="#302818"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:id="@+id/btn_penny_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/peace_widget_sparkle"
+                android:tint="#EFE4CE"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

@@ -109,7 +109,7 @@ export function startOfWeek(date: Date, first: Weekday = weekStartDay): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() - back);
 }
 
-const MONTHS = [
+export const MONTHS = [
   'January',
   'February',
   'March',

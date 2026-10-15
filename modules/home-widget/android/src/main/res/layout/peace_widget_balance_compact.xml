@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Balance at one row tall (4×1, its default): the figure on the left, the
+  three quick buttons as round icons on the right. Taller than that it
+  switches to peace_widget_balance (WidgetRenderer chooses by real height).
+
+  Every id WidgetRenderer paints exists here, even the ones this size does not
+  show (btn_expense_label): RemoteViews fails the WHOLE widget when an action
+  names a view the layout does not have.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/peace_widget_round"
+        android:tint="#241F17"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="18dp"
+        android:paddingEnd="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/month"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.12"
+                android:maxLines="1"
+                android:text="OCTOBER · NOW"
+                android:textAllCaps="true"
+                android:textColor="#9A8E79"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="$4,110.00"
+                android:textColor="#9CC46A"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/btn_expense"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="New expense">
+
+            <ImageView
+                android:id="@+id/btn_expense_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/peace_widget_dot"
+                android:tint="#E3A33C"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:id="@+id/btn_expense_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/peace_widget_plus"
+                android:tint="#17140F"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:id="@+id/btn_expense_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btn_receipt"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:contentDescription="Photograph a receipt">
+
+            <ImageView
+                android:id="@+id/btn_receipt_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/peace_widget_dot"
+                android:tint="#302818"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:id="@+id/btn_receipt_icon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:src="@drawable/peace_widget_camera"
+                android:tint="#EFE4CE"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btn_penny"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:contentDescription="Ask Penny">
+
+            <ImageView
+                android:id="@+id/btn_penny_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/peace_widget_dot"
+                android:tint="#302818"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:id="@+id/btn_penny_icon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:src="@drawable/peace_widget_sparkle"
+                android:tint="#EFE4CE"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

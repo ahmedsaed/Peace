@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  updatePeriodMillis is 0: nothing here needs polling. The app writes a fresh
+  snapshot whenever it leaves the foreground, and WidgetRenderer sets one
+  inexact alarm for the next thing that changes on its own — local midnight
+  (days left) or the end of the month (the snapshot going stale). Resizing
+  redraws it: the Balance widget counts how many accounts fit in its real size.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/peace_widget_balance_description"
+    android:initialLayout="@layout/peace_widget_balance_compact"
+    android:minWidth="250dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="40dp"
+    android:previewLayout="@layout/peace_widget_balance_compact"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

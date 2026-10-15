@@ -119,13 +119,21 @@ export function listBudgets(
 
     if (limit) {
       budgeted.push(row);
-      if (stale) staleCount++;
-      else totalBudgetMinor += limit.amountMinor;
       // Spend counts towards the total only for categories being watched.
       // Adding every category's spend would make "TOTAL SPENT" the month's
       // whole expense figure, which the records screen already shows and which
       // says nothing about how the budget is doing.
-      totalSpentMinor += spentMinor;
+      //
+      // A set-aside limit is not being watched either, so it leaves the total
+      // on BOTH sides. Its spending used to stay in: one $2,000 limit beside
+      // five from the old currency read "$2,074 of $2,000, over" while that
+      // one category had spent $1,600.
+      if (stale) {
+        staleCount++;
+      } else {
+        totalBudgetMinor += limit.amountMinor;
+        totalSpentMinor += spentMinor;
+      }
     } else {
       unbudgeted.push(row);
     }

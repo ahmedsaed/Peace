@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Budget: the month, what is spent against its budget with a bar, what is
+  left and for how long, and the quick bar. With nothing budgeted it says so
+  (WidgetRenderer) rather than turning into the Balance widget.
+
+  Every colour here is Ledger's, and every text a sample: this layout is also
+  the widget picker's preview on Android 12+. WidgetRenderer overwrites all of
+  them from the app's snapshot before anything is drawn on a home screen.
+  Backgrounds and icons are WHITE and tinted with setColorFilter, the one
+  colour call RemoteViews allows on every Android version this app supports.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/peace_widget_round"
+        android:tint="#241F17"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/month"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:letterSpacing="0.12"
+                android:maxLines="1"
+                android:text="OCTOBER"
+                android:textAllCaps="true"
+                android:textColor="#9A8E79"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <!-- "Peace" in Pacifico, pre-drawn white and tinted: launchers do not
+                 reliably load an app's fonts into a widget's TextView. Drawn by
+                 `magick label:` from the same font the app's wordmark uses. -->
+            <ImageView
+                android:id="@+id/wordmark"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="Peace"
+                android:scaleType="fitEnd"
+                android:src="@drawable/peace_widget_wordmark"
+                android:tint="#E3A33C" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <LinearLayout
+                android:id="@+id/figures"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="true"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/amount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:text="$690.00"
+                        android:textColor="#E5806A"
+                        android:textSize="24sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/beside"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="of $1,200.00 budget"
+                        android:textColor="#9A8E79"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:id="@+id/bar_holder"
+                    android:layout_width="match_parent"
+                    android:layout_height="6dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="6dp">
+
+                    <!-- Android 12+: tinted per theme, and per day/night on Match phone. -->
+                    <ProgressBar
+                        android:id="@+id/bar"
+                        style="@android:style/Widget.Material.ProgressBar.Horizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="6dp"
+                        android:max="1000"
+                        android:minHeight="6dp"
+                        android:maxHeight="6dp"
+                        android:progress="575"
+                        android:progressBackgroundTint="#302818"
+                        android:progressTint="#E3A33C" />
+
+                    <!-- Older Android cannot tint a ProgressBar remotely: a drawn bitmap. -->
+                    <ImageView
+                        android:id="@+id/bar_image"
+                        android:layout_width="match_parent"
+                        android:layout_height="6dp"
+                        android:scaleType="fitXY"
+                        android:visibility="gone"
+                        android:importantForAccessibility="no" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/foot"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="$510.00 left · 16 days to go"
+                    android:textColor="#9A8E79"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/notice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/notice_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/peace_widget_lock"
+                    android:tint="#B3A792"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/notice_text"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:maxLines="2"
+                    android:text="Peace is locked. Open it to see this month."
+                    android:textColor="#B3A792"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:orientation="horizontal">
+
+            <FrameLayout
+                android:id="@+id/btn_expense"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:contentDescription="New expense">
+
+                <ImageView
+                    android:id="@+id/btn_expense_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/peace_widget_pill"
+                    android:tint="#E3A33C"
+                    android:importantForAccessibility="no" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/btn_expense_icon"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/peace_widget_plus"
+                        android:tint="#17140F"
+                        android:importantForAccessibility="no" />
+
+                    <TextView
+                        android:id="@+id/btn_expense_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Expense"
+                        android:textColor="#17140F"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_receipt"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Photograph a receipt">
+
+                <ImageView
+                    android:id="@+id/btn_receipt_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/peace_widget_pill"
+                    android:tint="#302818"
+                    android:importantForAccessibility="no" />
+
+                <ImageView
+                    android:id="@+id/btn_receipt_icon"
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/peace_widget_camera"
+                    android:tint="#EFE4CE"
+                    android:importantForAccessibility="no" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_penny"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Ask Penny">
+
+                <ImageView
+                    android:id="@+id/btn_penny_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/peace_widget_pill"
+                    android:tint="#302818"
+                    android:importantForAccessibility="no" />
+
+                <ImageView
+                    android:id="@+id/btn_penny_icon"
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/peace_widget_sparkle"
+                    android:tint="#EFE4CE"
+                    android:importantForAccessibility="no" />
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

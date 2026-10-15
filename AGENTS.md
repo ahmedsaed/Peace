@@ -990,6 +990,25 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   built. The root layout's `anchor: '(drawer)'` is what puts Records under a linked screen; without
   it Save and Back close the app. Test one with `adb shell am start -a android.intent.action.VIEW -d
   "peace://record?startAs=income" -n dev.merope.peace.oss/.MainActivity`.
+- **The home-screen widgets (Budget, Balance, Quick add) draw a SNAPSHOT; they never read the ledger.** Android renders them in
+  the launcher with no JavaScript running, so `src/state/widget.ts` writes ready-made, already
+  masked text (`src/lib/widget.ts`, tested) whenever the app goes to the background — every ledger
+  change happens in the app, so leaving it is when there is something new to show. The native side
+  (`modules/home-widget`) only answers what changes while the app is closed: the month ending
+  (then it shows "Open Peace to update", never last month's figures as this month's) and the days
+  left, redrawn by one inexact alarm at local midnight. App lock on = no figures at all. Colours are
+  white drawables tinted with `setColorFilter`; on Match phone Android 12+ gets both palettes
+  (`setColorInt`) and flips with dark mode by itself. Custom fonts do not load reliably in a
+  widget, so the wordmark is a pre-drawn white PNG. **Only RemoteViews' allowed classes inflate**:
+  a plain `<View>` spacer made the whole Balance widget "Can't load widget" — use a FrameLayout,
+  and check `adb logcat | grep AppWidgetHostView` when one will not load. The Balance widget is
+  drawn per id and picks its layout from that widget's own height: one row tall is
+  `peace_widget_balance_compact`, taller is the full layout with as many accounts as fit. A
+  compact layout must still contain every id the renderer paints (a hidden one will do), or
+  RemoteViews fails the whole widget. **A FORCE-STOPPED app's widgets show a grey
+  placeholder after a theme or dark-mode change** until it is opened — Android, not a bug; do not
+  force-stop when checking one. Place one on the emulator by long-pressing the home screen ›
+  Widgets › search "Peace".
 - **A glyph is not a label.** TalkBack reads `÷` as "division sign", `✓` as "check mark" and a colour
   swatch as just "button", so anything drawn as a symbol carries an `accessibilityLabel` in words
   (`flowKeySpoken`, `OP_SPOKEN`, `SWATCH_NAMES`). A row that reads as one fact — a category, its

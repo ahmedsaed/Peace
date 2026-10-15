@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Balance at two rows and taller: the running position (the Records header's
+  third cell) and the month's two sides, the quick bar right under them, and
+  the accounts filling the height that is left — as many as fit, counted by
+  WidgetRenderer from the widget's real size. One row tall it is
+  peace_widget_balance_compact instead.
+
+  Colours are Ledger's and the text a sample: this is also the picker preview.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/peace_widget_round"
+        android:tint="#241F17"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/month"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:letterSpacing="0.12"
+                android:maxLines="1"
+                android:text="OCTOBER"
+                android:textAllCaps="true"
+                android:textColor="#9A8E79"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/wordmark"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="Peace"
+                android:scaleType="fitEnd"
+                android:src="@drawable/peace_widget_wordmark"
+                android:tint="#E3A33C" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/figures"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:baselineAligned="true"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="$4,110.00"
+                    android:textColor="#9CC46A"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/beside"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="now"
+                    android:textColor="#9A8E79"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/foot"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Spent $690.00 · earned $4,800.00"
+                android:textColor="#9A8E79"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/notice_icon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/peace_widget_lock"
+                android:tint="#B3A792"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:id="@+id/notice_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:maxLines="2"
+                android:text="Peace is locked. Open it to see this month."
+                android:textColor="#B3A792"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Takes the height left when no accounts are shown, so the quick
+             bar sits at the foot as it does on the Budget widget. A FrameLayout,
+             because a plain View is not on RemoteViews' allowed list: the whole
+             widget fails with "Can't load widget" over one spacer. -->
+        <FrameLayout
+            android:id="@+id/spacer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <FrameLayout
+                android:id="@+id/btn_expense"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:contentDescription="New expense">
+
+                <ImageView
+                    android:id="@+id/btn_expense_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/peace_widget_pill"
+                    android:tint="#E3A33C"
+                    android:importantForAccessibility="no" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/btn_expense_icon"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/peace_widget_plus"
+                        android:tint="#17140F"
+                        android:importantForAccessibility="no" />
+
+                    <TextView
+                        android:id="@+id/btn_expense_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Expense"
+                        android:textColor="#17140F"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_receipt"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Photograph a receipt">
+
+                <ImageView
+                    android:id="@+id/btn_receipt_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/peace_widget_pill"
+                    android:tint="#302818"
+                    android:importantForAccessibility="no" />
+
+                <ImageView
+                    android:id="@+id/btn_receipt_icon"
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/peace_widget_camera"
+                    android:tint="#EFE4CE"
+                    android:importantForAccessibility="no" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_penny"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Ask Penny">
+
+                <ImageView
+                    android:id="@+id/btn_penny_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/peace_widget_pill"
+                    android:tint="#302818"
+                    android:importantForAccessibility="no" />
+
+                <ImageView
+                    android:id="@+id/btn_penny_icon"
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/peace_widget_sparkle"
+                    android:tint="#EFE4CE"
+                    android:importantForAccessibility="no" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Up to six accounts, then "and N more". Each visible row takes an
+             equal share of the height, so a few accounts spread down the card
+             rather than leaving the foot of it empty. Fixed rows, each with ids
+             of its own so RemoteViews can address it, rather than a collection
+             widget: six is all a home screen holds, and a RemoteViewsService
+             would be a second component to keep alive for a short list. -->
+        <LinearLayout
+            android:id="@+id/accounts"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/acc_1"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/acc_1_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:src="@drawable/peace_widget_dot"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/acc_1_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#EFE4CE"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/acc_1_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:maxLines="1"
+                    android:textColor="#9CC46A"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/acc_2"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/acc_2_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:src="@drawable/peace_widget_dot"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/acc_2_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#EFE4CE"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/acc_2_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:maxLines="1"
+                    android:textColor="#9CC46A"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/acc_3"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/acc_3_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:src="@drawable/peace_widget_dot"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/acc_3_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#EFE4CE"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/acc_3_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:maxLines="1"
+                    android:textColor="#9CC46A"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/acc_4"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/acc_4_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:src="@drawable/peace_widget_dot"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/acc_4_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#EFE4CE"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/acc_4_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:maxLines="1"
+                    android:textColor="#9CC46A"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/acc_5"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/acc_5_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:src="@drawable/peace_widget_dot"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/acc_5_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#EFE4CE"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/acc_5_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:maxLines="1"
+                    android:textColor="#9CC46A"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/acc_6"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="22dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/acc_6_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:src="@drawable/peace_widget_dot"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/acc_6_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#EFE4CE"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/acc_6_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:maxLines="1"
+                    android:textColor="#9CC46A"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/acc_more"
+                android:layout_width="match_parent"
+                android:layout_height="16dp"
+                android:gravity="center_vertical"
+                android:maxLines="1"
+                android:textColor="#9A8E79"
+                android:textSize="11sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
