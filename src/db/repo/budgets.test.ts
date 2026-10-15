@@ -263,6 +263,24 @@ describe('the summary', () => {
     expect(summary.budgeted[0].stale).toBe(true);
     expect(summary.budgeted[0].budgetMinor).toBe(0);
   });
+
+  // The total's two sides cover the same categories: a set-aside limit takes
+  // its spending out with it, or the budget reads as overspent by money that
+  // was never measured against it.
+  it('leaves a set-aside limit out of the spent total too', () => {
+    setBudget(db, 'food', '2026-08', 300_000, 'EGP');
+    createRecord(db, {
+      accountId: 'usd',
+      categoryId: 'food',
+      type: 'expense',
+      amountMinor: 4_000,
+      homeCurrency: 'USD',
+      occurredAt: on(2026, 8, 7),
+    });
+    const summary = listBudgets(db, '2026-08', 'USD');
+    expect(summary.budgeted[0].spentMinor).toBe(4_000);
+    expect(summary.totalSpentMinor).toBe(0);
+  });
 });
 
 describe('setting a limit', () => {
