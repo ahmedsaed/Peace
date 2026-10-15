@@ -1016,6 +1016,13 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   `useMoney` like the figures it describes. Large text is checked with `adb shell settings put
   system font_scale 2.0` (and reset to `1.0` after): `densityForHeight` takes the font scale, and
   text sharing a fixed row (tab labels, keypad digits) caps its growth with `maxFontSizeMultiplier`.
+- **On a tablet or an unfolded foldable the app ROTATES, whatever the manifest says.** Android 16
+  ignores the portrait lock on screens 600dp and wider for apps targeting SDK 36. The root layout
+  centres everything in a column at most `CONTENT_MAX_WIDTH` (640dp) wide with the ground at the
+  sides, and `SheetPanel` caps sheets the same way, because each is its own window. Phones are
+  narrower than the cap and see no change. Check with `adb shell wm size 1600x2560`,
+  `wm density 320`, `wm user-rotation lock 1` — and `wm size reset`, `wm density reset`,
+  `wm user-rotation free` afterwards.
 - **Every change that ships bumps `version` in `app.json`** — patch for a fix, minor for a
   feature, in the same PR that does the work. See **Versioning** above for why the release tag
   makes this load-bearing rather than tidy.

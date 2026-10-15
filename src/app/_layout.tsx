@@ -2,11 +2,13 @@ import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLockGate } from '@/components/app-lock';
 import { DatabaseProvider } from '@/db/provider';
+import { CONTENT_MAX_WIDTH } from '@/lib/layout';
 import { BankCatchUp } from '@/state/bank';
 import { DriveCatchUp } from '@/state/drive';
 import { ReminderSchedule } from '@/state/reminders';
@@ -97,6 +99,14 @@ function Shell() {
       {/* Writes the home-screen widget's snapshot on launch and whenever the
           app leaves the foreground. Renders nothing, swallows every failure. */}
       <WidgetSync />
+      {/* A column, centred, no wider than a large phone. Peace is laid out for
+          one hand; on a tablet or an unfolded phone — where Android 16 ignores
+          the portrait lock — a keypad key 300dp wide and a row with its amount
+          a hand's width from its name are harder to use, not easier. The
+          ground fills the sides. Bottom sheets cap themselves the same way
+          (SheetPanel), because each is its own window. */}
+      <View style={{ flex: 1, alignItems: 'center', backgroundColor: palette.ground }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: CONTENT_MAX_WIDTH }}>
       <Stack
         screenOptions={{
           headerShown: false,
@@ -124,6 +134,8 @@ function Shell() {
         <Stack.Screen name="about" />
         <Stack.Screen name="assistant" />
       </Stack>
+      </View>
+      </View>
       {/* After the navigator, so it covers every screen without being
           one of them — locking never unmounts a half-typed record. Off
           unless switched on in Settings › App lock. */}
