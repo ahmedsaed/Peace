@@ -46,7 +46,7 @@ EVERY ACCOUNT, ADDING UP
 
 LET AI DO THE TYPING (OPTIONAL)
 With your own Google Gemini API key — free to create — Peace can:
-• Read a photographed receipt and fill in the amount.
+• Read a receipt or invoice — a photo, a PDF or a text file — and fill in the amount.
 • Turn bank notifications into records for you to approve.
 • Answer questions about your spending with Penny, the assistant, using figures from your own ledger.
 Only Google sees what you send, and only once you add a key. Everything else works without one.

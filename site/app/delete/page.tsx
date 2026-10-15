@@ -58,7 +58,7 @@ export default function DeleteData() {
 
         <h2>3. With Google Gemini (only if you added your own API key)</h2>
         <p>
-          Receipt photos, bank messages and questions to Penny are sent straight from your phone to Google, using
+          Receipts and invoices you ask to have read, bank messages and questions to Penny are sent straight from your phone to Google, using
           your own key. They never pass through us, so we cannot see or delete them.
         </p>
         <ul>

@@ -163,8 +163,8 @@ export default function SettingsIndex() {
           <SectionLink
             emblem="camera"
             color={SECTIONS.ai.color}
-            title="Receipts"
-            summary={!ai ? blockedLabel : aiState.receipts ? 'Read when you photograph one on a record' : 'Off'}
+            title="Receipts & invoices"
+            summary={!ai ? blockedLabel : aiState.receipts ? 'Photos, PDFs and text files, read into a record' : 'Off'}
             onPress={go('/settings/ai/receipts')}
             testID="settings-ai-receipts"
             dim={!ai}

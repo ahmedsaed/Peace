@@ -7,8 +7,11 @@ import {
   assertWithinLimit,
   attachmentFileName,
   extensionFor,
+  base64ToText,
   isImageMime,
   isPdfMime,
+  isReadableMime,
+  isTextMime,
   shortName,
 } from './attachment';
 
@@ -59,6 +62,51 @@ describe('telling the kinds apart', () => {
     expect(isImageMime('image/jpeg')).toBe(true);
     expect(isImageMime('application/pdf')).toBe(false);
     expect(isPdfMime('application/pdf')).toBe(true);
+  });
+
+  // The read button is drawn on exactly these, so it never sits on a file the
+  // model cannot take.
+  it('can read photos, PDFs and text, and nothing else', () => {
+    expect(isReadableMime('image/heic')).toBe(true);
+    expect(isReadableMime('application/pdf')).toBe(true);
+    expect(isReadableMime('text/plain')).toBe(true);
+    expect(isReadableMime('application/zip')).toBe(false);
+    expect(isTextMime('text/plain')).toBe(true);
+  });
+
+  it('stores a text file as .txt, and the picker offers it', () => {
+    expect(extensionFor('text/plain')).toBe('txt');
+    expect(ACCEPTED_MIME).toContain('text/plain');
+  });
+});
+
+describe('reading a text file back', () => {
+  const encode = (text: string) => Buffer.from(text, 'utf8').toString('base64');
+
+  // Every padding length, and characters outside ASCII: an e-receipt says
+  // "Café" and "€", and a decoder that only handles ASCII mangles exactly the
+  // shop name the reading is for.
+  it.each(['', 'a', 'ab', 'abc', 'Café Nero — total €4.50', 'سعر ١٢٫٥٠', 'line one\r\nline two'])(
+    'round-trips %j',
+    (text) => {
+      expect(base64ToText(encode(text))).toBe(text);
+    }
+  );
+
+  it('drops a byte-order mark, which would otherwise lead the text', () => {
+    expect(base64ToText(encode('\uFEFFTotal 12.00'))).toBe('Total 12.00');
+  });
+
+  it('cuts a long file and says it did', () => {
+    const out = base64ToText(encode('x'.repeat(50)), 10);
+    expect(out.startsWith('x'.repeat(10))).toBe(true);
+    expect(out).toContain('left out');
+    expect(out).not.toContain('x'.repeat(11));
+  });
+
+  it('ignores line breaks in the base64 itself', () => {
+    const wrapped = encode('Total due 64.80').replace(/(.{8})/g, '$1\n');
+    expect(base64ToText(wrapped)).toBe('Total due 64.80');
   });
 });
 

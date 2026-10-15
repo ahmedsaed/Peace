@@ -240,6 +240,28 @@ describe('reading a receipt end to end', () => {
     expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('super-secret');
   });
 
+  // What reaches the model, per format: a PDF as an inline file the model reads
+  // itself; a text file as TEXT, fenced, after the instructions.
+  const sentParts = (fetchImpl: jest.Mock) =>
+    JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string).contents[0].parts;
+
+  it('sends a PDF as a file', async () => {
+    const fetchImpl = ok(reply(READING));
+    await readReceipt('key', 'gemini-flash-latest', 'UERGLTEuNw==', 'application/pdf', { fetchImpl });
+    expect(sentParts(fetchImpl)[1]).toEqual({ inline_data: { mime_type: 'application/pdf', data: 'UERGLTEuNw==' } });
+  });
+
+  it('sends a text file as fenced text, decoded', async () => {
+    const fetchImpl = ok(reply(READING));
+    const text = 'Café Nero\nTOTAL USD 4.50';
+    await readReceipt('key', 'gemini-flash-latest', Buffer.from(text).toString('base64'), 'text/plain', { fetchImpl });
+    const parts = sentParts(fetchImpl);
+    expect(parts[1].inline_data).toBeUndefined();
+    expect(parts[1].text).toContain(`<<<\n${text}\n>>>`);
+    // After the instructions, so the document can never come first and pose as them.
+    expect(parts[0].text).toMatch(/receipt or invoice/);
+  });
+
   it('refuses to call at all with no key', async () => {
     const fetchImpl = ok(reply(READING));
     await expect(

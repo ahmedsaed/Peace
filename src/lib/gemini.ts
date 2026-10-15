@@ -18,6 +18,7 @@
  * copied into every backup. See `secrets.ts`.
  */
 
+import { base64ToText, isTextMime } from './attachment';
 import { buildPrompt, parseReading, ReceiptError, RESPONSE_SCHEMA, type ReadReceipt } from './receipt';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -682,10 +683,18 @@ async function generateJson(
   return extractJson(body);
 }
 
+/**
+ * Read a receipt or invoice: a photo, a PDF, or a text file.
+ *
+ * Photos and PDFs go as inline files, which the model reads directly. TEXT goes
+ * as text, fenced, after the instructions: it is the one input every model
+ * reads, and a fence is what keeps a line in somebody's e-receipt from being
+ * taken as an instruction rather than as the document.
+ */
 export async function readReceipt(
   apiKey: string,
   model: string,
-  base64Image: string,
+  base64: string,
   mimeType: string,
   {
     timeoutMs = READ_TIMEOUT_MS,
@@ -700,7 +709,9 @@ export async function readReceipt(
     model,
     [
       { text: buildPrompt(categoryNames, guidance.trim() || undefined) },
-      { inline_data: { mime_type: mimeType, data: base64Image } },
+      isTextMime(mimeType)
+        ? { text: `The document, as plain text, between the markers:\n<<<\n${base64ToText(base64)}\n>>>` }
+        : { inline_data: { mime_type: mimeType, data: base64 } },
     ],
     RESPONSE_SCHEMA,
     { timeoutMs, fetchImpl, label: 'receipt read' }

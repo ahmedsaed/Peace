@@ -1,0 +1,7 @@
+file 'seg-intro.mp4'
+file 'seg-scene-1-one-handed.mp4'
+file 'seg-scene-2-bank.mp4'
+file 'seg-scene-3-invoice.mp4'
+file 'seg-scene-4-penny.mp4'
+file 'seg-scene-5-widgets.mp4'
+file 'seg-outro.mp4'

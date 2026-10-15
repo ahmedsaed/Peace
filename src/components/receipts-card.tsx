@@ -1,5 +1,6 @@
 /**
- * Reading receipts — everything except the key, which is shared.
+ * Reading receipts and invoices — photos, PDFs and text files — everything
+ * except the key, which is shared.
  *
  * Shaped like Penny's card on purpose: the switch sits beside the sentence
  * saying what the feature does, and nothing else is shown while it is off. A
@@ -28,8 +29,8 @@ export function ReceiptsCard() {
       <View className="flex-row items-center gap-3">
         <View className="flex-1">
           <Text className="text-[15px] leading-6 text-ink">
-            Photograph a receipt on the record screen and tap the sparkle to fill in the amount, date
-            and shop.
+            Attach a receipt or invoice to a record — a photo, a PDF or a text file — and tap the
+            sparkle to fill in the amount, date and shop.
           </Text>
         </View>
         <Switch
@@ -37,7 +38,7 @@ export function ReceiptsCard() {
           onValueChange={(next) => update('receiptsEnabled', next)}
           disabled={!ai.ready}
           testID="receipts-enabled"
-          accessibilityLabel="Read receipts"
+          accessibilityLabel="Read receipts and invoices"
           {...switchColors}
         />
       </View>
@@ -47,7 +48,7 @@ export function ReceiptsCard() {
         <View className="mt-4">
           <PromptEditor
             label="Your rules"
-            hint="Anything about your own receipts the model could not work out — a shop it keeps misreading, a charge that should not count. Most people need none."
+            hint="Anything about your own receipts and invoices the model could not work out — a shop it keeps misreading, a charge that should not count. Most people need none."
             example={'Leave out the service charge on restaurant bills.\nReceipts from "AMZN Mktp" are Amazon.'}
             value={settings.receiptGuidance}
             onChange={(next) => update('receiptGuidance', next)}
@@ -56,7 +57,7 @@ export function ReceiptsCard() {
         </View>
       ) : ai.ready ? (
         <Text className="mt-3 text-xs leading-5 text-muted" testID="receipts-off">
-          Off: photos still attach to records, with no reading button on them.
+          Off: files still attach to records, with no reading button on them.
         </Text>
       ) : null}
     </View>

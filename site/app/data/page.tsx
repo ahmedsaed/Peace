@@ -20,7 +20,7 @@ const CONNECTIONS = [
   {
     to: 'Google Gemini',
     host: 'generativelanguage.googleapis.com',
-    what: 'A receipt photo you ask to have read; the text of a bank message from a sender you listed; a question to Penny, with the parts of your ledger it looks up to answer.',
+    what: 'A receipt or invoice you ask to have read — a photo, a PDF or a text file; the text of a bank message from a sender you listed; a question to Penny, with the parts of your ledger it looks up to answer.',
     when: 'Only after you add your own Gemini API key. Penny has its own switch on top of that.',
   },
   {

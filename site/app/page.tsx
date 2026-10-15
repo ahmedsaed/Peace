@@ -174,7 +174,7 @@ export default function Home() {
             flip
           >
             <ul>
-              <li>Photograph a receipt and have the shop, total and basket read into the form.</li>
+              <li>Read a receipt or invoice into the form — a photo, a PDF or a text file: the shop, total and basket.</li>
               <li>Bank notifications offered as records to approve — never written behind your back.</li>
               <li>Cash out of an ATM is recognised as a transfer, so it is not counted twice.</li>
               <li>
