@@ -10,12 +10,22 @@ const nothing: SetupFacts = {
 
 describe('setup progress', () => {
   it('starts with every step remaining', () => {
-    expect(setupProgress(nothing)).toEqual({ done: 0, total: 7, remaining: [...SETUP_STEPS] });
+    expect(setupProgress(nothing)).toEqual({
+      done: 1,
+      total: 8,
+      remaining: SETUP_STEPS.filter((s) => s !== 'theme'),
+    });
   });
 
   it('counts a feature switched on elsewhere as set up', () => {
     const facts = { ...nothing, remindersOn: true, hasKey: true, bankReady: true, driveConnected: true };
     expect(setupProgress(facts).remaining).toEqual(['currency', 'accounts', 'keypad']);
+  });
+
+  // The app always has a theme, so the Records card never offers this step.
+  it('never counts the theme as left to do', () => {
+    expect(stepDone('theme', nothing)).toBe(true);
+    expect(setupProgress(nothing).remaining).not.toContain('theme');
   });
 
   it('needs the steps with no state of their own to be finished on purpose', () => {
@@ -30,8 +40,8 @@ describe('setup progress', () => {
 
   it('is complete when every step is done', () => {
     expect(setupProgress({ ...nothing, done: [...SETUP_STEPS] })).toEqual({
-      done: 7,
-      total: 7,
+      done: 8,
+      total: 8,
       remaining: [],
     });
   });

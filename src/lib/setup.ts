@@ -9,6 +9,7 @@ export const SETUP_STEPS = [
   'currency',
   'accounts',
   'keypad',
+  'theme',
   'reminder',
   'ai',
   'bank',
@@ -26,6 +27,7 @@ export const STEP_LABELS: Record<SetupStep, string> = {
   currency: 'Currency',
   accounts: 'Accounts',
   keypad: 'Keypad',
+  theme: 'Theme',
   reminder: 'Reminder',
   ai: 'AI key',
   bank: 'Bank messages',
@@ -54,6 +56,12 @@ export type SetupFacts = {
 export function stepDone(step: SetupStep, facts: SetupFacts): boolean {
   if (facts.done.includes(step)) return true;
   switch (step) {
+    // Never left undone: the app always HAS a theme — Match phone, unless one
+    // was chosen — so there is nothing for the Records card to keep offering.
+    // Setup shows the step so a new install can choose by looking; skipping it
+    // is a choice too.
+    case 'theme':
+      return true;
     case 'reminder':
       return facts.remindersOn;
     case 'ai':

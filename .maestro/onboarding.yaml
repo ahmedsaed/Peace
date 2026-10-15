@@ -70,15 +70,36 @@ tags:
 - tapOn:
     id: "setup-keypad-confirm"
 
+# --- theme: chosen by looking, and applied at once ---
+- assertVisible:
+    id: "setup-theme"
+- assertVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-system"
+- scrollUntilVisible:
+    element:
+      id: "theme-option-graphite"
+    direction: DOWN
+- tapOn:
+    id: "theme-option-graphite"
+- assertVisible:
+    id: "theme-selected"
+    childOf:
+      id: "theme-option-graphite"
+- takeScreenshot: 05-theme
+- tapOn:
+    id: "setup-theme-confirm"
+
 # --- the optional features, each left for later ---
 - assertVisible:
     id: "setup-reminder"
-- takeScreenshot: 05-reminder
+- takeScreenshot: 06-reminder
 - tapOn:
     id: "setup-reminder-skip"
 - assertVisible:
     id: "setup-ai"
-- takeScreenshot: 06-ai
+- takeScreenshot: 07-ai
 - tapOn:
     id: "setup-ai-skip"
 # Play's prominent disclosure: it must be on screen BEFORE anything asks
@@ -86,12 +107,12 @@ tags:
 - assertVisible:
     id: "setup-bank-disclosure"
 - assertVisible: "What Peace can see"
-- takeScreenshot: 07-bank
+- takeScreenshot: 08-bank
 - tapOn:
     id: "setup-bank-skip"
 - assertVisible:
     id: "setup-backup"
-- takeScreenshot: 08-backup
+- takeScreenshot: 09-backup
 - tapOn:
     id: "setup-backup-skip"
 
@@ -104,7 +125,7 @@ tags:
 - assertVisible:
     id: "setup-summary-reminder"
     text: "Later"
-- takeScreenshot: 09-done
+- takeScreenshot: 10-done
 - tapOn:
     id: "setup-finish"
 
@@ -113,10 +134,10 @@ tags:
     id: "home-screen"
 - assertVisible:
     id: "setup-card-count"
-    text: "3 of 7"
+    text: "4 of 8"
 - assertVisible:
     id: "setup-card-bank"
-- takeScreenshot: 10-records-card
+- takeScreenshot: 11-records-card
 
 # A chip opens that one step on its own, and closing it comes back.
 - tapOn:
@@ -150,6 +171,16 @@ tags:
       id: "key-3"
 - tapOn:
     id: "record-cancel"
+
+# ...and the theme is the one that was picked, said by Settings.
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- assertVisible:
+    id: "settings-section-appearance-summary"
+    text: "Graphite"
+- back
 
 # Dismissing the card is for good.
 - tapOn:

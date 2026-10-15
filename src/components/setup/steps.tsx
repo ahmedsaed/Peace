@@ -16,6 +16,7 @@ import {
   SecondaryButton,
   StepFrame,
 } from '@/components/setup/frame';
+import { ThemeChooser } from '@/components/theme-chooser';
 import { Wordmark } from '@/components/wordmark';
 import { SECTIONS } from '@/constants/sections';
 import { openListenerSettings, setCapturing } from '@/db/bank-inbox';
@@ -42,6 +43,7 @@ const COLOR: Record<SetupStep | 'done', string> = {
   currency: SECTIONS.money.color,
   accounts: SECTIONS.accounts.color,
   keypad: SECTIONS.keypad.color,
+  theme: SECTIONS.appearance.color,
   reminder: SECTIONS.reminder.color,
   ai: SECTIONS.ai.color,
   bank: SECTIONS.bank.color,
@@ -50,7 +52,7 @@ const COLOR: Record<SetupStep | 'done', string> = {
 };
 
 export type StepProps = {
-  /** "Step 2 of 7" in the full flow; absent when opened on its own. */
+  /** "Step 2 of 8" in the full flow; absent when opened on its own. */
   eyebrow?: string;
   /** Finished on purpose — recorded, then the next step. */
   onDone: () => void;
@@ -431,6 +433,35 @@ export function KeypadStep({ eyebrow, onDone, onSkip }: StepProps) {
           </Pressable>
         ))}
       </View>
+    </StepFrame>
+  );
+}
+
+// ------------------------------------------------------------------ theme --
+
+/**
+ * Pick a theme by looking at it — the same miniatures as Settings › Appearance.
+ *
+ * Match phone is already selected (a fresh install writes `system`), so
+ * Continue without a tap keeps it. A choice applies AT ONCE: the rest of setup
+ * is drawn in it, which is the quickest way to know it was the right one.
+ */
+export function ThemeStep({ eyebrow, onDone, onSkip }: StepProps) {
+  return (
+    <StepFrame
+      emblem={SECTIONS.appearance.emblem}
+      color={COLOR.theme}
+      eyebrow={eyebrow}
+      title="How should Peace look?"
+      body="Match your phone's light and dark, or pick a theme. Change it any time in Settings."
+      testID="setup-theme"
+      actions={
+        <>
+          <PrimaryButton label="Continue" onPress={onDone} testID="setup-theme-confirm" />
+          <QuietButton onPress={onSkip} testID="setup-theme-skip" />
+        </>
+      }>
+      <ThemeChooser />
     </StepFrame>
   );
 }
