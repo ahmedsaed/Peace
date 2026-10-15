@@ -1,0 +1,35 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!--
+    Two widgets, chosen from the launcher's widget picker. exported="true" is
+    what lets the launcher's AppWidgetHost reach them, and is required on API 31+
+    for a receiver with an intent-filter; the only broadcasts they act on are
+    Android's own APPWIDGET_UPDATE and our refresh alarm, which carries no data.
+  -->
+  <application>
+    <receiver
+      android:name=".MonthWidgetProvider"
+      android:label="@string/peace_widget_month_label"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/peace_widget_month_info" />
+    </receiver>
+
+    <receiver
+      android:name=".QuickWidgetProvider"
+      android:label="@string/peace_widget_quick_label"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/peace_widget_quick_info" />
+    </receiver>
+  </application>
+
+</manifest>
