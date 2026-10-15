@@ -1,0 +1,42 @@
+appId: dev.merope.peace.oss
+---
+# Scene 3, recorded: a PDF invoice handed to Penny with "log this". She reads
+# the total, the shop and the date off it and proposes the record as a card;
+# one tap approves it. (The record screen's read button is for photos only.)
+- tapOn:
+    id: "nav-assistant"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-input"
+    timeout: 10000
+- tapOn:
+    id: "assistant-attach"
+- tapOn:
+    id: "assistant-attach-files"
+- scrollUntilVisible:
+    element: "northwind-invoice.pdf"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "northwind-invoice.pdf"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-pending-file"
+    timeout: 15000
+- tapOn:
+    id: "assistant-input"
+- inputText: "Log this, I paid with the Visa"
+- tapOn:
+    id: "assistant-send"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "assistant-proposal-create-record-approve"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000
+- tapOn:
+    id: "assistant-proposal-create-record-approve"
+- waitForAnimationToEnd:
+    timeout: 3000

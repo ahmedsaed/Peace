@@ -92,10 +92,10 @@ export function buildDemoLedger(db: TestDb, now: Date): DemoSummary {
   // --- standing orders, a year back, each occurrence posted against its rule ---
   const first = addMonths(periodOf(now), -11);
   const startsOn = (day: number) => `${first}-${String(day).padStart(2, '0')}`;
-  const salaryRule = createRule(db, { name: 'Salary', type: 'income', accountId: BANK, categoryId: catId('salary'), amountMinor: 520_000, frequency: 'monthly', startsOn: startsOn(1) }).id;
-  const rentRule = createRule(db, { name: 'Rent', type: 'expense', accountId: BANK, categoryId: catId('home'), amountMinor: 160_000, frequency: 'monthly', startsOn: startsOn(3) }).id;
-  const netflixRule = createRule(db, { name: 'Netflix', type: 'expense', accountId: VISA, categoryId: catId('entertainment'), amountMinor: 1_549, frequency: 'monthly', startsOn: startsOn(12) }).id;
-  const savingsRule = createRule(db, { name: 'To savings', type: 'transfer', accountId: BANK, counterAccountId: SAVINGS, amountMinor: 60_000, frequency: 'monthly', startsOn: startsOn(2) }).id;
+  const salaryRule = createRule(db, { name: 'Salary', type: 'income', accountId: BANK, categoryId: catId('salary'), amountMinor: 520_000, frequency: 'monthly', startsOn: startsOn(1), currency: DEMO_CURRENCY }).id;
+  const rentRule = createRule(db, { name: 'Rent', type: 'expense', accountId: BANK, categoryId: catId('home'), amountMinor: 160_000, frequency: 'monthly', startsOn: startsOn(3), currency: DEMO_CURRENCY }).id;
+  const netflixRule = createRule(db, { name: 'Netflix', type: 'expense', accountId: VISA, categoryId: catId('entertainment'), amountMinor: 1_549, frequency: 'monthly', startsOn: startsOn(12), currency: DEMO_CURRENCY }).id;
+  const savingsRule = createRule(db, { name: 'To savings', type: 'transfer', accountId: BANK, counterAccountId: SAVINGS, amountMinor: 60_000, frequency: 'monthly', startsOn: startsOn(2), currency: DEMO_CURRENCY }).id;
 
   for (let i = 11; i >= 0; i--) {
     const period = addMonths(periodOf(now), -i);
@@ -112,11 +112,11 @@ export function buildDemoLedger(db: TestDb, now: Date): DemoSummary {
 
     // Standing orders (rent and Netflix by rule; utilities by hand)
     if (past(at(y, m, 3, 10))) {
-      createRecord(db, { type: 'expense', accountId: BANK, categoryId: catId('home'), amountMinor: 160_000, homeCurrency: DEMO_CURRENCY, occurredAt: at(y, m, 3, 10), note: 'Rent', recurringRuleId: rentRule });
+      createRecord(db, { type: 'expense', accountId: BANK, categoryId: catId('home'), amountMinor: 160_000, currency: DEMO_CURRENCY, homeCurrency: DEMO_CURRENCY, occurredAt: at(y, m, 3, 10), note: 'Rent', recurringRuleId: rentRule });
       records++;
     }
     if (past(at(y, m, 12, 7))) {
-      createRecord(db, { type: 'expense', accountId: VISA, categoryId: catId('entertainment'), amountMinor: 1_549, homeCurrency: DEMO_CURRENCY, occurredAt: at(y, m, 12, 7), note: 'Netflix', recurringRuleId: netflixRule });
+      createRecord(db, { type: 'expense', accountId: VISA, categoryId: catId('entertainment'), amountMinor: 1_549, currency: DEMO_CURRENCY, homeCurrency: DEMO_CURRENCY, occurredAt: at(y, m, 12, 7), note: 'Netflix', recurringRuleId: netflixRule });
       records++;
     }
     move(BANK, SAVINGS, 60_000, at(y, m, 2, 11), 'Monthly saving', savingsRule);
@@ -157,7 +157,7 @@ export function buildDemoLedger(db: TestDb, now: Date): DemoSummary {
       const when = at(y, m, day(1, 20), 15);
       spend(VISA, 'clothing', dollars(40, 150), when, pick(['Shoes', 'Jacket', 'Shirts']));
       if (m === 3 && past(at(y, m, when.getDate() + 5, 15))) {
-        createRecord(db, { type: 'expense', isRefund: true, accountId: VISA, categoryId: catId('clothing'), amountMinor: 4_500, homeCurrency: DEMO_CURRENCY, occurredAt: at(y, m, when.getDate() + 5, 15), note: 'Returned one pair' });
+        createRecord(db, { type: 'expense', isRefund: true, accountId: VISA, categoryId: catId('clothing'), amountMinor: 4_500, currency: DEMO_CURRENCY, homeCurrency: DEMO_CURRENCY, occurredAt: at(y, m, when.getDate() + 5, 15), note: 'Returned one pair' });
         records++;
       }
     }
@@ -184,12 +184,12 @@ export function buildDemoLedger(db: TestDb, now: Date): DemoSummary {
 
   // Budgets for this month and last, set so the screen shows every state.
   for (const period of [addMonths(periodOf(now), -1), periodOf(now)]) {
-    setBudget(db, catId('food'), period, 70_000);
-    setBudget(db, catId('transport'), period, 12_000);
-    setBudget(db, catId('car'), period, 25_000);
-    setBudget(db, catId('shopping'), period, 15_000);
-    setBudget(db, catId('entertainment'), period, 8_000);
-    setBudget(db, catId('bills'), period, 25_000);
+    setBudget(db, catId('food'), period, 70_000, DEMO_CURRENCY);
+    setBudget(db, catId('transport'), period, 12_000, DEMO_CURRENCY);
+    setBudget(db, catId('car'), period, 25_000, DEMO_CURRENCY);
+    setBudget(db, catId('shopping'), period, 15_000, DEMO_CURRENCY);
+    setBudget(db, catId('entertainment'), period, 8_000, DEMO_CURRENCY);
+    setBudget(db, catId('bills'), period, 25_000, DEMO_CURRENCY);
   }
 
   return { records, months: 12, rules: 4 };

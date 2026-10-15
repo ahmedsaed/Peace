@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  The invoice the promo video's receipt scene reads: a real, text PDF (printed
+  by headless Chrome in make-video.sh), in dollars like the demo ledger, from a
+  shop that does not exist. Not a test fixture — nothing asserts its total.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice 2026-1047</title>
+<style>
+  @page { size: A5; margin: 14mm; }
+  body { font-family: "DejaVu Sans", Arial, sans-serif; color: #222; font-size: 10.5pt; }
+  h1 { font-size: 20pt; margin: 0; letter-spacing: -0.5px; }
+  .muted { color: #666; }
+  .row { display: flex; justify-content: space-between; }
+  table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+  th { text-align: left; font-weight: 600; border-bottom: 1.5px solid #222; padding: 6px 0; }
+  td { padding: 6px 0; border-bottom: 1px solid #ddd; }
+  td.n, th.n { text-align: right; }
+  .total td { border: 0; font-weight: 700; font-size: 12.5pt; padding-top: 10px; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div>
+      <h1>Northwind Hardware</h1>
+      <div class="muted">48 Harbour Road · Open daily 8–20</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-weight:700">INVOICE</div>
+      <div class="muted">No. 2026-1047</div>
+      <div class="muted">13 Oct 2026, 16:42</div>
+    </div>
+  </div>
+  <table>
+    <tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr>
+    <tr><td>Cordless drill, 18 V</td><td class="n">1</td><td class="n">49.00</td><td class="n">49.00</td></tr>
+    <tr><td>Wood screws, 4 × 40 mm (box)</td><td class="n">2</td><td class="n">3.50</td><td class="n">7.00</td></tr>
+    <tr><td>Wall plugs, assorted</td><td class="n">1</td><td class="n">4.00</td><td class="n">4.00</td></tr>
+    <tr><td colspan="3">Subtotal</td><td class="n">60.00</td></tr>
+    <tr><td colspan="3">Sales tax 8%</td><td class="n">4.80</td></tr>
+    <tr class="total"><td colspan="3">TOTAL USD</td><td class="n">64.80</td></tr>
+  </table>
+  <p class="muted" style="margin-top:16px">Paid by VISA ending 4421. Thank you for shopping with us.</p>
+</body>
+</html>

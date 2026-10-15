@@ -1,0 +1,22 @@
+appId: dev.merope.peace.oss
+---
+# Scene 2, recorded: make-video.sh texts the emulator as "NBANK" a moment after
+# this starts. The alert is read by Gemini into a row, the row opens as a
+# filled-in record, and one tap saves it.
+- extendedWaitUntil:
+    visible: "METRO MARKET"
+    timeout: 45000
+- tapOn: "METRO MARKET"
+- extendedWaitUntil:
+    visible:
+      id: "record-screen"
+    timeout: 5000
+- assertVisible:
+    id: "amount-display"
+    text: "18.75"
+- tapOn:
+    id: "record-save"
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 5000

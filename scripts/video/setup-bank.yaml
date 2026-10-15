@@ -1,0 +1,57 @@
+appId: dev.merope.peace.oss
+---
+# The promo video's starting state, part 2 — NOT recorded. Bank messages read
+# from "NBANK". Notification access is already granted by adb (make-video.sh),
+# so the disclosure ends in "Done" rather than Android's settings page.
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-bank"
+    direction: DOWN
+- tapOn:
+    id: "settings-ai-bank"
+- tapOn:
+    id: "bank-enabled"
+# With access already granted the switch turns on in place; only without it
+# does the disclosure come first. Either way, NBANK goes in the senders list.
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow:
+    when:
+      visible:
+        id: "setup-bank-sender"
+    commands:
+      - tapOn:
+          id: "setup-bank-sender"
+      - inputText: "NBANK"
+      - tapOn:
+          id: "setup-bank-sender-add"
+      - hideKeyboard
+      - tapOn:
+          id: "setup-bank-done"
+- runFlow:
+    when:
+      notVisible:
+        id: "bank-sender-NBANK"
+    commands:
+      - tapOn:
+          id: "bank-sender-input"
+      - inputText: "NBANK"
+      - tapOn:
+          id: "bank-sender-add"
+      - hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "bank-sender-NBANK"
+    timeout: 15000
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-back"
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 10000

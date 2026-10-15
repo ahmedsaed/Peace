@@ -1,0 +1,54 @@
+appId: dev.merope.peace.oss
+---
+# Scene 1, recorded: a spend logged with the thumb alone. `=` evaluates the
+# sum, then walks to the account, the category and saved.
+- tapOn:
+    id: "fab"
+- extendedWaitUntil:
+    visible:
+      id: "record-screen"
+    timeout: 5000
+- tapOn:
+    id: "key-1"
+- tapOn:
+    id: "key-2"
+- tapOn:
+    id: "key-dot"
+- tapOn:
+    id: "key-5"
+- tapOn:
+    id: "key-op-plus"
+- tapOn:
+    id: "key-3"
+- tapOn:
+    id: "key-equals"
+- assertVisible:
+    id: "amount-display"
+    text: "15.5"
+- tapOn:
+    id: "key-equals"
+- extendedWaitUntil:
+    visible:
+      id: "sheet-account"
+    timeout: 5000
+- tapOn:
+    text: "Cash"
+    childOf:
+      id: "sheet-account"
+- tapOn:
+    id: "key-equals"
+- extendedWaitUntil:
+    visible:
+      id: "sheet-category"
+    timeout: 5000
+- tapOn:
+    text: "Restaurants"
+    childOf:
+      id: "sheet-category"
+- tapOn:
+    id: "key-equals"
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 5000
+- assertVisible: "-\\$15.50"

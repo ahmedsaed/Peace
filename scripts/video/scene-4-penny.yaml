@@ -1,0 +1,32 @@
+appId: dev.merope.peace.oss
+---
+# Scene 4, recorded: a question to Penny, answered with a chart and figures
+# cited from the ledger. A live answer, so its wording differs run to run.
+# Straight on from scene 3, which leaves Penny open: a fresh conversation.
+- runFlow:
+    when:
+      notVisible:
+        id: "assistant-input"
+    commands:
+      - tapOn:
+          id: "nav-assistant"
+- tapOn:
+    id: "assistant-reset"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-input"
+    timeout: 10000
+- tapOn:
+    id: "assistant-input"
+- inputText: "How has my food spending changed month to month?"
+- tapOn:
+    id: "assistant-send"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "assistant-chart"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible:
+      id: "assistant-busy"
+    timeout: 120000

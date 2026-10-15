@@ -1,0 +1,84 @@
+appId: dev.merope.peace.oss
+---
+# The promo video's starting state, part 1 — NOT recorded. A year of invented
+# dollar history (the demo ledger, as the Penny screenshots use), a Gemini key
+# and Penny on. make-video.sh pushes the ledger first, then grants notification
+# access before setup-bank.yaml — AFTER this, because `clearState` revokes it.
+- launchApp:
+    clearState: true
+    arguments:
+      peace.onboarding: done
+      peace.currency: USD
+      peace.theme: ledger
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 90000
+
+# --- the demo year ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- tapOn:
+    id: "settings-section-backup"
+- scrollUntilVisible:
+    element:
+      id: "restore-pick"
+    direction: DOWN
+- tapOn:
+    id: "restore-pick"
+- scrollUntilVisible:
+    element: "peace-demo.db"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "peace-demo.db"
+- extendedWaitUntil:
+    visible: "REPLACE"
+    timeout: 15000
+- tapOn: "REPLACE"
+- extendedWaitUntil:
+    visible: "Restored.*records.*now in the app.*"
+    timeout: 30000
+- tapOn:
+    id: "nav-back"
+
+# --- the key ---
+- scrollUntilVisible:
+    element:
+      id: "gemini-key-edit"
+    direction: DOWN
+- tapOn:
+    id: "gemini-key-edit"
+- tapOn:
+    id: "gemini-key-input"
+- inputText: ${GEMINI_KEY}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "gemini-key-save"
+    direction: DOWN
+- tapOn:
+    id: "gemini-key-save"
+- extendedWaitUntil:
+    notVisible:
+      id: "gemini-key-input"
+    timeout: 20000
+
+# --- Penny ---
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-penny"
+    direction: DOWN
+- tapOn:
+    id: "settings-ai-penny"
+- tapOn:
+    id: "assistant-enabled"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "nav-back"
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 10000
