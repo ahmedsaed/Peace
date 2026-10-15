@@ -13,7 +13,9 @@ name: Play bundle
 #
 # UPLOADING. With a track chosen, the bundle goes straight to Play — as a DRAFT
 # by default, so nothing reaches a tester until somebody presses "Roll out" in
-# Play Console. There is no key anywhere: Workload Identity Federation lets a
+# Play Console. With `internal` (on by default) the same build is also RELEASED
+# to internal testing at once: that list is the owner and whoever they trust,
+# and it is how a build gets onto a real phone before the closed testers see it. There is no key anywhere: Workload Identity Federation lets a
 # run of THIS workflow, in this repo, on main, borrow the `peace-play-upload`
 # service account for an hour (the two `PLAY_*` repository variables say which
 # provider and account). That account holds "Release to testing tracks" for
@@ -32,6 +34,10 @@ on:
         type: choice
         options: [draft, completed]
         default: draft
+      internal:
+        description: Also release the same build to internal testing at once (not a draft).
+        type: boolean
+        default: true
       notes:
         description: Release notes (en-US). Empty takes this version's entry in src/constants/whats-new.json.
         type: string
@@ -65,7 +71,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   upload:
-    name: Upload to Play (${{ inputs.track }}, ${{ inputs.status }})
+    name: Upload to Play (${{ inputs.track }}, ${{ inputs.status }}${{ inputs.internal && inputs.track != 'internal' && ' + internal' || '' }})
     needs: bundle
     if: inputs.track != 'none'
     runs-on: ubuntu-latest
@@ -102,6 +108,7 @@ jobs:
           TOKEN: ${{ steps.auth.outputs.access_token }}
           TRACK: ${{ inputs.track }}
           STATUS: ${{ inputs.status }}
+          INTERNAL: ${{ inputs.internal }}
           NOTES: ${{ inputs.notes }}
           VERSION: ${{ needs.bundle.outputs.version }}
           BUILD: ${{ needs.bundle.outputs.build-number }}
@@ -140,12 +147,26 @@ jobs:
           # The number Play recorded must be the build we think we uploaded.
           [ "$UPLOADED" = "$BUILD" ] || { echo "::error::Play recorded versionCode $UPLOADED, expected $BUILD."; exit 1; }
 
-          RELEASE=$(jq -n --arg name "$VERSION ($BUILD)" --arg code "$BUILD" --arg status "$STATUS" --arg notes "$NOTES" '
-            {name: $name, versionCodes: [$code], status: $status}
-            + (if $notes == "" then {} else {releaseNotes: [{language: "en-US", text: $notes}]} end)')
-          jq -n --arg track "$TRACK" --argjson release "$RELEASE" '{track: $track, releases: [$release]}' > track.json
-          call -X PUT -H "Content-Type: application/json" \
-            --data @track.json "$API/edits/$EDIT/tracks/$TRACK" > /dev/null
+          # One versionCode can sit on several tracks. Internal testing gets it
+          # RELEASED, so the people closest to the app have it within minutes;
+          # the chosen track gets it as asked (a draft by default). Both in ONE
+          # edit, so either both land or neither does.
+          put_track() {
+            local track=$1 status=$2 release
+            release=$(jq -n --arg name "$VERSION ($BUILD)" --arg code "$BUILD" --arg status "$status" --arg notes "$NOTES" '
+              {name: $name, versionCodes: [$code], status: $status}
+              + (if $notes == "" then {} else {releaseNotes: [{language: "en-US", text: $notes}]} end)')
+            jq -n --arg track "$track" --argjson release "$release" '{track: $track, releases: [$release]}' > track.json
+            call -X PUT -H "Content-Type: application/json" \
+              --data @track.json "$API/edits/$EDIT/tracks/$track" > /dev/null
+            echo "$track: $status"
+          }
+          put_track "$TRACK" "$STATUS"
+          ALSO_INTERNAL=false
+          if [ "$INTERNAL" = true ] && [ "$TRACK" != internal ]; then
+            put_track internal completed
+            ALSO_INTERNAL=true
+          fi
 
           # Some changes cannot be sent for review by the API (Play says so in
           # the error); those are committed as pending and sent from the
@@ -162,4 +183,5 @@ jobs:
             echo
             echo "Track **$TRACK**, status **$STATUS**."
             [ "$STATUS" = draft ] && echo "Open Play Console › Test and release › $TRACK and press **Roll out** when ready." || true
+            [ "$ALSO_INTERNAL" = true ] && echo "Also **released** to internal testing." || true
           } >> "$GITHUB_STEP_SUMMARY"
