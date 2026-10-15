@@ -17,6 +17,14 @@ import { Dimensions, Keyboard, useWindowDimensions } from 'react-native';
 export type Density = 'regular' | 'compact' | 'tight';
 
 /**
+ * How wide the app's content may grow, in dp. A large phone is ~430; a tablet
+ * or an unfolded foldable is 700–1300, and Android 16 lets the app rotate and
+ * fill one whatever the manifest says. Beyond this the content is centred and
+ * the sides are ground — see the root layout.
+ */
+export const CONTENT_MAX_WIDTH = 640;
+
+/**
  * Pure so it can be tested at the boundaries — the breakpoints are the whole
  * design, and getting one off by a pixel is invisible until you are standing in
  * a shop trying to log a purchase.

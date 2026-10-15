@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CONTENT_MAX_WIDTH } from '@/lib/layout';
+
 /**
  * The body of every bottom sheet: the rounded, bordered panel a `Modal`
  * slides up from the foot of the screen.
@@ -38,7 +40,19 @@ export function SheetPanel({
   return (
     <View
       className={`rounded-t-2xl border-t border-line bg-ground ${className}`}
-      style={[{ elevation: 16, paddingBottom: pad + insets.bottom, marginBottom: lift }, style]}
+      // Centred and capped like the screens behind it (CONTENT_MAX_WIDTH): a
+      // sheet is its own window, so the root layout's column does not reach it.
+      style={[
+        {
+          elevation: 16,
+          paddingBottom: pad + insets.bottom,
+          marginBottom: lift,
+          width: '100%',
+          maxWidth: CONTENT_MAX_WIDTH,
+          alignSelf: 'center',
+        },
+        style,
+      ]}
       testID={testID}>
       {children}
     </View>

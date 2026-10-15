@@ -74,18 +74,18 @@ export function buildDemoLedger(db: TestDb, now: Date): DemoSummary {
 
   const spend = (account: string, category: string, minor: number, when: Date, note: string | null = null, tags: string[] = []) => {
     if (!past(when)) return;
-    const row = createRecord(db, { type: 'expense', accountId: account, categoryId: catId(category), amountMinor: minor, homeCurrency: DEMO_CURRENCY, occurredAt: when, note });
+    const row = createRecord(db, { type: 'expense', accountId: account, categoryId: catId(category), amountMinor: minor, currency: DEMO_CURRENCY, homeCurrency: DEMO_CURRENCY, occurredAt: when, note });
     if (tags.length > 0) setRecordTags(db, row.id, tags);
     records++;
   };
   const earn = (account: string, category: string, minor: number, when: Date, note: string | null = null, ruleId: string | null = null) => {
     if (!past(when)) return;
-    createRecord(db, { type: 'income', accountId: account, categoryId: catId(category), amountMinor: minor, homeCurrency: DEMO_CURRENCY, occurredAt: when, note, recurringRuleId: ruleId });
+    createRecord(db, { type: 'income', accountId: account, categoryId: catId(category), amountMinor: minor, currency: DEMO_CURRENCY, homeCurrency: DEMO_CURRENCY, occurredAt: when, note, recurringRuleId: ruleId });
     records++;
   };
   const move = (from: string, to: string, minor: number, when: Date, note: string, ruleId: string | null = null) => {
     if (!past(when)) return;
-    createTransfer(db, { fromAccountId: from, toAccountId: to, amountMinor: minor, homeCurrency: DEMO_CURRENCY, occurredAt: when, note, recurringRuleId: ruleId });
+    createTransfer(db, { fromAccountId: from, toAccountId: to, amountMinor: minor, currency: DEMO_CURRENCY, homeCurrency: DEMO_CURRENCY, occurredAt: when, note, recurringRuleId: ruleId });
     records++;
   };
 
