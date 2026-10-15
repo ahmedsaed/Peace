@@ -990,7 +990,7 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   built. The root layout's `anchor: '(drawer)'` is what puts Records under a linked screen; without
   it Save and Back close the app. Test one with `adb shell am start -a android.intent.action.VIEW -d
   "peace://record?startAs=income" -n dev.merope.peace.oss/.MainActivity`.
-- **The home-screen widgets draw a SNAPSHOT; they never read the ledger.** Android renders them in
+- **The home-screen widgets (Budget, Balance, Quick add) draw a SNAPSHOT; they never read the ledger.** Android renders them in
   the launcher with no JavaScript running, so `src/state/widget.ts` writes ready-made, already
   masked text (`src/lib/widget.ts`, tested) whenever the app goes to the background — every ledger
   change happens in the app, so leaving it is when there is something new to show. The native side
@@ -999,7 +999,10 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   left, redrawn by one inexact alarm at local midnight. App lock on = no figures at all. Colours are
   white drawables tinted with `setColorFilter`; on Match phone Android 12+ gets both palettes
   (`setColorInt`) and flips with dark mode by itself. Custom fonts do not load reliably in a
-  widget, so the wordmark is a pre-drawn white PNG. **A FORCE-STOPPED app's widgets show a grey
+  widget, so the wordmark is a pre-drawn white PNG. **Only RemoteViews' allowed classes inflate**:
+  a plain `<View>` spacer made the whole Balance widget "Can't load widget" — use a FrameLayout,
+  and check `adb logcat | grep AppWidgetHostView` when one will not load. The Balance widget is
+  drawn per id, because how many accounts fit depends on that widget's own height. **A FORCE-STOPPED app's widgets show a grey
   placeholder after a theme or dark-mode change** until it is opened — Android, not a bug; do not
   force-stop when checking one. Place one on the emulator by long-pressing the home screen ›
   Widgets › search "Peace".

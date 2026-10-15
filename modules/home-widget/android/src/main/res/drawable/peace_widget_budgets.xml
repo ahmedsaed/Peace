@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Budgets tab's glyph (src/components/icon.tsx); white, tinted at draw time. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M4 2h16v20H4V2zm3 4v3h10V6H7zm0 6v2h3v-2H7zm7 0v2h3v-2h-3zm-7 4v2h3v-2H7zm7 0v2h3v-2h-3z" />
+</vector>

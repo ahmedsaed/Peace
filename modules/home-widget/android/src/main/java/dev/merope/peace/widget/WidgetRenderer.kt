@@ -25,14 +25,15 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Draws both widgets from the stored snapshot.
+ * Draws all three widgets from the one stored snapshot.
  *
  * ARRANGES, NEVER DECIDES. What may be shown — masked or not, figures or none —
  * was settled by `src/lib/widget.ts` before the snapshot was written. This
  * answers only what changes while the app is closed: whether the snapshot's
- * month has ENDED (then it must not pose as the current one), and how many
- * days are left in it. Both depend on the clock, so one inexact alarm redraws
- * at the next local midnight or the month's end, whichever is first.
+ * month has ENDED (then it must not pose as the current one), how many days
+ * are left in it, and how many accounts fit in a Balance widget's real size.
+ * The first two depend on the clock, so one inexact alarm redraws at the next
+ * local midnight or the month's end, whichever is first.
  *
  * COLOURS. Backgrounds and icons are white drawables tinted with
  * `setColorFilter`, the colour call RemoteViews allows on every supported
@@ -42,9 +43,20 @@ import kotlin.math.roundToInt
  * phone is in when it draws.
  */
 internal object WidgetRenderer {
-  const val ACTION_REFRESH = "dev.merope.peace.widget.REFRESH"
   private const val DAY = 86_400_000L
   private const val TAG = "PeaceWidget"
+
+  /**
+   * Accounts appear only once the Balance widget is taller than its default
+   * 4×2 (about 224dp on a Pixel): at that size it is the figure and the quick
+   * bar, which is how most people will use it. Above it, the rows fill what
+   * is left under the quick bar — the header, figure, month line, quick bar
+   * and padding take about 162dp.
+   */
+  private const val ACCOUNTS_FROM_DP = 236
+  private const val BALANCE_TOP_DP = 162
+  private const val ACCOUNT_ROW_DP = 26
+  private const val MAX_ACCOUNT_ROWS = 6
 
   private class Palette(o: JSONObject) {
     val surface = color(o, "surface")
@@ -61,20 +73,36 @@ internal object WidgetRenderer {
 
   private class Theme(val system: Boolean, val light: Palette, val dark: Palette)
 
-  private class Figures(o: JSONObject) {
+  private class Budget(o: JSONObject) {
+    val amount: String = o.getString("amount")
+    val beside: String = o.getString("beside")
+    val fraction: Double = o.getJSONObject("bar").getDouble("fraction")
+    val over: Boolean = o.getJSONObject("bar").getBoolean("over")
+    val foot: String = o.getString("foot")
+  }
+
+  private class Balance(o: JSONObject) {
     val amount: String = o.getString("amount")
     val tone: String = o.getString("tone")
     val beside: String = o.getString("beside")
-    val bar: Double? = o.optJSONObject("bar")?.getDouble("fraction")
-    val over: Boolean = o.optJSONObject("bar")?.optBoolean("over") ?: false
     val foot: String = o.getString("foot")
-    val daysLeft: Boolean = o.optBoolean("daysLeft")
+  }
+
+  private class Account(o: JSONObject) {
+    val name: String = o.getString("name")
+    val amount: String = o.getString("amount")
+    val tone: String = o.getString("tone")
+    val color: Int = Color.parseColor(o.getString("color"))
   }
 
   private class Snapshot(o: JSONObject) {
     val month: String = o.getString("month")
     val endsAt: Long = o.getLong("endsAt")
-    val figures: Figures? = o.optJSONObject("figures")?.let { Figures(it) }
+    val budget: Budget? = o.optJSONObject("budget")?.let { Budget(it) }
+    val balance: Balance? = o.optJSONObject("balance")?.let { Balance(it) }
+    val accounts: List<Account> =
+      o.optJSONArray("accounts")?.let { a -> (0 until a.length()).map { Account(a.getJSONObject(it)) } }
+        ?: emptyList()
     val theme: Theme =
       o.getJSONObject("theme").let {
         Theme(it.getBoolean("system"), Palette(it.getJSONObject("light")), Palette(it.getJSONObject("dark")))
@@ -86,17 +114,27 @@ internal object WidgetRenderer {
     val snapshot = load(context)
     val now = System.currentTimeMillis()
     val night = phoneIsNight()
+    fun ids(provider: Class<*>) = manager.getAppWidgetIds(ComponentName(context, provider))
 
-    val monthIds = manager.getAppWidgetIds(ComponentName(context, MonthWidgetProvider::class.java))
-    if (monthIds.isNotEmpty()) {
-      manager.updateAppWidget(monthIds, month(context, snapshot, now, night))
+    val budgetIds = ids(BudgetWidgetProvider::class.java)
+    if (budgetIds.isNotEmpty()) manager.updateAppWidget(budgetIds, budget(context, snapshot, now, night))
+
+    // One RemoteViews PER widget: two Balance widgets of different heights
+    // show different numbers of accounts.
+    val balanceIds = ids(BalanceWidgetProvider::class.java)
+    for (id in balanceIds) {
+      manager.updateAppWidget(id, balance(context, snapshot, now, night, heightDp(manager, id)))
+    }
+
+    val quickIds = ids(QuickWidgetProvider::class.java)
+    if (quickIds.isNotEmpty()) manager.updateAppWidget(quickIds, quick(context, snapshot, night))
+
+    // Only the two widgets with figures go stale or count days.
+    if (budgetIds.isNotEmpty() || balanceIds.isNotEmpty()) {
       scheduleRefresh(context, snapshot?.endsAt, now)
     } else {
       cancelRefresh(context)
     }
-
-    val quickIds = manager.getAppWidgetIds(ComponentName(context, QuickWidgetProvider::class.java))
-    if (quickIds.isNotEmpty()) manager.updateAppWidget(quickIds, quick(context, snapshot, night))
   }
 
   /** A snapshot that cannot be read is no snapshot: the widget asks to be opened. */
@@ -110,83 +148,140 @@ internal object WidgetRenderer {
     }
   }
 
-  // ---------------------------------------------------------------- month --
-
-  private fun month(context: Context, s: Snapshot?, now: Long, night: Boolean): RemoteViews {
-    val rv = RemoteViews(context.packageName, R.layout.peace_widget_month)
-    val paint = Painter(rv, s?.theme, night)
-    clicks(context, rv)
-    paint.tint(R.id.widget_bg) { it.surface }
-    paint.text(R.id.month) { it.muted }
-    paint.tint(R.id.wordmark) { it.accent }
-    buttons(paint)
-
+  /**
+   * Why a widget with figures cannot show them, or null when it can. The same
+   * answers on both, so they never disagree about the same moment.
+   */
+  private fun blocked(s: Snapshot?, now: Long): Pair<Int, String>? =
     when {
-      s == null -> {
-        rv.setTextViewText(R.id.month, "This month")
-        notice(rv, paint, R.drawable.peace_widget_calendar, "Open Peace once to show this month here.")
-      }
+      s == null -> R.drawable.peace_widget_calendar to "Open Peace once to show this month here."
       // A month that has ended is not this month. Its figures would be read
       // as today's, so they are not shown at all until the app writes again.
-      now >= s.endsAt -> {
-        rv.setTextViewText(R.id.month, "New month")
-        notice(rv, paint, R.drawable.peace_widget_calendar, "A new month has started. Open Peace to update.")
-      }
-      s.figures == null -> {
-        rv.setTextViewText(R.id.month, s.month)
-        notice(rv, paint, R.drawable.peace_widget_lock, "Peace is locked. Open it to see this month.")
-      }
-      else -> {
-        rv.setTextViewText(R.id.month, s.month)
-        figures(rv, paint, s.figures, s.endsAt, now)
-      }
+      now >= s.endsAt -> R.drawable.peace_widget_calendar to "A new month has started. Open Peace to update."
+      // The snapshot carries no figures at all while the app lock is on.
+      s.balance == null -> R.drawable.peace_widget_lock to "Peace is locked. Open it to see this month."
+      else -> null
     }
+
+  private fun monthLabel(s: Snapshot?, now: Long): String =
+    when {
+      s == null -> "This month"
+      now >= s.endsAt -> "New month"
+      else -> s.month
+    }
+
+  // --------------------------------------------------------------- budget --
+
+  private fun budget(context: Context, s: Snapshot?, now: Long, night: Boolean): RemoteViews {
+    val rv = RemoteViews(context.packageName, R.layout.peace_widget_budget)
+    val paint = Painter(rv, s?.theme, night)
+    frame(context, rv, paint, s, now)
+
+    val stop = blocked(s, now)
+    if (s == null || stop != null) {
+      val (icon, text) = stop ?: (R.drawable.peace_widget_calendar to "Open Peace once to show this month here.")
+      notice(rv, paint, icon, text)
+      return rv
+    }
+    val b = s.budget
+    if (b == null) {
+      // Says what is missing rather than quietly becoming the Balance widget,
+      // and the whole widget opens the screen that fixes it.
+      notice(rv, paint, R.drawable.peace_widget_budgets, "No budget for ${s.month}. Set one in Peace.")
+      rv.setOnClickPendingIntent(R.id.widget_root, link(context, "peace://budgets", 4))
+      return rv
+    }
+    figures(rv, paint, b.amount, "expense", b.beside, "${b.foot} · ${daysLeft(now, s.endsAt)}")
+    rv.setViewVisibility(R.id.bar_holder, View.VISIBLE)
+    paint.bar(b.fraction, b.over)
     return rv
   }
 
-  private fun figures(rv: RemoteViews, paint: Painter, f: Figures, endsAt: Long, now: Long) {
-    rv.setViewVisibility(R.id.figures, View.VISIBLE)
-    rv.setViewVisibility(R.id.notice, View.GONE)
+  // -------------------------------------------------------------- balance --
 
-    rv.setTextViewText(R.id.amount, f.amount)
-    paint.text(R.id.amount) {
-      when (f.tone) {
-        "income" -> it.income
-        "expense" -> it.expense
-        else -> it.ink
+  private fun balance(context: Context, s: Snapshot?, now: Long, night: Boolean, heightDp: Int): RemoteViews {
+    val rv = RemoteViews(context.packageName, R.layout.peace_widget_balance)
+    val paint = Painter(rv, s?.theme, night)
+    frame(context, rv, paint, s, now)
+
+    val stop = blocked(s, now)
+    val b = s?.balance
+    if (s == null || stop != null || b == null) {
+      val (icon, text) = stop ?: (R.drawable.peace_widget_lock to "Peace is locked. Open it to see this month.")
+      notice(rv, paint, icon, text)
+      accounts(rv, paint, emptyList(), 0)
+      return rv
+    }
+
+    figures(rv, paint, b.amount, b.tone, b.beside, b.foot)
+    val rows =
+      if (heightDp < ACCOUNTS_FROM_DP) 0
+      else ((heightDp - BALANCE_TOP_DP) / ACCOUNT_ROW_DP).coerceIn(0, MAX_ACCOUNT_ROWS)
+    accounts(rv, paint, s.accounts, rows)
+    return rv
+  }
+
+  /**
+   * As many accounts as `rows` allows. When there are more, the last row
+   * becomes "and N more" — a list that silently stops looks complete.
+   */
+  private fun accounts(rv: RemoteViews, paint: Painter, list: List<Account>, rows: Int) {
+    val show = rows > 0 && list.isNotEmpty()
+    rv.setViewVisibility(R.id.accounts, if (show) View.VISIBLE else View.GONE)
+    // The spacer takes the slack only when the accounts do not, so without
+    // them the quick bar sits at the foot as it does on the Budget widget.
+    rv.setViewVisibility(R.id.spacer, if (show) View.GONE else View.VISIBLE)
+    if (!show) return
+
+    val fits = if (list.size > rows) rows - 1 else list.size
+    for (i in 0 until MAX_ACCOUNT_ROWS) {
+      val row = ACCOUNT_ROWS[i]
+      if (i >= fits) {
+        rv.setViewVisibility(row.root, View.GONE)
+        continue
       }
+      val a = list[i]
+      rv.setViewVisibility(row.root, View.VISIBLE)
+      // An account's colour is data, the same in every theme.
+      rv.setInt(row.dot, "setColorFilter", a.color)
+      rv.setTextViewText(row.name, a.name)
+      paint.text(row.name) { it.ink }
+      rv.setTextViewText(row.amount, a.amount)
+      paint.text(row.amount) { tone(it, a.tone) }
     }
-    rv.setTextViewText(R.id.beside, f.beside)
-    paint.text(R.id.beside) { it.muted }
-    rv.setTextViewText(R.id.foot, if (f.daysLeft) "${f.foot} · ${daysLeft(now, endsAt)}" else f.foot)
-    paint.text(R.id.foot) { it.muted }
-
-    val fraction = f.bar
-    if (fraction == null) {
-      rv.setViewVisibility(R.id.bar_holder, View.GONE)
-      return
+    val rest = list.size - fits
+    if (rest > 0) {
+      rv.setViewVisibility(R.id.acc_more, View.VISIBLE)
+      rv.setTextViewText(R.id.acc_more, "and $rest more")
+      paint.text(R.id.acc_more) { it.muted }
+    } else {
+      rv.setViewVisibility(R.id.acc_more, View.GONE)
     }
-    rv.setViewVisibility(R.id.bar_holder, View.VISIBLE)
-    paint.bar(fraction, f.over)
   }
 
-  private fun notice(rv: RemoteViews, paint: Painter, icon: Int, text: String) {
-    rv.setViewVisibility(R.id.figures, View.GONE)
-    rv.setViewVisibility(R.id.notice, View.VISIBLE)
-    rv.setImageViewResource(R.id.notice_icon, icon)
-    paint.tint(R.id.notice_icon) { it.muted }
-    rv.setTextViewText(R.id.notice_text, text)
-    paint.text(R.id.notice_text) { it.ink }
-  }
+  private class Row(val root: Int, val dot: Int, val name: Int, val amount: Int)
 
-  /** Counted at draw time, in local days: "16 days to go" on the 15th of October. */
-  private fun daysLeft(now: Long, endsAt: Long): String {
-    val days = ((startOfDay(endsAt - 1) - startOfDay(now)).toDouble() / DAY).roundToInt()
-    return when {
-      days <= 0 -> "last day"
-      days == 1 -> "1 day to go"
-      else -> "$days days to go"
-    }
+  private val ACCOUNT_ROWS =
+    listOf(
+      Row(R.id.acc_1, R.id.acc_1_dot, R.id.acc_1_name, R.id.acc_1_amount),
+      Row(R.id.acc_2, R.id.acc_2_dot, R.id.acc_2_name, R.id.acc_2_amount),
+      Row(R.id.acc_3, R.id.acc_3_dot, R.id.acc_3_name, R.id.acc_3_amount),
+      Row(R.id.acc_4, R.id.acc_4_dot, R.id.acc_4_name, R.id.acc_4_amount),
+      Row(R.id.acc_5, R.id.acc_5_dot, R.id.acc_5_name, R.id.acc_5_amount),
+      Row(R.id.acc_6, R.id.acc_6_dot, R.id.acc_6_name, R.id.acc_6_amount),
+    )
+
+  /**
+   * The widget's height in dp as the launcher currently draws it: the MAX
+   * height in portrait and the MIN in landscape, which is how the options
+   * bundle reports a resizable widget's two orientations.
+   */
+  private fun heightDp(manager: AppWidgetManager, id: Int): Int {
+    val options = manager.getAppWidgetOptions(id)
+    val portrait = Resources.getSystem().configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+    return options.getInt(
+      if (portrait) AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT
+    )
   }
 
   // ---------------------------------------------------------------- quick --
@@ -201,6 +296,53 @@ internal object WidgetRenderer {
   }
 
   // --------------------------------------------------------------- shared --
+
+  /** Background, header and the quick bar: everything both figure widgets share. */
+  private fun frame(context: Context, rv: RemoteViews, paint: Painter, s: Snapshot?, now: Long) {
+    clicks(context, rv)
+    paint.tint(R.id.widget_bg) { it.surface }
+    rv.setTextViewText(R.id.month, monthLabel(s, now))
+    paint.text(R.id.month) { it.muted }
+    paint.tint(R.id.wordmark) { it.accent }
+    buttons(paint)
+  }
+
+  private fun figures(rv: RemoteViews, paint: Painter, amount: String, tone: String, beside: String, foot: String) {
+    rv.setViewVisibility(R.id.figures, View.VISIBLE)
+    rv.setViewVisibility(R.id.notice, View.GONE)
+    rv.setTextViewText(R.id.amount, amount)
+    paint.text(R.id.amount) { tone(it, tone) }
+    rv.setTextViewText(R.id.beside, beside)
+    paint.text(R.id.beside) { it.muted }
+    rv.setTextViewText(R.id.foot, foot)
+    paint.text(R.id.foot) { it.muted }
+  }
+
+  private fun notice(rv: RemoteViews, paint: Painter, icon: Int, text: String) {
+    rv.setViewVisibility(R.id.figures, View.GONE)
+    rv.setViewVisibility(R.id.notice, View.VISIBLE)
+    rv.setImageViewResource(R.id.notice_icon, icon)
+    paint.tint(R.id.notice_icon) { it.muted }
+    rv.setTextViewText(R.id.notice_text, text)
+    paint.text(R.id.notice_text) { it.ink }
+  }
+
+  private fun tone(p: Palette, tone: String): Int =
+    when (tone) {
+      "income" -> p.income
+      "expense" -> p.expense
+      else -> p.ink
+    }
+
+  /** Counted at draw time, in local days: "16 days to go" on the 15th of October. */
+  private fun daysLeft(now: Long, endsAt: Long): String {
+    val days = ((startOfDay(endsAt - 1) - startOfDay(now)).toDouble() / DAY).roundToInt()
+    return when {
+      days <= 0 -> "last day"
+      days == 1 -> "1 day to go"
+      else -> "$days days to go"
+    }
+  }
 
   private fun buttons(paint: Painter) {
     paint.tint(R.id.btn_expense_bg) { it.accent }
@@ -270,7 +412,7 @@ internal object WidgetRenderer {
     alarms.set(AlarmManager.RTC, at, refreshIntent(context))
   }
 
-  fun cancelRefresh(context: Context) {
+  private fun cancelRefresh(context: Context) {
     context.getSystemService(AlarmManager::class.java)?.cancel(refreshIntent(context))
   }
 
@@ -278,7 +420,7 @@ internal object WidgetRenderer {
     PendingIntent.getBroadcast(
       context,
       0,
-      Intent(context, MonthWidgetProvider::class.java).setAction(ACTION_REFRESH),
+      Intent(context, WidgetRefreshReceiver::class.java),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 

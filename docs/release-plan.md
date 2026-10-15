@@ -183,10 +183,12 @@ layout on the screens that use them.
 - Localisation (string extraction first, then Arabic + RTL)
 - [x] Launcher shortcuts for quick add (1.25): hold the icon for Expense, Receipt or Penny (Income until 1.27) — static
       shortcuts deep-linking into the record screen with Records anchored beneath.
-- [x] Home-screen widgets (1.28): **This month** (4×2: spent against the budget with a bar, or the
-      running position when nothing is budgeted, plus the quick bar) and **Quick add** (2×1). Drawn
-      from a snapshot the app writes as it leaves the foreground; Hide amounts masks it, the app lock
-      empties it, a finished month says so; follows the app's theme, and on Match phone the phone's.
+- [x] Home-screen widgets (1.28): **Budget** (4×2: spent against the month's budget with a bar and
+      the days left, or "No budget for October" that opens Budgets), **Balance** (the Records
+      header's Now/Balance and the month's two sides, the quick bar under it, and the accounts once
+      stretched taller than 4×2) and **Quick add** (2×1). Drawn from one snapshot the app writes as
+      it leaves the foreground; Hide amounts masks them, the app lock empties them, a finished month
+      says so; they follow the app's theme, and on Match phone the phone's.
 - [x] Accessibility pass (1.25): keypad keys and the `=`/next/save key speak words, the amount is a live
       region, analysis rows and the six-month bars read as one sentence each (masked like the screen),
       swatches and icons in the pickers have names. Large text: density divides by the font scale (up

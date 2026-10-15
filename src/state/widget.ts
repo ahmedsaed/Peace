@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { setWidgetSnapshot } from '../../modules/home-widget/src/HomeWidgetModule';
 import { db } from '@/db/client';
+import { listAccountsWithBalance } from '@/db/repo/accounts';
 import { listBudgets } from '@/db/repo/budgets';
 import { broughtForward } from '@/db/repo/carry';
 import { periodSummary } from '@/db/repo/records';
@@ -12,7 +13,7 @@ import { moneyFor } from '@/state/money';
 import { useSettingsStore } from '@/state/settings';
 
 /**
- * Write the home-screen widget's snapshot from the ledger as it is now.
+ * Write the home-screen widgets' snapshot from the ledger as it is now.
  *
  * WHEN: on launch, whenever a setting it depends on changes, and every time
  * the app leaves the foreground. The last one is the one that matters — the
@@ -42,7 +43,10 @@ export function syncWidget(): void {
         budgetMinor: budgets.totalBudgetMinor,
         budgetSpentMinor: budgets.totalSpentMinor,
         monthSpentMinor: summary.expenseMinor,
+        monthEarnedMinor: summary.incomeMinor,
         headline,
+        // The Accounts tab's own list and order; the widget shows as many as fit.
+        accounts: listAccountsWithBalance(db),
         // The SETTING, not whether this phone can honour it: a widget is the
         // wrong place to discover the lock quietly failed open.
         locked: settings.lockEnabled,

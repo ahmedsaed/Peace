@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  "This month": the month, what is spent against the budget (or the running
-  position when nothing is budgeted), and the quick bar.
+  Budget: the month, what is spent against its budget with a bar, what is
+  left and for how long, and the quick bar. With nothing budgeted it says so
+  (WidgetRenderer) rather than turning into the Balance widget.
 
   Every colour here is Ledger's, and every text a sample: this layout is also
   the widget picker's preview on Android 12+. WidgetRenderer overwrites all of

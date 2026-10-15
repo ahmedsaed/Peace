@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="peace_widget_month_label">This month</string>
-    <string name="peace_widget_month_description">This month\'s spending against your budget, with quick add.</string>
+    <string name="peace_widget_budget_label">Budget</string>
+    <string name="peace_widget_budget_description">This month\'s spending against your budget, with quick add.</string>
+    <string name="peace_widget_balance_label">Balance</string>
+    <string name="peace_widget_balance_description">What you have now, with quick add. Stretch it taller to list your accounts.</string>
     <string name="peace_widget_quick_label">Quick add</string>
     <string name="peace_widget_quick_description">New expense, photograph a receipt, or ask Penny.</string>
 </resources>

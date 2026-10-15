@@ -1,22 +1,37 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
   <!--
-    Two widgets, chosen from the launcher's widget picker. exported="true" is
+    Three widgets, chosen from the launcher's widget picker. exported="true" is
     what lets the launcher's AppWidgetHost reach them, and is required on API 31+
-    for a receiver with an intent-filter; the only broadcasts they act on are
-    Android's own APPWIDGET_UPDATE and our refresh alarm, which carries no data.
+    for a receiver with an intent-filter; the only broadcast they act on is
+    Android's own APPWIDGET_UPDATE (and its option and lifecycle siblings).
+
+    The refresh alarm goes to its own receiver, NOT exported: it carries no data
+    and only ever comes from this app's AlarmManager.
   -->
   <application>
     <receiver
-      android:name=".MonthWidgetProvider"
-      android:label="@string/peace_widget_month_label"
+      android:name=".BudgetWidgetProvider"
+      android:label="@string/peace_widget_budget_label"
       android:exported="true">
       <intent-filter>
         <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
       </intent-filter>
       <meta-data
         android:name="android.appwidget.provider"
-        android:resource="@xml/peace_widget_month_info" />
+        android:resource="@xml/peace_widget_budget_info" />
+    </receiver>
+
+    <receiver
+      android:name=".BalanceWidgetProvider"
+      android:label="@string/peace_widget_balance_label"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/peace_widget_balance_info" />
     </receiver>
 
     <receiver
@@ -30,6 +45,10 @@
         android:name="android.appwidget.provider"
         android:resource="@xml/peace_widget_quick_info" />
     </receiver>
+
+    <receiver
+      android:name=".WidgetRefreshReceiver"
+      android:exported="false" />
   </application>
 
 </manifest>
