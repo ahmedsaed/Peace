@@ -91,7 +91,9 @@ difference behind one small module per concern, never as `if (flavor === …)` a
 **The Play upload is an AAB, built on request.** Actions › **Play bundle** › Run workflow builds
 `flavor: play` through the same `build-apk.yml` every PR uses, hands back `peace-play-…aab` as an
 artifact, and — unless the track input is `none` — uploads it to that track as a DRAFT, which
-waits for "Roll out" in Play Console. Nothing builds or uploads one automatically, because every
+waits for "Roll out" in Play Console — and, with `internal` on (the default), RELEASES the same
+versionCode to internal testing in the same edit, so it reaches the owner's phone within minutes
+while the closed testers still wait for the click. Nothing builds or uploads one automatically, because every
 upload burns its versionCode for good. **There is no key**: Workload Identity Federation lets this
 workflow, in this repo, on `main`, act as the `peace-play-upload` service account for an hour
 (`PLAY_WIF_PROVIDER` and `PLAY_SERVICE_ACCOUNT` are repository VARIABLES, not secrets). That account
