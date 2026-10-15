@@ -27,6 +27,8 @@ LOG A SPEND IN SECONDS
 • One key walks you from the amount to the account, the category and saved.
 • Pick a calculator or phone layout, and the side the operators sit on.
 • Works in split screen next to your bank's notification.
+• Photograph a receipt right in the note field: one tap and it is attached.
+• From your home screen: widgets for your balance and your budget, and hold the Peace icon for a new expense, a receipt or Penny.
 
 SEE WHERE IT WENT
 • Budgets per category, showing what is left this month.
@@ -52,8 +54,13 @@ Only Google sees what you send, and only once you add a key. Everything else wor
 YOURS TO KEEP
 • Back up to your own Google Drive automatically, encrypted with a passphrase if you like.
 • Or save one file holding everything, receipts included, wherever you choose.
-• Export to CSV for any spreadsheet.
+• Export to CSV for any spreadsheet, and import from one in the same format.
 • Hide every amount with one tap when someone is looking over your shoulder.
+• Lock Peace with your phone's own fingerprint, face or PIN.
+
+MAKE IT YOURS
+• Four themes, two dark and two light, or follow your phone.
+• Works with TalkBack and large text.
 
 PRIVATE BY DEFAULT
 Nothing leaves your phone until you turn something on: reminders, AI, bank notifications and backups each start switched off. Peace contains no advertising or tracking code at all.

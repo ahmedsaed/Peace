@@ -148,6 +148,8 @@ layout on the screens that use them.
 
 ## Peace Cloud (v1.1)
 
+**Deferred past launch (decided 2026-10-15).** The design below stands; nothing is built.
+
 - **Client**: `AiProvider` interface; `byok-gemini` (today) and `peace-cloud`. Only the `play` flavor offers the second.
 - **Server**: a thin streaming proxy. Stores no content, logs no content, paid Gemini tier only
   (the free tier allows Google to train on requests).
@@ -180,7 +182,7 @@ layout on the screens that use them.
 
 ## Backlog
 
-- Localisation (string extraction first, then Arabic + RTL)
+- Localisation (string extraction first, then Arabic + RTL) — **deferred past launch (decided 2026-10-15)**
 - [x] Launcher shortcuts for quick add (1.25): hold the icon for Expense, Receipt or Penny (Income until 1.27) — static
       shortcuts deep-linking into the record screen with Records anchored beneath.
 - [x] Home-screen widgets (1.28): **Budget** (4×2: spent against the month's budget with a bar and

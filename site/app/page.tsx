@@ -126,6 +126,11 @@ export default function Home() {
               <li>Multi-currency, with the rate kept per record — last year’s purchase stays at last year’s rate.</li>
               <li>Credit cards with their limits, foreign-transaction and cash-withdrawal fees.</li>
               <li>Works in split-screen beside your bank’s notification, which is where records get logged.</li>
+              <li>Photograph a receipt right in the note field — one tap and it is attached, no camera app in between.</li>
+              <li>
+                From the home screen: Budget, Balance and Quick add widgets, and hold the Peace icon for a new expense,
+                a receipt or Penny.
+              </li>
             </ul>
           </Feature>
 
@@ -192,6 +197,10 @@ export default function Home() {
               <li>Restore brings back your records, receipts and settings — and “Undo last restore” brings back what it replaced.</li>
               <li>Optional Google Drive backup, sealed with a passphrase if you choose one.</li>
               <li>CSV export that keeps both sides of every transfer, so per-account balances still add up.</li>
+              <li>
+                CSV import in the same format, from <a href="/import/">a template</a> — every row previewed before
+                anything is added, and the whole file undoable in one tap.
+              </li>
             </ul>
           </Feature>
 
