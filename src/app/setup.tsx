@@ -14,6 +14,7 @@ import {
   DoneStep,
   KeypadStep,
   ReminderStep,
+  ThemeStep,
   WelcomeStep,
   type StepProps,
 } from '@/components/setup/steps';
@@ -26,13 +27,14 @@ const STEPS: Record<SetupStep, (props: StepProps) => React.ReactNode> = {
   currency: CurrencyStep,
   accounts: AccountsStep,
   keypad: KeypadStep,
+  theme: ThemeStep,
   reminder: ReminderStep,
   ai: AiStep,
   bank: BankStep,
   backup: BackupStep,
 };
 
-/** Welcome, the seven steps, then the summary. */
+/** Welcome, the steps, then the summary. */
 const LAST = SETUP_STEPS.length + 1;
 
 /**
