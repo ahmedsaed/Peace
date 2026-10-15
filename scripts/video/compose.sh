@@ -42,19 +42,27 @@ still() { # still <card> <seconds>
     "${ENC[@]}" "$WORK/seg-$1.mp4"
 }
 
-scene() { # scene <clip> <from> <to> <speed> — the clip's from..to, played at speed
-  local name=$1 from=$2 to=$3 speed=$4 len
-  len=$(python3 -c "print(round(($to-$from)/$speed, 3))")
+scene() { # scene <clip> <from> <to> [hold] — the clip's from..to, stillness cut out
+  local name=$1 from=$2 to=$3 hold=${4:-} spans graph="" labels="" n=0 len s e speed
+  spans=$(python3 scripts/video/cut.py "$CLIPS/$name.mp4" "$from" "$to" $hold)
+  # One trim per kept span, at real speed unless cut.py says it is long motion,
+  # then joined: the app's own animations keep their own pace.
+  while read -r s e speed; do
+    graph+="[1:v]trim=start=$s:end=$e,setpts=(PTS-STARTPTS)/$speed,fps=30[c$n];"
+    labels+="[c$n]"
+    n=$((n + 1))
+  done <<< "$spans"
+  len=$(awk '{ t += ($2 - $1) / $3 } END { printf "%.3f", t }' <<< "$spans")
   card "$name"
   ffmpeg -v error -y -loop 1 -t "$len" -i "$WORK/$name.png" -i "$CLIPS/$name.mp4" -loop 1 -i "$WORK/mask.png" \
-    -filter_complex "\
-[1:v]trim=start=$from:end=$to,setpts=(PTS-STARTPTS)/$speed,fps=30,scale=$SCREEN_W:$SCREEN_H:flags=lanczos,format=rgba[screen];\
+    -filter_complex "$graph\
+${labels}concat=n=$n:v=1:a=0,scale=$SCREEN_W:$SCREEN_H:flags=lanczos,format=rgba[screen];\
 [2:v]format=gray,scale=$SCREEN_W:$SCREEN_H[mask];\
 [screen][mask]alphamerge[phone];\
-[0:v][phone]overlay=$SCREEN_X:$SCREEN_Y:shortest=1,\
+[0:v][phone]overlay=$SCREEN_X:$SCREEN_Y:shortest=1,fps=30,\
 fade=in:st=0:d=0.35,fade=out:st=$(python3 -c "print($len-0.35)"):d=0.35" \
     -t "$len" "${ENC[@]}" "$WORK/seg-$name.mp4"
-  echo "$name: ${len}s"
+  echo "$name: ${len}s in $n cuts"
 }
 
 picture() { # picture <card> <png> <seconds> — a still image in the phone
@@ -77,14 +85,14 @@ fade=in:st=0:d=0.35,fade=out:st=$(python3 -c "print($len-0.35)"):d=0.35" \
 HOME_SCREEN=site/out/store/home-screen.png
 [[ -s $HOME_SCREEN ]] || (cd site && npm run build >/dev/null)
 
-# The cut, in order. Times are seconds into each raw clip, chosen from where
-# the screen actually changes; speed > 1 is waiting compressed (Maestro types
-# slowly, and Gemini thinks), never a UI animation hurried for its own sake.
+# The cut, in order. from..to brackets each raw clip's action (Maestro starts
+# slowly); inside it cut.py keeps the motion and drops the waiting. The bank
+# scene holds longer after each step, so the text can be read as it arrives.
 still intro 3
-scene scene-1-one-handed 7.0 38.5 2.6
-scene scene-2-bank 3.0 14.0 1.15
-scene scene-3-invoice 9.0 52.0 3.0
-scene scene-4-penny 28.5 72.5 3.0
+scene scene-1-one-handed 7.0 38.5
+scene scene-2-bank 3.0 14.0 1.4
+scene scene-3-invoice 9.0 52.0
+scene scene-4-penny 28.5 72.5
 picture scene-5-widgets "$HOME_SCREEN" 5
 still outro 4
 
