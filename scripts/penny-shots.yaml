@@ -43,7 +43,7 @@ appId: dev.merope.peace.oss
     timeout: 15000
 - tapOn: "REPLACE"
 - extendedWaitUntil:
-    visible: ".*records in the ledger.*"
+    visible: "Restored.*records.*now in the app.*"
     timeout: 30000
 # Back to the Settings index, where Backup & export lives.
 - tapOn:
@@ -134,9 +134,12 @@ appId: dev.merope.peace.oss
     id: "assistant-attach"
 - tapOn:
     id: "assistant-attach-files"
-- extendedWaitUntil:
-    visible: "peace-receipt.jpg"
-    timeout: 15000
+# The picker opens on Recent, which the E2E runs fill with copies of their own
+# receipt fixture — so the one pushed for this flow can be below the fold.
+- scrollUntilVisible:
+    element: "peace-receipt.jpg"
+    direction: DOWN
+    timeout: 30000
 - tapOn: "peace-receipt.jpg"
 - extendedWaitUntil:
     visible:
