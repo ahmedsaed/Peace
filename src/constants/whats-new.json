@@ -1,5 +1,11 @@
 [
   {
+    "version": "1.32.0",
+    "notes": [
+      "The keypad's next key now shows where it goes: the account, then the category, then a check to save."
+    ]
+  },
+  {
     "version": "1.31.0",
     "notes": [
       "After an update, Peace now shows what changed — like this. Find it again any time in About."
