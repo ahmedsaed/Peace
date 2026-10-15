@@ -1,4 +1,4 @@
-import { featureGraphic, STORE_SHOTS, storeIcon, storeShot } from '@/lib/store-graphics';
+import { featureGraphic, homeScreenImage, STORE_SHOTS, storeIcon, storeShot } from '@/lib/store-graphics';
 
 /**
  * /store/<file>.png — the Play listing's graphics, drawn once at build time.
@@ -14,6 +14,8 @@ export const dynamicParams = false;
 const FILES: Record<string, () => Response> = {
   'feature-graphic.png': featureGraphic,
   'icon-512.png': storeIcon,
+  // Not a listing image: the website's widget section shows it as a phone.
+  'home-screen.png': homeScreenImage,
   ...Object.fromEntries(STORE_SHOTS.map((_, i) => [`screenshot-${i + 1}.png`, () => storeShot(i)])),
 };
 

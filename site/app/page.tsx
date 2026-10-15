@@ -27,10 +27,10 @@ const structuredData = {
 
 const RELEASES = 'https://github.com/ahmedsaed/Peace/releases/latest';
 
-function Shot({ name, alt }: { name: string; alt: string }) {
+function Shot({ name, src, alt }: { name: string; src?: string; alt: string }) {
   return (
     <div className="phone feature-shot">
-      <img src={`/screenshots/${name}.png`} alt={alt} width={540} height={1200} loading="lazy" />
+      <img src={src ?? `/screenshots/${name}.png`} alt={alt} width={540} height={1200} loading="lazy" />
     </div>
   );
 }
@@ -40,6 +40,7 @@ function Feature({
   title,
   optional,
   shot,
+  src,
   alt,
   flip,
   children,
@@ -48,6 +49,8 @@ function Feature({
   title: string;
   optional?: string;
   shot: string;
+  /** An image that is not one of the app's screenshots — the home-screen composite. */
+  src?: string;
   alt: string;
   flip?: boolean;
   children: ReactNode;
@@ -62,7 +65,7 @@ function Feature({
         </h3>
         {children}
       </div>
-      <Shot name={shot} alt={alt} />
+      <Shot name={shot} src={src} alt={alt} />
     </div>
   );
 }
@@ -127,10 +130,22 @@ export default function Home() {
               <li>Credit cards with their limits, foreign-transaction and cash-withdrawal fees.</li>
               <li>Works in split-screen beside your bank’s notification, which is where records get logged.</li>
               <li>Photograph a receipt right in the note field — one tap and it is attached, no camera app in between.</li>
-              <li>
-                From the home screen: Budget, Balance and Quick add widgets, and hold the Peace icon for a new expense,
-                a receipt or Penny.
-              </li>
+            </ul>
+          </Feature>
+
+          <Feature
+            eyebrow="On the home screen"
+            title="Your month, without opening the app."
+            shot="home"
+            src="/store/home-screen.png"
+            alt="A home screen with Peace's widgets: the balance with accounts, the month's budget, the balance on one row, and the quick-add buttons"
+            flip
+          >
+            <ul>
+              <li>Balance: what you have now and the month in and out. Stretch it taller and your accounts appear.</li>
+              <li>Budget: what is spent against the month’s budget, what is left, and the days to go.</li>
+              <li>Quick add: a new expense, a receipt photo or Penny, one tap each. Hold the Peace icon for the same.</li>
+              <li>They follow your theme, mask amounts when you hide them, and show nothing at all while the app is locked.</li>
             </ul>
           </Feature>
 
@@ -139,7 +154,6 @@ export default function Home() {
             title="Where it went, ranked — and what is left."
             shot="budgets"
             alt="The budgets screen with four categories and progress bars, one of them over budget"
-            flip
           >
             <ul>
               <li>Every day netted, with the month’s expense, income and running position in the header.</li>
@@ -157,6 +171,7 @@ export default function Home() {
             optional="Optional"
             shot="penny-receipt"
             alt="A photographed café receipt turned into a proposed record with Add and Decline buttons"
+            flip
           >
             <ul>
               <li>Photograph a receipt and have the shop, total and basket read into the form.</li>
@@ -175,7 +190,6 @@ export default function Home() {
             optional="Optional"
             shot="penny-ask"
             alt="Penny comparing two months with a bar chart and a written answer"
-            flip
           >
             <ul>
               <li>“How much did fuel cost me in December?” — worked out by the same totals every screen uses.</li>
@@ -191,6 +205,7 @@ export default function Home() {
             title="Backups you can open without this app."
             shot="actions"
             alt="A long press on a purchase showing its refund and the record actions"
+            flip
           >
             <ul>
               <li>A backup is a plain zip: the database beside your receipts. Unzip it anywhere and your data is there.</li>
@@ -209,7 +224,6 @@ export default function Home() {
             title="Set up in a minute — or skip it."
             shot="welcome"
             alt="The welcome screen: the Peace wordmark, the line Peace of mind, piece of cake, three promises about privacy, and a Get started button"
-            flip
           >
             <ul>
               <li>Your currency, worked out from the phone’s region; one tap to confirm or change it.</li>
