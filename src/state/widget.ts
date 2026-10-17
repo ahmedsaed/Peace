@@ -11,6 +11,7 @@ import { periodOf } from '@/lib/period';
 import { widgetSnapshot } from '@/lib/widget';
 import { moneyFor } from '@/state/money';
 import { useSettingsStore } from '@/state/settings';
+import { trackSync } from '@/state/stalls';
 
 /**
  * Write the home-screen widgets' snapshot from the ledger as it is now.
@@ -26,6 +27,10 @@ import { useSettingsStore } from '@/state/settings';
  * and that is never worth interrupting somebody leaving the app.
  */
 export function syncWidget(): void {
+  trackSync('widget', writeWidget);
+}
+
+function writeWidget(): void {
   try {
     const settings = useSettingsStore.getState().settings;
     const currency = settings.homeCurrency;

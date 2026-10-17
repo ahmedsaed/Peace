@@ -1,5 +1,11 @@
 [
   {
+    "version": "1.32.1",
+    "notes": [
+      "Fixed a rare freeze when Peace opened while a Google Drive backup was due. If Peace ever stops responding again, About now lists when and what it was busy with, so you can share it with us."
+    ]
+  },
+  {
     "version": "1.32.0",
     "notes": [
       "The keypad's next key now shows where it goes: the account, then the category, then a check to save."

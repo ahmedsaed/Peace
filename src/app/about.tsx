@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, Share, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 
@@ -9,7 +9,9 @@ import { WhatsNewSheet } from '@/components/whats-new';
 import { Wordmark } from '@/components/wordmark';
 import { buildInfo, packageName, selfUpdates } from '@/lib/build-info';
 import { formatCommit, formatVersion } from '@/lib/version';
+import { stallReport, type Stall } from '@/lib/stalls';
 import { recentNotes } from '@/lib/whats-new';
+import { clearStalls, readStalls } from '@/state/stalls';
 import { useTheme } from '@/state/theme';
 
 /**
@@ -126,8 +128,72 @@ export default function AboutScreen() {
             rest of the time — which is right, and leaves no way to tell "you
             are up to date" from "the check is broken". */}
         {selfUpdates ? <UpdateRow /> : null}
+
+        <SlowMoments />
       </ScrollView>
       <WhatsNewSheet entries={recent} visible={notes} onClose={() => setNotes(false)} />
+    </View>
+  );
+}
+
+/**
+ * The stall recorder's log (`state/stalls.ts`), shown only when there is one.
+ *
+ * A freeze that happens three times in two months cannot be reproduced on
+ * request, so the app writes down every time its thread stopped answering and
+ * which job held it. This is the only way that record leaves the phone: shared
+ * by hand, as text, by the person holding it.
+ */
+function SlowMoments() {
+  const [log, setLog] = useState<Stall[]>(readStalls);
+  if (log.length === 0) return null;
+
+  return (
+    <View className="mt-4 overflow-hidden rounded-xl bg-surface" testID="about-stalls">
+      <View className="px-4 pb-2 pt-3.5">
+        <Text className="text-sm text-ink">Slow moments</Text>
+        <Text className="mt-1 text-[11px] leading-4 text-muted">
+          Times Peace stopped responding for half a second or more, and what it was busy with.
+          Kept on this phone only.
+        </Text>
+      </View>
+      {log.slice(0, 10).map((stall) => (
+        <View key={stall.at} className="flex-row gap-3 border-t border-line px-4 py-2.5">
+          <Text className="text-xs text-muted">
+            {new Date(stall.at).toLocaleString(undefined, {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </Text>
+          <Text className="w-10 text-right text-xs font-semibold text-ink">
+            {(stall.ms / 1000).toFixed(1)}s
+          </Text>
+          <Text className="flex-1 text-xs text-muted" numberOfLines={2}>
+            {stall.jobs.length > 0 ? stall.jobs.join(', ') : 'nothing tracked'}
+          </Text>
+        </View>
+      ))}
+      <View className="flex-row border-t border-line">
+        <Pressable
+          onPress={() => void Share.share({ message: stallReport(log) })}
+          testID="about-stalls-share"
+          accessibilityRole="button"
+          className="flex-1 items-center py-3 active:bg-raised">
+          <Text className="text-sm text-accent">Share</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            clearStalls();
+            setLog([]);
+          }}
+          testID="about-stalls-clear"
+          accessibilityRole="button"
+          className="flex-1 items-center border-l border-line py-3 active:bg-raised">
+          <Text className="text-sm text-muted">Clear</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

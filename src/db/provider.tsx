@@ -7,6 +7,7 @@ import migrations from '../../drizzle/migrations';
 import { THEMES } from '../constants/themes';
 import { useLockStore } from '../state/app-lock';
 import { useSettingsStore } from '../state/settings';
+import { trackSync } from '../state/stalls';
 import { sweepOrphans } from './attachments';
 import { forgetHandled } from './repo/bank-captures';
 import { db } from './client';
@@ -57,7 +58,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         setSetting('whatsNewSeen', first.whatsNewSeen);
       }
 
-      seedDefaults(db, getSetting('homeCurrency'));
+      trackSync('launch:seed', () => seedDefaults(db, getSetting('homeCurrency')));
       // Loaded here, behind the same gate, so no screen ever renders with the
       // built-in defaults and then flicks to the stored values a frame later.
       useSettingsStore.getState().load();
@@ -81,7 +82,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
        * delete is worth a line in the log and nothing more.
        */
       try {
-        sweepOrphans();
+        trackSync('launch:sweep', sweepOrphans);
       } catch (e) {
         console.warn('[attachments] orphan sweep failed', e);
       }
@@ -95,7 +96,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
        * old: that is precisely the one the user has not dealt with.
        */
       try {
-        forgetHandled(db, new Date());
+        trackSync('launch:forget-bank', () => forgetHandled(db, new Date()));
       } catch (e) {
         console.warn('[bank] forgetting handled messages failed', e);
       }

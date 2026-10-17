@@ -9,6 +9,7 @@ import {
   describeContainer,
   looksLikeZip,
   packContainer,
+  packContainerTo,
   readContainer,
   type Manifest,
 } from './container';
@@ -198,5 +199,82 @@ describe('what it packs and how', () => {
     expect(
       describeContainer({ database: new Uint8Array(100), files: [receipt('a.jpg', 'ab')] })
     ).toEqual({ files: 1, bytes: 102 });
+  });
+});
+
+describe('packing without holding the thread', () => {
+  const big = (size: number, seed: number) =>
+    Uint8Array.from({ length: size }, (_, i) => (i * 31 + seed) & 0xff);
+  const container = {
+    database: big(200_000, 1),
+    files: [
+      { name: 'a.jpg', bytes: big(150_000, 2) },
+      { name: 'empty.txt', bytes: new Uint8Array(0) },
+      { name: 'b.pdf', bytes: big(90_000, 3) },
+    ],
+  };
+  const now = new Date(Date.UTC(2026, 9, 17));
+
+  const packed = async (options: Parameters<typeof packContainerTo>[2] = {}) => {
+    const chunks: Uint8Array[] = [];
+    await packContainerTo(container, (c) => chunks.push(c), { now, ...options });
+    const out = new Uint8Array(chunks.reduce((sum, c) => sum + c.byteLength, 0));
+    let at = 0;
+    for (const c of chunks) {
+      out.set(c, at);
+      at += c.byteLength;
+    }
+    return out;
+  };
+
+  /** One format: the fixtures tests build are exactly what a phone writes. */
+  it('writes the same bytes as the synchronous packer', async () => {
+    expect(await packed()).toEqual(packContainer(container, now));
+  });
+
+  it('restores to everything that went in', async () => {
+    const back = readContainer(await packed());
+    expect(back.database).toEqual(container.database);
+    expect(back.files.map((f) => [f.name, f.bytes.byteLength])).toEqual([
+      ['a.jpg', 150_000],
+      ['empty.txt', 0],
+      ['b.pdf', 90_000],
+    ]);
+  });
+
+  /**
+   * The point of it. A clock that moves 5ms per reading crosses the budget
+   * every few steps, so a large container gives the thread back again and
+   * again — where one `zipSync` gave it back once, at the end.
+   */
+  it('hands the thread back whenever it has held it for its budget', async () => {
+    let t = 0;
+    let pauses = 0;
+    await packed({
+      clock: () => (t += 5),
+      pause: async () => {
+        pauses += 1;
+      },
+    });
+    // ~440KB is ~15 steps of 32KB; at 5ms a reading the budget runs out about
+    // every third one.
+    expect(pauses).toBeGreaterThanOrEqual(4);
+  });
+
+  it('does not pause at all when every step is quick', async () => {
+    let pauses = 0;
+    await packed({
+      clock: () => 0,
+      pause: async () => {
+        pauses += 1;
+      },
+    });
+    expect(pauses).toBe(0);
+  });
+
+  it('still refuses an unsafe attachment name', async () => {
+    await expect(
+      packContainerTo({ database: database(), files: [receipt('../evil.jpg')] }, () => {})
+    ).rejects.toThrow(ContainerError);
   });
 });

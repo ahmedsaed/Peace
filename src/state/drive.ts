@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { runBackup } from '@/db/drive';
 import { syncBackgroundBackup } from '@/lib/background-backup';
 import { backupDue } from '@/lib/drive-backup';
+import { track } from '@/state/stalls';
 import { useSetting, useSettingsStore } from '@/state/settings';
 
 /**
@@ -45,7 +46,7 @@ export async function backupOnce(record: (at: number) => void): Promise<void> {
   if (running) return;
   running = true;
   try {
-    const outcome = await runBackup();
+    const outcome = await track('drive-backup', () => runBackup());
     record(outcome.at);
   } catch (error) {
     // Friendly nothing for the user — the age line already tells the truth —
@@ -68,6 +69,9 @@ export function DriveCatchUp(): null {
   useDriveCatchUp();
   return null;
 }
+
+/** How long after opening before a due backup starts. */
+const SETTLE_MS = 4_000;
 
 export function useDriveCatchUp(): void {
   const account = useSetting('driveAccount');
@@ -92,15 +96,33 @@ export function useDriveCatchUp(): void {
       void backupOnce((at) => write('driveLastBackupAt', at));
     };
 
-    attempt();
+    /**
+     * A few seconds after opening, not at once. The first moments are when
+     * the app is busiest drawing its first screen and when a person is most
+     * likely to tap, and a backup that started then — before packing gave the
+     * thread back — was the freeze somebody saw three times in two months.
+     * The check is re-made when the timer fires, so leaving the app first
+     * simply leaves it for the next time.
+     */
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const soon = () => {
+      clearTimeout(timer);
+      timer = setTimeout(attempt, SETTLE_MS);
+    };
+
+    soon();
 
     // Also on return to the foreground: the app can sit in memory for days, and
     // a launch-only check would then never fire for someone who never fully
     // closes it.
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active') attempt();
+      if (next === 'active') soon();
+      else clearTimeout(timer);
     });
-    return () => subscription.remove();
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
   }, []);
 
   /**

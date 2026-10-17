@@ -9,6 +9,7 @@ import { dueProposals } from '@/db/repo/recurring';
 import { getSetting } from '@/db/settings';
 import { planReminders, type ReminderSubject } from '@/lib/reminder';
 import { useSetting } from '@/state/settings';
+import { track } from '@/state/stalls';
 
 /**
  * Arming the nightly reminder, and keeping what it says true.
@@ -196,7 +197,7 @@ export function readSubject(now = new Date()): ReminderSubject {
 let queue: Promise<void> = Promise.resolve();
 
 export function syncReminders(now?: Date): Promise<void> {
-  queue = queue.then(() => runSync(now ?? new Date()));
+  queue = queue.then(() => track('reminders', () => runSync(now ?? new Date())));
   return queue;
 }
 
