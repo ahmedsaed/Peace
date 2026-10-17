@@ -18,6 +18,30 @@ export type Slice = {
   icon: string | null;
   /** Unsigned magnitude in minor units. */
   amountMinor: number;
+  /**
+   * What this slice is made of, when it is a parent with sub-categories that
+   * have something in them this month. Absent or empty means no breakdown.
+   * See `rankSubs`.
+   */
+  subs?: SubSlice[];
+};
+
+/**
+ * One line of a parent's breakdown: a sub-category, or the money filed on the
+ * parent itself (`own`), without which the lines would not add up to it.
+ */
+export type SubSlice = {
+  id: string;
+  label: string;
+  color: string;
+  icon: string | null;
+  /**
+   * SIGNED, in minor units: positive is money spent (or earned), negative is a
+   * sub-category whose month nets as money RETURNED — a refund with nothing
+   * spent against it. The lines of one parent sum to its `amountMinor`.
+   */
+  amountMinor: number;
+  own: boolean;
 };
 
 export type RankedSlice = Slice & {
@@ -41,8 +65,14 @@ export type RankedSlice = Slice & {
  */
 export function sharePercents(amounts: number[], decimals = 1): number[] {
   const scale = 10 ** decimals;
-  const target = 100 * scale;
+  return apportion(amounts, 100 * scale).map((v) => v / scale);
+}
 
+/**
+ * Split `target` whole units between `amounts` in proportion, by largest
+ * remainder, so the parts always add up to exactly `target`.
+ */
+function apportion(amounts: number[], target: number): number[] {
   const magnitudes = amounts.map((a) => Math.abs(a));
   const total = magnitudes.reduce((sum, a) => sum + a, 0);
   if (total === 0) return amounts.map(() => 0);
@@ -65,7 +95,7 @@ export function sharePercents(amounts: number[], decimals = 1): number[] {
     remaining -= 1;
   }
 
-  return out.map((v) => v / scale);
+  return out;
 }
 
 /**
@@ -115,6 +145,80 @@ export function rankSlices(
     percent: percents[i],
     isOther: slice.id === 'other' && other !== null,
   }));
+}
+
+export type RankedSub = SubSlice & {
+  /**
+   * Share of the MONTH, like the parent's — so the lines under "Food 37.1%"
+   * add up to 37.1, by the same largest remainder as the ring. Null for a
+   * refund line, and for every line of a parent that has one: lines that
+   * overshoot the parent and come back down have no shares that add up.
+   */
+  percent: number | null;
+  /** 0 is the parent's own colour; higher fades towards the page. */
+  tint: number;
+};
+
+/** How far the faintest line of a breakdown fades towards the page. */
+const MAX_TINT = 0.6;
+
+/**
+ * A parent's breakdown, largest first, refunds last.
+ *
+ * Sub-categories are drawn as TINTS of the parent rather than in their own
+ * colours. The seed gives every child its parent's colour, so their own would
+ * be one wedge of identical slices; and a tint is what says, at a glance, that
+ * the outer ring belongs to the wedge it sits on.
+ */
+export function rankSubs(parent: RankedSlice, decimals = 1): RankedSub[] {
+  const subs = parent.subs ?? [];
+  const byLabel = (a: SubSlice, b: SubSlice) => a.label.localeCompare(b.label);
+  const spent = subs
+    .filter((s) => s.amountMinor > 0)
+    .sort((a, b) => b.amountMinor - a.amountMinor || byLabel(a, b));
+  const returned = subs
+    .filter((s) => s.amountMinor < 0)
+    .sort((a, b) => a.amountMinor - b.amountMinor || byLabel(a, b));
+
+  const scale = 10 ** decimals;
+  const parts =
+    returned.length === 0
+      ? apportion(
+          spent.map((s) => s.amountMinor),
+          Math.round(parent.percent * scale)
+        )
+      : null;
+
+  return [
+    ...spent.map((sub, i) => ({
+      ...sub,
+      percent: parts ? parts[i] / scale : null,
+      tint: spent.length > 1 ? (i / (spent.length - 1)) * MAX_TINT : 0,
+    })),
+    ...returned.map((sub) => ({ ...sub, percent: null, tint: 0 })),
+  ];
+}
+
+/**
+ * `from` moved `amount` (0–1) of the way towards `to`, both `#RRGGBB`.
+ *
+ * Towards the PAGE colour rather than towards white: a tint towards white
+ * would glow on Ledger and vanish on Paper, where the page is nearly white.
+ */
+export function mixHex(from: string, to: string, amount: number): string {
+  const channels = (hex: string) =>
+    [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const a = channels(from);
+  const b = channels(to);
+  if ([...a, ...b].some(Number.isNaN)) return from;
+  return (
+    '#' +
+    a
+      .map((v, i) => Math.round(v + (b[i] - v) * amount))
+      .map((v) => v.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +292,7 @@ export function donutSegment(ring: Ring, startDeg: number, endDeg: number): stri
   ].join(' ');
 }
 
-export type Segment = { slice: RankedSlice; path: string };
+export type Segment = { slice: RankedSlice; path: string; startDeg: number; endDeg: number };
 
 /**
  * Lay the ranked slices out around the ring.
@@ -208,9 +312,44 @@ export function donutSegments(ring: Ring, slices: RankedSlice[]): Segment[] {
     // The last slice closes on 360 exactly rather than on an accumulated sum of
     // divisions, so float drift cannot leave a sliver of background showing.
     const end = i === slices.length - 1 ? 360 : cursor + (slice.amountMinor / total) * 360;
-    segments.push({ slice, path: donutSegment(ring, cursor, end) });
+    segments.push({ slice, path: donutSegment(ring, cursor, end), startDeg: cursor, endDeg: end });
     cursor = end;
   });
 
   return segments;
+}
+
+export type SubSegment = { sub: RankedSub; parentId: string; path: string };
+
+/**
+ * The outer ring: each parent's breakdown laid inside the span of its wedge.
+ *
+ * Only the lines that SPENT are drawn, sized against one another. Without a
+ * refund among them that is exactly their share of the parent; with one, they
+ * add up to more than the parent nets, and drawing them to scale would spill
+ * past the wedge into its neighbour — so they split the wedge between them
+ * and the refund is a line in the list, the only place a negative can go.
+ * A parent with no breakdown leaves its stretch of the outer ring empty,
+ * which is the honest picture of "nothing to break down".
+ */
+export function subRingSegments(ring: Ring, parents: Segment[]): SubSegment[] {
+  const out: SubSegment[] = [];
+
+  for (const { slice, startDeg, endDeg } of parents) {
+    const spent = rankSubs(slice).filter((s) => s.amountMinor > 0);
+    const total = spent.reduce((sum, s) => sum + s.amountMinor, 0);
+    if (total <= 0) continue;
+
+    let cursor = startDeg;
+    spent.forEach((sub, i) => {
+      const end =
+        i === spent.length - 1
+          ? endDeg
+          : cursor + (sub.amountMinor / total) * (endDeg - startDeg);
+      out.push({ sub, parentId: slice.id, path: donutSegment(ring, cursor, end) });
+      cursor = end;
+    });
+  }
+
+  return out;
 }

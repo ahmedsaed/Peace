@@ -1,10 +1,14 @@
 import {
   donutSegment,
   donutSegments,
+  mixHex,
   rankSlices,
+  rankSubs,
   sharePercents,
+  subRingSegments,
   type Ring,
   type Slice,
+  type SubSlice,
 } from './analysis';
 
 const slice = (id: string, amountMinor: number, label = id): Slice => ({
@@ -207,5 +211,129 @@ describe('donutSegments', () => {
 
   it('has nothing to draw for an empty month', () => {
     expect(donutSegments(ring, [])).toEqual([]);
+  });
+});
+
+describe('rankSlices without a fold', () => {
+  it('keeps every category when told to', () => {
+    const many = Array.from({ length: 19 }, (_, i) => slice(`c${i}`, 100 + i));
+    const out = rankSlices(many, { maxSlices: Infinity });
+    expect(out).toHaveLength(19);
+    expect(out.some((s) => s.isOther)).toBe(false);
+    expect(out.reduce((sum, s) => sum + s.percent * 10, 0)).toBe(1000);
+  });
+});
+
+const sub = (id: string, amountMinor: number, own = false): SubSlice => ({
+  id,
+  label: id,
+  color: '#B03A3A',
+  icon: null,
+  amountMinor,
+  own,
+});
+
+const withSubs = (subs: SubSlice[], others: Slice[] = []) =>
+  rankSlices([
+    { ...slice('food', subs.reduce((sum, s) => sum + s.amountMinor, 0)), subs },
+    ...others,
+  ]).find((s) => s.id === 'food')!;
+
+describe('rankSubs', () => {
+  it('orders the lines largest first', () => {
+    const out = rankSubs(withSubs([sub('coffee', 100), sub('groceries', 300)]));
+    expect(out.map((s) => s.id)).toEqual(['groceries', 'coffee']);
+  });
+
+  /**
+   * Shares of the MONTH, and they add up to the parent's printed share — not
+   * merely near it. Rounded on their own, three equal thirds of 37.1 print
+   * 12.4 three times, which is 37.2 under a parent saying 37.1.
+   */
+  it("splits the parent's printed share exactly between its lines", () => {
+    const parent = withSubs(
+      [sub('a', 1_000), sub('b', 1_000), sub('c', 1_000)],
+      [slice('rest', 5_087)]
+    );
+    expect(parent.percent).toBe(37.1);
+    const out = rankSubs(parent);
+    expect(out.reduce((sum, s) => sum + s.percent! * 10, 0)).toBe(371);
+  });
+
+  it('gives no shares to the lines of a parent holding a refund', () => {
+    const out = rankSubs(withSubs([sub('coffee', 10_000), sub('groceries', -3_000)]));
+    expect(out.map((s) => [s.id, s.percent])).toEqual([
+      ['coffee', null],
+      ['groceries', null],
+    ]);
+  });
+
+  it('puts refunds last', () => {
+    const out = rankSubs(withSubs([sub('back', -100), sub('coffee', 50), sub('tea', 500)]));
+    expect(out.map((s) => s.id)).toEqual(['tea', 'coffee', 'back']);
+  });
+
+  it('fades each line further from the parent colour, the first not at all', () => {
+    const out = rankSubs(withSubs([sub('a', 300), sub('b', 200), sub('c', 100)]));
+    expect(out.map((s) => s.tint)).toEqual([0, 0.3, 0.6]);
+    expect(rankSubs(withSubs([sub('a', 300)]))[0].tint).toBe(0);
+  });
+
+  it('is empty for a parent with no breakdown', () => {
+    expect(rankSubs(rankSlices([slice('a', 100)])[0])).toEqual([]);
+  });
+});
+
+describe('mixHex', () => {
+  it('moves the given fraction of the way', () => {
+    expect(mixHex('#000000', '#FFFFFF', 0)).toBe('#000000');
+    expect(mixHex('#000000', '#FFFFFF', 1)).toBe('#FFFFFF');
+    expect(mixHex('#000000', '#FFFFFF', 0.5)).toBe('#808080');
+    expect(mixHex('#b03a3a', '#17140f', 0.6)).toBe('#542320');
+  });
+
+  it('hands back the colour unchanged rather than an invalid one', () => {
+    expect(mixHex('red', '#FFFFFF', 0.5)).toBe('red');
+  });
+});
+
+describe('subRingSegments', () => {
+  const inner: Ring = { cx: 100, cy: 100, outer: 88, inner: 58 };
+  const outer: Ring = { cx: 100, cy: 100, outer: 100, inner: 92 };
+
+  it('lays a breakdown inside the span of its own wedge', () => {
+    const ranked = rankSlices([
+      { ...slice('food', 300), subs: [sub('coffee', 100), sub('groceries', 200)] },
+      slice('transport', 300),
+    ]);
+    const parents = donutSegments(inner, ranked);
+    const out = subRingSegments(outer, parents);
+
+    // Food is the first half of the ring; groceries takes two thirds of it.
+    expect(out.map((s) => s.sub.id)).toEqual(['groceries', 'coffee']);
+    expect(out[0].path).toBe(donutSegment(outer, 0, 120));
+    expect(out[1].path).toBe(donutSegment(outer, 120, 180));
+  });
+
+  it('draws nothing over a wedge with no breakdown', () => {
+    const parents = donutSegments(inner, rankSlices([slice('food', 300)]));
+    expect(subRingSegments(outer, parents)).toEqual([]);
+  });
+
+  it('closes a lone line on its wedge, all the way round', () => {
+    const ranked = rankSlices([{ ...slice('food', 300), subs: [sub('coffee', 300)] }]);
+    const out = subRingSegments(outer, donutSegments(inner, ranked));
+    expect(out).toHaveLength(1);
+    expect(out[0].path).toBe(donutSegment(outer, 0, 360));
+  });
+
+  /** A refund cannot be an arc, and drawn to scale the rest would overflow. */
+  it('splits the wedge between the lines that spent when one is a refund', () => {
+    const ranked = rankSlices([
+      { ...slice('food', 7_000), subs: [sub('coffee', 10_000), sub('groceries', -3_000)] },
+    ]);
+    const out = subRingSegments(outer, donutSegments(inner, ranked));
+    expect(out.map((s) => s.sub.id)).toEqual(['coffee']);
+    expect(out[0].path).toBe(donutSegment(outer, 0, 360));
   });
 });

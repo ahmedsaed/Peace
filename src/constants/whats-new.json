@@ -1,5 +1,11 @@
 [
   {
+    "version": "1.33.0",
+    "notes": [
+      "Analysis now breaks each category down by its sub-categories, in the list and as an outer ring on the chart. Every category gets its own row too, instead of the smaller ones being folded into \"Other\"."
+    ]
+  },
+  {
     "version": "1.32.1",
     "notes": [
       "Fixed a rare freeze when Peace opened while a Google Drive backup was due. If Peace ever stops responding again, About now lists when and what it was busy with, so you can share it with us."

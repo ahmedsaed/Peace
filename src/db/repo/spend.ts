@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import { periodBounds, type Period } from '../../lib/period';
@@ -50,6 +50,83 @@ export function totalsByTopCategory(
    */
   tagId: string | null = null
 ): TopCategoryTotals {
+  const rows = sideTotals(
+    db,
+    period,
+    kind,
+    homeCurrency,
+    tagId,
+    sql<string | null>`coalesce(${categories.parentId}, ${categories.id})`
+  );
+
+  const byCategory = new Map<string, number>();
+  let uncategorised = 0;
+  let unvalued = 0;
+
+  for (const row of rows) {
+    unvalued += Number(row.unvalued ?? 0);
+    const total = Math.abs(Number(row.total ?? 0));
+    // A record with no category is still money moved. Dropping it silently
+    // would leave these screens disagreeing with the records list, with nothing
+    // on either saying why.
+    if (row.topId === null) uncategorised += total;
+    else byCategory.set(row.topId, total);
+  }
+
+  return { byCategory, uncategorised, unvalued };
+}
+
+/**
+ * One month of money in or out per category EXACTLY as filed — no roll-up —
+ * SIGNED in the direction of `kind`: positive is money spent (or earned),
+ * negative is money that came back.
+ *
+ * Analysis needs both halves of what `totalsByTopCategory` throws away. The
+ * sub-category, to break a parent down; and the SIGN, because a month in which
+ * "Groceries" holds nothing but the refund for last month's shop nets as money
+ * returned. Made positive, that refund would be drawn as spending, and the
+ * sub-categories would add up to more than the parent they sit under.
+ */
+export function totalsByCategory(
+  db: Db,
+  period: Period,
+  kind: CategoryKind,
+  homeCurrency = 'EGP',
+  tagId: string | null = null
+): { byCategory: Map<string, number>; uncategorised: number; unvalued: number } {
+  const rows = sideTotals(db, period, kind, homeCurrency, tagId, transactions.categoryId);
+  // Stored amounts are negative for spending, so expense flips to read as "spent".
+  const direction = kind === 'expense' ? -1 : 1;
+
+  const byCategory = new Map<string, number>();
+  let uncategorised = 0;
+  let unvalued = 0;
+
+  for (const row of rows) {
+    unvalued += Number(row.unvalued ?? 0);
+    // `+ 0` folds the -0 that negating an empty sum produces.
+    const total = direction * Number(row.total ?? 0) + 0;
+    // Kept as `totalsByTopCategory` reports it, so the footnote under the ring
+    // says the same thing it always has.
+    if (row.topId === null) uncategorised += Math.abs(total);
+    else if (total !== 0) byCategory.set(row.topId, total);
+  }
+
+  return { byCategory, uncategorised, unvalued };
+}
+
+/**
+ * The query both of the above are made of: valued sums on one side of the
+ * ledger, transfers excluded, optionally within a tag, grouped by `group`.
+ */
+function sideTotals(
+  db: Db,
+  period: Period,
+  kind: CategoryKind,
+  homeCurrency: string,
+  tagId: string | null,
+  group: SQL<string | null> | typeof transactions.categoryId
+) {
   const { start, end } = periodBounds(period);
   const home = sql`${homeCurrency.toUpperCase()}`;
 
@@ -63,9 +140,9 @@ export function totalsByTopCategory(
   // nets against the category it reverses instead of inflating income.
   const direction = kind === 'expense' ? onExpenseSide() : onIncomeSide();
 
-  const rows = db
+  return db
     .select({
-      topId: sql<string | null>`coalesce(${categories.parentId}, ${categories.id})`,
+      topId: group,
       total: sql<number>`coalesce(sum(${valued}), 0)`,
       unvalued: sql<number>`coalesce(sum(case when ${valued} is null then 1 else 0 end), 0)`,
     })
@@ -88,24 +165,18 @@ export function totalsByTopCategory(
           : undefined
       )
     )
-    .groupBy(sql`coalesce(${categories.parentId}, ${categories.id})`)
+    .groupBy(group)
     .all();
+}
 
-  const byCategory = new Map<string, number>();
-  let uncategorised = 0;
-  let unvalued = 0;
-
-  for (const row of rows) {
-    unvalued += Number(row.unvalued ?? 0);
-    const total = Math.abs(Number(row.total ?? 0));
-    // A record with no category is still money moved. Dropping it silently
-    // would leave these screens disagreeing with the records list, with nothing
-    // on either saying why.
-    if (row.topId === null) uncategorised += total;
-    else byCategory.set(row.topId, total);
-  }
-
-  return { byCategory, uncategorised, unvalued };
+/** Every category of one kind, archived ones included, in the order the app shows them. */
+export function categoriesOfKind(db: Db, kind: CategoryKind): schema.Category[] {
+  return db
+    .select()
+    .from(categories)
+    .where(eq(categories.kind, kind))
+    .orderBy(categories.sortOrder, categories.name)
+    .all();
 }
 
 /** Top-level categories of one kind, in the order the app shows them. */
