@@ -5,8 +5,11 @@ import { createTestDb, type TestDb } from '../../test/db';
 import { localNoon as on } from '../../test/dates';
 import { createAccount } from './accounts';
 import { cashFlow, cashFlowPeak, categoryBreakdown } from './analysis';
-import { createCategory } from './categories';
+import { createCategory, updateCategory } from './categories';
+import { totalsByTopCategory } from './spend';
 import { createRecord, createTransfer } from './transactions';
+
+const archiveCategory = (db: TestDb, id: string) => updateCategory(db, id, { archived: true });
 
 function seed() {
   const { db } = createTestDb();
@@ -16,6 +19,7 @@ function seed() {
 
   createCategory(db, { id: 'food', name: 'Food', kind: 'expense', sortOrder: 0 });
   createCategory(db, { id: 'coffee', name: 'Coffee', kind: 'expense', parentId: 'food' });
+  createCategory(db, { id: 'groceries', name: 'Groceries', kind: 'expense', parentId: 'food' });
   createCategory(db, { id: 'transport', name: 'Transport', kind: 'expense', sortOrder: 1 });
   createCategory(db, { id: 'salary', name: 'Salary', kind: 'income', sortOrder: 0 });
   createCategory(db, { id: 'bonus', name: 'Bonus', kind: 'income', sortOrder: 1 });
@@ -32,6 +36,20 @@ const spend = (db: TestDb, id: string, categoryId: string | null, minor: number,
     amountMinor: minor,
     occurredAt: when,
   });
+
+const refund = (db: TestDb, id: string, categoryId: string, minor: number, when: Date) =>
+  createRecord(db, {
+    id,
+    accountId: 'bank',
+    categoryId,
+    type: 'expense',
+    isRefund: true,
+    amountMinor: minor,
+    occurredAt: when,
+  });
+
+const lines = (out: ReturnType<typeof categoryBreakdown>, parentId: string) =>
+  out.slices.find((s) => s.id === parentId)?.subs?.map((s) => [s.label, s.amountMinor]);
 
 const earn = (db: TestDb, id: string, categoryId: string | null, minor: number, when: Date) =>
   createRecord(db, {
@@ -169,6 +187,109 @@ describe('categoryBreakdown', () => {
     const out = categoryBreakdown(db, '2026-08', 'expense');
     expect(out.slices).toEqual([]);
     expect(out.totalMinor).toBe(0);
+  });
+
+  describe('sub-categories', () => {
+    it('breaks a parent down by the sub-categories with money in them', () => {
+      spend(db, 'a', 'coffee', 9_500, on(2026, 8, 3));
+      spend(db, 'b', 'groceries', 30_000, on(2026, 8, 4));
+      spend(db, 'c', 'transport', 10_000, on(2026, 8, 5));
+
+      const out = categoryBreakdown(db, '2026-08', 'expense');
+      expect(out.slices.find((s) => s.id === 'food')?.amountMinor).toBe(39_500);
+      expect(lines(out, 'food')).toEqual([
+        ['Coffee', 9_500],
+        ['Groceries', 30_000],
+      ]);
+      // A parent with no children of its own has nothing to break down.
+      expect(lines(out, 'transport')).toEqual([]);
+    });
+
+    it('leaves out a sub-category with nothing in it', () => {
+      spend(db, 'a', 'coffee', 9_500, on(2026, 8, 3));
+      expect(lines(categoryBreakdown(db, '2026-08', 'expense'), 'food')).toEqual([
+        ['Coffee', 9_500],
+      ]);
+    });
+
+    /**
+     * Without this line the breakdown does not add up to the wedge it breaks
+     * down, and the difference is money nothing on the screen accounts for.
+     */
+    it('gives money filed on the parent itself a line of its own', () => {
+      spend(db, 'a', 'coffee', 9_500, on(2026, 8, 3));
+      spend(db, 'b', 'food', 20_000, on(2026, 8, 4));
+
+      const out = categoryBreakdown(db, '2026-08', 'expense');
+      expect(lines(out, 'food')).toEqual([
+        ['Coffee', 9_500],
+        ['Food, no sub-category', 20_000],
+      ]);
+      expect(out.slices[0].subs?.find((s) => s.own)?.id).toBe('food-own');
+    });
+
+    it('does not break a parent down when everything is filed on the parent', () => {
+      spend(db, 'a', 'food', 20_000, on(2026, 8, 4));
+      expect(lines(categoryBreakdown(db, '2026-08', 'expense'), 'food')).toEqual([]);
+    });
+
+    /**
+     * The refund for last month's shop, in a month with no shop. Made positive,
+     * it would be E£30 of Groceries "spending" and the lines would add up to
+     * E£130 under a parent that nets E£70.
+     */
+    it('keeps the sign of a sub-category that nets as a refund', () => {
+      spend(db, 'a', 'coffee', 10_000, on(2026, 8, 3));
+      refund(db, 'b', 'groceries', 3_000, on(2026, 8, 4));
+
+      const out = categoryBreakdown(db, '2026-08', 'expense');
+      expect(out.slices[0].amountMinor).toBe(7_000);
+      expect(lines(out, 'food')).toEqual([
+        ['Coffee', 10_000],
+        ['Groceries', -3_000],
+      ]);
+      const sum = out.slices[0].subs!.reduce((total, s) => total + s.amountMinor, 0);
+      expect(sum).toBe(out.slices[0].amountMinor);
+      expect(out.totalMinor).toBe(7_000);
+    });
+
+    it('nets a refund against the sub-category it came back to', () => {
+      spend(db, 'a', 'coffee', 10_000, on(2026, 8, 3));
+      refund(db, 'b', 'coffee', 2_500, on(2026, 8, 4));
+      expect(lines(categoryBreakdown(db, '2026-08', 'expense'), 'food')).toEqual([
+        ['Coffee', 7_500],
+      ]);
+    });
+
+    /** A wedge cannot be negative, and drawing it as spending would be a lie. */
+    it('reports a whole category that nets as a refund beside the ring, not in it', () => {
+      spend(db, 'a', 'transport', 10_000, on(2026, 8, 3));
+      refund(db, 'b', 'groceries', 3_000, on(2026, 8, 4));
+
+      const out = categoryBreakdown(db, '2026-08', 'expense');
+      expect(out.slices.map((s) => s.id)).toEqual(['transport']);
+      expect(out.totalMinor).toBe(10_000);
+      expect(out.refundedMinor).toBe(3_000);
+    });
+
+    it('still counts a sub-category that has been archived', () => {
+      archiveCategory(db, 'coffee');
+      spend(db, 'a', 'coffee', 9_500, on(2026, 8, 3));
+      expect(lines(categoryBreakdown(db, '2026-08', 'expense'), 'food')).toEqual([
+        ['Coffee', 9_500],
+      ]);
+    });
+
+    it('rolls up to the same parent totals Budgets sees', () => {
+      spend(db, 'a', 'coffee', 9_500, on(2026, 8, 3));
+      spend(db, 'b', 'food', 20_000, on(2026, 8, 4));
+      spend(db, 'c', 'transport', 10_000, on(2026, 8, 5));
+
+      const { byCategory } = totalsByTopCategory(db, '2026-08', 'expense');
+      for (const slice of categoryBreakdown(db, '2026-08', 'expense').slices) {
+        expect(slice.amountMinor).toBe(byCategory.get(slice.id));
+      }
+    });
   });
 });
 

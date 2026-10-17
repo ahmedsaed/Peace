@@ -104,6 +104,23 @@ appId: dev.merope.peace.oss
 - assertVisible:
     id: "analysis-amount-seed-cat-food"
     text: "E£240.00"
+# --- and each parent broken down by the sub-categories under it ---
+# Coffee is all of Food, so its line carries Food's whole share of the MONTH —
+# a share of the parent would say 100% here and read as a different number.
+- assertVisible:
+    id: "analysis-sub-seed-cat-coffee"
+- assertVisible:
+    id: "analysis-sub-amount-seed-cat-coffee"
+    text: "E£240.00"
+- assertVisible:
+    id: "analysis-sub-percent-seed-cat-coffee"
+    text: "75.0%"
+- assertVisible:
+    id: "analysis-sub-percent-seed-cat-taxi"
+    text: "25.0%"
+# Only sub-categories with records get a line.
+- assertNotVisible:
+    id: "analysis-sub-seed-cat-groceries"
 - takeScreenshot: 01-analysis-expense
 
 # --- the income side is a different chart, not the same one relabelled ---
@@ -122,6 +139,9 @@ appId: dev.merope.peace.oss
     text: "100.0%"
 - assertNotVisible:
     id: "analysis-percent-seed-cat-food"
+# Salary has no sub-categories, so the income side has no breakdown at all.
+- assertNotVisible:
+    id: "analysis-sub-seed-cat-coffee"
 - takeScreenshot: 02-analysis-income
 
 # --- the expense side is still the expense side on the way back ---
@@ -135,6 +155,12 @@ appId: dev.merope.peace.oss
 - scrollUntilVisible:
     element:
       id: "analysis-cashflow"
+    direction: DOWN
+# And on to the line itself: the sub-category rows above push it below the
+# fold, and the strip's top being visible says nothing about its foot.
+- scrollUntilVisible:
+    element:
+      id: "analysis-cashflow-net"
     direction: DOWN
 - assertVisible:
     id: "analysis-cashflow-net"

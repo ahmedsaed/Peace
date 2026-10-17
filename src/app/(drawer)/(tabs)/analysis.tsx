@@ -17,7 +17,7 @@ import { broughtForward, runningTotals } from '@/db/repo/carry';
 import { hasAnyRecords } from '@/db/repo/records';
 import { tagBreakdown, type TagTotal } from '@/db/repo/tags';
 import type { CategoryKind } from '@/db/repo/spend';
-import { rankSlices, type RankedSlice } from '@/lib/analysis';
+import { mixHex, rankSlices, rankSubs, type RankedSlice, type RankedSub } from '@/lib/analysis';
 import { testIdSlug as slug } from '@/lib/id';
 import { parsePeriod, type Period } from '@/lib/period';
 import { usePeriodState, usePeriodLabel } from '@/state/period';
@@ -29,6 +29,7 @@ const EMPTY: Breakdown = {
   slices: [],
   totalMinor: 0,
   uncategorisedMinor: 0,
+  refundedMinor: 0,
   unvaluedCount: 0,
 };
 
@@ -79,7 +80,10 @@ export default function AnalysisScreen() {
   // logged, and returning from the record screen has to show that.
   useFocusEffect(refresh);
 
-  const ranked = rankSlices(breakdown.slices, { otherColor: palette.line });
+  // EVERY category, never folded into an "Other": the list is the only place
+  // a small category's name appears at all, and a thin wedge is still a true
+  // one. Penny's smaller charts keep the fold.
+  const ranked = rankSlices(breakdown.slices, { maxSlices: Infinity });
   const nothing = breakdown.totalMinor === 0;
   const filteredTo = tagTotals.find((t) => t.id === tagId)?.name ?? null;
 
@@ -135,7 +139,11 @@ export default function AnalysisScreen() {
         ) : (
           <>
             <View className="items-center pt-2">
-              <Donut slices={ranked} testID="analysis-donut">
+              <Donut
+                slices={ranked}
+                thickness={30}
+                ground={palette.ground}
+                testID="analysis-donut">
                 {/* THE NAME OF WHAT IS BEING SHOWN, when it is not the whole
                     month. The tag row that set this is far below and usually
                     scrolled off, so without this the ring silently means
@@ -159,13 +167,24 @@ export default function AnalysisScreen() {
 
             <View className="mt-4">
               {ranked.map((slice) => (
-                <SliceRow
-                  key={slice.id}
-                  slice={slice}
-                  kind={kind}
-                  homeCurrency={homeCurrency}
-                  totalMinor={breakdown.totalMinor}
-                />
+                <View key={slice.id}>
+                  <SliceRow
+                    slice={slice}
+                    kind={kind}
+                    homeCurrency={homeCurrency}
+                    totalMinor={breakdown.totalMinor}
+                  />
+                  {rankSubs(slice).map((sub) => (
+                    <SubRow
+                      key={sub.id}
+                      sub={sub}
+                      parent={slice}
+                      kind={kind}
+                      homeCurrency={homeCurrency}
+                      ground={palette.ground}
+                    />
+                  ))}
+                </View>
               ))}
             </View>
           </>
@@ -293,6 +312,81 @@ function SliceRow({
           style={{ width: `${fraction * 100}%`, backgroundColor: slice.color }}
         />
       </View>
+    </View>
+  );
+}
+
+/**
+ * One line of a parent's breakdown, indented under it.
+ *
+ * The dot is the line's colour in the OUTER ring — a tint of the parent — so
+ * the list is the ring's legend. Its bar is scaled against the parent, the
+ * whole it is a part of. A line that nets as money returned shows the amount
+ * and says "refund" where a share would be, and has no bar: it is not in the
+ * ring, and a bar would be a length for a negative.
+ */
+function SubRow({
+  sub,
+  parent,
+  kind,
+  homeCurrency,
+  ground,
+}: {
+  sub: RankedSub;
+  parent: RankedSlice;
+  kind: CategoryKind;
+  homeCurrency: string;
+  ground: string;
+}) {
+  const money = useMoney();
+  const id = slug(sub.id);
+  const refund = sub.amountMinor < 0;
+  const amount = money(Math.abs(sub.amountMinor), homeCurrency);
+  const fraction = !refund && parent.amountMinor > 0 ? sub.amountMinor / parent.amountMinor : 0;
+
+  return (
+    <View
+      className="border-b border-line py-2 pl-14 pr-4"
+      testID={`analysis-sub-${id}`}
+      accessible
+      accessibilityLabel={
+        refund
+          ? `${sub.label}, ${amount} refunded`
+          : sub.percent === null
+            ? `${sub.label}, ${amount}`
+            : `${sub.label}, ${amount}, ${sub.percent.toFixed(1)} percent`
+      }>
+      <View className="flex-row items-center gap-3">
+        <View
+          className="h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: refund ? 'transparent' : mixHex(sub.color, ground, sub.tint) }}
+        />
+        <Text className="flex-1 text-sm text-ink" numberOfLines={1}>
+          {sub.label}
+        </Text>
+        <Text
+          className={`text-sm ${refund ? 'text-income' : kind === 'expense' ? 'text-expense' : 'text-income'}`}
+          testID={`analysis-sub-amount-${id}`}>
+          {refund ? `+${amount}` : amount}
+        </Text>
+        <Text
+          className="w-12 text-right text-[11px] text-muted"
+          testID={`analysis-sub-percent-${id}`}>
+          {refund ? 'refund' : sub.percent === null ? '' : `${sub.percent.toFixed(1)}%`}
+        </Text>
+      </View>
+
+      {fraction > 0 ? (
+        <View className="ml-[22px] mt-1.5 h-0.5 overflow-hidden rounded-full bg-line">
+          <View
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.min(1, fraction) * 100}%`,
+              backgroundColor: mixHex(sub.color, ground, sub.tint),
+            }}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -468,7 +562,12 @@ function Footnotes({
   homeCurrency: string;
 }) {
   const money = useMoney();
-  if (breakdown.uncategorisedMinor === 0 && breakdown.unvaluedCount === 0) return null;
+  if (
+    breakdown.uncategorisedMinor === 0 &&
+    breakdown.refundedMinor === 0 &&
+    breakdown.unvaluedCount === 0
+  )
+    return null;
 
   return (
     <View className="mt-3 gap-1 px-4">
@@ -476,6 +575,12 @@ function Footnotes({
         <Text className="text-[11px] text-muted" testID="analysis-uncategorised">
           {money(breakdown.uncategorisedMinor, homeCurrency)} of{' '}
           {kind === 'expense' ? 'spending' : 'income'} has no category and is not in the chart
+        </Text>
+      ) : null}
+      {breakdown.refundedMinor > 0 ? (
+        <Text className="text-[11px] text-muted" testID="analysis-refunded">
+          {money(breakdown.refundedMinor, homeCurrency)} more came back in refunds than was spent in
+          their categories, and is not in the chart
         </Text>
       ) : null}
       {breakdown.unvaluedCount > 0 ? (

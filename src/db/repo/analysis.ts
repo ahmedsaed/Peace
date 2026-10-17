@@ -1,10 +1,10 @@
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
-import type { Slice } from '../../lib/analysis';
+import type { Slice, SubSlice } from '../../lib/analysis';
 import { addMonths, type Period } from '../../lib/period';
 import * as schema from '../schema';
 import { periodSummary } from './records';
-import { topLevelCategories, totalsByTopCategory, type CategoryKind } from './spend';
+import { categoriesOfKind, totalsByCategory, type CategoryKind } from './spend';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -18,17 +18,29 @@ export type Breakdown = {
   totalMinor: number;
   /** Money of this kind with no category. Reported, never silently folded in. */
   uncategorisedMinor: number;
+  /**
+   * Money that came back in a category with nothing (net) spent in it this
+   * month — the refund for last month's shop. A wedge cannot be negative, so
+   * it is reported beside the ring instead of being drawn as spending.
+   */
+  refundedMinor: number;
   unvaluedCount: number;
 };
 
 /**
- * One month, split by top-level category.
+ * One month, split by top-level category, each broken down by its
+ * sub-categories.
  *
- * Rolled up rather than leaf-level: nineteen parents already make a crowded
- * ring, and thirty-three would make it unreadable. It also keeps this screen
- * agreeing with Budgets, which can only ever be set on a parent — two screens
- * showing the same month under different groupings is how a person stops
- * trusting both.
+ * The RING is still the parents. Nineteen of them already make a crowded
+ * ring, and slicing it by thirty-three leaves would make it unreadable; it
+ * also keeps this screen agreeing with Budgets, which can only ever be set on
+ * a parent. The sub-categories are a breakdown INSIDE a parent's wedge — the
+ * same month under the same grouping, with more said about it — so the two
+ * screens still show one set of figures.
+ *
+ * Totals are rolled up from SIGNED per-category sums. Rolling up magnitudes
+ * would make a sub-category holding only a refund count as spending, and the
+ * lines under a parent would add up to more than the parent.
  */
 export function categoryBreakdown(
   db: Db,
@@ -44,7 +56,7 @@ export function categoryBreakdown(
    */
   tagId: string | null = null
 ): Breakdown {
-  const { byCategory, uncategorised, unvalued } = totalsByTopCategory(
+  const { byCategory, uncategorised, unvalued } = totalsByCategory(
     db,
     period,
     kind,
@@ -52,19 +64,56 @@ export function categoryBreakdown(
     tagId
   );
 
+  // Archived categories included: money filed under one has still been spent.
+  const all = categoriesOfKind(db, kind);
+  const childrenOf = new Map<string, schema.Category[]>();
+  for (const category of all) {
+    if (!category.parentId) continue;
+    childrenOf.set(category.parentId, [...(childrenOf.get(category.parentId) ?? []), category]);
+  }
+
   const slices: Slice[] = [];
   let totalMinor = 0;
+  let refundedMinor = 0;
 
-  for (const category of topLevelCategories(db, kind)) {
-    const amountMinor = byCategory.get(category.id) ?? 0;
-    if (amountMinor === 0) continue;
-    slices.push({
-      id: category.id,
-      label: category.name,
-      color: category.color ?? NO_COLOR,
-      icon: category.icon,
-      amountMinor,
-    });
+  for (const parent of all) {
+    if (parent.parentId) continue;
+    const color = parent.color ?? NO_COLOR;
+
+    const children: SubSlice[] = (childrenOf.get(parent.id) ?? [])
+      .filter((child) => byCategory.has(child.id))
+      .map((child) => ({
+        id: child.id,
+        label: child.name,
+        color,
+        icon: child.icon,
+        amountMinor: byCategory.get(child.id)!,
+        own: false,
+      }));
+    const ownMinor = byCategory.get(parent.id) ?? 0;
+    const amountMinor = children.reduce((sum, c) => sum + c.amountMinor, ownMinor);
+
+    if (amountMinor < 0) refundedMinor -= amountMinor;
+    if (amountMinor <= 0) continue;
+
+    // Money filed on the parent itself is a line of its own as soon as there
+    // is any breakdown at all, or the lines would not add up to the wedge.
+    const subs: SubSlice[] =
+      children.length > 0 && ownMinor !== 0
+        ? [
+            ...children,
+            {
+              id: `${parent.id}-own`,
+              label: `${parent.name}, no sub-category`,
+              color,
+              icon: parent.icon,
+              amountMinor: ownMinor,
+              own: true,
+            },
+          ]
+        : children;
+
+    slices.push({ id: parent.id, label: parent.name, color, icon: parent.icon, amountMinor, subs });
     totalMinor += amountMinor;
   }
 
@@ -72,6 +121,7 @@ export function categoryBreakdown(
     slices,
     totalMinor,
     uncategorisedMinor: uncategorised,
+    refundedMinor,
     unvaluedCount: unvalued,
   };
 }
