@@ -2,7 +2,8 @@ import { count } from 'drizzle-orm';
 import { Directory, File, Paths } from 'expo-file-system';
 import { defaultDatabaseDirectory } from 'expo-sqlite';
 
-import { packContainer } from '../lib/container';
+import { packContainerTo } from '../lib/container';
+import { track, trackSync } from '../state/stalls';
 import { toCsvFile } from '../lib/csv';
 import { importTemplate } from '../lib/import-csv';
 import { readReferencedFiles } from './attachments';
@@ -120,14 +121,26 @@ function databaseFile(): File {
  * a backup contains exactly what the ledger claims exists.
  */
 export async function databaseBackup(now = new Date()): Promise<Exported> {
-  sqliteDb.execSync('PRAGMA wal_checkpoint(TRUNCATE);');
+  // Each step under its own name, so a freeze says which one held the thread.
+  trackSync('backup:checkpoint', () => sqliteDb.execSync('PRAGMA wal_checkpoint(TRUNCATE);'));
 
-  const database = await databaseFile().bytes();
-  const files = await readReferencedFiles();
+  const { database, files } = await track('backup:read', async () => ({
+    database: await databaseFile().bytes(),
+    files: await readReferencedFiles(),
+  }));
 
+  // Packed in small steps straight into the file — see `packContainerTo` for
+  // why this used to freeze the app when a backup was due at launch.
   const destination = stagingFile(exportFilename(now, BACKUP_EXTENSION));
   destination.create({ overwrite: true });
-  destination.write(packContainer({ database, files }, now));
+  const handle = destination.open();
+  try {
+    await track('backup:zip', () =>
+      packContainerTo({ database, files }, (chunk) => handle.writeBytes(chunk), { now })
+    );
+  } finally {
+    handle.close();
+  }
   return verify(destination);
 }
 

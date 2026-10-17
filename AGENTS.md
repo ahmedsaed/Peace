@@ -624,6 +624,17 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   headless JS context with no React tree, so the store was never loaded and hands back its built-in
   defaults — `driveCadence: 'off'` — and the task would decide there was nothing to do, forever,
   with nothing in any log to say why. A store is a UI cache; the database is the truth.
+- **Heavy synchronous work on the JS thread freezes the app, and Android never notices.** The
+  Drive catch-up runs when the app opens, and packing a backup was one `zipSync` over the ledger
+  and every receipt: seconds in which the screen drew and no tap landed. It happened about three
+  times in two months, it was not an ANR, and nothing in Play's vitals or a crash log showed it.
+  `packContainerTo` now packs in steps and hands the thread back every ~12ms; anything else that
+  loops over megabytes in JS needs the same treatment. **The stall recorder** (`state/stalls.ts`)
+  is how the next one gets found: wrap long work in `track` / `trackSync` with a name per PHASE,
+  and a freeze is written to a local file with every job that overlapped it, shown under About ›
+  Slow moments (`adb logcat | grep stalls` sees it live). The watcher must stay the first thing
+  mounted in the shell — sibling effects run in order, and a watcher that starts after the job has
+  the thread cannot see it.
 - **WorkManager is an accelerator, never the mechanism.** It defers at the OS's discretion, and a
   force-stop — by the user or by an OEM battery manager "helping" — cancels pending work until the
   app is launched again. The on-open catch-up is what actually delivers a weekly backup, because

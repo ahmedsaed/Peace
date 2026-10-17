@@ -26,6 +26,7 @@ import { backupName, prunable, type Cadence } from '../lib/drive-backup';
 import { withDriveToken } from '../lib/google-auth';
 import { isSealed, seal, SealError, unseal } from '../lib/seal';
 import { getPassphrase } from '../lib/secrets';
+import { track } from '../state/stalls';
 import { databaseBackup } from './backup';
 import { inspectBackup } from './inspect';
 import { restoreFrom, type RestoreResult } from './restore';
@@ -68,10 +69,12 @@ export async function runBackup(now = new Date()): Promise<BackupOutcome> {
     const plain = await staged.file.bytes();
     const passphrase = await getPassphrase();
     const sealed = passphrase !== null;
-    const payload = sealed ? await seal(plain, passphrase) : plain;
+    const payload = sealed ? await track('backup:seal', () => seal(plain, passphrase)) : plain;
 
     const name = backupName(now, sealed);
-    await withDriveToken((token) => uploadBackup(token, name, payload), tokenExpired);
+    await track('backup:upload', () =>
+      withDriveToken((token) => uploadBackup(token, name, payload), tokenExpired)
+    );
 
     /**
      * Housekeeping, and NOT allowed to fail the backup.

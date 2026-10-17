@@ -13,6 +13,7 @@ import { CONTENT_MAX_WIDTH } from '@/lib/layout';
 import { BankCatchUp } from '@/state/bank';
 import { DriveCatchUp } from '@/state/drive';
 import { ReminderSchedule } from '@/state/reminders';
+import { StallWatch } from '@/state/stalls';
 import { ThemeRoot, useTheme } from '@/state/theme';
 import { WidgetSync } from '@/state/widget';
 
@@ -84,6 +85,10 @@ function Shell() {
   const palette = useTheme();
   return (
     <>
+      {/* Notices when the JS thread stops answering, and writes down which
+          job held it. FIRST, because sibling effects run in order and a
+          watcher that starts after the backup has the thread cannot see it. */}
+      <StallWatch />
       {/* Backs up to Drive if one is due. Renders nothing, blocks nothing,
           and swallows every failure — see the file for why the app being
           opened IS the scheduler rather than a fallback behind one. */}

@@ -8,6 +8,7 @@ import { db } from '@/db/client';
 import { pendingCaptures, reviewableCaptures } from '@/db/repo/bank-captures';
 import type { BankCapture } from '@/db/schema';
 import { useSetting } from '@/state/settings';
+import { track } from '@/state/stalls';
 
 /**
  * The inbox, held where every screen can see it change.
@@ -93,7 +94,7 @@ export async function runBankCatchUp(input: {
     // THE DRAIN HAPPENS EVEN WITH NO SENDERS CONFIGURED. The native store is
     // bounded, so leaving unwanted messages in it would let a chatty group chat
     // push a bank's own message out before it was ever read.
-    const drained = drainCaptures(input.senders);
+    const drained = await track('bank:drain', async () => drainCaptures(input.senders));
     // Straight away, so a captured message shows as waiting even while the
     // reading of it is still in flight.
     if (drained > 0) useBankInbox.getState().reload();
@@ -110,11 +111,10 @@ export async function runBankCatchUp(input: {
      * the slowest took — the app holding answers it already had. The store is
      * cheap to reload and the screens are already subscribed.
      */
-    const outcome = await readPending(
-      input.homeCurrency,
-      input.geminiModel,
-      input.guidance ?? '',
-      () => useBankInbox.getState().reload()
+    const outcome = await track('bank:read', () =>
+      readPending(input.homeCurrency, input.geminiModel, input.guidance ?? '', () =>
+        useBankInbox.getState().reload()
+      )
     );
 
     /**

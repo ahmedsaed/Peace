@@ -20,7 +20,7 @@
  * against real bytes rather than mocked out.
  */
 
-import { unzipSync, zipSync } from 'fflate';
+import { unzipSync, Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 
 /** Where the database sits inside the container. */
 export const DB_ENTRY = 'peace.db';
@@ -75,18 +75,68 @@ const decoder = new TextDecoder();
  * slightly larger than the input. Attachments are STORED, the database is
  * deflated, and a backup of a big photo library stays roughly as fast as
  * copying it.
+ *
+ * Synchronous: for tests and fixtures. The app packs with `packContainerTo`,
+ * which runs the very same steps without holding the thread.
  */
 export function packContainer(container: Container, now = new Date()): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  for (const out of packSteps(container, now)) chunks.push(...out);
+  return concat(chunks);
+}
+
+/** How much of an entry one step feeds the zip. */
+const STEP_BYTES = 32 * 1024;
+
+/** How long packing may hold the thread before it lets a tap through. */
+const BUDGET_MS = 12;
+
+/**
+ * Pack a container into `write`, handing the thread back as it goes.
+ *
+ * THIS IS WHAT FROZE THE APP. The Drive catch-up runs when the app opens, and
+ * packing used to be one `zipSync` over the database and every receipt: a CRC
+ * over tens of megabytes and a deflate of the ledger, in an interpreter, in a
+ * single call. For those seconds the screen drew and nothing on it answered a
+ * tap. Now packing is a series of small steps, and whenever one has held the
+ * thread for `BUDGET_MS` it waits for `pause` — a macrotask, so every touch
+ * that queued up meanwhile is handled first. Slower in total; never stuck.
+ *
+ * `write` receives the zip in order, so the file is written as it is made
+ * rather than built whole in memory and written in one more blocking call.
+ */
+export async function packContainerTo(
+  container: Container,
+  write: (chunk: Uint8Array) => void,
+  {
+    now = new Date(),
+    pause = () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+    clock = () => Date.now(),
+  }: { now?: Date; pause?: () => Promise<void>; clock?: () => number } = {}
+): Promise<void> {
+  let since = clock();
+  for (const out of packSteps(container, now)) {
+    for (const chunk of out) write(chunk);
+    if (clock() - since >= BUDGET_MS) {
+      await pause();
+      since = clock();
+    }
+  }
+}
+
+/**
+ * The one implementation of the format, as steps.
+ *
+ * Each yield is what the zip produced during one step. Both drivers above run
+ * this, so the synchronous fixtures in tests and the backups on a phone cannot
+ * drift into two formats.
+ */
+function* packSteps(container: Container, now: Date): Generator<Uint8Array[]> {
   const manifest: Manifest = {
     format: 'peace-backup',
     version: CONTAINER_VERSION,
     createdAt: now.toISOString(),
     attachments: container.files.length,
-  };
-
-  const entries: Record<string, [Uint8Array, { level: 0 | 6 }]> = {
-    [MANIFEST_ENTRY]: [encoder.encode(JSON.stringify(manifest, null, 2)), { level: 6 }],
-    [DB_ENTRY]: [container.database, { level: 6 }],
   };
 
   for (const file of container.files) {
@@ -99,10 +149,54 @@ export function packContainer(container: Container, now = new Date()): Uint8Arra
     if (file.name.includes('/') || file.name.includes('\\') || file.name.startsWith('.')) {
       throw new ContainerError(`Refusing to pack an attachment with an unsafe name: ${file.name}`);
     }
-    entries[ATTACHMENT_PREFIX + file.name] = [file.bytes, { level: 0 }];
   }
 
-  return zipSync(entries);
+  let pending: Uint8Array[] = [];
+  let failure: Error | null = null;
+  const zip = new Zip((error, data) => {
+    if (error) failure = error;
+    else pending.push(data);
+  });
+  const take = () => {
+    if (failure) throw failure;
+    const out = pending;
+    pending = [];
+    return out;
+  };
+
+  const entries: [ZipDeflate | ZipPassThrough, Uint8Array][] = [
+    [new ZipDeflate(MANIFEST_ENTRY, { level: 6 }), encoder.encode(JSON.stringify(manifest, null, 2))],
+    [new ZipDeflate(DB_ENTRY, { level: 6 }), container.database],
+    ...container.files.map(
+      (file): [ZipPassThrough, Uint8Array] => [
+        new ZipPassThrough(ATTACHMENT_PREFIX + file.name),
+        file.bytes,
+      ]
+    ),
+  ];
+
+  for (const [entry, bytes] of entries) {
+    zip.add(entry);
+    if (bytes.byteLength === 0) entry.push(bytes, true);
+    for (let at = 0; at < bytes.byteLength; at += STEP_BYTES) {
+      const end = Math.min(at + STEP_BYTES, bytes.byteLength);
+      entry.push(bytes.subarray(at, end), end === bytes.byteLength);
+      yield take();
+    }
+  }
+
+  zip.end();
+  yield take();
+}
+
+function concat(chunks: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(chunks.reduce((sum, c) => sum + c.byteLength, 0));
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return out;
 }
 
 /**
