@@ -188,6 +188,12 @@ appId: dev.merope.peace.oss
     element:
       id: "analysis-tags"
     direction: DOWN
+# On to the row itself: the ring above is sized to the screen, and the top of
+# the section being visible says nothing about the row under it.
+- scrollUntilVisible:
+    element:
+      id: "analysis-tag-amount-Kitchen"
+    direction: DOWN
 # Amounts, never percentages: tags overlap and most records carry none, so a
 # ring of them could not sum to 100.
 - assertVisible:

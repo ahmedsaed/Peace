@@ -121,6 +121,54 @@ appId: dev.merope.peace.oss
 # Only sub-categories with records get a line.
 - assertNotVisible:
     id: "analysis-sub-seed-cat-groceries"
+
+# --- touching the ring names what is under the finger ---
+# Points are relative to the ring's own box, so they hold at any screen size.
+# Food is 0-270 degrees and Transportation the last quarter; the outer ring
+# carries Coffee over the whole of Food. A tooltip that said the right name
+# with the wrong figure would be worse than none, so both are asserted.
+- tapOn:
+    id: "donut-touch"
+    point: "90%,50%"
+- assertVisible:
+    id: "donut-tooltip-figure"
+    text: "75.0%"
+- assertVisible:
+    id: "donut-tooltip-label"
+    text: "Food"
+# The total gives the hole to the tooltip while it is open.
+- assertNotVisible:
+    id: "analysis-total"
+- takeScreenshot: 01b-analysis-tooltip
+# A HOLD shows it too, while the finger is still down.
+- longPressOn:
+    id: "donut-touch"
+    point: "15%,35%"
+- assertVisible:
+    id: "donut-tooltip-figure"
+    text: "25.0%"
+- assertVisible:
+    id: "donut-tooltip-label"
+    text: "Transportation"
+# The outer ring is the breakdown: a share of the MONTH, and whose it is.
+# A little right of 12 o'clock: just left of it is Transportation's own
+# breakdown, and a point on the boundary would be a coin toss.
+- tapOn:
+    id: "donut-touch"
+    point: "55%,4%"
+- assertVisible:
+    id: "donut-tooltip-label"
+    text: "Coffee"
+- assertVisible: "in Food"
+# A tap in the hole puts it away, and the total comes back.
+- tapOn:
+    id: "donut-touch"
+    point: "50%,50%"
+- assertNotVisible:
+    id: "donut-tooltip"
+- assertVisible:
+    id: "analysis-total"
+    text: "E£320.00"
 - takeScreenshot: 01-analysis-expense
 
 # --- the income side is a different chart, not the same one relabelled ---

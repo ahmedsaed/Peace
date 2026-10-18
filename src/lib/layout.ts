@@ -25,6 +25,21 @@ export type Density = 'regular' | 'compact' | 'tight';
 export const CONTENT_MAX_WIDTH = 640;
 
 /**
+ * How big the Analysis ring is drawn, in dp.
+ *
+ * As wide as the column allows less a margin, because the ring is the screen's
+ * headline and a fixed 200 left a third of a phone's width empty either side of
+ * it. Capped at 360 so a tablet does not get a dinner plate, and at under half
+ * the window's HEIGHT so a split-screen half (~340dp tall) still shows the
+ * first rows of the list under it — never below the old 200, which every
+ * screen already held.
+ */
+export function ringSize(width: number, height: number): number {
+  const across = Math.min(width, CONTENT_MAX_WIDTH) - 48;
+  return Math.round(Math.max(200, Math.min(across, height * 0.45, 360)));
+}
+
+/**
  * Pure so it can be tested at the boundaries — the breakpoints are the whole
  * design, and getting one off by a pixel is invisible until you are standing in
  * a shop trying to log a purchase.

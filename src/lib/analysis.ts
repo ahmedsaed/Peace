@@ -319,7 +319,13 @@ export function donutSegments(ring: Ring, slices: RankedSlice[]): Segment[] {
   return segments;
 }
 
-export type SubSegment = { sub: RankedSub; parentId: string; path: string };
+export type SubSegment = {
+  sub: RankedSub;
+  parentId: string;
+  path: string;
+  startDeg: number;
+  endDeg: number;
+};
 
 /**
  * The outer ring: each parent's breakdown laid inside the span of its wedge.
@@ -346,10 +352,118 @@ export function subRingSegments(ring: Ring, parents: Segment[]): SubSegment[] {
         i === spent.length - 1
           ? endDeg
           : cursor + (sub.amountMinor / total) * (endDeg - startDeg);
-      out.push({ sub, parentId: slice.id, path: donutSegment(ring, cursor, end) });
+      out.push({
+        sub,
+        parentId: slice.id,
+        path: donutSegment(ring, cursor, end),
+        startDeg: cursor,
+        endDeg: end,
+      });
       cursor = end;
     });
   }
 
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Touching the ring
+// ---------------------------------------------------------------------------
+
+/** What a touch on the ring landed on: a category's wedge, or one line of its breakdown. */
+export type DonutHit = { kind: 'slice'; id: string } | { kind: 'sub'; id: string; parentId: string };
+
+/**
+ * Degrees clockwise from 12 o'clock to a point, 0–360 — the convention every
+ * segment above is laid out in.
+ */
+export function angleOf(cx: number, cy: number, x: number, y: number): number {
+  const degrees = (Math.atan2(y - cy, x - cx) * 180) / Math.PI + 90;
+  return (degrees + 360) % 360;
+}
+
+function spans(startDeg: number, endDeg: number, deg: number): boolean {
+  return deg >= startDeg && (deg < endDeg || (endDeg >= 360 && deg <= 360));
+}
+
+/**
+ * Which wedge, if any, a touch at (x, y) is on.
+ *
+ * GENEROUS ON PURPOSE. A finger is about 9mm wide and a thin wedge is a few
+ * pixels, so the target is the whole band out to `slop` beyond the painted
+ * ring on both sides, gap included — a touch that lands a little outside the
+ * ink still means the wedge under it. The outer ring takes everything beyond
+ * the middle of the gap between the two; where a wedge has no breakdown that
+ * stretch falls through to the wedge itself. The hole and the corners are
+ * nothing, which is what lets a tap there put the tooltip away.
+ */
+export function hitDonut(
+  x: number,
+  y: number,
+  main: { ring: Ring; segments: Segment[] },
+  sub: { ring: Ring; segments: SubSegment[] } | null,
+  slop = 12
+): DonutHit | null {
+  const { cx, cy, inner, outer } = main.ring;
+  const radius = Math.hypot(x - cx, y - cy);
+  const deg = angleOf(cx, cy, x, y);
+
+  const reach = sub ? sub.ring.outer + slop : outer + slop;
+  if (radius < inner - slop || radius > reach) return null;
+
+  if (sub && radius > (outer + sub.ring.inner) / 2) {
+    const line = sub.segments.find((s) => spans(s.startDeg, s.endDeg, deg));
+    if (line) return { kind: 'sub', id: line.sub.id, parentId: line.parentId };
+  }
+
+  const wedge = main.segments.find((s) => spans(s.startDeg, s.endDeg, deg));
+  return wedge ? { kind: 'slice', id: wedge.slice.id } : null;
+}
+
+/**
+ * Where a wedge's tooltip sits: in the HOLE, just inward of the middle of the
+ * wedge's arc, opening towards the centre.
+ *
+ * Inside rather than outside because outside there is no room. The chart
+ * fills the column, so a tooltip opening outwards was pushed back onto the
+ * ring — and for a wedge near the bottom it landed squarely on the arc it was
+ * describing. The hole is wide and empty but for the total, so a tooltip there
+ * covers no part of the ring, and its position still says which wedge it is
+ * about. `ring` is always the MAIN ring: a line of the outer ring is told by
+ * its angle, and its tooltip sits in the same hole.
+ */
+export function tooltipAnchor(
+  ring: Ring,
+  startDeg: number,
+  endDeg: number,
+  offset = 8
+): { x: number; y: number; right: boolean; below: boolean } {
+  const mid = (startDeg + endDeg) / 2;
+  const point = pointOn(ring.cx, ring.cy, ring.inner - offset, mid);
+  // Towards the centre: a point left of it opens to the right, and so on.
+  return { ...point, right: point.x < ring.cx, below: point.y < ring.cy };
+}
+
+/** The square inscribed in a ring's hole — the room a tooltip has. */
+export function holeBounds(ring: Ring, inset = 4): { left: number; top: number; side: number } {
+  const half = ring.inner / Math.SQRT2 - inset;
+  return { left: ring.cx - half, top: ring.cy - half, side: Math.max(0, half * 2) };
+}
+
+/**
+ * The tooltip's top-left corner: opened from `anchor` in the direction it
+ * says, then pulled back inside `bounds` so it is never cut off by the ring.
+ */
+export function placeTooltip(
+  anchor: { x: number; y: number; right: boolean; below: boolean },
+  width: number,
+  height: number,
+  bounds: { left: number; top: number; side: number }
+): { left: number; top: number } {
+  const clamp = (v: number, min: number, size: number) =>
+    Math.max(min, Math.min(v, min + Math.max(0, bounds.side - size)));
+  return {
+    left: clamp(anchor.right ? anchor.x : anchor.x - width, bounds.left, width),
+    top: clamp(anchor.below ? anchor.y : anchor.y - height, bounds.top, height),
+  };
 }

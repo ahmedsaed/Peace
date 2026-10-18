@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { Donut } from '@/components/donut';
 import { Icon } from '@/components/icon';
@@ -19,6 +19,7 @@ import { tagBreakdown, type TagTotal } from '@/db/repo/tags';
 import type { CategoryKind } from '@/db/repo/spend';
 import { mixHex, rankSlices, rankSubs, type RankedSlice, type RankedSub } from '@/lib/analysis';
 import { testIdSlug as slug } from '@/lib/id';
+import { ringSize } from '@/lib/layout';
 import { parsePeriod, type Period } from '@/lib/period';
 import { usePeriodState, usePeriodLabel } from '@/state/period';
 import { useSetting } from '@/state/settings';
@@ -38,6 +39,8 @@ const CASH_FLOW_MONTHS = 6;
 
 export default function AnalysisScreen() {
   const palette = useTheme();
+  const viewport = useWindowDimensions();
+  const ring = ringSize(viewport.width, viewport.height);
   const periodLabel = usePeriodLabel();
   const router = useRouter();
   const money = useMoney();
@@ -140,8 +143,12 @@ export default function AnalysisScreen() {
           <>
             <View className="items-center pt-2">
               <Donut
+                // A touched wedge belongs to the figures it was touched on: a
+                // new month, side or tag starts with nothing selected.
+                key={`${period}:${kind}:${tagId ?? ''}`}
                 slices={ranked}
-                thickness={30}
+                size={ring}
+                thickness={Math.round(ring * 0.14)}
                 ground={palette.ground}
                 testID="analysis-donut">
                 {/* THE NAME OF WHAT IS BEING SHOWN, when it is not the whole
@@ -156,7 +163,7 @@ export default function AnalysisScreen() {
                   {filteredTo ?? (kind === 'expense' ? 'Spent' : 'Earned')}
                 </Text>
                 <Text
-                  className="text-center text-xl font-semibold text-ink"
+                  className="text-center text-2xl font-semibold text-ink"
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   testID="analysis-total">
