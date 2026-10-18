@@ -1,6 +1,11 @@
 import {
   donutSegment,
+  angleOf,
   donutSegments,
+  hitDonut,
+  holeBounds,
+  placeTooltip,
+  tooltipAnchor,
   mixHex,
   rankSlices,
   rankSubs,
@@ -335,5 +340,135 @@ describe('subRingSegments', () => {
     const out = subRingSegments(outer, donutSegments(inner, ranked));
     expect(out.map((s) => s.sub.id)).toEqual(['coffee']);
     expect(out[0].path).toBe(donutSegment(outer, 0, 360));
+  });
+});
+
+describe('touching the ring', () => {
+  // A 200-box: main ring 58–88, outer ring 92–100, centre (100, 100).
+  const main: Ring = { cx: 100, cy: 100, outer: 88, inner: 58 };
+  const outer: Ring = { cx: 100, cy: 100, outer: 100, inner: 92 };
+  // Food is the right half (0–180°), Transport the left; Food breaks down.
+  const ranked = rankSlices([
+    { ...slice('food', 300), subs: [sub('groceries', 200), sub('coffee', 100)] },
+    slice('transport', 300),
+  ]);
+  const segments = donutSegments(main, ranked);
+  const rings = () => ({
+    main: { ring: main, segments },
+    sub: { ring: outer, segments: subRingSegments(outer, segments) },
+  });
+  const hit = (x: number, y: number) => {
+    const { main: m, sub: s } = rings();
+    return hitDonut(x, y, m, s);
+  };
+
+  it('measures angles clockwise from 12 o\'clock', () => {
+    expect(angleOf(100, 100, 100, 0)).toBeCloseTo(0);
+    expect(angleOf(100, 100, 200, 100)).toBeCloseTo(90);
+    expect(angleOf(100, 100, 100, 200)).toBeCloseTo(180);
+    expect(angleOf(100, 100, 0, 100)).toBeCloseTo(270);
+  });
+
+  it('finds the wedge under a touch on the main ring', () => {
+    expect(hit(100 + 73, 100)).toEqual({ kind: 'slice', id: 'food' });
+    expect(hit(100 - 73, 100)).toEqual({ kind: 'slice', id: 'transport' });
+  });
+
+  it('finds the line of a breakdown on the outer ring', () => {
+    // Groceries holds the first 120° of Food.
+    expect(hit(100 + 96, 100)).toEqual({ kind: 'sub', id: 'groceries', parentId: 'food' });
+    // Coffee holds 120°–180°: straight down is 180°, so look just before it.
+    const at = (deg: number, r: number) => {
+      const rad = ((deg - 90) * Math.PI) / 180;
+      return [100 + r * Math.cos(rad), 100 + r * Math.sin(rad)] as const;
+    };
+    expect(hit(...at(150, 96))).toEqual({ kind: 'sub', id: 'coffee', parentId: 'food' });
+  });
+
+  /** A finger is wider than a wedge; landing a little off the ink still counts. */
+  it('counts a touch just outside the painted ring', () => {
+    expect(hit(100 + 52, 100)).toEqual({ kind: 'slice', id: 'food' });
+    expect(hit(100 + 108, 100)).toEqual({ kind: 'sub', id: 'groceries', parentId: 'food' });
+  });
+
+  it('falls through to the wedge where it has no breakdown', () => {
+    expect(hit(100 - 96, 100)).toEqual({ kind: 'slice', id: 'transport' });
+  });
+
+  /** The hole is where a tap puts the tooltip away. */
+  it('is nothing in the hole or far outside', () => {
+    expect(hit(100, 100)).toBeNull();
+    expect(hit(100 + 30, 100)).toBeNull();
+    expect(hit(100 + 120, 100)).toBeNull();
+  });
+
+  it('works with no outer ring at all', () => {
+    expect(hitDonut(100 + 73, 100, { ring: main, segments }, null)).toEqual({
+      kind: 'slice',
+      id: 'food',
+    });
+    expect(hitDonut(100 + 96, 100, { ring: main, segments }, null)).toEqual({
+      kind: 'slice',
+      id: 'food',
+    });
+  });
+
+  it('reaches every degree of a ring owned by one wedge', () => {
+    const whole = donutSegments(main, rankSlices([slice('only', 5)]));
+    for (const [x, y] of [
+      [100, 100 - 73],
+      [100 + 73, 100],
+      [100, 100 + 73],
+      [100 - 73, 100],
+    ]) {
+      expect(hitDonut(x, y, { ring: main, segments: whole }, null)).toEqual({
+        kind: 'slice',
+        id: 'only',
+      });
+    }
+  });
+});
+
+describe('placing the tooltip', () => {
+  const ring: Ring = { cx: 100, cy: 100, outer: 88, inner: 58 };
+
+  it('sits just inside the middle of the arc', () => {
+    const anchor = tooltipAnchor(ring, 0, 180);
+    expect(anchor.x).toBeCloseTo(150);
+    expect(anchor.y).toBeCloseTo(100);
+  });
+
+  it('opens towards the centre', () => {
+    // A wedge at 1–2 o'clock: the tooltip opens down and to the left.
+    const anchor = tooltipAnchor(ring, 30, 60);
+    expect(anchor.right).toBe(false);
+    expect(anchor.below).toBe(true);
+    // At 7–8 o'clock: up and to the right.
+    const opposite = tooltipAnchor(ring, 210, 240);
+    expect(opposite.right).toBe(true);
+    expect(opposite.below).toBe(false);
+  });
+
+  it('is bounded by the square inside the hole', () => {
+    const bounds = holeBounds(ring, 0);
+    expect(bounds.side).toBeCloseTo(82.02, 1);
+    expect(bounds.left).toBeCloseTo(58.99, 1);
+  });
+
+  /** Pulled back rather than drawn over the ring it is describing. */
+  it('never leaves the hole', () => {
+    const bounds = { left: 60, top: 60, side: 80 };
+    expect(placeTooltip({ x: 150, y: 100, right: false, below: true }, 50, 30, bounds)).toEqual({
+      left: 90,
+      top: 100,
+    });
+    expect(placeTooltip({ x: 50, y: 50, right: true, below: true }, 50, 30, bounds)).toEqual({
+      left: 60,
+      top: 60,
+    });
+    expect(placeTooltip({ x: 130, y: 145, right: true, below: true }, 50, 30, bounds)).toEqual({
+      left: 90,
+      top: 110,
+    });
   });
 });

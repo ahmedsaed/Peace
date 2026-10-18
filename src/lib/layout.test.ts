@@ -1,4 +1,10 @@
-import { byDensity, centerScrollOffset, densityForHeight, keyboardOverlap } from './layout';
+import {
+  byDensity,
+  centerScrollOffset,
+  densityForHeight,
+  keyboardOverlap,
+  ringSize,
+} from './layout';
 
 describe('densityForHeight', () => {
   it('treats a whole phone as regular', () => {
@@ -119,5 +125,22 @@ describe('keyboardOverlap', () => {
 
   it('is never negative', () => {
     expect(keyboardOverlap(800, 900, 0)).toBe(0);
+  });
+});
+
+describe('ringSize', () => {
+  it('fills most of a phone\'s width', () => {
+    expect(ringSize(411, 914)).toBe(360);
+    expect(ringSize(360, 780)).toBe(312);
+  });
+
+  it('stops growing on a tablet', () => {
+    expect(ringSize(1280, 800)).toBe(360);
+  });
+
+  /** A split-screen half must still show the first rows of the list. */
+  it('stays small in a short window, but never below the old ring', () => {
+    expect(ringSize(411, 340)).toBe(200);
+    expect(ringSize(411, 600)).toBe(270);
   });
 });
