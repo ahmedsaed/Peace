@@ -32,7 +32,7 @@ no ads, no analytics — and nothing reaches the network unless you ask it to.
 <td align="center"><b>Budgets</b><br><sub>Limits it works out for you.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/analysis.png" alt="The analysis screen: a donut of spending by category with the month total in the middle, and a ranked list of shares below it"></td>
+<td><img src="docs/screenshots/analysis.png" alt="The analysis screen: a large ring of spending by category with an outer ring breaking each category into its sub-categories, a tooltip reading 37.1% Food on the touched slice, and the ranked list below with Groceries, Restaurants and Coffee under Food"></td>
 <td><img src="docs/screenshots/search.png" alt="Search filtered to the Food category, showing three records and their total"></td>
 <td><img src="docs/screenshots/accounts.png" alt="The accounts screen: cash and bank balances, and a credit card showing what is owed with the credit still available beneath it"></td>
 </tr>

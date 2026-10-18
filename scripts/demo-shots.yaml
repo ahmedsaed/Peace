@@ -390,14 +390,36 @@ appId: dev.merope.peace.oss
     id: "analysis-total"
     text: "\\$690.00"
 - assertVisible:
-    id: "analysis-percent-seed-cat-installments"
-    text: "13.0%"
-# Installments is the smallest slice but one — rounded with the rest so the
-# legend sums to exactly 100.
-- assertVisible:
     id: "analysis-percent-seed-cat-food"
     text: "37.1%"
+# The ring is touchable: the shot shows a tooltip open on Food, since a reader
+# of a still image cannot find that out for themselves. The point is relative
+# to the ring's own box, a third of the way round Food's arc.
+- tapOn:
+    id: "donut-touch"
+    point: "90%,40%"
+- assertVisible:
+    id: "donut-tooltip-figure"
+    text: "37.1%"
 - takeScreenshot: analysis
+# Installments is the smallest slice but one — rounded with the rest so the
+# legend sums to exactly 100. Below the ring now that it fills the width, so
+# checked after the shot and scrolled back from.
+- scrollUntilVisible:
+    element:
+      id: "analysis-percent-seed-cat-installments"
+    direction: DOWN
+- assertVisible:
+    id: "analysis-percent-seed-cat-installments"
+    text: "13.0%"
+- scrollUntilVisible:
+    element:
+      id: "donut-touch"
+    direction: UP
+# Put away again, so the theme shots below show the ring with its total.
+- tapOn:
+    id: "donut-touch"
+    point: "50%,50%"
 
 # ===========================================================================
 # 5. Search — the filters, and the total over what was found
