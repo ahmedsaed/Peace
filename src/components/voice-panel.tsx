@@ -14,6 +14,7 @@
 import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { VoiceWave } from '@/components/voice-wave';
 import { clipClock, MAX_CLIP_MS } from '@/lib/voice';
 import type { VoicePhase, VoiceProblem } from '@/state/voice';
 import { useTheme } from '@/state/theme';
@@ -66,7 +67,7 @@ export function VoicePanel({
     const opening = !reading && phase === 'starting';
     return (
       <View className={`${frame} gap-3`} testID={opening ? 'voice-starting' : 'voice-reading'}>
-        <ActivityIndicator color={palette.accent} />
+        {opening ? <ActivityIndicator color={palette.accent} /> : <VoiceWave />}
         <Text className="text-sm text-muted">{opening ? 'Opening the microphone…' : 'Reading what you said…'}</Text>
       </View>
     );

@@ -21,7 +21,7 @@
  */
 
 import { Image } from 'expo-image';
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
@@ -38,8 +38,6 @@ export const PREVIEW_SIZE = 56;
  * exactly what happened to the read badge along the bottom edge.
  */
 const BADGE_ROOM = 8;
-/** N 40dp buttons and the 8dp gaps between them. */
-const buttonsWidth = (count: number) => 40 * count + 8 * (count - 1);
 
 type Props = {
   attachments: StagedAttachment[];
@@ -67,6 +65,8 @@ type Props = {
    * the one place on the screen with room for them.
    */
   onVoice?: () => void;
+  /** Shares the buttons' row, on their left: the record's tags. */
+  leading?: ReactNode;
   /** True in split-screen: previews go, the buttons merge, the count stays. */
   compact: boolean;
   busy?: boolean;
@@ -219,10 +219,10 @@ export function AttachmentBar({
   onRead,
   reading,
   onVoice,
+  leading,
   compact,
   busy,
 }: Props) {
-  const width = buttonsWidth(onVoice ? 3 : 2);
   const mic = onVoice ? (
     <SquareButton icon="mic" label="Speak the record" onPress={onVoice} disabled={busy} testID="record-voice" />
   ) : null;
@@ -252,21 +252,18 @@ export function AttachmentBar({
   }
 
   /**
-   * The strip and the buttons share one band; the buttons FLOAT over its right.
+   * The previews get a strip of their own; the buttons share a ROW with
+   * whatever the screen puts on their left — the record's tags.
    *
-   * They had a row of their own, which cost 40dp of a screen that fights for
-   * every pixel and pushed the receipts a whole row further from the field they
-   * belong to. Floating them puts the previews beside the buttons rather than
-   * above them, and the band is no taller than one thumbnail.
+   * The buttons used to float over the right of the preview strip, which put
+   * the tags on a line of their own ABOVE the buttons: two controls for the
+   * same record at two heights, and a whole row spent when there were no
+   * receipts at all. Tags and buttons side by side cost one 40dp row; the
+   * strip appears only once there is something to show in it, and needs no
+   * trailing padding because nothing covers its end any more.
    */
   return (
-    <View
-      className="relative"
-      // Only as tall as it needs to be: one thumbnail plus its badges when
-      // there are receipts, one button when there are none. A band sized for
-      // previews that do not exist is 32dp of a short screen given to nothing.
-      style={{ minHeight: attachments.length > 0 ? PREVIEW_SIZE + BADGE_ROOM * 2 : 40 }}
-      testID="attachment-bar">
+    <View className="mt-2" testID="attachment-bar">
       {attachments.length > 0 ? (
         <ScrollView
           horizontal
@@ -278,16 +275,7 @@ export function AttachmentBar({
             // the read badge was visibly clipped along the bottom edge.
             paddingTop: BADGE_ROOM,
             paddingBottom: BADGE_ROOM,
-            /**
-             * SCROLL PAST THE LAST ONE.
-             *
-             * Without this the final thumbnail comes to rest UNDER the floating
-             * buttons and cannot be moved out from beneath them — the one
-             * receipt you just added is the one you cannot see. The trailing
-             * space is the buttons' own width, so the last tile can be scrolled
-             * fully clear into the middle of the strip.
-             */
-            paddingRight: width + 12,
+            paddingRight: BADGE_ROOM,
           }}
           testID="attachment-previews">
           {attachments.map((attachment) => (
@@ -303,13 +291,8 @@ export function AttachmentBar({
         </ScrollView>
       ) : null}
 
-      {/* Over the strip, not in the flow. `pointerEvents="box-none"` on the
-          wrapper so the scroll gesture still reaches the strip everywhere the
-          buttons themselves are not. */}
-      <View
-        className="absolute bottom-0 right-0 flex-row gap-2"
-        pointerEvents="box-none"
-        style={{ width }}>
+      <View className="flex-row items-center gap-2">
+        <View className="flex-1">{leading}</View>
         {mic}
         <SquareButton
           icon="camera"

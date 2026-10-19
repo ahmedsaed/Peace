@@ -480,9 +480,10 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   obvious circular-arrow choice — closes into a featureless blob. A solid arrow survives it, and
   reads as "came back" more directly anyway.
 - **A control floating over a scrollable strip needs trailing padding, or the last item is
-  unreachable.** The attach buttons overlay the receipt previews to save a row of height; without
-  `paddingRight` equal to the buttons' width, the final thumbnail comes to rest UNDERNEATH them and
-  no amount of scrolling frees it — and the last one added is exactly the one you want to look at.
+  unreachable.** The attach buttons once overlaid the receipt previews to save a row of height;
+  without `paddingRight` equal to the buttons' width, the final thumbnail came to rest UNDERNEATH
+  them and no amount of scrolling freed it — and the last one added is exactly the one you want to
+  look at. (They now share a row with the tags instead, and the strip sits above them.)
   Same family: badges that overhang a tile's corners are sliced off by the scroll view's bounds
   unless the content has padding on those edges too. Both are invisible until there are enough
   items to overflow, so test with more than fit.

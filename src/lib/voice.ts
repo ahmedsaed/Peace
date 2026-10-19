@@ -70,15 +70,41 @@ export const MAX_CLIP_MS = 60_000;
 /** Shorter than this is a tap, not a sentence — not worth a request. */
 export const MIN_CLIP_MS = 600;
 
+/**
+ * The loudest moment of a clip that contains a voice, in dBFS.
+ *
+ * A MODEL GIVEN SILENCE INVENTS SPEECH. The first emulator test sent clips of
+ * pure digital silence (its microphone was not connected) and got back fluent,
+ * plausible Arabic sentences about electricity meters and club fees — and the
+ * record screen filled itself in from them. So silence is caught HERE, before
+ * anything is sent: the recorder meters every clip, and a clip whose peak never
+ * rose above a quiet room was not spoken into.
+ *
+ * Speech held at a phone peaks around -25 to -10; a quiet room sits near -55;
+ * a dead or muted microphone reports -160. -45 leaves a whisper room either way.
+ */
+export const SILENT_PEAK_DB = -45;
+
+/** Was anything loud enough to be speech heard? Unknown (no metering) passes. */
+export function heardAnything(peakDb: number | null): boolean {
+  return peakDb === null || peakDb > SILENT_PEAK_DB;
+}
+
 /** What every spoken input shares: how to hear a mixed-language speaker. */
 const HEARING_RULES = [
-  'The speaker often mixes Arabic (any dialect, usually Egyptian) and English in',
-  'one sentence. Both are normal; neither is noise.',
-  'Numbers may be spoken in either language or as digits: "ميتين وخمسين" is 250,',
-  '"ألف ونص" is 1500, "two fifty" is 250, "١٢٠" is 120.',
+  'FIRST decide whether a person can clearly be heard speaking. If the audio is',
+  'silent, is only noise, or you cannot make out the words, set speech to false',
+  'and every other field to null. Never guess at words you cannot hear: an',
+  'invented sentence is far worse than none, because the app acts on it.',
+  '',
+  'The speaker may mix Arabic (any dialect, often Egyptian) and English in one',
+  'sentence. Both are normal; neither is noise.',
+  'How numbers can sound (these show the FORM of speech, not what was said):',
+  '"ميتين وخمسين" is 250, "ألف ونص" is 1500, "two fifty" is 250.',
 ].join('\n');
 
 const FIELD_RULES = [
+  'speech: true only if words were clearly spoken.',
   'transcript: exactly what was said, word for word. Write Arabic in Arabic',
   '  script and English in Latin letters, as spoken. Do not translate.',
   'type: "expense" for money spent or paid, "income" for money received or',
@@ -141,6 +167,9 @@ export function buildVoicePrompt({
 export const VOICE_SCHEMA = {
   type: 'object',
   properties: {
+    // First, so the model commits to whether anything was said before it is
+    // asked what was said.
+    speech: { type: 'boolean' },
     transcript: { type: 'string', nullable: true },
     type: { type: 'string', nullable: true },
     amount: { type: 'number', nullable: true },
@@ -169,13 +198,13 @@ export function buildTranscribePrompt(): string {
     '',
     'Write Arabic in Arabic script and English in Latin letters, as spoken. Do',
     'not translate, summarise, answer or correct it. Leave out filler sounds',
-    '("umm", "يعني" used as filler). Use null if nothing intelligible was said.',
+    '("umm", "يعني" used as filler).',
   ].join('\n');
 }
 
 export const TRANSCRIBE_SCHEMA = {
   type: 'object',
-  properties: { text: { type: 'string', nullable: true } },
+  properties: { speech: { type: 'boolean' }, text: { type: 'string', nullable: true } },
 } as const;
 
 /** The transcript out of Penny's reply. Empty means nothing was heard. */
@@ -183,7 +212,10 @@ export function parseTranscript(raw: unknown): string {
   if (typeof raw !== 'object' || raw === null) {
     throw new VoiceError('The model returned something that was not a transcript.');
   }
-  return clean((raw as Record<string, unknown>).text, 2_000) ?? '';
+  const body = raw as Record<string, unknown>;
+  // Only an explicit false: a reply that left the flag out still carries words.
+  if (body.speech === false) return '';
+  return clean(body.text, 2_000) ?? '';
 }
 
 /**
@@ -197,6 +229,8 @@ export function parseVoiceReading(raw: unknown, fallbackCurrency: string, today:
     throw new VoiceError('The model returned something that was not a reading.');
   }
   const body = raw as Record<string, unknown>;
+  // The model said nobody spoke: whatever else it filled in is invention.
+  if (body.speech === false) return { ...EMPTY_VOICE_READING };
 
   // Tested BEFORE it is shortened, never after — see the receipt reader, where
   // capping "pounds" to three letters manufactured the currency "POU".
@@ -229,6 +263,22 @@ export function isEmptyVoiceReading(reading: VoiceReading): boolean {
     reading.note === null &&
     reading.occurredOn === null
   );
+}
+
+/**
+ * The note a spoken record ends with: what it was for, then what was SAID.
+ *
+ * The transcript goes at the foot, like a bank message's own words under the
+ * reading of it: the short note is the line the list shows, and the words are
+ * the record of what was actually said — the thing to check when a field came
+ * out wrong, and the half search can find later. Not repeated when the note
+ * already is the whole of it.
+ */
+export function spokenNote(existing: string, reading: Pick<VoiceReading, 'note' | 'transcript'>): string {
+  const parts = [existing.trim(), reading.note?.trim() ?? '', reading.transcript?.trim() ?? ''].filter(
+    (part, index, all) => part !== '' && !all.slice(0, index).some((earlier) => earlier.includes(part))
+  );
+  return parts.join('\n\n');
 }
 
 /** "0:07" — the recording timer. */

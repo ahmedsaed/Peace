@@ -65,7 +65,7 @@ import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
 import { CURRENCIES } from '@/lib/currencies';
 import { captureNote, matchAccount } from '@/lib/bank-sms';
-import { isEmptyVoiceReading } from '@/lib/voice';
+import { isEmptyVoiceReading, spokenNote } from '@/lib/voice';
 import { VoicePanel } from '@/components/voice-panel';
 import { useVoiceRecorder, type VoiceProblem } from '@/state/voice';
 import { noteWithReading } from '@/lib/note';
@@ -957,8 +957,9 @@ export default function RecordScreen() {
   /**
    * Fill the form from what was said — the receipt rule: every field heard
    * replaces what is there, nothing is saved, and Cancel is the undo. What was
-   * HEARD is shown under the form, because a misheard name is only catchable
-   * by somebody who can see the words.
+   * SAID goes at the foot of the note, because a misheard name is only
+   * catchable by somebody who can see the words — and kept there, it stays
+   * catchable after saving too.
    */
   async function hear(clip: VoiceClip) {
     setHearing(true);
@@ -1011,20 +1012,16 @@ export default function RecordScreen() {
         // A category of the other side cannot stay once the side has changed.
         setCategoryId(matchCategory(reading.category, side)?.id ?? (nextType !== type ? null : categoryId));
       }
-      if (reading.note) {
-        // APPENDED, like a receipt — and with no room above it: what was said
-        // IS the comment, not a reading under one.
-        setNote((current) => noteWithReading(current, reading.note!, { leaveRoom: false }));
-      }
+      // APPENDED, like a receipt, and with no room above: what was said IS the
+      // comment, not a reading under one.
+      setNote((current) => spokenNote(current, reading));
       if (reading.occurredOn !== null) setOccurredAt(new Date(`${reading.occurredOn}T12:00:00`));
 
       setListening(false);
-      const heard = reading.transcript ? `Heard “${reading.transcript}”` : 'Filled in from what you said';
-      setHint(
-        reading.currency && reading.currency.toUpperCase() !== lands.toUpperCase()
-          ? `${heard}. You said ${reading.currency}; this account is in ${lands} — check the amount.`
-          : `${heard}.`
-      );
+      // The one thing the form cannot show: a currency it has no field for.
+      if (reading.currency && reading.currency.toUpperCase() !== lands.toUpperCase()) {
+        setHint(`You said ${reading.currency}; this account is in ${lands} — check the amount.`);
+      }
     } catch (e) {
       if (!(e instanceof GeminiError)) console.warn('[record] reading speech failed', e);
       setVoiceProblem({ message: e instanceof GeminiError ? e.message : 'Could not read what you said.' });
@@ -1547,11 +1544,13 @@ export default function RecordScreen() {
                   label is a property of what was written rather than a field of
                   its own — and because this is the one place on the screen with
                   the height for a row that wraps. */}
-              <TagChips
-                names={allTags.filter((t) => tagIds.includes(t.id)).map((t) => t.name)}
-                onOpen={() => setTagSheet(true)}
-              />
               <AttachmentBar
+                leading={
+                  <TagChips
+                    names={allTags.filter((t) => tagIds.includes(t.id)).map((t) => t.name)}
+                    onOpen={() => setTagSheet(true)}
+                  />
+                }
                 attachments={attached}
                 onCamera={() => setViewfinder(true)}
                 onFiles={() => pick('files')}

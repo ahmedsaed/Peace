@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { canRetry, sessionIsEmpty, toItems, type Item } from '@/assistant/display';
@@ -14,6 +14,7 @@ import { AttachmentViewer } from '@/components/attachment-viewer';
 import { RecordsSheet } from '@/components/assistant/records-sheet';
 import { MarkdownReply } from '@/components/assistant/markdown-reply';
 import { TypingIndicator } from '@/components/assistant/typing';
+import { VoiceWave } from '@/components/voice-wave';
 import { Icon } from '@/components/icon';
 import { HeaderButton, StackHeader } from '@/components/screen';
 import { Snackbar } from '@/components/snackbar';
@@ -376,7 +377,7 @@ export default function AssistantScreen() {
           </Pressable>
         ) : transcribing ? (
           <View className="h-11 w-11 items-center justify-center" testID="assistant-transcribing">
-            <ActivityIndicator color={palette.accent} />
+            <VoiceWave size="small" />
           </View>
         ) : ai.voice && !busy && draft.trim() === '' && pending.length === 0 ? (
           // An empty box has nothing to send, so the button speaks instead —

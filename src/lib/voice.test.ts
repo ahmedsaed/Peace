@@ -3,7 +3,9 @@ import {
   buildTranscribePrompt,
   buildVoicePrompt,
   clipClock,
+  heardAnything,
   isEmptyVoiceReading,
+  spokenNote,
   parseTranscript,
   parseVoiceReading,
   VoiceError,
@@ -33,7 +35,7 @@ describe('the record prompt', () => {
   });
 
   it('expects Arabic and English in one sentence, and keeps each in its own script', () => {
-    expect(prompt).toMatch(/mixes Arabic .* and English/);
+    expect(prompt).toMatch(/mix Arabic .* and English/);
     expect(prompt).toContain('Write Arabic in Arabic');
     expect(prompt).toContain('Do not translate');
   });
@@ -49,6 +51,77 @@ describe('the record prompt', () => {
     });
     expect(ruled.indexOf('"The card" means CIB Visa.')).toBeGreaterThan(ruled.indexOf('date: yyyy-mm-dd'));
     expect(ruled).toContain('My accounts: none.');
+  });
+});
+
+// A model given silence invents speech — the first emulator test, whose
+// microphone delivered nothing, came back with fluent Arabic sentences about
+// electricity meters. Both prompts make it decide that FIRST, and say what an
+// empty clip must produce.
+describe('silence', () => {
+  it('asks whether anyone spoke before asking what they said', () => {
+    const prompt = buildVoicePrompt({ today: TODAY, accountNames: [], categoryNames: [], homeCurrency: 'EGP' });
+    for (const text of [prompt, buildTranscribePrompt()]) {
+      expect(text).toContain('FIRST decide whether a person can clearly be heard speaking');
+      expect(text).toContain('Never guess at words you cannot hear');
+    }
+  });
+
+  // The examples are there to show how Arabic numbers SOUND; a model that
+  // reads them as likely content parrots them back over silence.
+  it('labels its examples as form, not content', () => {
+    expect(buildTranscribePrompt()).toContain('show the FORM of speech, not what was said');
+  });
+
+  it('throws away everything a reply says when it also says nobody spoke', () => {
+    const reading = parseVoiceReading(
+      { speech: false, transcript: 'دفعت 800 جنيه شحن عداد الكهربا', type: 'expense', amount: 800, note: 'كهربا' },
+      'EGP',
+      TODAY
+    );
+    expect(isEmptyVoiceReading(reading)).toBe(true);
+    expect(reading.transcript).toBeNull();
+    expect(parseTranscript({ speech: false, text: 'عاشر سؤال ايه هما اكتر حاجتين' })).toBe('');
+  });
+
+  // Only an explicit no: a reply that left the flag out still carries words.
+  it('keeps a reading whose flag is missing', () => {
+    expect(parseTranscript({ text: 'fuel this month' })).toBe('fuel this month');
+    expect(parseVoiceReading({ amount: 50 }, 'EGP', TODAY).amountMinor).toBe(5_000);
+  });
+
+  // And silence is never SENT: caught by the meter before any request.
+  it('treats a clip that never rose above a quiet room as unspoken', () => {
+    expect(heardAnything(-160)).toBe(false); // a dead or muted microphone
+    expect(heardAnything(-55)).toBe(false); // a quiet room
+    expect(heardAnything(-45)).toBe(false);
+    expect(heardAnything(-30)).toBe(true); // speech
+    expect(heardAnything(null)).toBe(true); // no metering: let the model decide
+  });
+});
+
+describe('the note a spoken record leaves', () => {
+  it('puts what it was for first and what was said at the foot', () => {
+    expect(spokenNote('', { note: 'lunch مع Sara', transcript: 'دفعت 250 lunch مع Sara' })).toBe(
+      'lunch مع Sara\n\nدفعت 250 lunch مع Sara'
+    );
+  });
+
+  it('keeps what was typed above both', () => {
+    expect(spokenNote('team outing', { note: 'dinner', transcript: 'dinner for 250 pounds' })).toBe(
+      'team outing\n\ndinner\n\ndinner for 250 pounds'
+    );
+  });
+
+  it('does not repeat what is already there', () => {
+    expect(spokenNote('', { note: 'بنزين', transcript: 'بنزين' })).toBe('بنزين');
+    expect(spokenNote('dinner for 250 pounds', { note: 'dinner', transcript: 'dinner for 250 pounds' })).toBe(
+      'dinner for 250 pounds'
+    );
+  });
+
+  it('leaves the note alone when nothing came back', () => {
+    expect(spokenNote('typed', { note: null, transcript: null })).toBe('typed');
   });
 });
 

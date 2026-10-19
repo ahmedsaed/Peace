@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import type { VoiceClip } from '../lib/gemini';
-import { MAX_CLIP_MS, MIN_CLIP_MS } from '../lib/voice';
+import { heardAnything, MAX_CLIP_MS, MIN_CLIP_MS } from '../lib/voice';
 
 /**
  * The microphone, for the record screen and Penny's composer alike.
@@ -78,6 +78,13 @@ export function useVoiceRecorder({
     handlers.current = { onClip, onProblem, onInterrupted };
   }, [onClip, onProblem, onInterrupted]);
 
+  /** The loudest the clip has been, in dBFS — null until metering reports. */
+  const peak = useRef<number | null>(null);
+  useEffect(() => {
+    if (phase !== 'recording' || state.metering == null) return;
+    peak.current = Math.max(peak.current ?? -Infinity, state.metering);
+  }, [phase, state.metering]);
+
   const move = useCallback((next: VoicePhase) => {
     phaseRef.current = next;
     setPhase(next);
@@ -131,6 +138,7 @@ export function useVoiceRecorder({
       }
       // The native side stops itself at the limit too, so a JS thread that is
       // busy at the wrong moment cannot leave the mic open past it.
+      peak.current = null;
       recorder.record({ forDuration: MAX_CLIP_MS / 1000 });
       move('recording');
     } catch (e) {
@@ -151,6 +159,13 @@ export function useVoiceRecorder({
       uri = recorder.uri;
       if (!uri || heard < MIN_CLIP_MS) {
         handlers.current.onProblem({ message: 'That was too short to hear. Tap the mic and speak.' });
+        return;
+      }
+      // Silence is never sent: a model given nothing invents something.
+      if (!heardAnything(peak.current)) {
+        handlers.current.onProblem({
+          message: 'Peace didn’t hear anything. Check the microphone isn’t muted or covered, then try again.',
+        });
         return;
       }
       const base64 = await new File(uri).base64();
