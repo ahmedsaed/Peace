@@ -1,4 +1,5 @@
 import {
+  getRecordingPermissionsAsync,
   RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
@@ -98,7 +99,14 @@ export function useVoiceRecorder({
     if (phaseRef.current !== 'idle') return;
     move('starting');
     try {
-      const permission = await requestRecordingPermissionsAsync();
+      /**
+       * CHECK BEFORE ASKING. A request opens Android's permission activity
+       * even when the answer is already yes — invisibly, for a frame — and
+       * that PAUSES this one, which reads as leaving the app. Asking only when
+       * the answer is unknown keeps the common case from ever pausing.
+       */
+      const known = await getRecordingPermissionsAsync();
+      const permission = known.granted ? known : await requestRecordingPermissionsAsync();
       if (!permission.granted) {
         move('idle');
         handlers.current.onProblem(
@@ -113,8 +121,14 @@ export function useVoiceRecorder({
       }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
-      // A cancel while Android was asking: do not open the mic after all.
+      // A cancel while Android was asking — or the app left meanwhile: do not
+      // open the mic after all.
       if ((phaseRef.current as VoicePhase) !== 'starting') return;
+      if (AppState.currentState !== 'active') {
+        move('idle');
+        handlers.current.onInterrupted();
+        return;
+      }
       // The native side stops itself at the limit too, so a JS thread that is
       // busy at the wrong moment cannot leave the mic open past it.
       recorder.record({ forDuration: MAX_CLIP_MS / 1000 });
@@ -158,7 +172,10 @@ export function useVoiceRecorder({
   // Leaving the app, or this screen, closes the mic.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active' || phaseRef.current === 'idle') return;
+      // Only a RECORDING is interrupted. While starting, Android's own
+      // permission prompt pauses the app — that is the prompt, not leaving —
+      // and `start` checks the app is in front before it opens the mic.
+      if (next === 'active' || phaseRef.current !== 'recording') return;
       void cancel();
       handlers.current.onInterrupted();
     });
