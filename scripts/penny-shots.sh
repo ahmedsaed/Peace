@@ -38,7 +38,15 @@ for name in penny-ask penny-chart penny-receipt; do
   [ -f "$SRC/$name.png" ] || { echo "missing $name.png in $SRC" >&2; exit 1; }
   cp "$SRC/$name.png" "$DEST/$name.png"
 done
+# Full resolution for the store (see store/README.md): penny-ask is a listing
+# screenshot, and drawing it from the halved copy would upscale it. The voice
+# capture is the store's alone — it needs the key, which demo-shots has not.
+mkdir -p store/screenshots
+for name in penny-ask voice; do
+  [ -f "$SRC/$name.png" ] || { echo "missing $name.png in $SRC" >&2; exit 1; }
+  cp "$SRC/$name.png" "store/screenshots/$name.png"
+done
 if command -v magick >/dev/null 2>&1; then
   magick mogrify -resize 540x "$DEST"/penny-*.png
 fi
-echo "wrote $DEST/penny-{ask,chart,receipt}.png — look at them before committing"
+echo "wrote $DEST/penny-{ask,chart,receipt}.png and store/screenshots/{penny-ask,voice}.png — look at them before committing"

@@ -1,6 +1,7 @@
 appId: dev.merope.peace.oss
 ---
-# The README's Penny row, from the demo ledger and a REAL Gemini key.
+# The README's Penny row and the store's voice and Penny screenshots, from the
+# demo ledger and a REAL Gemini key.
 #
 # NOT in .maestro/: it costs money (a handful of requests) and asserts little.
 # Run it through `npm run shots:penny`, which restores the demo ledger first.
@@ -87,6 +88,28 @@ appId: dev.merope.peace.oss
     id: "nav-back"
 - tapOn:
     id: "nav-back"
+
+# --- the mic on a new record: needs the key, sends nothing ---
+# The listening panel only. The emulator's mic is silence, so the clip is
+# CANCELLED, never sent — this capture costs nothing.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "record-voice"
+- extendedWaitUntil:
+    visible:
+      id: "voice-panel"
+    timeout: 15000
+- takeScreenshot: voice
+- tapOn:
+    id: "voice-cancel"
+- tapOn:
+    id: "record-cancel"
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 15000
+
 - tapOn:
     id: "nav-assistant"
 

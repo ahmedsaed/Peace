@@ -105,16 +105,16 @@ export const STORE_SHOTS: StoreShot[] = [
     subtitle: 'A calculator keypad that walks you from the amount to saved.',
   },
   {
+    shot: 'voice',
+    title: 'Or just',
+    highlight: 'say it.',
+    subtitle: 'Speak a record in Arabic, English or both, and Peace fills it in.',
+  },
+  {
     shot: 'home',
     title: 'On your',
     highlight: 'home screen.',
     subtitle: 'Your balance and budget at a glance, and a spend added in one tap.',
-  },
-  {
-    shot: 'budgets',
-    title: 'Know what',
-    highlight: "is left.",
-    subtitle: 'A budget per category, with the room you still have this month.',
   },
   {
     shot: 'analysis',
@@ -123,17 +123,16 @@ export const STORE_SHOTS: StoreShot[] = [
     subtitle: 'Spending ranked by category, with shares that add up to 100%.',
   },
   {
+    shot: 'penny-ask',
+    title: 'Ask about',
+    highlight: 'your money.',
+    subtitle: 'Penny answers from your own ledger, every figure taken from your records.',
+  },
+  {
     shot: 'accounts',
     title: 'Every account,',
     highlight: 'adding up.',
     subtitle: 'Cash, bank and cards — and a card reads as what you owe.',
-  },
-
-  {
-    shot: 'recurring',
-    title: 'Bills that',
-    highlight: 'ask first.',
-    subtitle: 'Repeating payments come due as suggestions, never posted behind your back.',
   },
   {
     shot: 'welcome',

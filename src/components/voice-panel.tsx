@@ -111,7 +111,7 @@ export function VoicePanel({
         <Text className="text-muted"> / {clipClock(MAX_CLIP_MS)}</Text>
       </Text>
       <Text className="mt-1 text-center text-xs leading-4 text-muted">
-        Say it your way — “250 lunch from Cash”, “دفعت 80 بنزين امبارح”. Tap ✓ when you’re done.
+        Say it your way.
       </Text>
     </View>
   );
