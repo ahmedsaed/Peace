@@ -5,5 +5,5 @@
     <string name="peace_widget_balance_label">Balance</string>
     <string name="peace_widget_balance_description">What you have now, with quick add. Stretch it taller to list your accounts.</string>
     <string name="peace_widget_quick_label">Quick add</string>
-    <string name="peace_widget_quick_description">New expense, photograph a receipt, or ask Penny.</string>
+    <string name="peace_widget_quick_description">New expense, photograph a receipt, speak a record, or ask Penny.</string>
 </resources>
