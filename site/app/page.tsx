@@ -144,7 +144,7 @@ export default function Home() {
             <ul>
               <li>Balance: what you have now and the month in and out. Stretch it taller and your accounts appear.</li>
               <li>Budget: what is spent against the month’s budget, what is left, and the days to go.</li>
-              <li>Quick add: a new expense, a receipt photo or Penny, one tap each. Hold the Peace icon for the same.</li>
+              <li>Quick add: a new expense, a receipt photo, your voice or Penny, one tap each. Hold the Peace icon for the same.</li>
               <li>They follow your theme, mask amounts when you hide them, and show nothing at all while the app is locked.</li>
             </ul>
           </Feature>
@@ -182,11 +182,28 @@ export default function Home() {
           </Feature>
 
           <Feature
+            eyebrow="Speaking"
+            title="Or just say it."
+            optional="Optional"
+            shot="voice"
+            alt="The record screen listening: the note field has become a microphone with a check button, a running timer and the line Say it your way"
+          >
+            <ul>
+              <li>Tap the mic and say it your way — “250 lunch from Cash”, in Arabic, English or both in one sentence.</li>
+              <li>The amount, account, category and date are filled in for you to check; what you said goes in the note.</li>
+              <li>Ask Penny out loud too: your words land in her box, to fix before you send.</li>
+              <li>The mic is open only while you see it, and the recording is never kept.</li>
+              <li>Off until you add your own Gemini API key.</li>
+            </ul>
+          </Feature>
+
+          <Feature
             eyebrow="Bank messages"
             title="Your bank texts you. Peace has the record ready."
             optional="Optional"
             shot="bank"
             alt="A bank's text message notification arriving, and beneath it at the top of Records a waiting record: Metro Market, $18.75, from the bank"
+            flip
           >
             <ul>
               <li>A card alert becomes a record waiting at the top of Records — the shop, the amount, the account.</li>
@@ -206,7 +223,6 @@ export default function Home() {
             optional="Optional"
             shot="penny-ask"
             alt="Penny comparing two months with a bar chart and a written answer"
-            flip
           >
             <ul>
               <li>“How much did fuel cost me in December?” — worked out by the same totals every screen uses.</li>
@@ -222,6 +238,7 @@ export default function Home() {
             title="Backups you can open without this app."
             shot="actions"
             alt="A long press on a purchase showing its refund and the record actions"
+            flip
           >
             <ul>
               <li>A backup is a plain zip: the database beside your receipts. Unzip it anywhere and your data is there.</li>
@@ -240,7 +257,6 @@ export default function Home() {
             title="Set up in a minute — or skip it."
             shot="welcome"
             alt="The welcome screen: the Peace wordmark, the line Peace of mind, piece of cake, three promises about privacy, and a Get started button"
-            flip
           >
             <ul>
               <li>Your currency, worked out from the phone’s region; one tap to confirm or change it.</li>

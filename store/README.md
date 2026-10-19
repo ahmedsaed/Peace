@@ -7,7 +7,7 @@ the same pull request as the app it describes.
 |---|---|
 | Name, short and full description, category, contact | [`listing.md`](listing.md) — `node scripts/check-listing.mjs` checks the lengths |
 | App icon, feature graphic, 8 phone screenshots | built by the website: `https://peace.merope.dev/store/<file>` |
-| Full-resolution captures the graphics are drawn from | [`screenshots/`](screenshots) — written by `npm run shots` |
+| Full-resolution captures the graphics are drawn from | [`screenshots/`](screenshots) — written by `npm run shots`, `shots:penny` and `shots:widgets` |
 | Data safety answers, importable | [`data-safety.csv`](data-safety.csv) — Play Console's own export format, filled in |
 
 ## Regenerating
@@ -22,7 +22,17 @@ the same pull request as the app it describes.
    website composes them onto a home screen (`HomeScreen` in `site/lib/store-graphics.tsx`), which
    is screenshot 3 and the site's "On the home screen" section. Nothing but the wallpaper and the
    arrangement is drawn — the widgets are the real renders.
-3. Build the site (`cd site && npm run build`). The store graphics land in `site/out/store/`, and a
+3. `PEACE_GEMINI_KEY_FILE=<file> npm run shots:penny` — **costs money**, a handful of Gemini
+   requests — writes `penny-ask.png` (screenshot 7) and `voice.png` (screenshot 3, the bars moving
+   while a clip is read). The voice capture needs SOUND in the emulator's mic, and the headless AVD has
+   none: it boots with `-no-audio`, and without a window it cannot open PulseAudio at all ("Could not
+   init `pa' audio driver"). Use the WINDOWED emulator with `-allow-host-audio` and
+   `adb emu avd hostmicon`, and give it something to hear — a tone looping into a PulseAudio null
+   sink works without a microphone, but PipeWire may route the emulator's input elsewhere, so check
+   `pw-link -l` while it records and link `peace_mic:monitor_*` to `qemu-system-x86_64:input_*`.
+   Without sound Peace refuses the silent clip, the flow skips the capture, and the previous
+   `voice.png` is kept.
+4. Build the site (`cd site && npm run build`). The store graphics land in `site/out/store/`, and a
    merge to `main` publishes them.
 
 The graphics are generated, never edited by hand: captions live in `STORE_SHOTS` in

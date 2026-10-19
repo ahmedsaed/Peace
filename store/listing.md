@@ -28,11 +28,12 @@ LOG A SPEND IN SECONDS
 • Pick a calculator or phone layout, and the side the operators sit on.
 • Works in split screen next to your bank's notification.
 • Photograph a receipt right in the note field: one tap and it is attached.
-• From your home screen: widgets for your balance and your budget, and hold the Peace icon for a new expense, a receipt or Penny.
+• Or just say it — "250 lunch from Cash" — in Arabic, English or both, and the record fills itself in.
+• From your home screen: widgets for your balance and your budget, and hold the Peace icon for a new expense, a receipt, your voice or Penny.
 
 SEE WHERE IT WENT
 • Budgets per category, showing what is left this month.
-• Spending ranked by category, with shares that add up to exactly 100%.
+• Spending ranked by category and sub-category, with shares that add up to exactly 100%.
 • Search by category, account, date, amount or note, with a total of what it found.
 • Carry your balance from month to month, so you always know what you hold.
 
@@ -47,8 +48,9 @@ EVERY ACCOUNT, ADDING UP
 LET AI DO THE TYPING (OPTIONAL)
 With your own Google Gemini API key — free to create — Peace can:
 • Read a receipt or invoice — a photo, a PDF or a text file — and fill in the amount.
+• Hear a record you speak, and fill in the amount, account, category and date. The recording is never kept.
 • Turn bank notifications into records for you to approve.
-• Answer questions about your spending with Penny, the assistant, using figures from your own ledger.
+• Answer questions about your spending with Penny, the assistant, using figures from your own ledger — typed or spoken.
 Only Google sees what you send, and only once you add a key. Everything else works without one.
 
 YOURS TO KEEP
@@ -63,7 +65,7 @@ MAKE IT YOURS
 • Works with TalkBack and large text.
 
 PRIVATE BY DEFAULT
-Nothing leaves your phone until you turn something on: reminders, AI, bank notifications and backups each start switched off. Peace contains no advertising or tracking code at all.
+Nothing leaves your phone until you turn something on: reminders, AI, bank notifications and backups each start switched off, and the microphone is only open while you are speaking. Peace contains no advertising or tracking code at all.
 
 FREE AND OPEN SOURCE
 Peace is free software under the GPL-3.0. Read the code at github.com/ahmedsaed/Peace.

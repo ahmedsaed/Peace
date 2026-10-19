@@ -1,6 +1,7 @@
 appId: dev.merope.peace.oss
 ---
-# The README's Penny row, from the demo ledger and a REAL Gemini key.
+# The README's Penny row and the store's voice and Penny screenshots, from the
+# demo ledger and a REAL Gemini key.
 #
 # NOT in .maestro/: it costs money (a handful of requests) and asserts little.
 # Run it through `npm run shots:penny`, which restores the demo ledger first.
@@ -26,6 +27,10 @@ appId: dev.merope.peace.oss
 # Backup & export lives under Settings › Your data, not in the side menu.
 - tapOn:
     id: "drawer-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-section-backup"
+    direction: DOWN
 - tapOn:
     id: "settings-section-backup"
 - scrollUntilVisible:
@@ -87,6 +92,60 @@ appId: dev.merope.peace.oss
     id: "nav-back"
 - tapOn:
     id: "nav-back"
+
+# --- the mic on a new record: the bars moving while the clip is read ---
+# NEEDS SOUND IN THE EMULATOR'S MIC (see store/README.md): the headless AVD
+# boots with -no-audio, hears silence, and Peace rightly refuses to send that —
+# so without sound there is no reading to photograph, and this section skips
+# its capture rather than failing the Penny shots. One Gemini request when it
+# runs; whatever the model makes of the sound is discarded below.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "record-voice"
+- extendedWaitUntil:
+    visible:
+      id: "voice-panel"
+    timeout: 15000
+# Listen for a couple of seconds, long enough for the metering to hear the
+# sound and the clip to pass the minimum length. (Maestro has no plain sleep:
+# this waits for something that never appears.)
+- extendedWaitUntil:
+    visible:
+      id: "voice-done-never"
+    timeout: 2500
+    optional: true
+- tapOn:
+    id: "voice-done"
+- extendedWaitUntil:
+    visible:
+      id: "voice-reading"
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: "voice-reading"
+    commands:
+      - takeScreenshot: voice
+- extendedWaitUntil:
+    notVisible:
+      id: "voice-reading"
+    timeout: 60000
+- runFlow:
+    when:
+      visible:
+        id: "voice-close"
+    commands:
+      - tapOn:
+          id: "voice-close"
+- tapOn:
+    id: "record-cancel"
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 15000
+
 - tapOn:
     id: "nav-assistant"
 
