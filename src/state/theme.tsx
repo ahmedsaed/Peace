@@ -4,6 +4,7 @@ import { vars } from 'nativewind';
 import { useEffect, useMemo } from 'react';
 import { Appearance, useColorScheme, View } from 'react-native';
 
+import { persistNightMode } from '../../modules/night-mode/src/NightModeModule';
 import { cssVariables, THEMES } from '../constants/themes';
 import { resolveTheme, themeColors, type ThemeColors, type ThemeId } from '../lib/theme';
 import { useSetting } from './settings';
@@ -46,7 +47,7 @@ export function useSwitchColors() {
 /**
  * Paints everything beneath it in the active theme.
  *
- * Four things follow the theme, and only the first is ours to draw:
+ * Five things follow the theme, and only the first is ours to draw:
  *
  * 1. The CSS variables every colour class reads. Set on ONE view at the root;
  *    NativeWind hands them down through context, so a `Modal` — its own native
@@ -58,6 +59,11 @@ export function useSwitchColors() {
  *    a Ledger screen. Forced to match, they follow the theme. In "Match phone"
  *    the override is lifted, which is also what lets `useColorScheme` report
  *    the phone's real setting rather than the one we forced.
+ *    The same choice is PERSISTED with Android (`persistNightMode`), because
+ *    the splash is drawn before any JavaScript runs and the override above dies
+ *    with the process. That makes the next cold start dark or light to match —
+ *    Ledger's or Paper's ground, set in `app.config.js`; the system can pick
+ *    between two resource folders and nothing finer.
  * 4. The root view's background, which shows for a frame behind a screen
  *    transition or a keyboard animating in.
  */
@@ -68,7 +74,9 @@ export function ThemeRoot({ children }: { children: React.ReactNode }) {
   const style = useMemo(() => vars(cssVariables(theme.colors)), [theme]);
 
   useEffect(() => {
-    Appearance.setColorScheme(setting === 'system' ? 'unspecified' : theme.dark ? 'dark' : 'light');
+    const scheme = setting === 'system' ? 'unspecified' : theme.dark ? 'dark' : 'light';
+    Appearance.setColorScheme(scheme);
+    persistNightMode(scheme);
   }, [setting, theme]);
 
   useEffect(() => {

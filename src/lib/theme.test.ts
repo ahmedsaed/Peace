@@ -243,3 +243,22 @@ describe('the CSS variables', () => {
     expect(config).toContain('cssVariables(THEMES.ledger.colors)');
   });
 });
+
+// The splash is drawn by Android before any of this code runs, from the colours
+// app.config.js hands the splash plugin: one for `values/`, one for
+// `values-night/`. They must be the grounds of the pair "Match phone" resolves
+// to, or the first frame of the app is a different colour from the splash it
+// fades out of.
+describe('the splash', () => {
+  it('opens on the ground of the light and the dark theme of the system pair', () => {
+    const { expo } = require('../../app.json');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const config = require('../../app.config.js')({ config: expo });
+    const splash = config.plugins.find(
+      (p: unknown) => Array.isArray(p) && p[0] === 'expo-splash-screen',
+    )[1];
+    expect(splash.backgroundColor).toBe(THEMES[SYSTEM_PAIR.light as keyof typeof THEMES].colors.ground);
+    expect(splash.dark.backgroundColor).toBe(THEMES[SYSTEM_PAIR.dark as keyof typeof THEMES].colors.ground);
+    expect(splash.image).toBe('./assets/images/splash-icon.png');
+  });
+});

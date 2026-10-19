@@ -1,5 +1,7 @@
 const { execSync } = require('node:child_process');
 
+const { SYSTEM_PAIR, THEMES } = require('./src/constants/themes');
+
 /**
  * Dynamic layer over app.json.
  *
@@ -68,9 +70,34 @@ if (!FLAVORS[flavor]) {
 
 const gitSha = process.env.GITHUB_SHA?.slice(0, 7) ?? git('git rev-parse --short HEAD', 'unknown');
 
+/**
+ * THE SPLASH FOLLOWS THE THEME, as far as Android lets it.
+ *
+ * The system draws it before any JavaScript runs, from resources, so it cannot
+ * read the theme setting — it can only pick `values/` or `values-night/` by the
+ * night mode `ThemeRoot` persisted on the last run. So there are two splashes,
+ * in the grounds of the pair "Match phone" uses: Graphite opens on Ledger's,
+ * Mist on Paper's, exactly as their date pickers do. The colours come from the
+ * theme table rather than being written into app.json, so a nudged hex cannot
+ * leave the splash a shade off the first screen it fades into.
+ */
+function themedSplash(plugin) {
+  if (!Array.isArray(plugin) || plugin[0] !== 'expo-splash-screen') return plugin;
+  const [name, options] = plugin;
+  return [
+    name,
+    {
+      ...options,
+      backgroundColor: THEMES[SYSTEM_PAIR.light].colors.ground,
+      dark: { ...options.dark, backgroundColor: THEMES[SYSTEM_PAIR.dark].colors.ground },
+    },
+  ];
+}
+
 module.exports = ({ config }) => ({
   ...config,
   name: FLAVORS[flavor].name,
+  plugins: config.plugins.map(themedSplash),
   android: {
     ...config.android,
     package: FLAVORS[flavor].package,
