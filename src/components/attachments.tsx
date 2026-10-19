@@ -38,8 +38,8 @@ export const PREVIEW_SIZE = 56;
  * exactly what happened to the read badge along the bottom edge.
  */
 const BADGE_ROOM = 8;
-/** Two 40dp buttons and the 8dp gap between them. */
-const BUTTONS_WIDTH = 40 * 2 + 8;
+/** N 40dp buttons and the 8dp gaps between them. */
+const buttonsWidth = (count: number) => 40 * count + 8 * (count - 1);
 
 type Props = {
   attachments: StagedAttachment[];
@@ -57,6 +57,16 @@ type Props = {
   onRead?: (attachment: StagedAttachment) => void;
   /** Which attachment is being read, so only its own badge spins. */
   reading: string | null;
+  /**
+   * Speak the record instead. Absent when voice cannot run (no key, Use AI or
+   * Voice off), and then there is no mic button at all — the same rule as the
+   * reading badge.
+   *
+   * It lives with the attach buttons, not in a row of its own: both are ways
+   * of putting something INTO this record other than typing, and this band is
+   * the one place on the screen with room for them.
+   */
+  onVoice?: () => void;
   /** True in split-screen: previews go, the buttons merge, the count stays. */
   compact: boolean;
   busy?: boolean;
@@ -172,7 +182,7 @@ function SquareButton({
   testID,
   badge,
 }: {
-  icon: 'camera' | 'folder';
+  icon: 'camera' | 'folder' | 'mic';
   label: string;
   onPress: () => void;
   disabled?: boolean;
@@ -208,9 +218,15 @@ export function AttachmentBar({
   onOpen,
   onRead,
   reading,
+  onVoice,
   compact,
   busy,
 }: Props) {
+  const width = buttonsWidth(onVoice ? 3 : 2);
+  const mic = onVoice ? (
+    <SquareButton icon="mic" label="Speak the record" onPress={onVoice} disabled={busy} testID="record-voice" />
+  ) : null;
+
   /**
    * One button in split-screen, and it opens the CAMERA.
    *
@@ -221,14 +237,17 @@ export function AttachmentBar({
    */
   if (compact) {
     return (
-      <SquareButton
-        icon="camera"
-        label={`Attach a receipt. ${attachments.length} attached`}
-        onPress={onCamera}
-        disabled={busy}
-        testID="attach-camera"
-        badge={attachments.length}
-      />
+      <>
+        {mic}
+        <SquareButton
+          icon="camera"
+          label={`Attach a receipt. ${attachments.length} attached`}
+          onPress={onCamera}
+          disabled={busy}
+          testID="attach-camera"
+          badge={attachments.length}
+        />
+      </>
     );
   }
 
@@ -268,7 +287,7 @@ export function AttachmentBar({
              * space is the buttons' own width, so the last tile can be scrolled
              * fully clear into the middle of the strip.
              */
-            paddingRight: BUTTONS_WIDTH + 12,
+            paddingRight: width + 12,
           }}
           testID="attachment-previews">
           {attachments.map((attachment) => (
@@ -290,7 +309,8 @@ export function AttachmentBar({
       <View
         className="absolute bottom-0 right-0 flex-row gap-2"
         pointerEvents="box-none"
-        style={{ width: BUTTONS_WIDTH }}>
+        style={{ width }}>
+        {mic}
         <SquareButton
           icon="camera"
           label="Photograph a receipt"

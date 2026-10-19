@@ -20,6 +20,16 @@
 
 import { base64ToText, isTextMime } from './attachment';
 import { buildPrompt, parseReading, ReceiptError, RESPONSE_SCHEMA, type ReadReceipt } from './receipt';
+import {
+  buildTranscribePrompt,
+  buildVoicePrompt,
+  parseTranscript,
+  parseVoiceReading,
+  TRANSCRIBE_SCHEMA,
+  VOICE_SCHEMA,
+  VoiceError,
+  type VoiceReading,
+} from './voice';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -663,7 +673,12 @@ async function generateJson(
   model: string,
   parts: unknown[],
   responseSchema: unknown,
-  { timeoutMs, fetchImpl, label }: { timeoutMs: number; fetchImpl: typeof fetch; label: string }
+  {
+    timeoutMs,
+    fetchImpl,
+    label,
+    meanwhile,
+  }: { timeoutMs: number; fetchImpl: typeof fetch; label: string; meanwhile?: string }
 ): Promise<unknown> {
   const body = await postGenerate(
     apiKey,
@@ -678,7 +693,7 @@ async function generateJson(
         temperature: 0,
       },
     },
-    { timeoutMs, fetchImpl, label }
+    { timeoutMs, fetchImpl, label, meanwhile }
   );
   return extractJson(body);
 }
@@ -745,4 +760,88 @@ export async function readBankMessage(
     fetchImpl,
     label: 'bank message read',
   });
+}
+
+/** A recorded clip, as the recorder hands it over. */
+export type VoiceClip = { base64: string; mimeType: string };
+
+/**
+ * Hear a spoken record and return its fields.
+ *
+ * The clip goes INLINE, after the instructions, exactly as a receipt photo
+ * does — a few seconds of 16kHz mono AAC is tens of kilobytes, far inside the
+ * inline limit, and the Files API would be a second request and a file left on
+ * Google's side for something heard once.
+ */
+export async function readVoice(
+  apiKey: string,
+  model: string,
+  clip: VoiceClip,
+  {
+    today,
+    accountNames,
+    categoryNames,
+    homeCurrency,
+    fallbackCurrency,
+    guidance = '',
+    timeoutMs = READ_TIMEOUT_MS,
+    fetchImpl = fetch,
+  }: {
+    today: Date;
+    accountNames: string[];
+    categoryNames: string[];
+    homeCurrency: string;
+    /** Decides the decimal places when no currency was said: the account's. */
+    fallbackCurrency: string;
+    guidance?: string;
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+  }
+): Promise<VoiceReading> {
+  const raw = await generateJson(
+    apiKey,
+    model,
+    [
+      { text: buildVoicePrompt({ today, accountNames, categoryNames, homeCurrency, guidance }) },
+      { inline_data: { mime_type: clip.mimeType, data: clip.base64 } },
+    ],
+    VOICE_SCHEMA,
+    { timeoutMs, fetchImpl, label: 'voice read' }
+  );
+  try {
+    return parseVoiceReading(raw, fallbackCurrency, today);
+  } catch (error) {
+    if (error instanceof VoiceError) throw new GeminiError(error.message);
+    throw error;
+  }
+}
+
+/**
+ * Turn a spoken question into text for Penny's composer.
+ *
+ * TEXT, NOT THE AUDIO, goes into the conversation. Penny's history is replayed
+ * to the model verbatim on every turn, so a clip sent as a message would be
+ * sent again with every question after it — and stored, and backed up. As
+ * text it costs nothing further, and the person reads and corrects it before
+ * anything acts on it.
+ */
+export async function transcribe(
+  apiKey: string,
+  model: string,
+  clip: VoiceClip,
+  { timeoutMs = READ_TIMEOUT_MS, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
+): Promise<string> {
+  const raw = await generateJson(
+    apiKey,
+    model,
+    [{ text: buildTranscribePrompt() }, { inline_data: { mime_type: clip.mimeType, data: clip.base64 } }],
+    TRANSCRIBE_SCHEMA,
+    { timeoutMs, fetchImpl, label: 'transcription', meanwhile: 'Type the question instead.' }
+  );
+  try {
+    return parseTranscript(raw);
+  } catch (error) {
+    if (error instanceof VoiceError) throw new GeminiError(error.message);
+    throw error;
+  }
 }

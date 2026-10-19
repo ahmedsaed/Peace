@@ -82,6 +82,8 @@ export const SETTING_DEFAULTS = {
    */
   receiptGuidance: '' as string,
   bankGuidance: '' as string,
+  /** What a spoken record could not know: "the card" is CIB Visa, and so on. */
+  voiceGuidance: '' as string,
 
   /**
    * Use AI at all — the master switch over everything that sends to Gemini.
@@ -106,6 +108,12 @@ export const SETTING_DEFAULTS = {
    * changing its mind behind somebody's back.
    */
   receiptsEnabled: true as boolean,
+  /**
+   * Speaking a record or a question for Penny. ON by default, like Receipts:
+   * it only matters once there is a key, and the microphone is asked for the
+   * first time the mic is tapped — not by this switch, and not on install.
+   */
+  voiceEnabled: true as boolean,
   /**
    * The assistant — a chat that answers from the ledger. OFF until switched on.
    *

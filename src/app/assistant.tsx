@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { canRetry, sessionIsEmpty, toItems, type Item } from '@/assistant/display';
@@ -22,6 +22,10 @@ import { db } from '@/db/client';
 import type { RecordRow } from '@/db/repo/records';
 import { searchRecords } from '@/db/repo/search';
 import { AttachmentError } from '@/lib/attachment';
+import { GeminiError, transcribe, type VoiceClip } from '@/lib/gemini';
+import { getGeminiKey } from '@/lib/secrets';
+import { clipClock, MAX_CLIP_MS } from '@/lib/voice';
+import { useVoiceRecorder } from '@/state/voice';
 import { EMPTY_QUERY } from '@/lib/search-query';
 import { useKeyboardOverlap } from '@/lib/layout';
 import { useAssistantStore } from '@/state/assistant';
@@ -88,6 +92,51 @@ export default function AssistantScreen() {
   // Bumped on focus so lists drawn from the ledger re-read it: a record
   // edited from a sheet here should not come back showing its old amount.
   const [focusTick, setFocusTick] = useState(0);
+
+  /**
+   * SPEAKING A QUESTION writes it, it does not send it. The clip is turned into
+   * text and put in the box, where the person reads it — a misheard "Sara" is
+   * one tap to fix there, and an unfixable proposal once Penny has acted on
+   * it. The audio itself never enters the conversation (see `transcribe`).
+   */
+  const geminiModel = useSetting('geminiModel');
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const recorder = useVoiceRecorder({
+    onClip: (clip) => void writeDown(clip),
+    onProblem: (problem) => setVoiceError(problem.message),
+    onInterrupted: () => {},
+  });
+  const recording = recorder.phase !== 'idle';
+
+  async function writeDown(clip: VoiceClip) {
+    setTranscribing(true);
+    try {
+      const key = await getGeminiKey();
+      if (key === null) {
+        setVoiceError('Add a Gemini API key in Settings to ask by voice.');
+        return;
+      }
+      const text = await transcribe(key, geminiModel, clip);
+      if (text === '') {
+        setVoiceError('Nothing could be heard. Try again, or type it.');
+        return;
+      }
+      // Added to whatever was typed meanwhile, never over it.
+      setDraft((current) => (current.trim() ? `${current.trimEnd()} ${text}` : text));
+    } catch (e) {
+      if (!(e instanceof GeminiError)) console.warn('[assistant] transcription failed', e);
+      setVoiceError(e instanceof GeminiError ? e.message : 'Could not write down what you said.');
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
+  const listen = () => {
+    setVoiceError(null);
+    setAttachError(null);
+    void recorder.start();
+  };
 
   useEffect(() => {
     if (!loaded) load();
@@ -246,12 +295,27 @@ export default function AssistantScreen() {
           {attachError}
         </Text>
       ) : null}
+      {voiceError ? (
+        <Text className="px-4 pt-2 text-xs text-expense" testID="assistant-voice-error">
+          {voiceError}
+        </Text>
+      ) : null}
       <View
         className="flex-row items-end gap-2 px-3 pt-2"
         style={{ paddingBottom: keyboard > 0 ? 8 : Math.max(insets.bottom, 8) }}>
         {/* A PLUS — "add something to this message". Not a paperclip, whose
             hole closes into a blob at this size (see the glyph rule in
             AGENTS.md), and not a folder, which read as "browse files". */}
+        {recording ? (
+          <Pressable
+            onPress={() => void recorder.cancel()}
+            testID="assistant-voice-cancel"
+            accessibilityRole="button"
+            accessibilityLabel="Stop listening and discard"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-raised">
+            <Icon name="close" size={20} color={palette.muted} />
+          </Pressable>
+        ) : (
         <Pressable
           onPress={() => setAttachOpen(true)}
           disabled={busy}
@@ -261,11 +325,33 @@ export default function AssistantScreen() {
           className={`h-11 w-11 items-center justify-center rounded-full active:bg-raised ${busy ? 'opacity-40' : ''}`}>
           <Icon name="plus" size={22} color={palette.muted} />
         </Pressable>
+        )}
+        {recording ? (
+          // The box itself says the mic is open, with the clock, so nobody has
+          // to wonder whether it is still listening.
+          <View
+            className="h-11 flex-1 flex-row items-center gap-2 rounded-2xl bg-raised px-4"
+            testID="assistant-listening">
+            <View
+              className="h-2.5 w-2.5 rounded-full bg-expense"
+              style={{ opacity: recorder.phase === 'recording' ? 0.5 + 0.5 * (recorder.level ?? 1) : 0.3 }}
+            />
+            <Text className="flex-1 text-base text-ink">
+              {recorder.phase === 'recording' ? 'Listening…' : 'Opening the microphone…'}
+            </Text>
+            <Text className="text-sm text-muted" testID="assistant-voice-clock">
+              {clipClock(recorder.elapsedMs)} / {clipClock(MAX_CLIP_MS)}
+            </Text>
+          </View>
+        ) : (
         <TextInput
           value={draft}
           onChangeText={setDraft}
+          editable={!transcribing}
           placeholder={
-            waiting
+            transcribing
+              ? 'Writing down what you said…'
+              : waiting
               ? 'Answer the card above, or ask something else'
               : pending.length > 0
                 ? 'Ask about it, or send to have it read'
@@ -277,7 +363,33 @@ export default function AssistantScreen() {
           testID="assistant-input"
           accessibilityLabel="Message"
         />
-        {busy ? (
+        )}
+        {recording ? (
+          <Pressable
+            onPress={() => void recorder.finish()}
+            disabled={recorder.phase !== 'recording'}
+            testID="assistant-voice-done"
+            accessibilityRole="button"
+            accessibilityLabel="Done speaking. Write it down"
+            className="h-11 w-11 items-center justify-center rounded-full bg-accent active:opacity-80">
+            <Icon name="check" size={20} color={palette['accent-ink']} />
+          </Pressable>
+        ) : transcribing ? (
+          <View className="h-11 w-11 items-center justify-center" testID="assistant-transcribing">
+            <ActivityIndicator color={palette.accent} />
+          </View>
+        ) : ai.voice && !busy && draft.trim() === '' && pending.length === 0 ? (
+          // An empty box has nothing to send, so the button speaks instead —
+          // the composer gains a mic without gaining a button.
+          <Pressable
+            onPress={listen}
+            testID="assistant-voice"
+            accessibilityRole="button"
+            accessibilityLabel="Ask by voice"
+            className="h-11 w-11 items-center justify-center rounded-full bg-accent active:opacity-80">
+            <Icon name="mic" size={20} color={palette['accent-ink']} />
+          </Pressable>
+        ) : busy ? (
           <Pressable
             onPress={stop}
             testID="assistant-stop"

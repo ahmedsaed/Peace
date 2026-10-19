@@ -150,7 +150,7 @@ export default function SettingsIndex() {
               keyless
                 ? 'Add your Gemini key below, then switch this on.'
                 : s.aiEnabled
-                  ? 'Reading receipts, reading bank messages and Penny can run.'
+                  ? 'Reading receipts, voice, reading bank messages and Penny can run.'
                   : 'Paused. Your key and choices are kept; bank messages wait unread.'
             }
             // Muted without a key: there is nothing for it to turn on.
@@ -167,6 +167,15 @@ export default function SettingsIndex() {
             summary={!ai ? blockedLabel : aiState.receipts ? 'Photos, PDFs and text files, read into a record' : 'Off'}
             onPress={go('/settings/ai/receipts')}
             testID="settings-ai-receipts"
+            dim={!ai}
+          />
+          <SectionLink
+            emblem="mic"
+            color={SECTIONS.ai.color}
+            title="Voice"
+            summary={!ai ? blockedLabel : aiState.voice ? 'Speak a record or a question' : 'Off'}
+            onPress={go('/settings/ai/voice')}
+            testID="settings-ai-voice"
             dim={!ai}
           />
           <SectionLink

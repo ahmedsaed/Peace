@@ -49,6 +49,81 @@ tags:
 - tapOn:
     id: "record-cancel"
 
+# --- Voice on: the mic opens on a new record and in Penny, and closes again ---
+# Nothing is SENT: the emulator's microphone hears silence, so each panel is
+# cancelled. What a voice is heard as is only provable on a phone.
+- tapOn:
+    id: "fab"
+- tapOn:
+    id: "record-voice"
+- extendedWaitUntil:
+    visible:
+      id: "voice-panel"
+    timeout: 10000
+- assertVisible:
+    id: "voice-clock"
+- takeScreenshot: 01b-record-listening
+- tapOn:
+    id: "voice-cancel"
+- assertVisible:
+    id: "record-note"
+- tapOn:
+    id: "record-cancel"
+- tapOn:
+    id: "nav-assistant"
+- tapOn:
+    id: "assistant-voice"
+- extendedWaitUntil:
+    visible:
+      id: "assistant-listening"
+    timeout: 10000
+- takeScreenshot: 01c-penny-listening
+- tapOn:
+    id: "assistant-voice-cancel"
+- assertVisible:
+    id: "assistant-voice"
+- tapOn:
+    id: "nav-back"
+
+# --- Voice off: the mic is gone from BOTH screens ---
+- tapOn:
+    id: "nav-menu"
+- tapOn:
+    id: "drawer-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-voice"
+    direction: DOWN
+- tapOn:
+    id: "settings-ai-voice"
+- tapOn:
+    id: "voice-enabled"
+- assertVisible:
+    id: "voice-off"
+- tapOn:
+    id: "nav-back"
+- assertVisible:
+    id: "settings-ai-voice-summary"
+    text: "Off"
+- tapOn:
+    id: "nav-back"
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "attach-camera"
+- assertNotVisible:
+    id: "record-voice"
+- tapOn:
+    id: "record-cancel"
+- tapOn:
+    id: "nav-assistant"
+- assertVisible:
+    id: "assistant-input"
+- assertNotVisible:
+    id: "assistant-voice"
+- tapOn:
+    id: "nav-back"
+
 # --- Receipts off: the photo still attaches, with nothing to read it ---
 - tapOn:
     id: "nav-menu"

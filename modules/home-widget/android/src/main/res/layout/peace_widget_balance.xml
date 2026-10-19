@@ -225,6 +225,32 @@
             </FrameLayout>
 
             <FrameLayout
+                android:id="@+id/btn_voice"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Speak a record">
+
+                <ImageView
+                    android:id="@+id/btn_voice_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/peace_widget_pill"
+                    android:tint="#302818"
+                    android:importantForAccessibility="no" />
+
+                <ImageView
+                    android:id="@+id/btn_voice_icon"
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/peace_widget_mic"
+                    android:tint="#EFE4CE"
+                    android:importantForAccessibility="no" />
+            </FrameLayout>
+
+            <FrameLayout
                 android:id="@+id/btn_penny"
                 android:layout_width="48dp"
                 android:layout_height="match_parent"
