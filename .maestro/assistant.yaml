@@ -47,6 +47,9 @@ appId: dev.merope.peace.oss
 - assertVisible:
     id: "settings-ai-penny-summary"
     text: "Needs a key"
+- assertVisible:
+    id: "settings-ai-voice-summary"
+    text: "Needs a key"
 - takeScreenshot: 01-ai-no-key
 
 # --- each feature page: the notice, and a switch that cannot claim to be on ---
@@ -93,6 +96,18 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "nav-back"
 
+- tapOn:
+    id: "settings-ai-voice"
+- assertVisible:
+    id: "key-notice"
+- assertVisible:
+    id: "voice-enabled"
+    enabled: false
+- assertNotVisible:
+    id: "voice-guidance"
+- tapOn:
+    id: "nav-back"
+
 # --- a made-up key is CHECKED, refused, and not saved ---
 # Saving asks Google to list models with the key first. A made-up one is
 # refused (or, on a runner with no network, cannot be checked) — either way the
@@ -128,6 +143,29 @@ appId: dev.merope.peace.oss
     enabled: false
 - tapOn:
     id: "nav-back"
+
+# --- no mic on a new record, and the Speak shortcut says what is missing ---
+- assertVisible:
+    id: "home-screen"
+- tapOn:
+    id: "fab"
+- assertVisible:
+    id: "attach-camera"
+- assertNotVisible:
+    id: "record-voice"
+- tapOn:
+    id: "record-cancel"
+- openLink: "peace://record?voice=1"
+- extendedWaitUntil:
+    visible:
+      id: "record-error"
+      text: ".*needs a Gemini key.*"
+    timeout: 10000
+- assertNotVisible:
+    id: "voice-panel"
+- takeScreenshot: 04-speak-no-key
+- tapOn:
+    id: "record-cancel"
 
 # --- reached anyway (a link), Penny's screen says what is missing ---
 - openLink: "peace://assistant"

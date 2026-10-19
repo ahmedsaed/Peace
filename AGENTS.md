@@ -480,9 +480,10 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   obvious circular-arrow choice — closes into a featureless blob. A solid arrow survives it, and
   reads as "came back" more directly anyway.
 - **A control floating over a scrollable strip needs trailing padding, or the last item is
-  unreachable.** The attach buttons overlay the receipt previews to save a row of height; without
-  `paddingRight` equal to the buttons' width, the final thumbnail comes to rest UNDERNEATH them and
-  no amount of scrolling frees it — and the last one added is exactly the one you want to look at.
+  unreachable.** The attach buttons once overlaid the receipt previews to save a row of height;
+  without `paddingRight` equal to the buttons' width, the final thumbnail came to rest UNDERNEATH
+  them and no amount of scrolling freed it — and the last one added is exactly the one you want to
+  look at. (They now share a row with the tags instead, and the strip sits above them.)
   Same family: badges that overhang a tile's corners are sliced off by the scroll view's bounds
   unless the content has padding on those edges too. Both are invisible until there are enough
   items to overflow, so test with more than fit.
@@ -794,8 +795,9 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   camera dot and the battery pays), and it closes when the app leaves the foreground. "Camera app"
   inside it is the old `launchCameraAsync` path, kept for night mode and for a phone where the
   preview fails. expo-camera is configured with `recordAudioAndroid: false` and
-  `barcodeScannerEnabled: false` (built from source, see `package.json`): a microphone permission
-  would contradict the Data safety form, and the barcode scanner is ML Kit we do not use. The
+  `barcodeScannerEnabled: false` (built from source, see `package.json`): the camera has no reason
+  to hear anything — `RECORD_AUDIO` exists for voice input alone, through `expo-audio` — and the
+  barcode scanner is ML Kit we do not use. The
   emulator's camera is a test pattern and its stills come out black — a flow can prove the shutter
   attaches something, only a phone can show the picture.
 - **Downscale a photo before it is stored, never at render time.** A 4MB camera JPEG that reaches
@@ -959,6 +961,22 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   with `postInvalidateOnAnimation` from inside its own `draw`, so it costs frames only while it is
   on screen. Its code-highlighting and maths extras are opted out in `package.json`
   (`"enriched-markdown"`) — they download ~200MB of native dependencies nothing here uses.
+- **Voice is audio straight to Gemini, never Android's speech recogniser.** Testers speak Arabic and
+  English in one sentence, and the platform recogniser hears one language per session — half of
+  "دفعت 300 Uber" is noise to it. One request with the clip inline (`readVoice`) hears both and
+  returns the record's fields, under the receipt's discipline: structured output, temperature zero,
+  names matched against the ledger's own, a relative date ("yesterday") dropped if it lands in the
+  future or over a year back, and nothing written until the person saves. The prompt is given
+  TODAY with its weekday — without it "Thursday" is counted from the model's training date.
+  **Penny gets TEXT, not the clip** (`transcribe`): her history is replayed verbatim every turn, so
+  a clip in it would be re-sent with every later question, stored and backed up — and the words
+  land in the composer where a misheard name is fixed before she acts on it. **The mic is open only
+  while it is shown** (`state/voice.ts`): started by a tap, capped at a minute natively as well as
+  in JS, CANCELLED (not sent) when the app leaves the foreground or the screen unmounts, and the
+  file is deleted the moment it has been read, whatever the request did. Only a blank new record
+  offers the mic — an edit, refund, repeat or bank message arrives filled in to be confirmed, and a
+  clip would overwrite what it came for. The emulator's microphone is silence: a flow can prove
+  the panel opens and closes; only a phone, and a real voice, proves what is heard.
 - **The app lock is the PHONE'S lock, and it fails OPEN.** No Peace PIN: there is no account to
   reset one through, so a forgotten PIN would lock somebody out of the only copy of their ledger.
   And the setting travels in backups, so a ledger restored onto a phone with no screen lock arrives

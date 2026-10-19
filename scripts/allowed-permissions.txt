@@ -13,6 +13,11 @@ android.permission.ACCESS_NETWORK_STATE
 # Receipt photos, only on tapping the camera button
 android.permission.CAMERA
 
+# Speaking a record or a question to Penny, only while the mic is open (expo-audio);
+# MODIFY_AUDIO_SETTINGS comes with it and is granted at install
+android.permission.RECORD_AUDIO
+android.permission.MODIFY_AUDIO_SETTINGS
+
 # The daily reminder: a local notification, rebuilt after a reboot
 android.permission.POST_NOTIFICATIONS
 android.permission.RECEIVE_BOOT_COMPLETED

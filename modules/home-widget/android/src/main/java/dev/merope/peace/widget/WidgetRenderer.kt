@@ -394,6 +394,8 @@ internal object WidgetRenderer {
     paint.text(R.id.btn_expense_label) { it.accentInk }
     paint.tint(R.id.btn_receipt_bg) { it.raised }
     paint.tint(R.id.btn_receipt_icon) { it.ink }
+    paint.tint(R.id.btn_voice_bg) { it.raised }
+    paint.tint(R.id.btn_voice_icon) { it.ink }
     paint.tint(R.id.btn_penny_bg) { it.raised }
     paint.tint(R.id.btn_penny_icon) { it.ink }
   }
@@ -409,6 +411,7 @@ internal object WidgetRenderer {
     }
     rv.setOnClickPendingIntent(R.id.btn_expense, link(context, "peace://record", 1))
     rv.setOnClickPendingIntent(R.id.btn_receipt, link(context, "peace://record?capture=1", 2))
+    rv.setOnClickPendingIntent(R.id.btn_voice, link(context, "peace://record?voice=1", 5))
     rv.setOnClickPendingIntent(R.id.btn_penny, link(context, "peace://assistant", 3))
   }
 

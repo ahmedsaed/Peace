@@ -183,7 +183,7 @@ export function TagChips({
 }) {
   const palette = useTheme();
   return (
-    <View className="mt-2 flex-row flex-wrap items-center gap-1.5" testID="tag-chips">
+    <View className="flex-row flex-wrap items-center gap-1.5" testID="tag-chips">
       {names.map((name) => (
         <View key={name} className="rounded-full bg-raised px-2.5 py-1">
           <Text className="text-[11px] text-ink" numberOfLines={1}>

@@ -80,6 +80,9 @@ const CHROME_PATHS = {
   // fill gives a solid disc, which reads as a sticker rather than a lens.
   camera:
     'M9.2 3h5.6l1.2 2H20a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l1.2-2zM12 8a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 1 1 0-5.6z',
+  // Solid capsule over an open cradle: the gap between them is 1.6 units and
+  // was checked rasterised at 14, 18 and 22px — it holds at all three.
+  mic: 'M12 2a3.2 3.2 0 0 1 3.2 3.2v5.6a3.2 3.2 0 0 1-6.4 0V5.2A3.2 3.2 0 0 1 12 2zM5 10h1.9v1a5.1 5.1 0 0 0 10.2 0v-1H19v1a7 7 0 0 1-6 6.93V20h3v2H8v-2h3v-2.07A7 7 0 0 1 5 11z',
   // A folder rather than a paperclip: a clip is mostly negative space and turns
   // to mush at 18px, which is the size this is actually drawn at.
   folder: 'M2 4h7.2l2 3H22v13H2V4z',

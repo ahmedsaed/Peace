@@ -5,7 +5,7 @@ const { AndroidConfig, withAndroidManifest, withDangerousMod } = require('expo/c
 const { THEMES } = require('../src/constants/themes');
 
 /**
- * Launcher shortcuts: hold the Peace icon for Expense, Receipt and Penny.
+ * Launcher shortcuts: hold the Peace icon for Expense, Receipt, Speak and Penny.
  *
  * STATIC shortcuts, declared in `res/xml/shortcuts.xml`, so they exist from the
  * moment the app is installed and need no JavaScript to have run. Each one is a
@@ -15,9 +15,10 @@ const { THEMES } = require('../src/constants/themes');
  * Back and Save return to.
  *
  * Income had a slot and lost it to Penny: income is a few records a month,
- * and three slots are for what gets done daily. Penny's shortcut is offered
- * whether or not she is switched on — a static shortcut cannot know — and the
- * assistant screen's own gate says what is missing and links to the setting.
+ * and these slots are for what gets done daily. Four is the most a launcher
+ * reliably shows, so a fifth needs one of these to go. Penny's and Speak's
+ * shortcuts are offered whether or not they can run — a static shortcut
+ * cannot know — and the screen each opens says what is missing.
  *
  * EVERY INTENT NAMES ITS PACKAGE. Both flavors register the `peace` scheme, so
  * a bare `peace://record` on a phone with the GitHub build AND the Play build
@@ -41,12 +42,14 @@ const GLYPHS = {
     'M13 2l1.9 5.6L20.5 9.5l-5.6 1.9L13 17l-1.9-5.6L5.5 9.5l5.6-1.9L13 2zM5.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6L2 17.5l2.6-.9L5.5 14z',
   camera:
     'M9.2 3h5.6l1.2 2H20a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l1.2-2zM12 8a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 1 1 0-5.6z',
+  mic: 'M12 2a3.2 3.2 0 0 1 3.2 3.2v5.6a3.2 3.2 0 0 1-6.4 0V5.2A3.2 3.2 0 0 1 12 2zM5 10h1.9v1a5.1 5.1 0 0 0 10.2 0v-1H19v1a7 7 0 0 1-6 6.93V20h3v2H8v-2h3v-2.07A7 7 0 0 1 5 11z',
 };
 
 /** Order is the order the launcher lists them, nearest the icon first. */
 const SHORTCUTS = [
   { id: 'expense', glyph: 'minus', short: 'Expense', long: 'New expense', link: 'record' },
   { id: 'receipt', glyph: 'camera', short: 'Receipt', long: 'Photograph a receipt', link: 'record?capture=1' },
+  { id: 'voice', glyph: 'mic', short: 'Speak', long: 'Speak a record', link: 'record?voice=1' },
   // Larger than the others: the sparkle is two thin four-point stars, and at
   // the solid glyphs' size it rasterised to a speck at 48dp.
   { id: 'penny', glyph: 'sparkle', short: 'Penny', long: 'Ask Penny', link: 'assistant', scale: 1.36 },

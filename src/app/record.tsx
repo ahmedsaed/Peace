@@ -23,7 +23,7 @@ import {
 import { listAttachments, syncAttachments } from '@/db/repo/attachments';
 import { getCapture, markSaved } from '@/db/repo/bank-captures';
 import { AttachmentError } from '@/lib/attachment';
-import { GeminiError, readReceipt } from '@/lib/gemini';
+import { GeminiError, readReceipt, readVoice, type VoiceClip } from '@/lib/gemini';
 import { isEmptyReading, matchCategory, receiptNote } from '@/lib/receipt';
 import { getGeminiKey } from '@/lib/secrets';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
@@ -64,7 +64,10 @@ import { flowKeyFace, flowKeySpoken, nextAction, type Sheet } from '@/lib/record
 import { accountBalance } from '@/db/repo/adjust';
 import { createCardPurchase } from '@/db/repo/card';
 import { CURRENCIES } from '@/lib/currencies';
-import { captureNote } from '@/lib/bank-sms';
+import { captureNote, matchAccount } from '@/lib/bank-sms';
+import { isEmptyVoiceReading, spokenNote } from '@/lib/voice';
+import { VoicePanel } from '@/components/voice-panel';
+import { useVoiceRecorder, type VoiceProblem } from '@/state/voice';
 import { noteWithReading } from '@/lib/note';
 import { foreignPurchase } from '@/lib/fees';
 import { hasCardProfile, isLiability } from '@/lib/liability';
@@ -94,6 +97,7 @@ export default function RecordScreen() {
     fromRule,
     dueOn,
     capture,
+    voice,
     fromCapture,
     startAs,
     repeat: startRepeating,
@@ -115,6 +119,12 @@ export default function RecordScreen() {
      * arrives HERE and asks for the same two actions the buttons already run.
      */
     capture?: string;
+    /**
+     * `1`: open listening — the Voice launcher shortcut and widget tile. Same
+     * shape as `capture`: a flag that asks this screen for the action its own
+     * mic button runs, never a second screen.
+     */
+    voice?: string;
     /** Reverse this record: same account and category, marked a refund. */
     refundOf?: string;
     /**
@@ -235,7 +245,9 @@ export default function RecordScreen() {
   const geminiModel = useSetting('geminiModel');
   // A key, Use AI, and Receipts — all three, or no reading button, and the
   // photograph shortcut only photographs (`state/ai.ts` decides).
-  const aiEnabled = useAi().receipts;
+  const ai = useAi();
+  const aiEnabled = ai.receipts;
+  const voiceGuidance = useSetting('voiceGuidance');
   const receiptGuidance = useSetting('receiptGuidance');
 
   // A transfer can be opened from either leg; the form always presents it as
@@ -386,6 +398,13 @@ export default function RecordScreen() {
    * button, holding +, the Receipt shortcut — never on opening a record.
    */
   const [viewfinder, setViewfinder] = useState(false);
+  /**
+   * The notes field is the MICROPHONE: `listening` while the panel is shown,
+   * `hearing` while the clip is with Gemini. Like the camera, only by asking.
+   */
+  const [listening, setListening] = useState(false);
+  const [hearing, setHearing] = useState(false);
+  const [voiceProblem, setVoiceProblem] = useState<VoiceProblem | null>(null);
   /** Read the photo the viewfinder takes: true when it was opened to scan. */
   const readAfterCapture = useRef(false);
   /** The receipt currently being read, so only its own badge spins. */
@@ -900,6 +919,127 @@ export default function RecordScreen() {
     setViewfinder(true);
   }, [capture]);
 
+  /**
+   * SPEAK A NEW RECORD. Only a blank one: an edit, a refund, a repeat and a
+   * bank message all open already filled in for the person to confirm, and a
+   * clip that rewrote those fields would undo exactly what they came for.
+   */
+  const canSpeak = ai.voice && !existing && !source && !rule && !bankMessage;
+  const recorder = useVoiceRecorder({
+    onClip: (clip) => void hear(clip),
+    onProblem: setVoiceProblem,
+    onInterrupted: () => setListening(false),
+  });
+
+  function openVoice() {
+    setError(null);
+    if (!canSpeak) {
+      // Only reachable from the shortcut or the widget, which cannot know.
+      setError(
+        ai.voice
+          ? 'Speak a new record from the + button.'
+          : 'Speaking a record needs a Gemini key and Voice on, in Settings › AI.'
+      );
+      return;
+    }
+    setViewfinder(false);
+    setVoiceProblem(null);
+    setListening(true);
+    void recorder.start();
+  }
+
+  const closeVoice = useCallback(() => {
+    void recorder.cancel();
+    setListening(false);
+    setVoiceProblem(null);
+  }, [recorder]);
+
+  /**
+   * Fill the form from what was said — the receipt rule: every field heard
+   * replaces what is there, nothing is saved, and Cancel is the undo. What was
+   * SAID goes at the foot of the note, because a misheard name is only
+   * catchable by somebody who can see the words — and kept there, it stays
+   * catchable after saving too.
+   */
+  async function hear(clip: VoiceClip) {
+    setHearing(true);
+    try {
+      const key = await getGeminiKey();
+      if (key === null) {
+        setVoiceProblem({ message: 'Add a Gemini API key in Settings to speak records.' });
+        return;
+      }
+      const reading = await readVoice(key, geminiModel, clip, {
+        today: new Date(),
+        accountNames: accounts.map((a) => a.name),
+        // Both kinds: the model decides spent or received, and the name is
+        // matched against that side's list below.
+        categoryNames: [
+          ...listCategoryTree(db, 'expense').flatMap((n) => [n, ...n.children]),
+          ...listCategoryTree(db, 'income').flatMap((n) => [n, ...n.children]),
+        ].map((c) => c.name),
+        homeCurrency,
+        fallbackCurrency: currency,
+        guidance: voiceGuidance,
+      });
+
+      if (isEmptyVoiceReading(reading)) {
+        setVoiceProblem({
+          message: reading.transcript
+            ? `Heard “${reading.transcript}”, but no record in it. Try again, or type it.`
+            : 'Nothing could be heard. Try again, or type it.',
+        });
+        return;
+      }
+
+      const nextType = reading.type ?? type;
+      if (reading.type) setType(reading.type);
+      const from = matchAccount(reading.account, accounts);
+      if (from) onPickAccount(from.id);
+      const to = nextType === 'transfer' ? matchAccount(reading.toAccount, accounts) : null;
+      if (to && to.id !== (from?.id ?? accountId)) setToAccountId(to.id);
+
+      const lands = (from ?? account)?.currency ?? homeCurrency;
+      if (reading.amountMinor !== null) {
+        // Scaled by the currency it was parsed in; re-scaled only when the
+        // account it lands on keeps a different number of decimal places.
+        const parsedIn = reading.currency ?? currency;
+        setCalc(calcFromMinor(convertMinor(reading.amountMinor, parsedIn, lands, 1), lands));
+      }
+
+      if (nextType !== 'transfer') {
+        const side = listCategoryTree(db, nextType).flatMap((n) => [n, ...n.children]);
+        // A category of the other side cannot stay once the side has changed.
+        setCategoryId(matchCategory(reading.category, side)?.id ?? (nextType !== type ? null : categoryId));
+      }
+      // APPENDED, like a receipt, and with no room above: what was said IS the
+      // comment, not a reading under one.
+      setNote((current) => spokenNote(current, reading));
+      if (reading.occurredOn !== null) setOccurredAt(new Date(`${reading.occurredOn}T12:00:00`));
+
+      setListening(false);
+      // The one thing the form cannot show: a currency it has no field for.
+      if (reading.currency && reading.currency.toUpperCase() !== lands.toUpperCase()) {
+        setHint(`You said ${reading.currency}; this account is in ${lands} — check the amount.`);
+      }
+    } catch (e) {
+      if (!(e instanceof GeminiError)) console.warn('[record] reading speech failed', e);
+      setVoiceProblem({ message: e instanceof GeminiError ? e.message : 'Could not read what you said.' });
+    } finally {
+      setHearing(false);
+    }
+  }
+
+  // The Voice shortcut and widget tile: listen once, on arrival.
+  const voiceStarted = useRef(false);
+  useEffect(() => {
+    if (voice !== '1' || voiceStarted.current || ai.hasKey === null) return;
+    voiceStarted.current = true;
+    openVoice();
+    // openVoice reads the latest state; this runs once per mount by the ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice, ai.hasKey]);
+
   function onSave() {
     if (!canSave || amountMinor === null) return;
     try {
@@ -1124,6 +1264,19 @@ export default function RecordScreen() {
   // block, so they merge into one line. See the comment at that branch.
   const compact = density === 'tight';
 
+  const voicePanel = (
+    <VoicePanel
+      phase={recorder.phase}
+      reading={hearing}
+      elapsedMs={recorder.elapsedMs}
+      level={recorder.level}
+      problem={voiceProblem}
+      onDone={() => void recorder.finish()}
+      onCancel={closeVoice}
+      onRetry={openVoice}
+    />
+  );
+
   return (
     <View
       className="flex-1 bg-ground"
@@ -1319,6 +1472,7 @@ export default function RecordScreen() {
               onOpen={setViewing}
               onRead={aiEnabled ? onRead : undefined}
               reading={readingFile}
+              onVoice={canSpeak ? openVoice : undefined}
               compact
               busy={attaching}
             />
@@ -1368,6 +1522,11 @@ export default function RecordScreen() {
               <View className={`mx-4 flex-1 ${gap}`} style={{ minHeight: viewfinderMinHeight }}>
                 <InlineCamera onCapture={onCapture} onClose={closeViewfinder} onCameraApp={onCameraApp} />
               </View>
+            ) : listening ? (
+              // …or the microphone, on the same terms.
+              <View className={`mx-4 flex-1 ${gap}`} style={{ minHeight: viewfinderMinHeight }}>
+                {voicePanel}
+              </View>
             ) : (
             <View className={`mx-4 flex-1 rounded-lg bg-surface px-4 py-3 ${gap}`}>
               <TextInput
@@ -1385,11 +1544,13 @@ export default function RecordScreen() {
                   label is a property of what was written rather than a field of
                   its own — and because this is the one place on the screen with
                   the height for a row that wraps. */}
-              <TagChips
-                names={allTags.filter((t) => tagIds.includes(t.id)).map((t) => t.name)}
-                onOpen={() => setTagSheet(true)}
-              />
               <AttachmentBar
+                leading={
+                  <TagChips
+                    names={allTags.filter((t) => tagIds.includes(t.id)).map((t) => t.name)}
+                    onOpen={() => setTagSheet(true)}
+                  />
+                }
                 attachments={attached}
                 onCamera={() => setViewfinder(true)}
                 onFiles={() => pick('files')}
@@ -1399,6 +1560,7 @@ export default function RecordScreen() {
                 onOpen={setViewing}
                 onRead={aiEnabled ? onRead : undefined}
                 reading={readingFile}
+                onVoice={canSpeak ? openVoice : undefined}
                 compact={false}
                 busy={attaching}
               />
@@ -1414,6 +1576,8 @@ export default function RecordScreen() {
         <View className="absolute inset-0 bg-ground px-4 py-1">
           <InlineCamera onCapture={onCapture} onClose={closeViewfinder} onCameraApp={onCameraApp} />
         </View>
+      ) : listening && compact ? (
+        <View className="absolute inset-0 bg-ground px-4 py-1">{voicePanel}</View>
       ) : null}
       </View>
 

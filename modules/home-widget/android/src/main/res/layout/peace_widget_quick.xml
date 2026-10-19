@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The quick bar: the three launcher shortcuts, one tap each, no figures. It
+  The quick bar: the four launcher shortcuts, one tap each, no figures. It
   needs no snapshot to be useful, so it works from the moment it is placed.
   Colours are Ledger's as the preview; WidgetRenderer sets the real ones.
 -->
@@ -73,6 +73,33 @@
                 android:layout_height="20dp"
                 android:layout_gravity="center"
                 android:src="@drawable/peace_widget_camera"
+                android:tint="#EFE4CE"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btn_voice"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_weight="0.7"
+            android:contentDescription="Speak a record">
+
+            <ImageView
+                android:id="@+id/btn_voice_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/peace_widget_tile"
+                android:tint="#302818"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:id="@+id/btn_voice_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/peace_widget_mic"
                 android:tint="#EFE4CE"
                 android:importantForAccessibility="no" />
         </FrameLayout>

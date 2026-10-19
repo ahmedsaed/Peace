@@ -21,7 +21,7 @@
  */
 
 import { Image } from 'expo-image';
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
@@ -38,8 +38,6 @@ export const PREVIEW_SIZE = 56;
  * exactly what happened to the read badge along the bottom edge.
  */
 const BADGE_ROOM = 8;
-/** Two 40dp buttons and the 8dp gap between them. */
-const BUTTONS_WIDTH = 40 * 2 + 8;
 
 type Props = {
   attachments: StagedAttachment[];
@@ -57,6 +55,18 @@ type Props = {
   onRead?: (attachment: StagedAttachment) => void;
   /** Which attachment is being read, so only its own badge spins. */
   reading: string | null;
+  /**
+   * Speak the record instead. Absent when voice cannot run (no key, Use AI or
+   * Voice off), and then there is no mic button at all — the same rule as the
+   * reading badge.
+   *
+   * It lives with the attach buttons, not in a row of its own: both are ways
+   * of putting something INTO this record other than typing, and this band is
+   * the one place on the screen with room for them.
+   */
+  onVoice?: () => void;
+  /** Shares the buttons' row, on their left: the record's tags. */
+  leading?: ReactNode;
   /** True in split-screen: previews go, the buttons merge, the count stays. */
   compact: boolean;
   busy?: boolean;
@@ -172,7 +182,7 @@ function SquareButton({
   testID,
   badge,
 }: {
-  icon: 'camera' | 'folder';
+  icon: 'camera' | 'folder' | 'mic';
   label: string;
   onPress: () => void;
   disabled?: boolean;
@@ -208,9 +218,15 @@ export function AttachmentBar({
   onOpen,
   onRead,
   reading,
+  onVoice,
+  leading,
   compact,
   busy,
 }: Props) {
+  const mic = onVoice ? (
+    <SquareButton icon="mic" label="Speak the record" onPress={onVoice} disabled={busy} testID="record-voice" />
+  ) : null;
+
   /**
    * One button in split-screen, and it opens the CAMERA.
    *
@@ -221,33 +237,33 @@ export function AttachmentBar({
    */
   if (compact) {
     return (
-      <SquareButton
-        icon="camera"
-        label={`Attach a receipt. ${attachments.length} attached`}
-        onPress={onCamera}
-        disabled={busy}
-        testID="attach-camera"
-        badge={attachments.length}
-      />
+      <>
+        {mic}
+        <SquareButton
+          icon="camera"
+          label={`Attach a receipt. ${attachments.length} attached`}
+          onPress={onCamera}
+          disabled={busy}
+          testID="attach-camera"
+          badge={attachments.length}
+        />
+      </>
     );
   }
 
   /**
-   * The strip and the buttons share one band; the buttons FLOAT over its right.
+   * The previews get a strip of their own; the buttons share a ROW with
+   * whatever the screen puts on their left — the record's tags.
    *
-   * They had a row of their own, which cost 40dp of a screen that fights for
-   * every pixel and pushed the receipts a whole row further from the field they
-   * belong to. Floating them puts the previews beside the buttons rather than
-   * above them, and the band is no taller than one thumbnail.
+   * The buttons used to float over the right of the preview strip, which put
+   * the tags on a line of their own ABOVE the buttons: two controls for the
+   * same record at two heights, and a whole row spent when there were no
+   * receipts at all. Tags and buttons side by side cost one 40dp row; the
+   * strip appears only once there is something to show in it, and needs no
+   * trailing padding because nothing covers its end any more.
    */
   return (
-    <View
-      className="relative"
-      // Only as tall as it needs to be: one thumbnail plus its badges when
-      // there are receipts, one button when there are none. A band sized for
-      // previews that do not exist is 32dp of a short screen given to nothing.
-      style={{ minHeight: attachments.length > 0 ? PREVIEW_SIZE + BADGE_ROOM * 2 : 40 }}
-      testID="attachment-bar">
+    <View className="mt-2" testID="attachment-bar">
       {attachments.length > 0 ? (
         <ScrollView
           horizontal
@@ -259,16 +275,7 @@ export function AttachmentBar({
             // the read badge was visibly clipped along the bottom edge.
             paddingTop: BADGE_ROOM,
             paddingBottom: BADGE_ROOM,
-            /**
-             * SCROLL PAST THE LAST ONE.
-             *
-             * Without this the final thumbnail comes to rest UNDER the floating
-             * buttons and cannot be moved out from beneath them — the one
-             * receipt you just added is the one you cannot see. The trailing
-             * space is the buttons' own width, so the last tile can be scrolled
-             * fully clear into the middle of the strip.
-             */
-            paddingRight: BUTTONS_WIDTH + 12,
+            paddingRight: BADGE_ROOM,
           }}
           testID="attachment-previews">
           {attachments.map((attachment) => (
@@ -284,13 +291,9 @@ export function AttachmentBar({
         </ScrollView>
       ) : null}
 
-      {/* Over the strip, not in the flow. `pointerEvents="box-none"` on the
-          wrapper so the scroll gesture still reaches the strip everywhere the
-          buttons themselves are not. */}
-      <View
-        className="absolute bottom-0 right-0 flex-row gap-2"
-        pointerEvents="box-none"
-        style={{ width: BUTTONS_WIDTH }}>
+      <View className="flex-row items-center gap-2">
+        <View className="flex-1">{leading}</View>
+        {mic}
         <SquareButton
           icon="camera"
           label="Photograph a receipt"

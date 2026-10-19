@@ -7,7 +7,7 @@
 
 # Peace — Privacy Policy
 
-**Effective 14 October 2026** · Peace is made by Merope ([merope.dev](https://merope.dev)).
+**Effective 19 October 2026** · Peace is made by Merope ([merope.dev](https://merope.dev)).
 
 ## The short version
 
@@ -26,6 +26,12 @@ is off until you do. They are listed below, with exactly what each one sends and
 If you add your own **Gemini API key** in Settings, Peace can:
 
 - **Read a receipt or invoice** you photograph or pick: the photo, PDF or text file is sent to Google's Gemini API.
+- **Hear a record or a question you speak**, when you tap the microphone: the recording is sent to
+  Gemini, with the names of your accounts and categories and any voice rules you wrote (for a
+  record) or on its own (for a question to Penny). It is recorded only while the microphone panel
+  is open on screen, stops after one minute or when you leave the app, and is **deleted from your
+  phone as soon as it has been sent** — Peace never keeps a recording. What comes back is shown to
+  you to check before anything is saved or sent to Penny.
 - **Read a bank message** (see *Bank notifications* below): the message's text, the names of your
   accounts and categories, and any reading rules you wrote are sent to Gemini.
 - **Answer questions with Penny**, the assistant, which is a separate switch in Settings: your
@@ -83,6 +89,7 @@ Play delivers its updates.
 | Permission | Used for |
 |---|---|
 | Camera | Photographing a receipt, only when you tap the camera button |
+| Microphone | Speaking a record or a question, only while you have the microphone open; never in the background, and the camera never records sound |
 | Notifications | The optional daily reminder, scheduled on your phone |
 | Notification access | The optional bank-message reading described above |
 | Fingerprint and face unlock | The optional app lock. Android checks your fingerprint or face itself and tells Peace only whether it matched — Peace never sees or stores it |

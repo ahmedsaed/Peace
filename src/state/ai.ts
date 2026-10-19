@@ -22,6 +22,8 @@ export type AiState = {
   ready: boolean;
   receipts: boolean;
   penny: boolean;
+  /** Speaking a record, or a question to Penny (where Penny is also on). */
+  voice: boolean;
   /** Bank READING; capture is native and carries on regardless. */
   bank: boolean;
   /** Why nothing can run, when nothing can — for the notice that says so. */
@@ -34,6 +36,7 @@ export function useAi(): AiState {
   const aiEnabled = useSettingsStore((s) => s.settings.aiEnabled);
   const receiptsEnabled = useSettingsStore((s) => s.settings.receiptsEnabled);
   const assistantEnabled = useSettingsStore((s) => s.settings.assistantEnabled);
+  const voiceEnabled = useSettingsStore((s) => s.settings.voiceEnabled);
 
   // The key lives in the secure store, which nothing can subscribe to; the
   // first screen that asks loads it, and `save` keeps it current after that.
@@ -47,6 +50,7 @@ export function useAi(): AiState {
     ready,
     receipts: ready && receiptsEnabled,
     penny: ready && assistantEnabled,
+    voice: ready && voiceEnabled,
     bank: ready,
     blocked: hasKey === false ? 'no-key' : !aiEnabled ? 'ai-off' : null,
   };
