@@ -23,8 +23,15 @@ the same pull request as the app it describes.
    is screenshot 3 and the site's "On the home screen" section. Nothing but the wallpaper and the
    arrangement is drawn — the widgets are the real renders.
 3. `PEACE_GEMINI_KEY_FILE=<file> npm run shots:penny` — **costs money**, a handful of Gemini
-   requests — writes `penny-ask.png` (screenshot 6) and `voice.png` (screenshot 3, the mic listening;
-   it needs a key to be offered, but the clip is cancelled, never sent).
+   requests — writes `penny-ask.png` (screenshot 7) and `voice.png` (screenshot 3, the bars moving
+   while a clip is read). The voice capture needs SOUND in the emulator's mic, and the headless AVD has
+   none: it boots with `-no-audio`, and without a window it cannot open PulseAudio at all ("Could not
+   init `pa' audio driver"). Use the WINDOWED emulator with `-allow-host-audio` and
+   `adb emu avd hostmicon`, and give it something to hear — a tone looping into a PulseAudio null
+   sink works without a microphone, but PipeWire may route the emulator's input elsewhere, so check
+   `pw-link -l` while it records and link `peace_mic:monitor_*` to `qemu-system-x86_64:input_*`.
+   Without sound Peace refuses the silent clip, the flow skips the capture, and the previous
+   `voice.png` is kept.
 4. Build the site (`cd site && npm run build`). The store graphics land in `site/out/store/`, and a
    merge to `main` publishes them.
 

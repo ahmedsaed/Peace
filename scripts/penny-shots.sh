@@ -34,7 +34,7 @@ maestro test -e GEMINI_KEY="$key" scripts/penny-shots.yaml
 SRC=$(ls -td "$HOME"/.maestro/tests/*/penny-shots/takeScreenshot 2>/dev/null | head -1)
 [ -n "$SRC" ] || { echo "no screenshots produced"; exit 1; }
 DEST=docs/screenshots
-for name in penny-ask penny-chart penny-receipt voice; do
+for name in penny-ask penny-chart penny-receipt; do
   [ -f "$SRC/$name.png" ] || { echo "missing $name.png in $SRC" >&2; exit 1; }
   cp "$SRC/$name.png" "$DEST/$name.png"
 done
@@ -42,10 +42,15 @@ done
 # screenshot, and drawing it from the halved copy would upscale it. The voice
 # capture needs the key, which demo-shots has not.
 mkdir -p store/screenshots
-for name in penny-ask voice; do
-  [ -f "$SRC/$name.png" ] || { echo "missing $name.png in $SRC" >&2; exit 1; }
-  cp "$SRC/$name.png" "store/screenshots/$name.png"
-done
+cp "$SRC/penny-ask.png" store/screenshots/penny-ask.png
+# The voice capture needs sound in the emulator's mic, which a plain headless
+# run does not have — keep the last one rather than failing (store/README.md).
+if [ -f "$SRC/voice.png" ]; then
+  cp "$SRC/voice.png" store/screenshots/voice.png
+  cp "$SRC/voice.png" "$DEST/voice.png"
+else
+  echo "note: no voice.png — the emulator heard silence; the previous capture is kept" >&2
+fi
 if command -v magick >/dev/null 2>&1; then
   magick mogrify -resize 540x "$DEST"/penny-*.png "$DEST"/voice.png
 fi

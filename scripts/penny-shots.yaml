@@ -93,9 +93,12 @@ appId: dev.merope.peace.oss
 - tapOn:
     id: "nav-back"
 
-# --- the mic on a new record: needs the key, sends nothing ---
-# The listening panel only. The emulator's mic is silence, so the clip is
-# CANCELLED, never sent — this capture costs nothing.
+# --- the mic on a new record: the bars moving while the clip is read ---
+# NEEDS SOUND IN THE EMULATOR'S MIC (see store/README.md): the headless AVD
+# boots with -no-audio, hears silence, and Peace rightly refuses to send that —
+# so without sound there is no reading to photograph, and this section skips
+# its capture rather than failing the Penny shots. One Gemini request when it
+# runs; whatever the model makes of the sound is discarded below.
 - tapOn:
     id: "fab"
 - tapOn:
@@ -104,9 +107,38 @@ appId: dev.merope.peace.oss
     visible:
       id: "voice-panel"
     timeout: 15000
-- takeScreenshot: voice
+# Listen for a couple of seconds, long enough for the metering to hear the
+# sound and the clip to pass the minimum length. (Maestro has no plain sleep:
+# this waits for something that never appears.)
+- extendedWaitUntil:
+    visible:
+      id: "voice-done-never"
+    timeout: 2500
+    optional: true
 - tapOn:
-    id: "voice-cancel"
+    id: "voice-done"
+- extendedWaitUntil:
+    visible:
+      id: "voice-reading"
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: "voice-reading"
+    commands:
+      - takeScreenshot: voice
+- extendedWaitUntil:
+    notVisible:
+      id: "voice-reading"
+    timeout: 60000
+- runFlow:
+    when:
+      visible:
+        id: "voice-close"
+    commands:
+      - tapOn:
+          id: "voice-close"
 - tapOn:
     id: "record-cancel"
 - extendedWaitUntil:
