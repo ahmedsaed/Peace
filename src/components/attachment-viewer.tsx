@@ -9,6 +9,10 @@
  * here. Bundling a PDF renderer to display an invoice somebody already has a
  * reader for would be a native dependency, an APK several megabytes larger, and
  * a worse reader than the one they chose.
+ *
+ * A photo shows here and ALSO carries a Share button in the header, because a
+ * receipt is often wanted somewhere else — sent to whoever is paying you back,
+ * or to an expenses form. Both go through the same share sheet.
  */
 
 import { Image } from 'expo-image';
@@ -48,13 +52,19 @@ export function AttachmentViewer({ attachment, onClose }: Props) {
       }
       await Sharing.shareAsync(attachmentUri(attachment.fileName), {
         mimeType: attachment.mimeType,
-        // iOS only; Android goes by the mime type above.
-        UTI: attachment.mimeType === 'text/plain' ? 'public.plain-text' : 'com.adobe.pdf',
+        dialogTitle: label,
+        // iOS only; Android goes by the mime type above. Left out for a photo,
+        // where the system works it out from the file itself.
+        UTI: image
+          ? undefined
+          : attachment.mimeType === 'text/plain'
+            ? 'public.plain-text'
+            : 'com.adobe.pdf',
       });
     } catch (e) {
       // Friendly sentence for the user, the real error for whoever fixes it.
-      console.warn('[attachments] could not open the file', e);
-      setError('Could not open this file.');
+      console.warn('[attachments] could not share the file', e);
+      setError(image ? 'Could not share this photo.' : 'Could not open this file.');
     }
   }
 
@@ -73,6 +83,17 @@ export function AttachmentViewer({ attachment, onClose }: Props) {
           <Text className="flex-1 text-sm text-white/80" numberOfLines={1}>
             {label}
           </Text>
+          {missing ? null : (
+            <Pressable
+              onPress={openElsewhere}
+              hitSlop={12}
+              testID="viewer-share"
+              accessibilityRole="button"
+              accessibilityLabel="Share"
+              className="h-10 w-10 items-center justify-center rounded-lg active:opacity-70">
+              <Icon name="share" size={18} color="#ffffff" />
+            </Pressable>
+          )}
           <Pressable
             onPress={onClose}
             hitSlop={12}
@@ -83,6 +104,12 @@ export function AttachmentViewer({ attachment, onClose }: Props) {
             <Icon name="close" size={18} color="#ffffff" />
           </Pressable>
         </View>
+        {/* Shown here for a photo, which has no body text for it to sit under. */}
+        {image && error ? (
+          <Text className="px-4 text-xs text-negative" testID="viewer-error">
+            {error}
+          </Text>
+        ) : null}
 
         {/* Dismissing by tapping the backdrop as well as the button: a
             full-screen overlay with one small target in a corner is the kind

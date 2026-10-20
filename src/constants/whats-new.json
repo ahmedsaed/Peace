@@ -1,5 +1,11 @@
 [
   {
+    "version": "1.37.0",
+    "notes": [
+      "You can now share a receipt photo. Tap it to open it full screen, then tap Share at the top to send it to any app, like WhatsApp or email."
+    ]
+  },
+  {
     "version": "1.36.0",
     "notes": [
       "You can now speak a record instead of typing it — in Arabic, English or both. Tap the mic on a new record, use the new Speak shortcut or widget button, or tap the mic in Penny to ask her a question out loud.",

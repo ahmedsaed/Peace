@@ -93,6 +93,11 @@ const CHROME_PATHS = {
   // stroke, so line segments would render as nothing at all.
   close:
     'M5.6 4.2L12 10.6l6.4-6.4 1.4 1.4L13.4 12l6.4 6.4-1.4 1.4L12 13.4l-6.4 6.4-1.4-1.4L10.6 12 4.2 5.6z',
+  // Hands a receipt to another app. Three SOLID dots, so nothing closes up at
+  // the 18px it is drawn at. The bars are wound the SAME way as the dots: wound
+  // against them, the non-zero fill punched a hole wherever the two overlap.
+  share:
+    'M18 2a3 3 0 1 0 0 6 3 3 0 1 0 0-6zM6 9a3 3 0 1 0 0 6 3 3 0 1 0 0-6zM18 16a3 3 0 1 0 0 6 3 3 0 1 0 0-6zM6.5 12.86l12-7-1-1.72-12 7zM5.5 12.86l12 7 1-1.72-12-7z',
   /**
    * "This record has a receipt", on a list row.
    *
