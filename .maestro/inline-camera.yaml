@@ -68,6 +68,25 @@ appId: dev.merope.peace.oss
     id: "record-note"
 - takeScreenshot: 02-attached
 
+# --- the photo opens full screen and can be shared ---
+# The share sheet is Android's, different on every version, so the flow stops
+# at its edge: the button is there and the hand-off did not fail. Back closes
+# the sheet, close closes the viewer.
+- tapOn:
+    id: "attachment-[0-9a-f]{8}"
+- assertVisible:
+    id: "viewer-image"
+- tapOn:
+    id: "viewer-share"
+- assertNotVisible:
+    id: "viewer-error"
+- takeScreenshot: 03-share-sheet
+- back
+- tapOn:
+    id: "viewer-close"
+- assertVisible:
+    id: "record-note"
+
 # Close without shooting leaves the note as it was.
 - tapOn:
     id: "attach-camera"
