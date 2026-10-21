@@ -10,7 +10,7 @@
  * reader for would be a native dependency, an APK several megabytes larger, and
  * a worse reader than the one they chose.
  *
- * A photo shows here and ALSO carries a Share button in the header, because a
+ * A photo shows here and ALSO carries a Share button at the foot, because a
  * receipt is often wanted somewhere else — sent to whoever is paying you back,
  * or to an expenses form. Both go through the same share sheet.
  */
@@ -79,41 +79,14 @@ export function AttachmentViewer({ attachment, onClose }: Props) {
         className="flex-1 bg-black/90"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         testID="attachment-viewer">
-        <View className="flex-row items-center justify-between px-4 py-3">
-          <Text className="flex-1 text-sm text-white/80" numberOfLines={1}>
+        <View className="px-4 py-3">
+          <Text className="text-sm text-white/80" numberOfLines={1}>
             {label}
           </Text>
-          {missing ? null : (
-            <Pressable
-              onPress={openElsewhere}
-              hitSlop={12}
-              testID="viewer-share"
-              accessibilityRole="button"
-              accessibilityLabel="Share"
-              className="h-10 w-10 items-center justify-center rounded-lg active:opacity-70">
-              <Icon name="share" size={18} color="#ffffff" />
-            </Pressable>
-          )}
-          <Pressable
-            onPress={onClose}
-            hitSlop={12}
-            testID="viewer-close"
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            className="h-10 w-10 items-center justify-center rounded-lg active:opacity-70">
-            <Icon name="close" size={18} color="#ffffff" />
-          </Pressable>
         </View>
-        {/* Shown here for a photo, which has no body text for it to sit under. */}
-        {image && error ? (
-          <Text className="px-4 text-xs text-negative" testID="viewer-error">
-            {error}
-          </Text>
-        ) : null}
 
         {/* Dismissing by tapping the backdrop as well as the button: a
-            full-screen overlay with one small target in a corner is the kind
-            of thing people get stuck in. */}
+            full-screen overlay is the kind of thing people get stuck in. */}
         <Pressable className="flex-1 items-center justify-center px-4" onPress={onClose}>
           {image ? (
             <Image
@@ -136,19 +109,42 @@ export function AttachmentViewer({ attachment, onClose }: Props) {
                   It was attached on another device, or restored from a backup made before Peace
                   kept receipts.
                 </Text>
-              ) : (
-                <Pressable
-                  onPress={openElsewhere}
-                  testID="viewer-open"
-                  accessibilityRole="button"
-                  className="mt-2 rounded-lg bg-accent px-5 py-3 active:opacity-80">
-                  <Text className="text-sm font-semibold text-accent-ink">Open</Text>
-                </Pressable>
-              )}
-              {error ? <Text className="text-xs text-negative">{error}</Text> : null}
+              ) : null}
             </View>
           )}
         </Pressable>
+
+        {/* The actions sit at the FOOT, under the thumb, rather than in a
+            header corner — the same Cancel-left, act-right pair as the record
+            screen. A photo is shared; anything else is opened in the app the
+            phone uses for it, through the same share sheet. */}
+        {error ? (
+          <Text className="px-4 pb-2 text-center text-xs text-negative" testID="viewer-error">
+            {error}
+          </Text>
+        ) : null}
+        <View className="flex-row gap-3 px-4 pb-3 pt-2">
+          <Pressable
+            onPress={onClose}
+            testID="viewer-close"
+            accessibilityRole="button"
+            className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-lg border border-line bg-surface active:opacity-70">
+            <Icon name="close" size={16} color={palette.ink} />
+            <Text className="text-sm font-medium text-ink">Close</Text>
+          </Pressable>
+          {missing ? null : (
+            <Pressable
+              onPress={openElsewhere}
+              testID={image ? 'viewer-share' : 'viewer-open'}
+              accessibilityRole="button"
+              className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-lg bg-accent active:opacity-80">
+              <Icon name={image ? 'share' : 'document'} size={16} color={palette['accent-ink']} />
+              <Text className="text-sm font-semibold text-accent-ink">
+                {image ? 'Share' : 'Open'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     </Modal>
   );
