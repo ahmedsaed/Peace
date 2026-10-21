@@ -39,6 +39,11 @@ appId: dev.merope.peace.oss
 # Backup & export lives under Settings › Your data, not in the side menu.
 - tapOn:
     id: "drawer-settings"
+# Below the fold since Settings grew a Voice row — scroll, never assume it fits.
+- scrollUntilVisible:
+    element:
+      id: "settings-section-backup"
+    direction: DOWN
 - tapOn:
     id: "settings-section-backup"
 - assertVisible:

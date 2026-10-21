@@ -26,6 +26,11 @@ appId: dev.merope.peace.oss
     id: "nav-menu"
 - tapOn:
     id: "drawer-settings"
+# Below the fold since Settings grew a Voice row — scroll, never assume it fits.
+- scrollUntilVisible:
+    element:
+      id: "settings-section-backup"
+    direction: DOWN
 - tapOn:
     id: "settings-section-backup"
 - scrollUntilVisible:
@@ -102,6 +107,11 @@ appId: dev.merope.peace.oss
     id: "nav-menu"
 - tapOn:
     id: "drawer-settings"
+# Below the fold since Settings grew a Voice row — scroll, never assume it fits.
+- scrollUntilVisible:
+    element:
+      id: "settings-section-backup"
+    direction: DOWN
 - tapOn:
     id: "settings-section-backup"
 - scrollUntilVisible:
