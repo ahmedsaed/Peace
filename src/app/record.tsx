@@ -57,7 +57,7 @@ import {
   inputOp,
 } from '@/lib/calculator';
 import { ageInDays, fetchRate, formatRateDate, RateError } from '@/lib/fx';
-import { byDensity, useDensity } from '@/lib/layout';
+import { byDensity, fittedNoteBlock, useDensity } from '@/lib/layout';
 import { convertMinor, groupDigits } from '@/lib/money';
 import { formatDayLabel, formatTimeLabel, weekStart } from '@/lib/period';
 import { flowKeyFace, flowKeySpoken, nextAction, type Sheet } from '@/lib/record-flow';
@@ -1256,6 +1256,25 @@ export default function RecordScreen() {
   // The note keeps a floor rather than a fixed height: with room it grows like a
   // web textarea, without room it stops at something still usable.
   const noteMinHeight = byDensity(density, { regular: 120, compact: 76, tight: 48 });
+  /**
+   * The block above the amount, sized so a long note scrolls INSIDE its field
+   * rather than taking the pickers with it — see `fittedNoteBlock`. Measured
+   * from three layouts, held in a ref because they arrive as separate events.
+   */
+  const measured = useRef({ viewport: 0, content: 0, note: 0 });
+  const [noteBlock, setNoteBlock] = useState<number | null>(null);
+  // The bar that floats over the foot of the note: tags, receipts, buttons.
+  // Its height is room the text needs beneath its last line.
+  const [noteBar, setNoteBar] = useState(0);
+  const noteScroll = useRef<ScrollView>(null);
+  // Whether the caret is at the end of a note being typed — the one case in
+  // which a new line must be scrolled into view above the bar.
+  const typingAtEnd = useRef(false);
+  const refitNote = (part: 'viewport' | 'content' | 'note', height: number) => {
+    measured.current[part] = height;
+    const next = fittedNoteBlock({ ...measured.current, noteMin: noteMinHeight + noteBar });
+    if (next !== null && (noteBlock === null || Math.abs(next - noteBlock) > 1)) setNoteBlock(next);
+  };
   // The camera takes the note's place but needs more room than an empty note:
   // below this the shutter and its controls crowd the picture. The scroll view
   // gives way instead — the same floor-then-scroll rule the note follows.
@@ -1371,14 +1390,26 @@ export default function RecordScreen() {
         </View>
       </View>
 
-      {/* `flexGrow: 1` lets the note expand into spare room on a full-height
-          screen, while still allowing the whole block to scroll when there is
-          none. Without it the content container collapses to its content and
-          the note's flex-1 has nothing to grow into. */}
+      {/* While the note is showing, the block is pinned to a measured height
+          (`fittedNoteBlock`): the window's, or everything's floor when that is
+          taller. A long note then scrolls inside its own field and the pickers
+          and the bar under it stay where they are.
+
+          Otherwise — the first frame, the camera, the microphone, the one-line
+          tight layout — `flexGrow: 1` lets whatever is there fill the spare
+          room and the block scroll when there is none. The camera and the mic
+          keep that because a fixed height measured with the note in place
+          would clip their taller floor instead of letting it scroll. */}
       <View className="flex-1">
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={
+          noteBlock !== null && !compact && !viewfinder && !listening
+            ? { height: noteBlock }
+            : { flexGrow: 1 }
+        }
+        onLayout={(e) => refitNote('viewport', e.nativeEvent.layout.height)}
+        onContentSizeChange={(_, height) => refitNote('content', height)}
         keyboardShouldPersistTaps="handled">
         <View className={`mx-4 flex-row rounded-lg bg-surface p-1 ${gap}`}>
           {TYPES.map(({ value, label }) => {
@@ -1528,22 +1559,60 @@ export default function RecordScreen() {
                 {voicePanel}
               </View>
             ) : (
-            <View className={`mx-4 flex-1 rounded-lg bg-surface px-4 py-3 ${gap}`}>
-              <TextInput
-                value={note}
-                onChangeText={setNote}
-                placeholder="Add notes"
-                placeholderTextColor={palette.muted}
-                multiline
-                textAlignVertical="top"
-                testID="record-note"
-                style={{ minHeight: noteMinHeight }}
-                className="flex-1 p-0 text-base text-ink"
-              />
-              {/* Inside the note's surface, with the attach buttons, because a
-                  label is a property of what was written rather than a field of
-                  its own — and because this is the one place on the screen with
-                  the height for a row that wraps. */}
+            <View className={`mx-4 flex-1 overflow-hidden rounded-lg bg-surface ${gap}`}>
+              {/* The text scrolls UNDER the bar, the way a chat composer's text
+                  passes beneath its toolbar, rather than stopping short of a
+                  slice of the box the bar takes for itself.
+
+                  The field grows with its text inside a scroll view of its own:
+                  Android clips an input's text to its padding box, so an input
+                  that scrolled itself could never draw a line behind the bar.
+                  Its bottom padding is the bar's measured height — room to
+                  scroll the last lines up clear of it, and no further. */}
+              <ScrollView
+                ref={noteScroll}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                style={{ minHeight: noteMinHeight + noteBar }}
+                contentContainerStyle={{ flexGrow: 1 }}
+                onLayout={(e) => refitNote('note', e.nativeEvent.layout.height)}
+                onContentSizeChange={() => {
+                  // Typing at the end must never put the new line behind the
+                  // bar, which Android's own caret-following knows nothing of.
+                  if (typingAtEnd.current) noteScroll.current?.scrollToEnd({ animated: false });
+                }}>
+                <TextInput
+                  value={note}
+                  onChangeText={setNote}
+                  placeholder="Add notes"
+                  placeholderTextColor={palette.muted}
+                  multiline
+                  textAlignVertical="top"
+                  testID="record-note"
+                  onFocus={() => {
+                    typingAtEnd.current = true;
+                  }}
+                  onBlur={() => {
+                    typingAtEnd.current = false;
+                  }}
+                  onSelectionChange={(e) => {
+                    typingAtEnd.current = e.nativeEvent.selection.end >= note.length;
+                  }}
+                  style={{ flexGrow: 1, paddingBottom: noteBar + 12 }}
+                  className="px-4 pt-3 text-base text-ink"
+                />
+              </ScrollView>
+              {/* Floating over the foot of the note, with the attach buttons,
+                  because a label is a property of what was written rather than
+                  a field of its own. `box-none` so a tap between the controls
+                  lands on the text underneath. */}
+              <View
+                pointerEvents="box-none"
+                className="absolute bottom-0 left-0 right-0 px-4 pb-3"
+                onLayout={(e) => {
+                  const height = Math.round(e.nativeEvent.layout.height);
+                  if (height !== noteBar) setNoteBar(height);
+                }}>
               <AttachmentBar
                 leading={
                   <TagChips
@@ -1564,6 +1633,7 @@ export default function RecordScreen() {
                 compact={false}
                 busy={attaching}
               />
+              </View>
             </View>
             )}
           </>

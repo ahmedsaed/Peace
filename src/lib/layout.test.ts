@@ -2,6 +2,7 @@ import {
   byDensity,
   centerScrollOffset,
   densityForHeight,
+  fittedNoteBlock,
   keyboardOverlap,
   ringSize,
 } from './layout';
@@ -142,5 +143,36 @@ describe('ringSize', () => {
   it('stays small in a short window, but never below the old ring', () => {
     expect(ringSize(411, 340)).toBe(200);
     expect(ringSize(411, 600)).toBe(270);
+  });
+});
+
+describe('fittedNoteBlock', () => {
+  /** A whole phone: the note gets the room the pickers leave, and no more. */
+  it('pins the block to its window when everything fits', () => {
+    // 600 tall, of which the note is 400: the rest of the block is 200.
+    expect(fittedNoteBlock({ viewport: 600, content: 600, note: 400, noteMin: 120 })).toBe(600);
+  });
+
+  /** A long note made the content 1400 tall; it must not stretch the block. */
+  it('does not grow with the text of a long note', () => {
+    expect(fittedNoteBlock({ viewport: 600, content: 1400, note: 1200, noteMin: 120 })).toBe(600);
+  });
+
+  /** Split-screen: the floors add up to more than the window, so it scrolls. */
+  it('never squeezes the note below its floor', () => {
+    expect(fittedNoteBlock({ viewport: 250, content: 300, note: 76, noteMin: 76 })).toBe(300);
+  });
+
+  it('makes room when tags or receipts make the rest taller', () => {
+    // The attachment bar grew by 80: still the window, the note just gets less.
+    expect(fittedNoteBlock({ viewport: 600, content: 600, note: 320, noteMin: 120 })).toBe(600);
+    // …until the rest alone no longer leaves the note its floor.
+    expect(fittedNoteBlock({ viewport: 600, content: 600, note: 120, noteMin: 120 })).toBe(600);
+    expect(fittedNoteBlock({ viewport: 600, content: 650, note: 120, noteMin: 120 })).toBe(650);
+  });
+
+  it('waits until everything has been laid out', () => {
+    expect(fittedNoteBlock({ viewport: 0, content: 600, note: 400, noteMin: 120 })).toBeNull();
+    expect(fittedNoteBlock({ viewport: 600, content: 600, note: 0, noteMin: 120 })).toBeNull();
   });
 });

@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.37.2",
+    "notes": [
+      "A long note now scrolls inside the notes box, so the account and category stay where they are while you type.",
+      "Transfers show their note in the list, next to the accounts the money moved between."
+    ]
+  },
+  {
     "version": "1.37.1",
     "notes": [
       "Peace no longer slows to a crawl when it opens on a day a backup is due. Backups are now made in the background, so the app stays quick while one runs."
