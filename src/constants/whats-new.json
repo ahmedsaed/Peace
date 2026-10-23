@@ -1,5 +1,11 @@
 [
   {
+    "version": "1.37.3",
+    "notes": [
+      "A long note now scrolls wherever you drag it, including in the space around the photos, tags and buttons at its foot."
+    ]
+  },
+  {
     "version": "1.37.2",
     "notes": [
       "A long note now scrolls inside the notes box, so the account and category stay where they are while you type.",
