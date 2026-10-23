@@ -1,5 +1,11 @@
 [
   {
+    "version": "1.37.1",
+    "notes": [
+      "Peace no longer slows to a crawl when it opens on a day a backup is due. Backups are now made in the background, so the app stays quick while one runs."
+    ]
+  },
+  {
     "version": "1.37.0",
     "notes": [
       "You can now share a receipt photo. Tap it to open it full screen, then tap Share at the bottom to send it to any app, like WhatsApp or email."

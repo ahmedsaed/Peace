@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { runBackup } from '@/db/drive';
+import { getSetting } from '@/db/settings';
 import { syncBackgroundBackup } from '@/lib/background-backup';
 import { backupDue } from '@/lib/drive-backup';
 import { track } from '@/state/stalls';
@@ -32,28 +33,16 @@ import { useSetting, useSettingsStore } from '@/state/settings';
  *   network cannot stop a record being saved.
  */
 
-/**
- * Module-level, not component state.
- *
- * The guard has to outlive re-renders AND cover the manual "Back up now"
- * button, because two uploads racing would each prune against a list the other
- * was still changing — and the loser deletes a backup the winner had just
- * counted as safe.
- */
-let running = false;
-
 export async function backupOnce(record: (at: number) => void): Promise<void> {
-  if (running) return;
-  running = true;
   try {
+    // `runBackup` is single-flight, so a backup already running — from the
+    // button or the background task — is joined rather than repeated.
     const outcome = await track('drive-backup', () => runBackup());
     record(outcome.at);
   } catch (error) {
     // Friendly nothing for the user — the age line already tells the truth —
     // and the real error for whoever has to work out why it stopped.
     console.warn('[drive] automatic backup failed', error);
-  } finally {
-    running = false;
   }
 }
 
@@ -90,6 +79,17 @@ export function useDriveCatchUp(): void {
 
   useEffect(() => {
     const attempt = () => {
+      /**
+       * The background task records its backups in SQLite, never in the
+       * store — it may run with no React tree at all. Read the truth, and
+       * bring the store up to date when it is behind, or this would back up
+       * again on top of one finished minutes ago and Settings would go on
+       * calling it overdue.
+       */
+      if (getSetting('driveLastBackupAt') !== state.current.lastBackupAt) {
+        useSettingsStore.getState().load();
+        state.current = { ...state.current, lastBackupAt: getSetting('driveLastBackupAt') };
+      }
       const { account: email, cadence: how, lastBackupAt: last, update: write } = state.current;
       if (!email || how === 'off') return;
       if (!backupDue({ cadence: how, lastBackupAt: last > 0 ? last : null }, Date.now())) return;

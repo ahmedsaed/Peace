@@ -1,11 +1,11 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { Directory, File, Paths } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 
 import { openBackupPayload, type BackupPayload } from '../lib/backup-payload';
-import { packContainer } from '../lib/container';
 import { useSettingsStore } from '../state/settings';
-import { filesOnDisk, readReferencedFiles, sweepOrphans, writeRestoredFiles } from './attachments';
-import { db, sqliteDb, DATABASE_NAME } from './client';
+import { filesOnDisk, sweepOrphans, writeRestoredFiles } from './attachments';
+import { packLedgerTo } from './backup';
+import { db, sqliteDb } from './client';
 import { missingFiles } from './repo/attachments';
 import {
   copyFromBackup,
@@ -154,13 +154,11 @@ export async function restoreFrom(picked: File): Promise<RestoreResult> {
      */
     const safety = safetyCopy();
     if (safety.exists) safety.delete();
-    safety.create({ overwrite: true });
-    safety.write(
-      packContainer({
-        database: await databaseFile().bytes(),
-        files: await readReferencedFiles(),
-      })
-    );
+    try {
+      await packLedgerTo(safety);
+    } catch (error) {
+      console.warn('[restore] could not write the safety copy', error);
+    }
     if (!safety.exists || safety.size <= 0) {
       throw new RestoreError('Could not save a copy of your current data, so nothing was changed.');
     }
@@ -190,21 +188,6 @@ export async function restoreFrom(picked: File): Promise<RestoreResult> {
     }
     if (source.exists) source.delete();
   }
-}
-
-/**
- * The live SQLite file. Duplicated from backup.ts rather than imported to keep
- * restore independent of the export path — see that file for why both URI
- * shapes are tried.
- */
-function databaseFile(): File {
-  const candidates = [
-    new File(Paths.document, 'SQLite', DATABASE_NAME),
-    new File(new Directory(`${Paths.document.uri}SQLite`), DATABASE_NAME),
-  ];
-  const found = candidates.find((f) => f.exists);
-  if (!found) throw new RestoreError('Could not find the database file to back up.');
-  return found;
 }
 
 /**

@@ -34,6 +34,7 @@ import {
 } from 'expo-crypto';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
 
+import { backupArchive } from '../../modules/backup-archive/src/BackupArchiveModule';
 import { looksLikeZip } from './container';
 
 /**
@@ -58,7 +59,7 @@ export const HEADER_BYTES = MAGIC_BYTES.byteLength + 4 + SALT_BYTES;
 /**
  * scrypt cost, chosen for a phone.
  *
- * N=2^14 with r=8 is ~16 MB and a second or two in JavaScript — slow enough to
+ * N=2^14 with r=8 is ~16 MB and tens of milliseconds natively — slow enough to
  * make guessing a passphrase expensive, fast enough that a daily backup does
  * not stall. They are WRITTEN INTO EVERY FILE rather than hardcoded at the read
  * end, so raising them later strengthens new backups without orphaning old
@@ -106,13 +107,33 @@ export function assertUsablePassphrase(passphrase: string): string {
   return normalised;
 }
 
-/** passphrase + salt -> 32-byte AES key. Deterministic; this is the recovery path. */
+/**
+ * passphrase + salt -> 32-byte AES key. Deterministic; this is the recovery path.
+ *
+ * NATIVE ON A PHONE. In Hermes this held the JS thread for seconds — noble's
+ * async variant yields to microtasks only, so no tap gets in — and it runs on
+ * every sealed backup, the automatic one at launch included. The Kotlin
+ * version in `modules/backup-archive` was checked byte for byte against noble,
+ * which stays as the fallback for jest and is what every older backup was
+ * sealed with.
+ */
 export async function deriveKey(
   passphrase: string,
   salt: Uint8Array,
   params: KdfParams = KDF_PARAMS
 ): Promise<Uint8Array> {
-  return scryptAsync(normalisePassphrase(passphrase), salt, {
+  const password = normalisePassphrase(passphrase);
+  if (backupArchive) {
+    return backupArchive.scrypt(
+      new TextEncoder().encode(password),
+      salt,
+      params.logN,
+      params.r,
+      params.p,
+      32
+    );
+  }
+  return scryptAsync(password, salt, {
     N: 2 ** params.logN,
     r: params.r,
     p: params.p,
