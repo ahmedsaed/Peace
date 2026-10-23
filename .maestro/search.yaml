@@ -278,12 +278,12 @@ appId: dev.merope.peace.oss
 # The one that ARRIVED in Bank — the other transfer LEFT Bank, and is what
 # comes back if this filter is ever pointed at account_id.
 #
-# Asserted on the row's own subtitle rather than on the note: a transfer row
-# renders "<from> → <to>" and does not show its note at all, so the direction
-# IS the visible text. It is also the stronger assertion of the two — it names
-# both ends, and the wrong leg would read "Bank → Cash".
-- assertVisible: "Cash → Bank"
-- assertNotVisible: "Bank → Cash"
+# Asserted on the row's whole subtitle, "<from> → <to> · “<note>”": it names
+# both ends AND the note, so the wrong leg — "Bank → Cash", carrying the other
+# transfer's note — cannot pass for this one. (Maestro matches whole text as a
+# regex, hence the `.*` on the negative.)
+- assertVisible: "Cash → Bank · “moving to bank”"
+- assertNotVisible: "Bank → Cash.*"
 # Narrowing to transfers must not turn them into spending: a screen showing
 # only transfers shows no total at all.
 - assertNotVisible:

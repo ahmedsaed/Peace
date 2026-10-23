@@ -181,6 +181,7 @@ function SquareButton({
   disabled,
   testID,
   badge,
+  solid,
 }: {
   icon: 'camera' | 'folder' | 'mic';
   label: string;
@@ -188,6 +189,8 @@ function SquareButton({
   disabled?: boolean;
   testID: string;
   badge?: number;
+  /** Filled rather than outlined, for a bar that floats over the note's text. */
+  solid?: boolean;
 }) {
   const palette = useTheme();
   return (
@@ -198,8 +201,8 @@ function SquareButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       className={`h-10 w-10 items-center justify-center rounded-lg border border-line active:opacity-70 ${
-        disabled ? 'opacity-40' : ''
-      }`}>
+        solid ? 'bg-surface' : ''
+      } ${disabled ? 'opacity-40' : ''}`}>
       <Icon name={icon} size={18} color={palette.muted} />
       {badge ? (
         <View className="absolute -right-1 -top-1 h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1">
@@ -224,7 +227,16 @@ export function AttachmentBar({
   busy,
 }: Props) {
   const mic = onVoice ? (
-    <SquareButton icon="mic" label="Speak the record" onPress={onVoice} disabled={busy} testID="record-voice" />
+    <SquareButton
+      icon="mic"
+      label="Speak the record"
+      onPress={onVoice}
+      disabled={busy}
+      testID="record-voice"
+      // The full bar floats over the note's text, so its buttons need a fill
+      // of their own; the one-line split-screen row sits on nothing.
+      solid={!compact}
+    />
   ) : null;
 
   /**
@@ -261,6 +273,9 @@ export function AttachmentBar({
    * receipts at all. Tags and buttons side by side cost one 40dp row; the
    * strip appears only once there is something to show in it, and needs no
    * trailing padding because nothing covers its end any more.
+   *
+   * On the record screen the whole bar floats over the foot of the note, and
+   * the note's text scrolls beneath it — see `record.tsx`.
    */
   return (
     <View className="mt-2" testID="attachment-bar">
@@ -300,6 +315,7 @@ export function AttachmentBar({
           onPress={onCamera}
           disabled={busy}
           testID="attach-camera"
+          solid
         />
         <SquareButton
           icon="folder"
@@ -307,6 +323,7 @@ export function AttachmentBar({
           onPress={onFiles}
           disabled={busy}
           testID="attach-file"
+          solid
         />
       </View>
     </View>

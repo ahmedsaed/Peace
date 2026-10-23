@@ -170,3 +170,33 @@ export function centerScrollOffset(
   const ideal = item.y + item.height / 2 - viewportHeight / 2;
   return Math.max(0, Math.min(ideal, contentHeight - viewportHeight));
 }
+
+/**
+ * How tall the record screen's scrolling block should be, so a long note
+ * scrolls INSIDE its field instead of dragging the pickers up with it.
+ *
+ * A multiline input in a scroll view has no ceiling: it grows with its text,
+ * the block grows with it, and the account and category pickers scroll out of
+ * sight above a note that is still being typed. Pinning the block to the
+ * height of its window gives the note exactly the room left over, and the text
+ * scrolls within that.
+ *
+ * Never shorter than everything at its floor, though. In split-screen that is
+ * taller than the window, and the block scrolls as it always has — the rule
+ * that keeps the keypad on screen (see `record.tsx`).
+ *
+ * Measured, not computed: `content - note` is everything that is not the note
+ * — the type row and the pickers — and `noteMin` is the note's floor plus the
+ * bar of tags and receipts floating over its foot, which grows as they are
+ * added. Null until all three have been laid out, which leaves the block to
+ * size itself for that first frame.
+ */
+export function fittedNoteBlock(m: {
+  viewport: number;
+  content: number;
+  note: number;
+  noteMin: number;
+}): number | null {
+  if (m.viewport <= 0 || m.content <= 0 || m.note <= 0) return null;
+  return Math.round(Math.max(m.viewport, m.content - m.note + m.noteMin));
+}

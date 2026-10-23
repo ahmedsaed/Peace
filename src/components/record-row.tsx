@@ -2,7 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import type { RecordRow as Row } from '@/db/repo/records';
-import { formatTags } from '@/lib/tag';
+import { recordSubtitle } from '@/lib/record-subtitle';
 import { useMoney } from '@/state/money';
 import { useTheme } from '@/state/theme';
 
@@ -77,25 +77,7 @@ export function RecordRow({
    */
   const isReversal = row.isTransfer && row.reversesId !== null;
 
-  /**
-   * The labels, after everything else on the line.
-   *
-   * LAST because it is the part that may be cut: the account and the note are
-   * what identify a row, and a tag is how you found it in the first place. The
-   * `#` is what stops `Cash · "Winter jacket" · kitchen` reading as one longer
-   * note — see `formatTags`.
-   */
-  const labels = row.tags.length > 0 ? ` · ${formatTags(row.tags)}` : '';
-
-  const subtitle = row.isTransfer
-    ? `${row.accountName} → ${row.counterAccountName ?? '—'}${isReversal ? ' · reversal' : ''}${labels}`
-    : row.isRefund
-      ? `${row.accountName} · refunded${row.note ? ` · “${row.note}”` : ''}${labels}`
-      : row.isAdjustment
-      ? `${row.accountName} · not counted as spending${labels}`
-      : row.note
-        ? `${row.accountName} · “${row.note}”${labels}`
-        : `${row.accountName}${labels}`;
+  const subtitle = recordSubtitle(row);
 
   return (
     <Pressable
