@@ -183,7 +183,9 @@ export function TagChips({
 }) {
   const palette = useTheme();
   return (
-    <View className="flex-row flex-wrap items-center gap-1.5" testID="tag-chips">
+    // `box-none`: on the record screen this row floats over the note, and the
+    // space beside the chips must let a drag through to the text beneath.
+    <View className="flex-row flex-wrap items-center gap-1.5" testID="tag-chips" pointerEvents="box-none">
       {names.map((name) => (
         <View key={name} className="rounded-full bg-raised px-2.5 py-1">
           <Text className="text-[11px] text-ink" numberOfLines={1}>

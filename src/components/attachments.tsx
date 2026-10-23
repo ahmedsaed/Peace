@@ -275,14 +275,21 @@ export function AttachmentBar({
    * trailing padding because nothing covers its end any more.
    *
    * On the record screen the whole bar floats over the foot of the note, and
-   * the note's text scrolls beneath it — see `record.tsx`.
+   * the note's text scrolls beneath it — see `record.tsx`. So nothing here may
+   * take a touch it has no use for: on Android a drag belongs to whatever is
+   * on top where it starts, and the note is a SIBLING underneath, not a parent
+   * that could take it back. The containers are `box-none` — their controls
+   * still answer, the gaps between them let a drag through to the text — and
+   * the preview strip is only as wide as its thumbnails, so the empty space to
+   * their right is the note's too.
    */
   return (
-    <View className="mt-2" testID="attachment-bar">
+    <View className="mt-2" testID="attachment-bar" pointerEvents="box-none">
       {attachments.length > 0 ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={{ alignSelf: 'flex-start', maxWidth: '100%' }}
           contentContainerStyle={{
             gap: 10,
             // Room for the badges, which overhang the corners of every tile and
@@ -306,8 +313,10 @@ export function AttachmentBar({
         </ScrollView>
       ) : null}
 
-      <View className="flex-row items-center gap-2">
-        <View className="flex-1">{leading}</View>
+      <View className="flex-row items-center gap-2" pointerEvents="box-none">
+        <View className="flex-1" pointerEvents="box-none">
+          {leading}
+        </View>
         {mic}
         <SquareButton
           icon="camera"
