@@ -346,12 +346,16 @@ export function sweepOrphans(): number {
   return removed;
 }
 
-/** Every file the ledger expects, for the backup container to pack. */
-export async function readReferencedFiles(): Promise<{ name: string; bytes: Uint8Array }[]> {
-  const wanted = referencedFiles(db);
-  const files: { name: string; bytes: Uint8Array }[] = [];
+/**
+ * Every file the ledger expects, as uris for the backup container to pack.
+ *
+ * Paths, not bytes: the native writer streams them from disk, so a year of
+ * receipts never passes through the JS heap on its way into a zip.
+ */
+export function referencedFilePaths(): { name: string; path: string }[] {
+  const files: { name: string; path: string }[] = [];
 
-  for (const name of wanted) {
+  for (const name of referencedFiles(db)) {
     const file = new File(attachmentsDirectory(), name);
     if (!file.exists) {
       // A row whose file is gone. Not fatal — it is already missing, and
@@ -359,7 +363,7 @@ export async function readReferencedFiles(): Promise<{ name: string; bytes: Uint
       console.warn(`[attachments] referenced file is missing, not packing it: ${name}`);
       continue;
     }
-    files.push({ name, bytes: await file.bytes() });
+    files.push({ name, path: file.uri });
   }
 
   return files;

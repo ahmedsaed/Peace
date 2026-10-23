@@ -2,11 +2,12 @@ import { count } from 'drizzle-orm';
 import { Directory, File, Paths } from 'expo-file-system';
 import { defaultDatabaseDirectory } from 'expo-sqlite';
 
-import { packContainerTo } from '../lib/container';
+import { backupArchive } from '../../modules/backup-archive/src/BackupArchiveModule';
+import { containerLayout } from '../lib/container';
 import { track, trackSync } from '../state/stalls';
 import { toCsvFile } from '../lib/csv';
 import { importTemplate } from '../lib/import-csv';
-import { readReferencedFiles } from './attachments';
+import { referencedFilePaths } from './attachments';
 import { DATABASE_NAME, db, sqliteDb } from './client';
 import { attachmentTotalBytes } from './repo/attachments';
 import { CSV_HEADER, exportFilename, exportRows } from './repo/export';
@@ -122,26 +123,33 @@ function databaseFile(): File {
  */
 export async function databaseBackup(now = new Date()): Promise<Exported> {
   // Each step under its own name, so a freeze says which one held the thread.
-  trackSync('backup:checkpoint', () => sqliteDb.execSync('PRAGMA wal_checkpoint(TRUNCATE);'));
+  // Async so SQLite does it on its own thread, not this one.
+  await track('backup:checkpoint', () => sqliteDb.execAsync('PRAGMA wal_checkpoint(TRUNCATE);'));
 
-  const { database, files } = await track('backup:read', async () => ({
-    database: await databaseFile().bytes(),
-    files: await readReferencedFiles(),
-  }));
-
-  // Packed in small steps straight into the file — see `packContainerTo` for
-  // why this used to freeze the app when a backup was due at launch.
   const destination = stagingFile(exportFilename(now, BACKUP_EXTENSION));
-  destination.create({ overwrite: true });
-  const handle = destination.open();
-  try {
-    await track('backup:zip', () =>
-      packContainerTo({ database, files }, (chunk) => handle.writeBytes(chunk), { now })
-    );
-  } finally {
-    handle.close();
-  }
+  await packLedgerTo(destination, now);
   return verify(destination);
+}
+
+/**
+ * Write the ledger and its receipts into `destination` as a container.
+ *
+ * Packed natively, on a background thread, from disk to disk — see
+ * `containerLayout` for why nothing here may pack in JavaScript. The caller
+ * checkpoints first; restore's safety copy needs that done earlier than here.
+ */
+export async function packLedgerTo(destination: File, now = new Date()): Promise<void> {
+  const archive = backupArchive;
+  if (!archive) {
+    // Only jest gets here; every APK built from this code carries the module.
+    // Packing in JS instead is what froze the app, so there is no fallback.
+    throw new Error('This build cannot write backups. Update the app.');
+  }
+
+  const layout = trackSync('backup:list', () =>
+    containerLayout(databaseFile().uri, referencedFilePaths(), now)
+  );
+  await track('backup:zip', () => archive.zip(destination.uri, layout, now.getTime()));
 }
 
 /**

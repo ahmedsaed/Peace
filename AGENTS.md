@@ -629,8 +629,17 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   Drive catch-up runs when the app opens, and packing a backup was one `zipSync` over the ledger
   and every receipt: seconds in which the screen drew and no tap landed. It happened about three
   times in two months, it was not an ANR, and nothing in Play's vitals or a crash log showed it.
-  `packContainerTo` now packs in steps and hands the thread back every ~12ms; anything else that
-  loops over megabytes in JS needs the same treatment. **The stall recorder** (`state/stalls.ts`)
+  **Slicing the work does not fix it — moving it off the thread does.** The first fix packed in
+  12ms steps with `setTimeout(0)` between them, and on a phone it turned a 2-second freeze into
+  minutes of crawling: every pause costs at least a frame, the Records list renders in batches
+  through the same queue, and the log still showed 4-second stalls inside `backup:zip`. Packing
+  and scrypt now live in `modules/backup-archive` (Kotlin, background dispatchers, disk to disk),
+  and JS only awaits a promise; `containerLayout` in `lib/container.ts` still decides the format,
+  so the native writer has no opinion about it. Use `Coroutine` + `withContext` in a module like
+  that: a plain `AsyncFunction` runs on the ONE queue every Expo module shares, so a long job there
+  stalls file reads and crypto behind it. The Kotlin was checked on a JVM against the RFC 7914
+  vectors, noble and `readContainer` — the compiler is in the Gradle cache, no device needed.
+  Anything else that loops over megabytes in JS belongs native too. **The stall recorder** (`state/stalls.ts`)
   is how the next one gets found: wrap long work in `track` / `trackSync` with a name per PHASE,
   and a freeze is written to a local file with every job that overlapped it, shown under About ›
   Slow moments (`adb logcat | grep stalls` sees it live). The watcher must stay the first thing

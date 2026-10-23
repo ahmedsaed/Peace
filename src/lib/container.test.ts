@@ -3,14 +3,15 @@ import { unzipSync, zipSync } from 'fflate';
 import {
   ATTACHMENT_PREFIX,
   ContainerError,
+  containerLayout,
   CONTAINER_VERSION,
   DB_ENTRY,
   MANIFEST_ENTRY,
   describeContainer,
   looksLikeZip,
   packContainer,
-  packContainerTo,
   readContainer,
+  type LayoutEntry,
   type Manifest,
 } from './container';
 
@@ -202,79 +203,67 @@ describe('what it packs and how', () => {
   });
 });
 
-describe('packing without holding the thread', () => {
-  const big = (size: number, seed: number) =>
-    Uint8Array.from({ length: size }, (_, i) => (i * 31 + seed) & 0xff);
-  const container = {
-    database: big(200_000, 1),
-    files: [
-      { name: 'a.jpg', bytes: big(150_000, 2) },
-      { name: 'empty.txt', bytes: new Uint8Array(0) },
-      { name: 'b.pdf', bytes: big(90_000, 3) },
-    ],
-  };
-  const now = new Date(Date.UTC(2026, 9, 17));
+describe('the layout the native writer packs', () => {
+  const now = new Date(Date.UTC(2026, 9, 23));
+  const layout = () =>
+    containerLayout(
+      'file:///data/peace.db',
+      [
+        { name: 'a.jpg', path: 'file:///data/attachments/a.jpg' },
+        { name: 'b.pdf', path: 'file:///data/attachments/b.pdf' },
+      ],
+      now
+    );
 
-  const packed = async (options: Parameters<typeof packContainerTo>[2] = {}) => {
-    const chunks: Uint8Array[] = [];
-    await packContainerTo(container, (c) => chunks.push(c), { now, ...options });
-    const out = new Uint8Array(chunks.reduce((sum, c) => sum + c.byteLength, 0));
-    let at = 0;
-    for (const c of chunks) {
-      out.set(c, at);
-      at += c.byteLength;
-    }
-    return out;
-  };
+  /**
+   * What `modules/backup-archive` does with a layout, in JS: each entry's
+   * bytes under its name, deflated or stored as it says. The Kotlin writer was
+   * checked against `readContainer` byte for byte on a JVM; this keeps the
+   * layout itself honest without one.
+   */
+  const write = (entries: LayoutEntry[], disk: Record<string, Uint8Array>) =>
+    zipSync(
+      Object.fromEntries(
+        entries.map((entry) => [
+          entry.name,
+          [entry.text !== undefined ? ascii(entry.text) : disk[entry.path!], { level: entry.deflate ? 6 : 0 }],
+        ])
+      )
+    );
 
-  /** One format: the fixtures tests build are exactly what a phone writes. */
-  it('writes the same bytes as the synchronous packer', async () => {
-    expect(await packed()).toEqual(packContainer(container, now));
+  it('restores to everything that went in', () => {
+    const back = readContainer(
+      write(layout(), {
+        'file:///data/peace.db': database(),
+        'file:///data/attachments/a.jpg': ascii('photo'),
+        'file:///data/attachments/b.pdf': ascii('invoice'),
+      })
+    );
+    expect(back.database).toEqual(database());
+    expect(back.files.map((f) => f.name)).toEqual(['a.jpg', 'b.pdf']);
   });
 
-  it('restores to everything that went in', async () => {
-    const back = readContainer(await packed());
-    expect(back.database).toEqual(container.database);
-    expect(back.files.map((f) => [f.name, f.bytes.byteLength])).toEqual([
-      ['a.jpg', 150_000],
-      ['empty.txt', 0],
-      ['b.pdf', 90_000],
+  it('deflates the manifest and the database and stores attachments', () => {
+    expect(layout().map(({ name, deflate }) => [name, deflate])).toEqual([
+      [MANIFEST_ENTRY, true],
+      [DB_ENTRY, true],
+      [`${ATTACHMENT_PREFIX}a.jpg`, false],
+      [`${ATTACHMENT_PREFIX}b.pdf`, false],
     ]);
   });
 
-  /**
-   * The point of it. A clock that moves 5ms per reading crosses the budget
-   * every few steps, so a large container gives the thread back again and
-   * again — where one `zipSync` gave it back once, at the end.
-   */
-  it('hands the thread back whenever it has held it for its budget', async () => {
-    let t = 0;
-    let pauses = 0;
-    await packed({
-      clock: () => (t += 5),
-      pause: async () => {
-        pauses += 1;
-      },
-    });
-    // ~440KB is ~15 steps of 32KB; at 5ms a reading the budget runs out about
-    // every third one.
-    expect(pauses).toBeGreaterThanOrEqual(4);
+  it('writes the same manifest as the in-memory packer', () => {
+    const fromPacker = new TextDecoder().decode(
+      unzipSync(
+        packContainer({ database: database(), files: [receipt('a.jpg'), receipt('b.pdf')] }, now)
+      )[MANIFEST_ENTRY]
+    );
+    expect(layout()[0]!.text).toBe(fromPacker);
   });
 
-  it('does not pause at all when every step is quick', async () => {
-    let pauses = 0;
-    await packed({
-      clock: () => 0,
-      pause: async () => {
-        pauses += 1;
-      },
-    });
-    expect(pauses).toBe(0);
-  });
-
-  it('still refuses an unsafe attachment name', async () => {
-    await expect(
-      packContainerTo({ database: database(), files: [receipt('../evil.jpg')] }, () => {})
-    ).rejects.toThrow(ContainerError);
+  it('still refuses an unsafe attachment name', () => {
+    expect(() =>
+      containerLayout('file:///data/peace.db', [{ name: '../evil.jpg', path: '/x' }])
+    ).toThrow(ContainerError);
   });
 });

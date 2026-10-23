@@ -279,6 +279,27 @@ describe('taking a backup', () => {
     const [, , payload] = (await runBackup(), mocked.uploadBackup.mock.calls[0]);
     expect(isSealed(payload as Uint8Array)).toBe(false);
   });
+
+  /**
+   * The launch catch-up, "Back up now" and the background task all call this,
+   * and two uploads racing each prune against a list the other is changing.
+   */
+  it('joins a backup already running instead of starting a second', async () => {
+    stageFile();
+    const [first, second] = await Promise.all([runBackup(), runBackup()]);
+
+    expect(mocked.databaseBackup).toHaveBeenCalledTimes(1);
+    expect(mocked.uploadBackup).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+  });
+
+  it('starts a fresh one once the last has finished', async () => {
+    stageFile();
+    await runBackup();
+    stageFile();
+    await runBackup();
+    expect(mocked.uploadBackup).toHaveBeenCalledTimes(2);
+  });
 });
 
 /**

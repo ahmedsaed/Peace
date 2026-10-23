@@ -20,7 +20,7 @@
  * against real bytes rather than mocked out.
  */
 
-import { unzipSync, Zip, ZipDeflate, ZipPassThrough } from 'fflate';
+import { unzipSync, zipSync } from 'fflate';
 
 /** Where the database sits inside the container. */
 export const DB_ENTRY = 'peace.db';
@@ -65,8 +65,43 @@ export function looksLikeZip(bytes: Uint8Array): boolean {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+function manifestFor(attachments: number, now: Date): string {
+  const manifest: Manifest = {
+    format: 'peace-backup',
+    version: CONTAINER_VERSION,
+    createdAt: now.toISOString(),
+    attachments,
+  };
+  return JSON.stringify(manifest, null, 2);
+}
+
 /**
- * Pack a database and its attachments.
+ * A name with a slash in it would place the entry outside the folder the
+ * reader looks in — and, once unpacked, outside the attachments directory
+ * altogether. Names come from `attachment.ts`, which builds them from a hash,
+ * so this cannot currently fire; it is here because the day someone stores a
+ * user-supplied name is the day it matters and nobody will remember to add it
+ * then.
+ */
+function assertSafeName(name: string): void {
+  if (name.includes('/') || name.includes('\\') || name.startsWith('.')) {
+    throw new ContainerError(`Refusing to pack an attachment with an unsafe name: ${name}`);
+  }
+}
+
+/** One entry of the container as the native zip writer takes it. */
+export type LayoutEntry = { name: string; path?: string; text?: string; deflate: boolean };
+
+/**
+ * The container as a list of entries on DISK, for the native writer.
+ *
+ * The app never packs in JavaScript: Hermes has no JIT, and a CRC plus a
+ * deflate over the ledger held the thread that draws the screen for as long
+ * as they took — slicing it into steps only turned a freeze into minutes of
+ * crawling. `modules/backup-archive` streams these entries from disk to disk
+ * on a background thread. What goes in, under which name and compressed or
+ * not, is still decided here, beside the reader, so there is one definition
+ * of the format.
  *
  * COMPRESSION IS PER-ENTRY AND THAT IS DELIBERATE. A SQLite file is mostly
  * padding and repeated structure and shrinks by ~80%; a JPEG or a PDF is
@@ -75,128 +110,35 @@ const decoder = new TextDecoder();
  * slightly larger than the input. Attachments are STORED, the database is
  * deflated, and a backup of a big photo library stays roughly as fast as
  * copying it.
- *
- * Synchronous: for tests and fixtures. The app packs with `packContainerTo`,
- * which runs the very same steps without holding the thread.
+ */
+export function containerLayout(
+  databasePath: string,
+  files: { name: string; path: string }[],
+  now = new Date()
+): LayoutEntry[] {
+  for (const file of files) assertSafeName(file.name);
+  return [
+    { name: MANIFEST_ENTRY, text: manifestFor(files.length, now), deflate: true },
+    { name: DB_ENTRY, path: databasePath, deflate: true },
+    ...files.map((file) => ({ name: ATTACHMENT_PREFIX + file.name, path: file.path, deflate: false })),
+  ];
+}
+
+/**
+ * Pack a database and its attachments in memory, following the same rules as
+ * `containerLayout`. For tests and fixtures; the app writes through the native
+ * module.
  */
 export function packContainer(container: Container, now = new Date()): Uint8Array {
-  const chunks: Uint8Array[] = [];
-  for (const out of packSteps(container, now)) chunks.push(...out);
-  return concat(chunks);
-}
-
-/** How much of an entry one step feeds the zip. */
-const STEP_BYTES = 32 * 1024;
-
-/** How long packing may hold the thread before it lets a tap through. */
-const BUDGET_MS = 12;
-
-/**
- * Pack a container into `write`, handing the thread back as it goes.
- *
- * THIS IS WHAT FROZE THE APP. The Drive catch-up runs when the app opens, and
- * packing used to be one `zipSync` over the database and every receipt: a CRC
- * over tens of megabytes and a deflate of the ledger, in an interpreter, in a
- * single call. For those seconds the screen drew and nothing on it answered a
- * tap. Now packing is a series of small steps, and whenever one has held the
- * thread for `BUDGET_MS` it waits for `pause` — a macrotask, so every touch
- * that queued up meanwhile is handled first. Slower in total; never stuck.
- *
- * `write` receives the zip in order, so the file is written as it is made
- * rather than built whole in memory and written in one more blocking call.
- */
-export async function packContainerTo(
-  container: Container,
-  write: (chunk: Uint8Array) => void,
-  {
-    now = new Date(),
-    pause = () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
-    clock = () => Date.now(),
-  }: { now?: Date; pause?: () => Promise<void>; clock?: () => number } = {}
-): Promise<void> {
-  let since = clock();
-  for (const out of packSteps(container, now)) {
-    for (const chunk of out) write(chunk);
-    if (clock() - since >= BUDGET_MS) {
-      await pause();
-      since = clock();
-    }
-  }
-}
-
-/**
- * The one implementation of the format, as steps.
- *
- * Each yield is what the zip produced during one step. Both drivers above run
- * this, so the synchronous fixtures in tests and the backups on a phone cannot
- * drift into two formats.
- */
-function* packSteps(container: Container, now: Date): Generator<Uint8Array[]> {
-  const manifest: Manifest = {
-    format: 'peace-backup',
-    version: CONTAINER_VERSION,
-    createdAt: now.toISOString(),
-    attachments: container.files.length,
+  const entries: Record<string, [Uint8Array, { level: 0 | 6 }]> = {
+    [MANIFEST_ENTRY]: [encoder.encode(manifestFor(container.files.length, now)), { level: 6 }],
+    [DB_ENTRY]: [container.database, { level: 6 }],
   };
-
   for (const file of container.files) {
-    // A name with a slash in it would place the entry outside the folder the
-    // reader looks in — and, once unpacked, outside the attachments directory
-    // altogether. Names come from `attachment.ts`, which builds them from a
-    // hash, so this cannot currently fire; it is here because the day someone
-    // stores a user-supplied name is the day it matters and nobody will
-    // remember to add it then.
-    if (file.name.includes('/') || file.name.includes('\\') || file.name.startsWith('.')) {
-      throw new ContainerError(`Refusing to pack an attachment with an unsafe name: ${file.name}`);
-    }
+    assertSafeName(file.name);
+    entries[ATTACHMENT_PREFIX + file.name] = [file.bytes, { level: 0 }];
   }
-
-  let pending: Uint8Array[] = [];
-  let failure: Error | null = null;
-  const zip = new Zip((error, data) => {
-    if (error) failure = error;
-    else pending.push(data);
-  });
-  const take = () => {
-    if (failure) throw failure;
-    const out = pending;
-    pending = [];
-    return out;
-  };
-
-  const entries: [ZipDeflate | ZipPassThrough, Uint8Array][] = [
-    [new ZipDeflate(MANIFEST_ENTRY, { level: 6 }), encoder.encode(JSON.stringify(manifest, null, 2))],
-    [new ZipDeflate(DB_ENTRY, { level: 6 }), container.database],
-    ...container.files.map(
-      (file): [ZipPassThrough, Uint8Array] => [
-        new ZipPassThrough(ATTACHMENT_PREFIX + file.name),
-        file.bytes,
-      ]
-    ),
-  ];
-
-  for (const [entry, bytes] of entries) {
-    zip.add(entry);
-    if (bytes.byteLength === 0) entry.push(bytes, true);
-    for (let at = 0; at < bytes.byteLength; at += STEP_BYTES) {
-      const end = Math.min(at + STEP_BYTES, bytes.byteLength);
-      entry.push(bytes.subarray(at, end), end === bytes.byteLength);
-      yield take();
-    }
-  }
-
-  zip.end();
-  yield take();
-}
-
-function concat(chunks: Uint8Array[]): Uint8Array {
-  const out = new Uint8Array(chunks.reduce((sum, c) => sum + c.byteLength, 0));
-  let at = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, at);
-    at += chunk.byteLength;
-  }
-  return out;
+  return zipSync(entries);
 }
 
 /**

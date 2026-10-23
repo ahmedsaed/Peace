@@ -61,8 +61,24 @@ export type BackupOutcome = {
  * Returns the outcome rather than recording it. The caller owns the settings
  * write, so the write-through store repaints every screen instead of this
  * module reaching into UI state.
+ *
+ * ONE AT A TIME, WHOEVER ASKS. The launch catch-up, "Back up now" and the
+ * WorkManager task all end up here, and two uploads racing would each prune
+ * against a list the other was still changing — the loser deleting a backup
+ * the winner had just counted as safe. A caller arriving while one is running
+ * joins it and gets its outcome. The guard used to live in the catch-up, which
+ * left the button and the background task outside it.
  */
-export async function runBackup(now = new Date()): Promise<BackupOutcome> {
+let inFlight: Promise<BackupOutcome> | null = null;
+
+export function runBackup(now = new Date()): Promise<BackupOutcome> {
+  inFlight ??= backUp(now).finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function backUp(now: Date): Promise<BackupOutcome> {
   const staged = await databaseBackup(now);
 
   try {
