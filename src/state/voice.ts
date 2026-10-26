@@ -11,7 +11,7 @@ import { File } from 'expo-file-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import type { VoiceClip } from '../lib/gemini';
+import type { VoiceClip } from '../ai/read';
 import { heardAnything, MAX_CLIP_MS, MIN_CLIP_MS } from '../lib/voice';
 
 /**

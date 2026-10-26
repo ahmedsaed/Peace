@@ -15,7 +15,7 @@ import { EMPTY_QUERY, type SearchQuery } from '../../lib/search-query';
 import { aggregate, GROUP_BYS, inBucket, MEASURES, wholeMonths, type Aggregate, type GroupBy, type Measure } from '../aggregate';
 import { resolveSpan, spanLabel, ToolInputError, ymd, type Span } from '../dates';
 import { citedFigures } from '../figures';
-import type { Schema } from '../gemini-chat';
+import type { Schema } from '../../ai/content';
 import {
   optBool,
   optEnum,

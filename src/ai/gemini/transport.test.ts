@@ -1,16 +1,18 @@
+import { AiError } from '../error';
+import type { Endpoint } from '../providers';
+import { readReceipt } from '../read';
 import {
-  GeminiError,
-  buildRequest,
+  checkKey,
   describeFailure,
   endpoint,
   extractJson,
   isTransientStatus,
-  checkGeminiKey,
   listModels,
   parseModelList,
-  readReceipt,
   reasonOf,
-} from './gemini';
+} from './transport';
+
+const gem = (apiKey: string, model: string): Endpoint => ({ provider: 'gemini', apiKey, model });
 
 const IMAGE = 'aGVsbG8='; // "hello" in base64 — the bytes never matter here.
 
@@ -47,11 +49,18 @@ const googleError = (code: number, message: string, reason?: string) => ({
 
 const READING = { total: 120.5, currency: 'EGP', date: '2026-08-13', merchant: 'Grocery Mart' };
 
+/** What a receipt read actually put on the wire. */
+async function sentBody(categoryNames: string[] = [], mime = 'image/jpeg'): Promise<Record<string, any>> {
+  const fetchImpl = ok(reply(READING));
+  await readReceipt(gem('key', 'm'), IMAGE, mime, { fetchImpl, categoryNames });
+  return JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+}
+
 describe('the request', () => {
-  it('asks for structured output against the schema', () => {
+  it('asks for structured output against the schema', async () => {
     // The whole reason this feature does not parse prose: the model answers
     // with the fields, not a sentence about them.
-    const body = buildRequest(IMAGE, 'image/jpeg', []) as Record<string, any>;
+    const body = await sentBody();
     expect(body.generationConfig.responseMimeType).toBe('application/json');
     expect(body.generationConfig.responseSchema.properties.total).toBeDefined();
   });
@@ -60,17 +69,17 @@ describe('the request', () => {
    * Reading a receipt has ONE right answer. Sampling variety is exactly what is
    * not wanted here — the same photo read twice must not give two totals.
    */
-  it('asks for no creativity at all', () => {
-    expect((buildRequest(IMAGE, 'image/jpeg', []) as any).generationConfig.temperature).toBe(0);
+  it('asks for no creativity at all', async () => {
+    expect((await sentBody()).generationConfig.temperature).toBe(0);
   });
 
-  it('sends the image inline, with its real mime type', () => {
-    const parts = (buildRequest(IMAGE, 'image/png', []) as any).contents[0].parts;
-    expect(parts[1].inline_data).toEqual({ mime_type: 'image/png', data: IMAGE });
+  it('sends the image inline, with its real mime type', async () => {
+    const parts = (await sentBody([], 'image/png')).contents[0].parts;
+    expect(parts[1].inlineData).toEqual({ mimeType: 'image/png', data: IMAGE });
   });
 
-  it('carries the user\'s own category names in the prompt', () => {
-    const parts = (buildRequest(IMAGE, 'image/jpeg', ['Groceries']) as any).contents[0].parts;
+  it("carries the user's own category names in the prompt", async () => {
+    const parts = (await sentBody(['Groceries'])).contents[0].parts;
     expect(parts[0].text).toContain('Groceries');
   });
 
@@ -127,7 +136,7 @@ describe('digging the reading out of the envelope', () => {
   });
 
   it('refuses a body that is not an object', () => {
-    expect(() => extractJson('nope')).toThrow(GeminiError);
+    expect(() => extractJson('nope')).toThrow(AiError);
   });
 });
 
@@ -216,7 +225,7 @@ describe('listing the models a key can call', () => {
 
 describe('reading a receipt end to end', () => {
   it('returns fields the record screen can use', async () => {
-    const reading = await readReceipt('key', 'gemini-flash-latest', IMAGE, 'image/jpeg', {
+    const reading = await readReceipt(gem('key', 'gemini-flash-latest'), IMAGE, 'image/jpeg', {
       fetchImpl: ok(reply(READING)),
     });
 
@@ -233,7 +242,7 @@ describe('reading a receipt end to end', () => {
    */
   it('never puts the key in the url', async () => {
     const fetchImpl = ok(reply(READING));
-    await readReceipt('super-secret', 'gemini-flash-latest', IMAGE, 'image/jpeg', { fetchImpl });
+    await readReceipt(gem('super-secret', 'gemini-flash-latest'), IMAGE, 'image/jpeg', { fetchImpl });
 
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).not.toContain('super-secret');
@@ -247,16 +256,16 @@ describe('reading a receipt end to end', () => {
 
   it('sends a PDF as a file', async () => {
     const fetchImpl = ok(reply(READING));
-    await readReceipt('key', 'gemini-flash-latest', 'UERGLTEuNw==', 'application/pdf', { fetchImpl });
-    expect(sentParts(fetchImpl)[1]).toEqual({ inline_data: { mime_type: 'application/pdf', data: 'UERGLTEuNw==' } });
+    await readReceipt(gem('key', 'gemini-flash-latest'), 'UERGLTEuNw==', 'application/pdf', { fetchImpl });
+    expect(sentParts(fetchImpl)[1]).toEqual({ inlineData: { mimeType: 'application/pdf', data: 'UERGLTEuNw==' } });
   });
 
   it('sends a text file as fenced text, decoded', async () => {
     const fetchImpl = ok(reply(READING));
     const text = 'Café Nero\nTOTAL USD 4.50';
-    await readReceipt('key', 'gemini-flash-latest', Buffer.from(text).toString('base64'), 'text/plain', { fetchImpl });
+    await readReceipt(gem('key', 'gemini-flash-latest'), Buffer.from(text).toString('base64'), 'text/plain', { fetchImpl });
     const parts = sentParts(fetchImpl);
-    expect(parts[1].inline_data).toBeUndefined();
+    expect(parts[1].inlineData).toBeUndefined();
     expect(parts[1].text).toContain(`<<<\n${text}\n>>>`);
     // After the instructions, so the document can never come first and pose as them.
     expect(parts[0].text).toMatch(/receipt or invoice/);
@@ -265,7 +274,7 @@ describe('reading a receipt end to end', () => {
   it('refuses to call at all with no key', async () => {
     const fetchImpl = ok(reply(READING));
     await expect(
-      readReceipt('   ', 'gemini-flash-latest', IMAGE, 'image/jpeg', { fetchImpl })
+      readReceipt(gem('   ', 'gemini-flash-latest'), IMAGE, 'image/jpeg', { fetchImpl })
     ).rejects.toThrow(/No Gemini API key/);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -279,7 +288,7 @@ describe('reading a receipt end to end', () => {
     [500, /unavailable/i],
   ])('explains a %s in terms of what to fix', async (code, expected) => {
     await expect(
-      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: status(code) })
+      readReceipt(gem('key', 'm'), IMAGE, 'image/jpeg', { fetchImpl: status(code) })
     ).rejects.toThrow(expected);
   });
 
@@ -296,7 +305,7 @@ describe('reading a receipt end to end', () => {
     const body = googleError(400, 'API key not valid. Please pass a valid API key.', 'API_KEY_INVALID');
 
     await expect(
-      readReceipt('bad', 'gemini-flash-latest', IMAGE, 'image/jpeg', {
+      readReceipt(gem('bad', 'gemini-flash-latest'), IMAGE, 'image/jpeg', {
         fetchImpl: status(400, body),
       })
     ).rejects.toThrow(/key was refused/i);
@@ -308,7 +317,7 @@ describe('reading a receipt end to end', () => {
     const body = googleError(400, 'Unable to submit request because it has an empty model name.');
 
     await expect(
-      readReceipt('key', '', IMAGE, 'image/jpeg', { fetchImpl: status(400, body) })
+      readReceipt(gem('key', ''), IMAGE, 'image/jpeg', { fetchImpl: status(400, body) })
     ).rejects.toThrow(/empty model name/);
   });
 
@@ -327,7 +336,7 @@ describe('reading a receipt end to end', () => {
     );
 
     await expect(
-      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: broken })
+      readReceipt(gem('key', 'm'), IMAGE, 'image/jpeg', { fetchImpl: broken })
     ).rejects.toThrow(/unavailable/i);
   });
 
@@ -363,14 +372,14 @@ describe('reading a receipt end to end', () => {
 
   it('marks a busy model transient on the error it throws', async () => {
     await expect(
-      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: status(503) })
+      readReceipt(gem('key', 'm'), IMAGE, 'image/jpeg', { fetchImpl: status(503) })
     ).rejects.toMatchObject({ transient: true });
   });
 
   it('marks a refused key permanent on the error it throws', async () => {
     const body = googleError(400, 'API key not valid.', 'API_KEY_INVALID');
     await expect(
-      readReceipt('bad', 'm', IMAGE, 'image/jpeg', { fetchImpl: status(400, body) })
+      readReceipt(gem('bad', 'm'), IMAGE, 'image/jpeg', { fetchImpl: status(400, body) })
     ).rejects.toMatchObject({ transient: false });
   });
 
@@ -385,7 +394,7 @@ describe('reading a receipt end to end', () => {
     }) as unknown as typeof fetch;
 
     await expect(
-      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: boom })
+      readReceipt(gem('key', 'm'), IMAGE, 'image/jpeg', { fetchImpl: boom })
     ).rejects.toMatchObject({ transient: true });
   });
 
@@ -408,7 +417,7 @@ describe('reading a receipt end to end', () => {
     ) as unknown as typeof fetch;
 
     await expect(
-      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: hang, timeoutMs: 10 })
+      readReceipt(gem('key', 'm'), IMAGE, 'image/jpeg', { fetchImpl: hang, timeoutMs: 10 })
     ).rejects.toThrow(/Could not reach Gemini/);
   });
 
@@ -424,7 +433,7 @@ describe('reading a receipt end to end', () => {
     }) as unknown as typeof fetch;
 
     await expect(
-      readReceipt('key', 'm', IMAGE, 'image/jpeg', { fetchImpl: boom })
+      readReceipt(gem('key', 'm'), IMAGE, 'image/jpeg', { fetchImpl: boom })
     ).rejects.toThrow(/Enter the record by hand/);
 
     expect(warn).toHaveBeenCalledWith(
@@ -438,10 +447,10 @@ describe('reading a receipt end to end', () => {
   });
 });
 
-describe('checkGeminiKey', () => {
+describe('checkKey', () => {
   it('accepts a key Google answers for, sending it in a header', async () => {
     const fetchImpl = ok({ models: [] });
-    await expect(checkGeminiKey(' AIza-good ', { fetchImpl })).resolves.toBeUndefined();
+    await expect(checkKey(' AIza-good ', { fetchImpl })).resolves.toBeUndefined();
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).not.toContain('AIza-good');
     expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('AIza-good');
@@ -450,30 +459,30 @@ describe('checkGeminiKey', () => {
   // Exactly what typing random text into the field used to save.
   it('refuses a key Google rejects, in words about the key', async () => {
     const fetchImpl = status(400, googleError(400, 'API key not valid.', 'API_KEY_INVALID'));
-    await expect(checkGeminiKey('random text', { fetchImpl })).rejects.toThrow(
+    await expect(checkKey('random text', { fetchImpl })).rejects.toThrow(
       /did not accept that key/
     );
   });
 
   it('says when the key is real but the API is off', async () => {
     const fetchImpl = status(403, googleError(403, 'disabled', 'SERVICE_DISABLED'));
-    await expect(checkGeminiKey('AIza-off', { fetchImpl })).rejects.toThrow(/not turned on/);
+    await expect(checkKey('AIza-off', { fetchImpl })).rejects.toThrow(/not turned on/);
   });
 
   it('counts a rate-limited key as a working one', async () => {
-    await expect(checkGeminiKey('AIza-busy', { fetchImpl: status(429) })).resolves.toBeUndefined();
+    await expect(checkKey('AIza-busy', { fetchImpl: status(429) })).resolves.toBeUndefined();
   });
 
   it('blames the check, not the key, when Google cannot be reached', async () => {
     const fetchImpl = jest.fn(async () => {
       throw new Error('offline');
     });
-    await expect(checkGeminiKey('AIza-maybe', { fetchImpl })).rejects.toThrow(/Could not reach/);
+    await expect(checkKey('AIza-maybe', { fetchImpl })).rejects.toThrow(/Could not reach/);
   });
 
   it('does not call out for an empty key', async () => {
     const fetchImpl = ok({});
-    await expect(checkGeminiKey('  ', { fetchImpl })).rejects.toThrow(/Paste a key/);
+    await expect(checkKey('  ', { fetchImpl })).rejects.toThrow(/Paste a key/);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

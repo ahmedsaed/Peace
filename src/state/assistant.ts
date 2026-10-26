@@ -1,7 +1,6 @@
 import { fetch as streamingFetch } from 'expo/fetch';
 import { create } from 'zustand';
 
-import { chatStepStreaming } from '@/assistant/gemini-chat';
 import { withRetries } from '@/assistant/retry';
 import {
   ask,
@@ -16,8 +15,13 @@ import { undoWrite, type Undo } from '@/assistant/tools';
 import { attachmentAsBase64, type StagedAttachment } from '@/db/attachments';
 import { db } from '@/db/client';
 import { latestMessages, messagesBefore, type StoredRow } from '@/db/repo/chat';
-import { GeminiError } from '@/lib/gemini';
-import { getGeminiKey } from '@/lib/secrets';
+import { chatStepStreaming } from '@/ai';
+import { AiError } from '@/ai/error';
+import { endpointForJob } from '@/ai/job';
+import { readDocument } from '@/ai/read';
+import { isTextMime } from '@/lib/attachment';
+import type { Content } from '@/ai/content';
+import { PROVIDERS, type Endpoint, type ProviderId } from '@/ai/providers';
 import { useSettingsStore } from '@/state/settings';
 
 /**
@@ -72,8 +76,55 @@ function upsert(rows: StoredRow[], row: StoredRow): StoredRow[] {
   return next;
 }
 
+/**
+ * Whether the conversation since the last divider has turns another provider
+ * wrote. Translating it works almost always; when the new provider refuses it
+ * anyway, the way out is a new conversation, and the failure says so.
+ */
+function startedElsewhere(rows: StoredRow[], provider: ProviderId): boolean {
+  const since = rows.slice(rows.findLastIndex((r) => r.kind === 'divider') + 1);
+  return since.some(
+    (r) => r.kind === 'model' && ((r.content as Content | null)?.native?.provider ?? 'gemini') !== provider
+  );
+}
+
+/**
+ * Files Penny's own model will not see, read into text by her files model.
+ *
+ * Only when the two are DIFFERENT models: the same one sees the file itself,
+ * which is better than any description of it. A file that cannot be read goes
+ * with the reason in its place, so Penny says so rather than inventing it.
+ */
+async function readForPenny(
+  files: StagedAttachment[],
+  say: (activity: string | null) => void
+): Promise<(StagedAttachment & { reading?: string })[]> {
+  const { pennyModel, pennyFilesModel } = useSettingsStore.getState().settings;
+  if (files.length === 0 || pennyFilesModel === '' || pennyFilesModel === pennyModel) return files;
+  const job = await endpointForJob(pennyFilesModel, 'read files for Penny');
+  const out: (StagedAttachment & { reading?: string })[] = [];
+  for (const file of files) {
+    if (isTextMime(file.mimeType)) {
+      out.push(file);
+      continue;
+    }
+    say('Reading the attachment');
+    let reading: string;
+    try {
+      if ('problem' in job) throw new AiError(job.problem);
+      reading = await readDocument(job.endpoint, await attachmentAsBase64(file.fileName), file.mimeType);
+    } catch (error) {
+      if (!(error instanceof AiError)) console.warn('[assistant] reading an attachment failed', error);
+      reading = `(It could not be read: ${error instanceof AiError ? error.message : 'something went wrong'})`;
+    }
+    out.push({ ...file, reading });
+  }
+  say(null);
+  return out;
+}
+
 export const useAssistantStore = create<AssistantStore>((set, get) => {
-  function deps(apiKey: string, signal: AbortSignal): Deps {
+  function deps(endpoint: Endpoint, signal: AbortSignal): Deps {
     const settings = useSettingsStore.getState().settings;
     return {
       db,
@@ -94,16 +145,18 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
       step: (request) =>
         withRetries(
           () =>
-            chatStepStreaming(apiKey, settings.assistantModel, request, {
+            chatStepStreaming(endpoint, request, {
               signal,
               fetchImpl: streamingFetch as unknown as typeof fetch,
               onText: (soFar) => set({ streaming: soFar }),
             }),
           {
             signal,
+            provider: PROVIDERS[endpoint.provider].name,
             onRetry: ({ waitMs }) =>
               // Whatever streamed before the failure is thrown away with it.
-              set({ streaming: null, activity: `Gemini is busy — trying again in ${Math.round(waitMs / 1000)}s` }),
+              set({ streaming: null, activity: `${PROVIDERS[endpoint.provider].name} is busy — trying again in ${Math.round(waitMs / 1000)}s`,
+              }),
           }
         ),
       loadAttachment: (fileName) => attachmentAsBase64(fileName),
@@ -130,17 +183,24 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
    */
   async function drive(): Promise<void> {
     if (get().busy) return;
-    const apiKey = await getGeminiKey();
+    const job = await endpointForJob(useSettingsStore.getState().settings.pennyModel, 'talk to Penny');
     const local = new AbortController();
     controller = local;
     set({ busy: true, activity: 'Penny is thinking' });
-    const d = deps(apiKey ?? '', local.signal);
+    const d = deps('endpoint' in job ? job.endpoint : { provider: 'gemini', apiKey: '', model: '' }, local.signal);
     try {
-      if (apiKey === null) throw new GeminiError('No Gemini API key is saved. Add one in Settings.');
+      if ('problem' in job) throw new AiError(job.problem);
       await run(d, local.signal);
     } catch (error) {
-      if (error instanceof GeminiError) {
-        recordFailure(d, error.message, error.transient);
+      if (error instanceof AiError) {
+        const switched = 'endpoint' in job && !error.transient && startedElsewhere(get().rows, job.endpoint.provider);
+        recordFailure(
+          d,
+          switched
+            ? `${error.message} This conversation began with another provider — if it keeps failing, start a new one.`
+            : error.message,
+          error.transient
+        );
       } else {
         console.warn('[assistant] turn failed', error);
         recordFailure(d, 'Something went wrong answering that. Try again.', true);
@@ -175,7 +235,8 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
     send: async (text, files = []) => {
       const trimmed = text.trim();
       if ((trimmed === '' && files.length === 0) || get().busy) return;
-      const row = ask({ db, now: () => new Date() }, trimmed, files);
+      const read = await readForPenny(files, (activity) => set({ activity }));
+      const row = ask({ db, now: () => new Date() }, trimmed, read);
       set((state) => ({ rows: upsert(state.rows, row) }));
       await drive();
     },
@@ -189,7 +250,8 @@ export const useAssistantStore = create<AssistantStore>((set, get) => {
     },
 
     decide: async (seq, index, approve) => {
-      const d = deps('', new AbortController().signal);
+      // Deciding never calls a model, so it needs no endpoint.
+      const d = deps({ provider: 'gemini', apiKey: '', model: '' }, new AbortController().signal);
       const outcome = decideProposal(d, seq, index, approve);
       if (outcome.undo) {
         const n = outcome.undo.rows.filter((r) => !r.transferPairId || r.amountMinor < 0).length;

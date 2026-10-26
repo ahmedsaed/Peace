@@ -5,7 +5,7 @@ import { listAttachments, orphanedFiles, referencedFiles } from '../db/repo/atta
 import { sessionMessages } from '../db/repo/chat';
 import { INLINE_ATTACHMENTS, sessionAttachments, type ChatAttachment } from './attachments';
 import { ask, decide, run, toContents, type Deps, type ModelMeta } from './engine';
-import type { Content, Part } from './gemini-chat';
+import type { Content, Part } from '../ai/content';
 import { applyWrite, prepareWrite } from './tools';
 import { buildLedger, ctxFor, NOW, type Ledger } from './test-ledger';
 

@@ -23,9 +23,10 @@ import {
 import { listAttachments, syncAttachments } from '@/db/repo/attachments';
 import { getCapture, markSaved } from '@/db/repo/bank-captures';
 import { AttachmentError } from '@/lib/attachment';
-import { GeminiError, readReceipt, readVoice, type VoiceClip } from '@/lib/gemini';
+import { AiError } from '@/ai/error';
+import { endpointForJob, listenerFor } from '@/ai/job';
+import { hearRecord, readReceipt, type VoiceClip } from '@/ai/read';
 import { isEmptyReading, matchCategory, receiptNote } from '@/lib/receipt';
-import { getGeminiKey } from '@/lib/secrets';
 import { PickerSheet, type PickerOption } from '@/components/picker-sheet';
 import { db } from '@/db/client';
 import { listAccountsWithBalance } from '@/db/repo/accounts';
@@ -242,7 +243,10 @@ export default function RecordScreen() {
   });
 
   const defaultAccountId = useSetting('defaultAccountId');
-  const geminiModel = useSetting('geminiModel');
+  const receiptsModel = useSetting('receiptsModel');
+  const voiceModel = useSetting('voiceModel');
+  const voiceReadModel = useSetting('voiceReadModel');
+  const modelAbilities = useSetting('modelAbilities');
   // A key, Use AI, and Receipts — all three, or no reading button, and the
   // photograph shortcut only photographs (`state/ai.ts` decides).
   const ai = useAi();
@@ -400,7 +404,7 @@ export default function RecordScreen() {
   const [viewfinder, setViewfinder] = useState(false);
   /**
    * The notes field is the MICROPHONE: `listening` while the panel is shown,
-   * `hearing` while the clip is with Gemini. Like the camera, only by asking.
+   * `hearing` while the clip is with the model. Like the camera, only by asking.
    */
   const [listening, setListening] = useState(false);
   const [hearing, setHearing] = useState(false);
@@ -846,17 +850,16 @@ export default function RecordScreen() {
     setReadingFile(attachment.fileName);
     setError(null);
     try {
-      const key = await getGeminiKey();
-      if (key === null) {
+      const job = await endpointForJob(receiptsModel, 'read receipts');
+      if ('problem' in job) {
         // Not an error — the feature is optional and simply not set up. The
         // sentence names the screen that fixes it.
-        setError('Add a Gemini API key in Settings to read receipts.');
+        setError(job.problem);
         return;
       }
 
       const reading = await readReceipt(
-        key,
-        geminiModel,
+        job.endpoint,
         await attachmentAsBase64(attachment.fileName),
         attachment.mimeType,
         {
@@ -890,7 +893,7 @@ export default function RecordScreen() {
       const matched = matchCategory(reading.category, flatCategories);
       if (matched) setCategoryId(matched.id);
     } catch (e) {
-      if (e instanceof GeminiError || e instanceof AttachmentError) {
+      if (e instanceof AiError || e instanceof AttachmentError) {
         setError(e.message);
       } else {
         console.warn('[record] reading a receipt failed', e);
@@ -938,7 +941,7 @@ export default function RecordScreen() {
       setError(
         ai.voice
           ? 'Speak a new record from the + button.'
-          : 'Speaking a record needs a Gemini key and Voice on, in Settings › AI.'
+          : 'Speaking a record needs Voice on and a model to listen with, in Settings › AI.'
       );
       return;
     }
@@ -964,12 +967,12 @@ export default function RecordScreen() {
   async function hear(clip: VoiceClip) {
     setHearing(true);
     try {
-      const key = await getGeminiKey();
-      if (key === null) {
-        setVoiceProblem({ message: 'Add a Gemini API key in Settings to speak records.' });
+      const job = await listenerFor(voiceModel, voiceReadModel, modelAbilities, 'speak records');
+      if ('problem' in job) {
+        setVoiceProblem({ message: job.problem });
         return;
       }
-      const reading = await readVoice(key, geminiModel, clip, {
+      const reading = await hearRecord(job.listener, clip, {
         today: new Date(),
         accountNames: accounts.map((a) => a.name),
         // Both kinds: the model decides spent or received, and the name is
@@ -1023,8 +1026,8 @@ export default function RecordScreen() {
         setHint(`You said ${reading.currency}; this account is in ${lands} — check the amount.`);
       }
     } catch (e) {
-      if (!(e instanceof GeminiError)) console.warn('[record] reading speech failed', e);
-      setVoiceProblem({ message: e instanceof GeminiError ? e.message : 'Could not read what you said.' });
+      if (!(e instanceof AiError)) console.warn('[record] reading speech failed', e);
+      setVoiceProblem({ message: e instanceof AiError ? e.message : 'Could not read what you said.' });
     } finally {
       setHearing(false);
     }

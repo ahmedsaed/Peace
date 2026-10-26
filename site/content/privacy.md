@@ -7,7 +7,7 @@
 
 # Peace — Privacy Policy
 
-**Effective 19 October 2026** · Peace is made by Merope ([merope.dev](https://merope.dev)).
+**Effective 26 October 2026** · Peace is made by Merope ([merope.dev](https://merope.dev)).
 
 ## The short version
 
@@ -21,30 +21,56 @@ is off until you do. They are listed below, with exactly what each one sends and
 
 ## Features that send data off your phone
 
-### Reading with AI — Google Gemini (optional)
+### Reading with AI — your own AI provider (optional)
 
-If you add your own **Gemini API key** in Settings, Peace can:
+If you add your own **API key** from an AI provider in Settings — **Google Gemini, OpenAI,
+DeepSeek, Mistral** or **OpenRouter** — and choose a model for a feature, Peace can:
 
-- **Read a receipt or invoice** you photograph or pick: the photo, PDF or text file is sent to Google's Gemini API.
+- **Read a receipt or invoice** you photograph or pick: the photo, PDF or text file is sent to the
+  provider of the model you chose for receipts.
 - **Hear a record or a question you speak**, when you tap the microphone: the recording is sent to
-  Gemini, with the names of your accounts and categories and any voice rules you wrote (for a
-  record) or on its own (for a question to Penny). It is recorded only while the microphone panel
-  is open on screen, stops after one minute or when you leave the app, and is **deleted from your
-  phone as soon as it has been sent** — Peace never keeps a recording. What comes back is shown to
-  you to check before anything is saved or sent to Penny.
+  the provider of the model you chose for voice, with the names of your accounts and categories and
+  any voice rules you wrote (for a record) or on its own (for a question to Penny). If that model
+  only transcribes speech, the words it writes down are then sent to the model you chose to read
+  them, with the same names and rules. A recording is made only while the microphone panel is open
+  on screen, stops after one minute or when you leave the app, and is **deleted from your phone as
+  soon as it has been sent** — Peace never keeps a recording. What comes back is shown to you to
+  check before anything is saved or sent to Penny.
 - **Read a bank message** (see *Bank notifications* below): the message's text, the names of your
-  accounts and categories, and any reading rules you wrote are sent to Gemini.
+  accounts and categories, and any reading rules you wrote are sent to the provider of the model
+  you chose for bank messages.
 - **Answer questions with Penny**, the assistant, which is a separate switch in Settings: your
   question, the conversation so far, files you attach to it, and the parts of your ledger Penny
   looks up to answer (amounts, dates, notes, and the names of accounts, categories and tags) are
-  sent to Gemini.
+  sent to the provider of Penny's model. If you choose a different model for Penny's images and
+  documents, files you attach are sent to that model's provider instead, once, to be read.
+- **Check what a model can do**, when you choose one: Peace sends it four tiny test requests — a
+  short instruction, a 16-pixel coloured square and a half-second tone. They contain nothing about
+  you or your ledger.
 
-These requests go **directly from your phone to Google**, authenticated with **your** key. They
-do not pass through any server of ours, and we never see them. Google's handling of them is
-governed by the [Gemini API terms](https://ai.google.dev/gemini-api/terms) for your key. Note
-that on Google's **free** tier, Google may use requests to improve its products; on a paid tier
-it does not. Your key is stored in Android's encrypted storage and is **never** included in a
-backup.
+Each feature can use a different provider, and nothing is sent to a provider you have not added a
+key for and chosen a model from. These requests go **directly from your phone to that provider**,
+authenticated with **your** key. They do not pass through any server of ours, and we never see
+them. Each provider handles them under its own terms for your key:
+
+- **Google Gemini** — the [Gemini API terms](https://ai.google.dev/gemini-api/terms). On Google's
+  **free** tier, Google may use requests to improve its products; on a paid tier it does not.
+- **OpenAI** — [OpenAI's privacy policy](https://openai.com/policies/privacy-policy) and API data
+  terms.
+- **DeepSeek** — [DeepSeek's privacy policy](https://www.deepseek.com). DeepSeek is based in China
+  and **processes requests on servers in the People's Republic of China**.
+- **Mistral** — [Mistral's terms](https://mistral.ai/terms). Mistral is based in the European
+  Union.
+- **OpenRouter** — [OpenRouter's privacy policy](https://openrouter.ai/privacy). OpenRouter is a
+  gateway: it **forwards each request to the company that runs the model you chose**, whose own
+  terms then apply as well.
+
+Your keys are stored in Android's encrypted storage and are **never** included in a backup. Which
+model you chose for each feature, and what the checks found, are ordinary settings and are.
+
+When you open the list of **OpenAI** models, Peace also downloads a public table of model
+capabilities from [models.dev](https://models.dev), to show only the models that can read a
+receipt. The request contains no personal data.
 
 ### Bank notifications (optional)
 
@@ -54,8 +80,8 @@ can become records.
 
 - Messages from **senders you did not list are discarded on your phone** the next time Peace
   opens; they are never sent anywhere. With an empty sender list, nothing is read at all.
-- A message from a listed sender is stored on your phone and, if you have a Gemini key, sent to
-  Gemini to be read as described above.
+- A message from a listed sender is stored on your phone and, if you have chosen a model for bank
+  messages, sent to that model's provider to be read as described above.
 - Notifications from other apps are ignored.
 
 You can withdraw notification access at any time in Android's settings.

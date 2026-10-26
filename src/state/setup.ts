@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 
 import { isCapturing, isPermitted } from '@/db/bank-inbox';
 import { markDone, type SetupFacts, type SetupStep } from '@/lib/setup';
-import { useGeminiKeyStore } from '@/state/gemini-key';
+import { anyKey, useAiKeysStore } from '@/state/ai-keys';
 import { useSettingsStore } from '@/state/settings';
 
 /**
@@ -31,8 +31,8 @@ export function useSetupFacts(): SetupFacts {
   const remindersOn = useSettingsStore((s) => s.settings.remindersOn);
   const senders = useSettingsStore((s) => s.settings.bankSenders);
   const driveAccount = useSettingsStore((s) => s.settings.driveAccount);
-  const hasKey = useGeminiKeyStore((s) => s.hasKey);
-  const refreshKey = useGeminiKeyStore((s) => s.refresh);
+  const hasKey = useAiKeysStore((s) => anyKey(s.keys));
+  const refreshKey = useAiKeysStore((s) => s.refresh);
   const [access, setAccess] = useState(bankAccess);
 
   useEffect(() => {

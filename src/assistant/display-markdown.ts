@@ -1,5 +1,5 @@
 import { maskStrayFigures, splitFigures, type Figure } from './figures';
-import { streamingVisible } from './gemini-chat';
+import { streamingVisible } from './streaming';
 
 /**
  * A reply as the markdown the native renderer draws.

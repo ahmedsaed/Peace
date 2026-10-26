@@ -11,9 +11,9 @@ appId: dev.merope.peace.oss
 # What IS covered is the half that must not break for people who have no key at
 # all — which is everyone, until they set one:
 #
-#   the Settings card exists and reports "Not set" rather than a blank,
-#   the model row is HIDDEN until a key exists (a control for something that
-#     cannot run is a control that silently does nothing), and
+#   the Providers & keys page reports "Not set" rather than a blank,
+#   the receipts model row is HIDDEN until a key exists (a control for something
+#     that cannot run is a control that silently does nothing), and
 #   the record screen is completely unchanged without a key.
 - launchApp:
     clearState: true
@@ -36,8 +36,12 @@ appId: dev.merope.peace.oss
     id: "settings-screen"
 - scrollUntilVisible:
     element:
-      id: "gemini-card"
+      id: "settings-ai-providers"
     direction: DOWN
+- tapOn:
+    id: "settings-ai-providers"
+- assertVisible:
+    id: "settings-ai-providers-page"
 
 # "Not set" rather than an empty string: there has to be a way to tell a saved
 # key from a blank field, and blank is what a failed keystore read looks like.
@@ -45,13 +49,6 @@ appId: dev.merope.peace.oss
     id: "gemini-key-state"
     text: "Not set"
 
-# THE MODEL ROW MUST NOT BE HERE YET. Choosing a model before there is a key to
-# call it with is exactly the "setting that does nothing" this app refuses to
-# ship — and it is the sort of thing that only shows up in a screenshot.
-- assertNotVisible:
-    id: "gemini-model-state"
-- assertNotVisible:
-    id: "gemini-model-edit"
 - takeScreenshot: 01-gemini-no-key
 
 # The editor opens and closes without saving anything.
@@ -60,11 +57,9 @@ appId: dev.merope.peace.oss
 - assertVisible:
     id: "gemini-key-input"
 - takeScreenshot: 02-gemini-key-editor
-# Scroll to the BUTTON, not to the card. `scrollUntilVisible` on `gemini-card`
-# above is satisfied by the card's top edge, so everything further down is on
-# screen only as long as the page above it is short enough — and Settings grew
-# an Archived section, which put Save and Cancel under the fold while the input
-# they belong to stayed visible. Reach for the control being tapped.
+# Scroll to the BUTTON, not to the row: a page that grows puts Save and Cancel
+# under the fold while the input they belong to stays visible. Reach for the
+# control being tapped.
 - scrollUntilVisible:
     element:
       id: "gemini-key-cancel"
@@ -75,6 +70,26 @@ appId: dev.merope.peace.oss
     id: "gemini-key-state"
     text: "Not set"
 
+- tapOn:
+    id: "nav-back"
+
+# THE MODEL ROW MUST NOT BE HERE YET. Choosing a model before there is a key to
+# call it with is exactly the "setting that does nothing" this app refuses to
+# ship — and it is the sort of thing that only shows up in a screenshot.
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-receipts"
+    direction: DOWN
+- tapOn:
+    id: "settings-ai-receipts"
+- assertVisible:
+    id: "settings-ai-receipts-page"
+- assertNotVisible:
+    id: "receipts-model-state"
+- assertNotVisible:
+    id: "receipts-model-edit"
+- tapOn:
+    id: "nav-back"
 - tapOn:
     id: "nav-back"
 

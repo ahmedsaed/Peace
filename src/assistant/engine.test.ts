@@ -5,7 +5,7 @@ import { appendMessage, latestMessages, messagesBefore, sessionMessages } from '
 import { getRecord } from '../db/repo/transactions';
 import { transactions } from '../db/schema';
 import { ask, CONTEXT_ROWS, decide, reset, run, toContents, type Deps, type ModelMeta, type ToolsMeta } from './engine';
-import type { Content, Part } from './gemini-chat';
+import type { Content, Part } from '../ai/content';
 import { buildLedger, NOW, type Ledger } from './test-ledger';
 
 /**

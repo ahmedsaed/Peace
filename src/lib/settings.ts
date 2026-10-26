@@ -1,3 +1,4 @@
+import type { StoredAbilities } from '../ai/checks';
 import type { DigitOrder, OperatorSide } from './keypad-layout';
 import type { LockAfter } from './app-lock';
 
@@ -53,8 +54,42 @@ export const SETTING_DEFAULTS = {
    * across read exactly like the day you spent them.
    */
   showTotal: true as boolean,
-  /** Which Gemini model the AI features call. Not a secret. */
+  /**
+   * LEGACY: the one Gemini model that read receipts, bank messages and voice
+   * before there were providers. Read only to migrate an older install or
+   * backup into the per-job choices below (`legacyModelChoices`); nothing
+   * calls a model through it any more.
+   */
   geminiModel: 'gemini-flash-latest' as string,
+  /**
+   * Which model does each job, as `provider:model` (`ai/model-ref.ts`).
+   *
+   * EMPTY BY DEFAULT, and empty means "Choose a model", never a fallback: a
+   * model nobody picked could be expensive or bad at the job. A fresh install
+   * writes them empty on purpose; an install from before providers has no rows
+   * and is filled from `geminiModel` / `assistantModel` when settings load, so
+   * an upgrade leaves every feature where it was.
+   *
+   * Not secrets — the keys are in secure storage. They travel in backups, and a
+   * backup restored onto a phone without that provider's key blocks only the
+   * jobs that use it, and says so.
+   */
+  receiptsModel: '' as string,
+  bankModel: '' as string,
+  /** Hears the clip: a model that listens, or a transcription model. */
+  voiceModel: '' as string,
+  /** Reads a TRANSCRIPT into a record's fields — only when `voiceModel` cannot. */
+  voiceReadModel: '' as string,
+  pennyModel: '' as string,
+  /** Reads a file attached to Penny, when her own model cannot see it. */
+  pennyFilesModel: '' as string,
+  /**
+   * What each chosen model can do, keyed `provider:model` (`ai/checks.ts`):
+   * what its provider's listing claimed, and what the checks run on choosing
+   * it found. Decides which features a model can run. Not a secret, and fine
+   * in a backup — a restored phone is spared re-running the checks.
+   */
+  modelAbilities: {} as Record<string, StoredAbilities>,
   /**
    * Whose SMS messages are worth reading — "CIB", "QNB", a short code.
    *
@@ -125,11 +160,8 @@ export const SETTING_DEFAULTS = {
    */
   assistantEnabled: false as boolean,
   /**
-   * Which model the assistant talks to, separate from `geminiModel`.
-   *
-   * Reading a receipt and running a multi-step conversation with tools are
-   * different jobs with different trade-offs — a cheap fast model is right for
-   * the first and may fumble the second — so they are chosen apart.
+   * LEGACY: Penny's Gemini model from before providers, kept for the
+   * migration exactly as `geminiModel` is. `pennyModel` is what she uses.
    */
   assistantModel: 'gemini-flash-latest' as string,
   /**

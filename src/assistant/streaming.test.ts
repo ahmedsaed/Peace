@@ -1,8 +1,10 @@
 /**
  * @jest-environment node
  */
-import { GeminiError, SseParser } from '../lib/gemini';
-import { chatStepStreaming, mergeParts, streamingVisible } from './gemini-chat';
+import { AiError } from '../ai/error';
+import { chatStepStreaming, mergeParts } from '../ai/gemini/chat';
+import { SseParser } from '../ai/sse';
+import { streamingVisible } from './streaming';
 
 describe('SseParser', () => {
   it('returns events only once a blank line closes them, however the bytes were cut', () => {
@@ -147,7 +149,7 @@ describe('chatStepStreaming', () => {
       }),
     })) as unknown as typeof fetch;
     const failure = chatStepStreaming('k', 'm', request, { fetchImpl, idleMs: 20 });
-    await expect(failure).rejects.toBeInstanceOf(GeminiError);
+    await expect(failure).rejects.toBeInstanceOf(AiError);
     await expect(failure).rejects.toMatchObject({ transient: true });
   });
 });

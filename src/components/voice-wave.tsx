@@ -1,7 +1,7 @@
 /**
  * A voice being worked on: five bars rising and falling in a wave.
  *
- * Shown while a clip is with Gemini, in place of a generic spinner — the
+ * Shown while a clip is with the model, in place of a generic spinner — the
  * person has just spoken, and bars that move like speech say "your words are
  * being read" where a ring says only "wait". Native-driven, so a busy JS
  * thread cannot freeze it mid-wave.

@@ -18,10 +18,16 @@ export const metadata: Metadata = pageMeta({
  */
 const CONNECTIONS = [
   {
-    to: 'Google Gemini',
-    host: 'generativelanguage.googleapis.com',
-    what: 'A receipt or invoice you ask to have read — a photo, a PDF or a text file; the text of a bank message from a sender you listed; a question to Penny, with the parts of your ledger it looks up to answer.',
-    when: 'Only after you add your own Gemini API key. Penny has its own switch on top of that.',
+    to: 'Your AI provider — Google Gemini, OpenAI, DeepSeek, Mistral or OpenRouter',
+    host: 'generativelanguage.googleapis.com · api.openai.com · api.deepseek.com · api.mistral.ai · openrouter.ai',
+    what: 'A receipt or invoice you ask to have read — a photo, a PDF or a text file; something you speak into the mic; the text of a bank message from a sender you listed; a question to Penny, with the parts of your ledger it looks up to answer. Each goes to the provider of the model you chose for that feature.',
+    when: 'Only after you add your own API key and choose a model. Penny has its own switch on top of that.',
+  },
+  {
+    to: 'models.dev',
+    host: 'models.dev',
+    what: 'A request for its public table of what AI models can do — nothing about you or your ledger.',
+    when: 'Only when you open the list of OpenAI models.',
   },
   {
     to: 'Your Google Drive',
@@ -92,7 +98,7 @@ export default function YourData() {
           <li>Every record, account, category, tag, budget and recurring payment.</li>
           <li>Receipt photos and invoices you attach.</li>
           <li>
-            Your Gemini API key and backup passphrase, in Android’s encrypted storage — and never inside a
+            Your AI API keys and backup passphrase, in Android’s encrypted storage — and never inside a
             backup, so a backup you share does not carry them.
           </li>
           <li>
@@ -137,7 +143,7 @@ export default function YourData() {
           <li>Before you go, Settings › Backup &amp; export gives you everything as CSV or as a full backup.</li>
         </ul>
         <p>
-          Step by step, including what Google keeps for Gemini: <Link href="/delete/">Deleting your data</Link>.
+          Step by step, including what AI providers keep: <Link href="/delete/">Deleting your data</Link>.
         </p>
 
         <p>

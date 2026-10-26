@@ -18,7 +18,7 @@ import { Pressable, Switch, Text, View } from 'react-native';
 import { ModelRow } from '@/components/model-picker';
 import { PromptEditor } from '@/components/prompt-editor';
 import { useAi } from '@/state/ai';
-import { useGeminiKeyStore } from '@/state/gemini-key';
+import { useAiKeysStore } from '@/state/ai-keys';
 import { useSettingsStore } from '@/state/settings';
 import { useSwitchColors } from '@/state/theme';
 
@@ -27,12 +27,14 @@ export function AssistantCard() {
   // Shown on only when Penny can answer — a key, Use AI and this switch. With
   // no key the switch is off and muted; her own setting is kept for later.
   const ai = useAi();
-  const enabled = ai.penny;
-  const model = useSettingsStore((state) => state.settings.assistantModel);
+  const wanted = useSettingsStore((state) => state.settings.assistantEnabled);
+  const enabled = ai.ready && wanted;
+  const model = useSettingsStore((state) => state.settings.pennyModel);
+  const filesModel = useSettingsStore((state) => state.settings.pennyFilesModel);
   const guidance = useSettingsStore((state) => state.settings.assistantGuidance);
   const update = useSettingsStore((state) => state.update);
   // Re-read on focus: the key is saved on another page of Settings.
-  const refreshKey = useGeminiKeyStore((state) => state.refresh);
+  const refreshKey = useAiKeysStore((state) => state.refresh);
   useFocusEffect(
     useCallback(() => {
       void refreshKey();
@@ -62,18 +64,25 @@ export function AssistantCard() {
 
       <Text className="mt-3 text-xs leading-5 text-muted" testID="assistant-privacy">
         To answer, Penny sends your question and what it reads from your ledger — totals, notes,
-        account, category and tag names — to Google&apos;s Gemini using your key. Your data stays stored on
+        account, category and tag names — to the provider of the model you choose, using your key. Your data stays stored on
         this phone. Turning this on means you accept that.
       </Text>
 
       {enabled ? (
         <View className="mt-4 gap-4 border-t border-line pt-4">
           <ModelRow
-            label="Model"
+            label="Chat"
             value={model}
-            onChange={(id) => update('assistantModel', id)}
+            onChange={(stored) => update('pennyModel', stored)}
             sheetTitle="Penny's model"
             testIDPrefix="assistant-model"
+          />
+          <ModelRow
+            label="Images & documents"
+            value={filesModel}
+            onChange={(stored) => update('pennyFilesModel', stored)}
+            sheetTitle="Model for files you attach"
+            testIDPrefix="assistant-files-model"
           />
           <PromptEditor
             label="Your rules"

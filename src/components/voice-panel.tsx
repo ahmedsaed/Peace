@@ -30,7 +30,7 @@ export function VoicePanel({
   onRetry,
 }: {
   phase: VoicePhase;
-  /** The clip is with Gemini. */
+  /** The clip is with the model. */
   reading: boolean;
   elapsedMs: number;
   level: number | null;

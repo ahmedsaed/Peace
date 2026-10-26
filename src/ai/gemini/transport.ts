@@ -18,18 +18,9 @@
  * copied into every backup. See `secrets.ts`.
  */
 
-import { base64ToText, isTextMime } from './attachment';
-import { buildPrompt, parseReading, ReceiptError, RESPONSE_SCHEMA, type ReadReceipt } from './receipt';
-import {
-  buildTranscribePrompt,
-  buildVoicePrompt,
-  parseTranscript,
-  parseVoiceReading,
-  TRANSCRIBE_SCHEMA,
-  VOICE_SCHEMA,
-  VoiceError,
-  type VoiceReading,
-} from './voice';
+import { AiError } from '../error';
+import type { ModelInfo } from '../providers';
+import { parseEvent, SseParser } from '../sse';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -42,26 +33,6 @@ const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
  * button spinning and they cannot tell whether to wait or to type.
  */
 export const READ_TIMEOUT_MS = 30_000;
-
-/**
- * A failure talking to Gemini.
- *
- * `transient` is the whole reason this is not a plain Error. "The model is busy"
- * and "your key is wrong" both stop a reading, and treating them the same is how
- * a message that would have worked thirty seconds later gets parked forever with
- * an error beside it. One is worth retrying and the other never will be.
- */
-export class GeminiError extends Error {
-  readonly transient: boolean;
-  /** How long Google asked us to wait before trying again, when it said. */
-  readonly retryAfterMs: number | null;
-
-  constructor(message: string, transient = false, retryAfterMs: number | null = null) {
-    super(message);
-    this.transient = transient;
-    this.retryAfterMs = retryAfterMs;
-  }
-}
 
 /**
  * The wait Google asks for, from `error.details[].retryDelay` ("23s", "1.5s").
@@ -91,32 +62,6 @@ export function endpoint(model: string, method: 'generateContent' | 'streamGener
   return method === 'streamGenerateContent' ? `${base}?alt=sse` : base;
 }
 
-export function buildRequest(
-  base64Image: string,
-  mimeType: string,
-  categoryNames: string[],
-  guidance?: string
-): unknown {
-  return {
-    contents: [
-      {
-        parts: [
-          { text: buildPrompt(categoryNames, guidance) },
-          { inline_data: { mime_type: mimeType, data: base64Image } },
-        ],
-      },
-    ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: RESPONSE_SCHEMA,
-      // Reading a receipt has one right answer. Sampling variety is exactly
-      // what is not wanted: the same photo read twice should not produce two
-      // different totals.
-      temperature: 0,
-    },
-  };
-}
-
 /**
  * Dig the payload out of the envelope.
  *
@@ -126,7 +71,7 @@ export function buildRequest(
  */
 export function extractJson(body: unknown): unknown {
   if (typeof body !== 'object' || body === null) {
-    throw new GeminiError('Gemini returned something unexpected.');
+    throw new AiError('Gemini returned something unexpected.');
   }
 
   const envelope = body as Record<string, unknown>;
@@ -134,12 +79,12 @@ export function extractJson(body: unknown): unknown {
   // Safety filters answer 200 with no candidates and a reason at the top level.
   const feedback = envelope.promptFeedback as Record<string, unknown> | undefined;
   if (feedback?.blockReason) {
-    throw new GeminiError(`Gemini refused to read that image (${String(feedback.blockReason)}).`);
+    throw new AiError(`Gemini refused to read that image (${String(feedback.blockReason)}).`);
   }
 
   const candidates = envelope.candidates;
   if (!Array.isArray(candidates) || candidates.length === 0) {
-    throw new GeminiError('Gemini returned no reading for that image.');
+    throw new AiError('Gemini returned no reading for that image.');
   }
 
   const first = candidates[0] as Record<string, unknown>;
@@ -154,18 +99,18 @@ export function extractJson(body: unknown): unknown {
    */
   const finish = first.finishReason;
   if (typeof finish === 'string' && finish !== 'STOP' && finish !== 'FINISH_REASON_UNSPECIFIED') {
-    throw new GeminiError(`Gemini stopped early (${finish}) and the reading is incomplete.`);
+    throw new AiError(`Gemini stopped early (${finish}) and the reading is incomplete.`);
   }
 
   const content = first.content as Record<string, unknown> | undefined;
   const parts = content?.parts;
   if (!Array.isArray(parts) || parts.length === 0) {
-    throw new GeminiError('Gemini returned an empty reading.');
+    throw new AiError('Gemini returned an empty reading.');
   }
 
   const text = (parts[0] as Record<string, unknown>).text;
   if (typeof text !== 'string' || text.trim() === '') {
-    throw new GeminiError('Gemini returned an empty reading.');
+    throw new AiError('Gemini returned an empty reading.');
   }
 
   try {
@@ -174,7 +119,7 @@ export function extractJson(body: unknown): unknown {
     // Should be impossible with a responseSchema, which is exactly why it is
     // worth saying so rather than reporting a generic failure.
     console.warn('[gemini] structured output was not valid JSON', text.slice(0, 200));
-    throw new GeminiError('Gemini returned a reading that could not be read.');
+    throw new AiError('Gemini returned a reading that could not be read.');
   }
 }
 
@@ -265,13 +210,6 @@ export function describeFailure(
   return `Gemini refused the request (${status}).`;
 }
 
-export type GeminiModel = {
-  /** The bare id, with the `models/` prefix stripped — what `endpoint` wants. */
-  id: string;
-  label: string;
-  description: string;
-};
-
 /**
  * Which models a key may actually call.
  *
@@ -283,11 +221,11 @@ export type GeminiModel = {
  * and then cannot read a photo answers with Google's own error, which this
  * module now passes through verbatim.
  */
-export function parseModelList(body: unknown): GeminiModel[] {
+export function parseModelList(body: unknown): ModelInfo[] {
   const models = (body as { models?: unknown } | null)?.models;
   if (!Array.isArray(models)) return [];
 
-  const out: GeminiModel[] = [];
+  const out: ModelInfo[] = [];
   for (const raw of models) {
     const model = (raw ?? {}) as Record<string, unknown>;
     const name = typeof model.name === 'string' ? model.name : '';
@@ -321,9 +259,9 @@ export function parseModelList(body: unknown): GeminiModel[] {
 export async function listModels(
   apiKey: string,
   { timeoutMs = 15_000, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
-): Promise<GeminiModel[]> {
+): Promise<ModelInfo[]> {
   if (apiKey.trim() === '') {
-    throw new GeminiError('No Gemini API key is saved. Add one in Settings › AI.');
+    throw new AiError('No Gemini API key is saved. Add one in Settings › AI.');
   }
 
   const controller = new AbortController();
@@ -337,7 +275,7 @@ export async function listModels(
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      throw new GeminiError(
+      throw new AiError(
         describeFailure(response.status, body),
         isTransientStatus(response.status, body)
       );
@@ -345,13 +283,13 @@ export async function listModels(
 
     const models = parseModelList(await response.json());
     if (models.length === 0) {
-      throw new GeminiError('That key can reach Gemini but has no usable models.');
+      throw new AiError('That key can reach Gemini but has no usable models.');
     }
     return models;
   } catch (error) {
-    if (error instanceof GeminiError) throw error;
+    if (error instanceof AiError) throw error;
     console.warn('[gemini] listing models failed', error);
-    throw new GeminiError('Could not reach Gemini to list its models.');
+    throw new AiError('Could not reach Gemini to list its models.');
   } finally {
     clearTimeout(timer);
   }
@@ -375,12 +313,12 @@ export async function listModels(
  * CHECK that failed rather than the key: saving something unverified is
  * exactly the trap this exists to close.
  */
-export async function checkGeminiKey(
+export async function checkKey(
   apiKey: string,
   { timeoutMs = 15_000, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
 ): Promise<void> {
   const key = apiKey.trim();
-  if (key === '') throw new GeminiError('Paste a key first.');
+  if (key === '') throw new AiError('Paste a key first.');
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -392,7 +330,7 @@ export async function checkGeminiKey(
     });
   } catch (error) {
     console.warn('[gemini] checking the key failed', error);
-    throw new GeminiError(
+    throw new AiError(
       'Could not reach Google to check the key. Check your connection and try again.',
       true
     );
@@ -405,34 +343,16 @@ export async function checkGeminiKey(
   const body = await response.json().catch(() => null);
   console.warn('[gemini] key refused', response.status, reasonOf(body));
   if (reasonOf(body) === 'SERVICE_DISABLED') {
-    throw new GeminiError(
+    throw new AiError(
       'Google knows that key, but the Gemini API is not turned on for its project.'
     );
   }
   if (response.status >= 500) {
-    throw new GeminiError('Google could not check the key just now. Try again in a minute.', true);
+    throw new AiError('Google could not check the key just now. Try again in a minute.', true);
   }
-  throw new GeminiError('Google did not accept that key. Check that you copied all of it.');
+  throw new AiError('Google did not accept that key. Check that you copied all of it.');
 }
 
-export type ReadOptions = {
-  timeoutMs?: number;
-  fetchImpl?: typeof fetch;
-  /** The user's own category names, so the model picks from them. */
-  categoryNames?: string[];
-  /** The editable half of the prompt. Empty falls back to the shipped default. */
-  guidance?: string;
-  /** Decides the decimal places when the receipt names no currency. */
-  fallbackCurrency?: string;
-};
-
-/**
- * Read one receipt.
- *
- * The key goes in the `x-goog-api-key` HEADER rather than the query string.
- * A key in a URL is the one that ends up in a proxy log, a crash report or a
- * console line — and this app writes the URL to the console on failure.
- */
 /**
  * One request, whatever is being asked.
  *
@@ -444,7 +364,7 @@ export type ReadOptions = {
  * the real API to get right.
  *
  * Returns the parsed envelope of a 2xx reply; everything else throws a
- * `GeminiError` carrying a sentence for the screen.
+ * `AiError` carrying a sentence for the screen.
  */
 export async function postGenerate(
   apiKey: string,
@@ -466,7 +386,7 @@ export async function postGenerate(
   }
 ): Promise<unknown> {
   if (apiKey.trim() === '') {
-    throw new GeminiError('No Gemini API key is saved. Add one in Settings › AI.');
+    throw new AiError('No Gemini API key is saved. Add one in Settings › AI.');
   }
 
   const controller = new AbortController();
@@ -490,7 +410,7 @@ export async function postGenerate(
       // throw over the top of the real failure, so a body that will not read
       // simply leaves the status to speak for itself.
       const errorBody = await response.json().catch(() => null);
-      throw new GeminiError(
+      throw new AiError(
         describeFailure(response.status, errorBody, meanwhile),
         isTransientStatus(response.status, errorBody),
         retryDelayOf(errorBody)
@@ -499,9 +419,9 @@ export async function postGenerate(
 
     return await response.json();
   } catch (error) {
-    if (error instanceof GeminiError) throw error;
+    if (error instanceof AiError) throw error;
 
-    if (signal?.aborted) throw new GeminiError('Stopped.', true);
+    if (signal?.aborted) throw new AiError('Stopped.', true);
 
     /**
      * Offline, DNS failure, timeout, malformed JSON — all the same to the USER,
@@ -520,7 +440,7 @@ export async function postGenerate(
      * usually presents.
      */
     console.warn(`[gemini] ${label} failed`, endpoint(model), error);
-    throw new GeminiError(`Could not reach Gemini. ${meanwhile}`, true);
+    throw new AiError(`Could not reach Gemini. ${meanwhile}`, true);
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
@@ -564,7 +484,7 @@ export async function postStream(
   }
 ): Promise<void> {
   if (apiKey.trim() === '') {
-    throw new GeminiError('No Gemini API key is saved. Add one in Settings › AI.');
+    throw new AiError('No Gemini API key is saved. Add one in Settings › AI.');
   }
 
   const controller = new AbortController();
@@ -587,7 +507,7 @@ export async function postStream(
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null);
-      throw new GeminiError(
+      throw new AiError(
         describeFailure(response.status, errorBody, meanwhile),
         isTransientStatus(response.status, errorBody),
         retryDelayOf(errorBody)
@@ -603,72 +523,23 @@ export async function postStream(
       if (done) break;
       arm();
       for (const data of sse.push(decoder.decode(value, { stream: true }))) {
-        onEvent(parseEvent(data));
+        onEvent(parseEvent(data, 'gemini'));
       }
     }
-    for (const data of sse.push(decoder.decode() + '\n\n')) onEvent(parseEvent(data));
+    for (const data of sse.push(decoder.decode() + '\n\n')) onEvent(parseEvent(data, 'gemini'));
   } catch (error) {
-    if (error instanceof GeminiError) throw error;
-    if (signal?.aborted) throw new GeminiError('Stopped.', true);
+    if (error instanceof AiError) throw error;
+    if (signal?.aborted) throw new AiError('Stopped.', true);
     console.warn(`[gemini] ${label} failed`, endpoint(model, 'streamGenerateContent'), error);
-    throw new GeminiError(`Could not reach Gemini. ${meanwhile}`, true);
+    throw new AiError(`Could not reach Gemini. ${meanwhile}`, true);
   } finally {
     if (timer) clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
   }
 }
 
-function parseEvent(data: string): unknown {
-  try {
-    return JSON.parse(data);
-  } catch {
-    // One mangled event must not be mistaken for a network failure — but it
-    // is worth knowing about, so it is logged and handed on as nothing.
-    console.warn('[gemini] a streamed event was not JSON', data.slice(0, 200));
-    return null;
-  }
-}
-
-/**
- * Server-Sent Events, fed in arbitrary pieces.
- *
- * A network read can end anywhere — mid-line, mid-word, between the `\r` and
- * the `\n` — so text is buffered until a blank line closes an event, and only
- * then are its `data:` lines joined and handed back.
- */
-export class SseParser {
-  private buffer = '';
-  /** A `\r` that ended the last piece — it may be half of a `\r\n`. */
-  private held = '';
-
-  push(text: string): string[] {
-    let raw = this.held + text;
-    this.held = '';
-    // Normalising "\r" to "\n" here and its partner "\n" in the next piece
-    // would make one line break into two — a blank line, which ENDS an event
-    // early and splits its JSON in half.
-    if (raw.endsWith('\r')) {
-      this.held = '\r';
-      raw = raw.slice(0, -1);
-    }
-    this.buffer += raw.replace(/\r\n?/g, '\n');
-    const events: string[] = [];
-    let end: number;
-    while ((end = this.buffer.indexOf('\n\n')) >= 0) {
-      const block = this.buffer.slice(0, end);
-      this.buffer = this.buffer.slice(end + 2);
-      const data = block
-        .split('\n')
-        .filter((line) => line.startsWith('data:'))
-        .map((line) => line.slice(5).replace(/^ /, ''));
-      if (data.length > 0) events.push(data.join('\n'));
-    }
-    return events;
-  }
-}
-
 /** A structured-output request: one prompt in, one JSON object out. */
-async function generateJson(
+export async function generateJson(
   apiKey: string,
   model: string,
   parts: unknown[],
@@ -696,152 +567,4 @@ async function generateJson(
     { timeoutMs, fetchImpl, label, meanwhile }
   );
   return extractJson(body);
-}
-
-/**
- * Read a receipt or invoice: a photo, a PDF, or a text file.
- *
- * Photos and PDFs go as inline files, which the model reads directly. TEXT goes
- * as text, fenced, after the instructions: it is the one input every model
- * reads, and a fence is what keeps a line in somebody's e-receipt from being
- * taken as an instruction rather than as the document.
- */
-export async function readReceipt(
-  apiKey: string,
-  model: string,
-  base64: string,
-  mimeType: string,
-  {
-    timeoutMs = READ_TIMEOUT_MS,
-    fetchImpl = fetch,
-    categoryNames = [],
-    fallbackCurrency = 'USD',
-    guidance = '',
-  }: ReadOptions = {}
-): Promise<ReadReceipt> {
-  const raw = await generateJson(
-    apiKey,
-    model,
-    [
-      { text: buildPrompt(categoryNames, guidance.trim() || undefined) },
-      isTextMime(mimeType)
-        ? { text: `The document, as plain text, between the markers:\n<<<\n${base64ToText(base64)}\n>>>` }
-        : { inline_data: { mime_type: mimeType, data: base64 } },
-    ],
-    RESPONSE_SCHEMA,
-    { timeoutMs, fetchImpl, label: 'receipt read' }
-  );
-
-  try {
-    return parseReading(raw, fallbackCurrency);
-  } catch (error) {
-    if (error instanceof ReceiptError) throw new GeminiError(error.message);
-    throw error;
-  }
-}
-
-/**
- * Read a bank message into the fields of a record.
- *
- * Text, not an image, and otherwise the same discipline: structured output, a
- * temperature of zero, and everything that comes back treated as text somebody
- * typed badly. `lib/bank-sms.ts` owns the prompt, the schema and the checking,
- * so this file stays the transport.
- */
-export async function readBankMessage(
-  apiKey: string,
-  model: string,
-  prompt: string,
-  responseSchema: unknown,
-  { timeoutMs = READ_TIMEOUT_MS, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
-): Promise<unknown> {
-  return generateJson(apiKey, model, [{ text: prompt }], responseSchema, {
-    timeoutMs,
-    fetchImpl,
-    label: 'bank message read',
-  });
-}
-
-/** A recorded clip, as the recorder hands it over. */
-export type VoiceClip = { base64: string; mimeType: string };
-
-/**
- * Hear a spoken record and return its fields.
- *
- * The clip goes INLINE, after the instructions, exactly as a receipt photo
- * does — a few seconds of 16kHz mono AAC is tens of kilobytes, far inside the
- * inline limit, and the Files API would be a second request and a file left on
- * Google's side for something heard once.
- */
-export async function readVoice(
-  apiKey: string,
-  model: string,
-  clip: VoiceClip,
-  {
-    today,
-    accountNames,
-    categoryNames,
-    homeCurrency,
-    fallbackCurrency,
-    guidance = '',
-    timeoutMs = READ_TIMEOUT_MS,
-    fetchImpl = fetch,
-  }: {
-    today: Date;
-    accountNames: string[];
-    categoryNames: string[];
-    homeCurrency: string;
-    /** Decides the decimal places when no currency was said: the account's. */
-    fallbackCurrency: string;
-    guidance?: string;
-    timeoutMs?: number;
-    fetchImpl?: typeof fetch;
-  }
-): Promise<VoiceReading> {
-  const raw = await generateJson(
-    apiKey,
-    model,
-    [
-      { text: buildVoicePrompt({ today, accountNames, categoryNames, homeCurrency, guidance }) },
-      { inline_data: { mime_type: clip.mimeType, data: clip.base64 } },
-    ],
-    VOICE_SCHEMA,
-    { timeoutMs, fetchImpl, label: 'voice read' }
-  );
-  try {
-    return parseVoiceReading(raw, fallbackCurrency, today);
-  } catch (error) {
-    if (error instanceof VoiceError) throw new GeminiError(error.message);
-    throw error;
-  }
-}
-
-/**
- * Turn a spoken question into text for Penny's composer.
- *
- * TEXT, NOT THE AUDIO, goes into the conversation. Penny's history is replayed
- * to the model verbatim on every turn, so a clip sent as a message would be
- * sent again with every question after it — and stored, and backed up. As
- * text it costs nothing further, and the person reads and corrects it before
- * anything acts on it.
- */
-export async function transcribe(
-  apiKey: string,
-  model: string,
-  clip: VoiceClip,
-  { timeoutMs = READ_TIMEOUT_MS, fetchImpl = fetch }: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
-): Promise<string> {
-  const raw = await generateJson(
-    apiKey,
-    model,
-    [{ text: buildTranscribePrompt() }, { inline_data: { mime_type: clip.mimeType, data: clip.base64 } }],
-    TRANSCRIBE_SCHEMA,
-    { timeoutMs, fetchImpl, label: 'transcription', meanwhile: 'Type the question instead.' }
-  );
-  try {
-    return parseTranscript(raw);
-  } catch (error) {
-    if (error instanceof VoiceError) throw new GeminiError(error.message);
-    throw error;
-  }
 }

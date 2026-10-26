@@ -1,4 +1,5 @@
-import { readVoice, transcribe } from './gemini';
+import type { Endpoint } from '../ai/providers';
+import { readVoice, transcribe } from '../ai/read';
 import {
   buildTranscribePrompt,
   buildVoicePrompt,
@@ -10,6 +11,8 @@ import {
   parseVoiceReading,
   VoiceError,
 } from './voice';
+
+const gem = (apiKey: string, model: string): Endpoint => ({ provider: 'gemini', apiKey, model });
 
 // A Tuesday. Local time, midday, so no timezone moves it across a day.
 const TODAY = new Date(2026, 9, 20, 12, 0);
@@ -269,7 +272,7 @@ describe('the requests', () => {
 
   it('sends the clip inline after the instructions, and reads the fields back', async () => {
     const fetchImpl = ok(reply({ type: 'expense', amount: 80, note: 'بنزين', category: 'Fuel' }));
-    const reading = await readVoice('key', 'gemini-flash-latest', CLIP, {
+    const reading = await readVoice(gem('key', 'gemini-flash-latest'), CLIP, {
       today: TODAY,
       accountNames: ['Cash'],
       categoryNames: ['Fuel'],
@@ -280,14 +283,14 @@ describe('the requests', () => {
 
     const body = sent(fetchImpl);
     expect(body.contents[0].parts[0].text).toContain('Today is Tuesday');
-    expect(body.contents[0].parts[1]).toEqual({ inline_data: { mime_type: 'audio/m4a', data: 'AAAA' } });
+    expect(body.contents[0].parts[1]).toEqual({ inlineData: { mimeType: 'audio/m4a', data: 'AAAA' } });
     expect(body.generationConfig).toMatchObject({ responseMimeType: 'application/json', temperature: 0 });
     expect(reading).toMatchObject({ type: 'expense', amountMinor: 8_000, note: 'بنزين', category: 'Fuel' });
   });
 
   it('transcribes for Penny with its own prompt and schema', async () => {
     const fetchImpl = ok(reply({ text: 'how much on fuel this month' }));
-    const text = await transcribe('key', 'gemini-flash-latest', CLIP, { fetchImpl });
+    const text = await transcribe(gem('key', 'gemini-flash-latest'), CLIP, { fetchImpl });
 
     const body = sent(fetchImpl);
     expect(body.contents[0].parts[0].text).toContain('Transcribe');
@@ -301,6 +304,6 @@ describe('the requests', () => {
     const fetchImpl = jest.fn(
       async () => ({ ok: false, status: 503, json: async () => ({}) }) as unknown as Response
     );
-    await expect(transcribe('key', 'm', CLIP, { fetchImpl })).rejects.toThrow('Type the question instead.');
+    await expect(transcribe(gem('key', 'm'), CLIP, { fetchImpl })).rejects.toThrow('Type the question instead.');
   });
 });

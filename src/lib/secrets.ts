@@ -1,5 +1,5 @@
 /**
- * The two secrets this app stores.
+ * The secrets this app stores.
  *
  * It used to hold four: a Google client id, a client secret, and the OAuth
  * tokens minted from them. Switching to the native Google Sign-In SDK deleted
@@ -17,8 +17,8 @@
  * automatic backup can seal without prompting; the copy that matters is the one
  * in the user's head, because that is the one that survives the phone.
  *
- * For the Gemini API key it is nearly as bad: a backup is a file that gets
- * shared, mailed to yourself, and uploaded to Drive, and a billable Google
+ * For the AI providers' API keys it is nearly as bad: a backup is a file that
+ * gets shared, mailed to yourself, and uploaded to Drive, and a billable
  * credential riding along inside it is a credential you have published. It is
  * also why the key is never baked into the APK — the user pastes their own into
  * Settings after installing.
@@ -26,8 +26,17 @@
 
 import * as SecureStore from 'expo-secure-store';
 
+import { PROVIDERS, type Endpoint, type ModelRef, type ProviderId } from '../ai/providers';
+
 const PASSPHRASE_KEY = 'peace.drive.passphrase';
-const GEMINI_KEY = 'peace.gemini.apikey';
+
+/**
+ * One secure-store entry per provider. Gemini's name predates the others and is
+ * kept exactly, or every existing install would lose its key on upgrade.
+ */
+function apiKeyName(provider: ProviderId): string {
+  return `peace.${provider}.apikey`;
+}
 
 /**
  * Null means "upload unsealed", which is a legitimate choice.
@@ -60,31 +69,37 @@ export async function sealingEnabled(): Promise<boolean> {
 }
 
 /**
- * The Gemini key, or null when the user has not set one.
+ * A provider's key, or null when the user has not set one.
  *
- * Null is a completely ordinary state — reading receipts is optional, and the
- * record screen works exactly as it always has without it. The caller says so
- * and offers Settings rather than treating it as an error.
+ * Null is a completely ordinary state — AI is optional, and the record screen
+ * works exactly as it always has without it. The caller says so and offers
+ * Settings rather than treating it as an error.
  */
-export async function getGeminiKey(): Promise<string | null> {
+export async function getApiKey(provider: ProviderId): Promise<string | null> {
   try {
-    const stored = await SecureStore.getItemAsync(GEMINI_KEY);
+    const stored = await SecureStore.getItemAsync(apiKeyName(provider));
     // An empty string in the store is the same as no key, and would otherwise
     // reach the API as a request guaranteed to 401.
     return stored === null || stored.trim() === '' ? null : stored;
   } catch (error) {
-    console.warn('[secrets] could not read the Gemini API key', error);
+    console.warn(`[secrets] could not read the ${PROVIDERS[provider].name} API key`, error);
     return null;
   }
 }
 
-export async function setGeminiKey(key: string | null): Promise<void> {
+export async function setApiKey(provider: ProviderId, key: string | null): Promise<void> {
   const trimmed = key?.trim() ?? '';
   if (trimmed === '') {
-    await SecureStore.deleteItemAsync(GEMINI_KEY);
+    await SecureStore.deleteItemAsync(apiKeyName(provider));
     return;
   }
-  await SecureStore.setItemAsync(GEMINI_KEY, trimmed);
+  await SecureStore.setItemAsync(apiKeyName(provider), trimmed);
+}
+
+/** A model choice made callable, or null when its provider has no key. */
+export async function endpointFor(ref: ModelRef): Promise<Endpoint | null> {
+  const apiKey = await getApiKey(ref.provider);
+  return apiKey === null ? null : { ...ref, apiKey };
 }
 
 /**

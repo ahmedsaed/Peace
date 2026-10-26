@@ -134,15 +134,8 @@ export const MAX_TEXT_CHARS = 20_000;
 
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-/**
- * A text attachment's bytes, read back as UTF-8 text.
- *
- * Text goes to the model as TEXT rather than as an inline file: plain text in
- * the prompt is the one input every model reads, and it is cut to
- * `MAX_TEXT_CHARS`. Decoded here, by hand, so it does not depend on which of
- * `atob` and `Buffer` a given JavaScript engine happens to provide.
- */
-export function base64ToText(base64: string, maxChars = MAX_TEXT_CHARS): string {
+/** Base64 to bytes, by hand — whichever of `atob` and `Buffer` the engine has. */
+export function base64ToBytes(base64: string): Uint8Array {
   const clean = base64.replace(/[^A-Za-z0-9+/]/g, '');
   const bytes = new Uint8Array(Math.floor((clean.length * 3) / 4));
   let n = 0;
@@ -154,7 +147,20 @@ export function base64ToText(base64: string, maxChars = MAX_TEXT_CHARS): string 
     if (present > 2) bytes[n++] = (value >> 8) & 255;
     if (present > 3) bytes[n++] = value & 255;
   }
-  const text = new TextDecoder('utf-8').decode(bytes.subarray(0, n)).replace(/^\uFEFF/, '');
+  return bytes.subarray(0, n);
+}
+
+/**
+ * A text attachment's bytes, read back as UTF-8 text.
+ *
+ * Text goes to the model as TEXT rather than as an inline file: plain text in
+ * the prompt is the one input every model reads, and it is cut to
+ * `MAX_TEXT_CHARS`. Decoded here, by hand, so it does not depend on which of
+ * `atob` and `Buffer` a given JavaScript engine happens to provide.
+ */
+export function base64ToText(base64: string, maxChars = MAX_TEXT_CHARS): string {
+  const bytes = base64ToBytes(base64);
+  const text = new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '');
   return text.length > maxChars ? `${text.slice(0, maxChars)}\n[…the rest of the file was left out]` : text;
 }
 
