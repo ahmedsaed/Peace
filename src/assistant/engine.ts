@@ -10,7 +10,7 @@ import {
 import { decimalsFor } from '../lib/money';
 import { attachmentsOf, inlineSet, sessionAttachments, userParts, type ChatAttachment } from './attachments';
 import { citedFigures, FigureBook, type Figure } from './figures';
-import { callsOf, textOf, type Content, type FunctionCall, type Part } from './gemini-chat';
+import { callsOf, textOf, type Content, type FunctionCall, type Part } from '../ai/content';
 import { systemPrompt } from './prompt';
 import {
   applyWrite,

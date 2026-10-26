@@ -96,8 +96,8 @@ export default function MoveToPlay() {
         </p>
         <ul>
           <li>
-            <strong>Gemini API key</strong> — for reading receipts and bank messages, and for Penny. Paste it in{' '}
-            <em>Settings › AI</em>. It is kept in Android’s encrypted storage and is never put in a backup.
+            <strong>AI API keys</strong> — for reading receipts and bank messages, voice, and Penny. Paste each in{' '}
+            <em>Settings › AI › Providers &amp; keys</em>. It is kept in Android’s encrypted storage and is never put in a backup.
           </li>
           <li>
             <strong>Google Drive backups</strong> — connect again in <em>Settings › Backup &amp; export</em>. If your

@@ -20,6 +20,7 @@ import { AppState, Pressable, Switch, Text, TextInput, View } from 'react-native
 import { Icon } from '@/components/icon';
 import { useSwitchColors, useTheme } from '@/state/theme';
 import { isCapturing, isPermitted, setCapturing } from '@/db/bank-inbox';
+import { ModelRow } from '@/components/model-picker';
 import { PromptEditor } from '@/components/prompt-editor';
 import { useAi } from '@/state/ai';
 import { useBankInbox } from '@/state/bank';
@@ -136,7 +137,7 @@ export function BankMessagesCard() {
   // them the switch is off and muted; Android's access and the capture flag
   // are left exactly as they are, so nothing needs redoing once a key exists.
   const ai = useAi();
-  const on = permitted && capturing && ai.bank;
+  const on = permitted && capturing && ai.ready;
   const toggle = (next: boolean) => {
     if (next && !permitted) {
       router.push('/setup?step=bank');
@@ -232,6 +233,17 @@ export function BankMessagesCard() {
               className="justify-center rounded-lg bg-accent px-4 active:opacity-80">
               <Text className="text-sm font-semibold text-accent-ink">Add</Text>
             </Pressable>
+          </View>
+
+          <View className="mt-4">
+            {/* Without one, messages are still captured and wait, counted above. */}
+            <ModelRow
+              label="Read with"
+              value={settings.bankModel}
+              onChange={(stored) => update('bankModel', stored)}
+              sheetTitle="Model for bank messages"
+              testIDPrefix="bank-model"
+            />
           </View>
 
           <View className="mt-4">

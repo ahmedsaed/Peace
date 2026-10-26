@@ -2,7 +2,8 @@ import { create } from 'zustand';
 
 import { getCalendars } from 'expo-localization';
 
-import { getSetting, setSetting } from '@/db/settings';
+import { legacyModelChoices, MODEL_SETTINGS } from '@/ai/model-ref';
+import { getSetting, hasSetting, setSetting } from '@/db/settings';
 import { configurePeriods, type Weekday } from '@/lib/period';
 import { SETTING_DEFAULTS, type SettingKey, type Settings, type WeekStart } from '@/lib/settings';
 
@@ -39,6 +40,20 @@ function applyPeriods(settings: Settings): void {
 }
 
 /**
+ * Fill each AI job with no row from what an install before providers used.
+ *
+ * Here, at load, because load is what runs after BOTH ways an old ledger
+ * arrives: an upgrade, and restoring a backup made before providers. A fresh
+ * install has rows (written empty on first launch) and is left alone.
+ */
+function migrateModelChoices(): void {
+  const missing = MODEL_SETTINGS.filter((key) => !hasSetting(key));
+  if (missing.length === 0) return;
+  const legacy = legacyModelChoices(getSetting('geminiModel'), getSetting('assistantModel'));
+  for (const key of missing) setSetting(key, legacy[key]);
+}
+
+/**
  * Settings, in memory, so a change repaints every screen that depends on it.
  *
  * The database is still the source of truth — this is a write-through cache,
@@ -64,6 +79,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   loaded: false,
 
   load: () => {
+    migrateModelChoices();
     const loadedSettings = {} as Settings;
     for (const key of Object.keys(SETTING_DEFAULTS) as SettingKey[]) {
       // A per-key read rather than one SELECT: `getSetting` already resolves a

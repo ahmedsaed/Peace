@@ -1,9 +1,11 @@
 /**
  * @jest-environment node
  *
- * The assistant against the REAL Gemini API. Skipped unless a key is supplied:
+ * The assistant against a REAL provider. Skipped unless a key is supplied:
  *
  *   PEACE_GEMINI_KEY_FILE=.toolchain/gemini-key npx jest src/assistant/live
+ *   PEACE_AI_PROVIDER=deepseek PEACE_AI_KEY_FILE=.toolchain/deepseek-key \
+ *     PEACE_AI_MODEL=deepseek-flash npx jest src/assistant/live
  *
  * WHY THIS EXISTS. The scripted tests prove the loop; only Google proves the
  * request is shaped the way Google wants — that the declarations validate,
@@ -24,13 +26,19 @@ import { sessionMessages } from '../db/repo/chat';
 import { getRecord } from '../db/repo/transactions';
 import type { ChatAttachment } from './attachments';
 import { ask, decide, run, type Deps, type ModelMeta, type ToolsMeta } from './engine';
-import { callsOf, chatStepStreaming, type Content } from './gemini-chat';
+import { callsOf, type Content } from '../ai/content';
+import { chatStepStreaming } from '../ai';
+import { FLAVORS } from '../ai/openai/flavors';
+import { isProviderId } from '../ai/providers';
 import { buildLedger, NOW, type Ledger } from './test-ledger';
 
-const keyFile = process.env.PEACE_GEMINI_KEY_FILE;
+const provider = isProviderId(process.env.PEACE_AI_PROVIDER) ? process.env.PEACE_AI_PROVIDER : 'gemini';
+const keyFile = process.env.PEACE_AI_KEY_FILE ?? process.env.PEACE_GEMINI_KEY_FILE;
 const key = keyFile && fs.existsSync(keyFile) ? fs.readFileSync(keyFile, 'utf8').trim() : '';
-const model = process.env.PEACE_GEMINI_MODEL ?? 'gemini-flash-latest';
+const model = process.env.PEACE_AI_MODEL ?? process.env.PEACE_GEMINI_MODEL ?? 'gemini-flash-latest';
 const live = key ? describe : describe.skip;
+/** A provider that cannot take a PDF in a message is not asked to read one. */
+const readsPdf = provider === 'gemini' || FLAVORS[provider]?.pdf != null;
 
 jest.setTimeout(240_000);
 
@@ -76,7 +84,7 @@ beforeEach(() => {
     now: () => NOW,
     loadAttachment: async (fileName) => fs.readFileSync(path.join(__dirname, '__fixtures__', fileName)).toString('base64'),
     step: (request) =>
-      chatStepStreaming(key, model, request, { fetchImpl: nodeFetch, onText: (t) => (streamed += t.length > 0 ? 1 : 0) }),
+      chatStepStreaming({ provider, apiKey: key, model }, request, { fetchImpl: nodeFetch, onText: (t) => (streamed += t.length > 0 ? 1 : 0) }),
   };
 });
 
@@ -200,7 +208,7 @@ live(`the assistant on ${model}`, () => {
     expect(ledger.db.query.attachments.findMany().sync().map((a) => a.fileName)).toEqual(['receipt.jpg']);
   });
 
-  it('answers a question about a PDF invoice without logging anything', async () => {
+  (readsPdf ? it : it.skip)('answers a question about a PDF invoice without logging anything', async () => {
     expect(await turn('What is this invoice for, and how much?', [fixture('invoice.pdf', 'application/pdf')])).toBe('done');
     expect(lastReply()).toMatch(/internet/i);
     expect(lastReply()).toMatch(/706\.80/);

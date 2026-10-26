@@ -20,6 +20,11 @@ export function getSetting<K extends SettingKey>(key: K): Settings[K] {
   return decodeSetting(key, row?.value);
 }
 
+/** Whether a row exists at all — a migration's question, never a screen's. */
+export function hasSetting(key: SettingKey): boolean {
+  return db.select({ key: settings.key }).from(settings).where(eq(settings.key, key)).get() !== undefined;
+}
+
 export function setSetting<K extends SettingKey>(key: K, value: Settings[K]): void {
   const encoded = encodeSetting(key, value);
   const updatedAt = new Date();

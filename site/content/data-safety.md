@@ -7,7 +7,8 @@ both in the same PR. The same answers, in the form Play Console imports, are
 Google's definitions decide the wording here, not ours:
 
 - **Collected** = transmitted off the device by the app, *including* to a third party such as
-  Google's Gemini API, even when we never see it.
+  the user's own AI provider (Gemini, OpenAI, DeepSeek, Mistral or OpenRouter), even when we
+  never see it.
 - **Shared** = transferred to a third party — EXCEPT a transfer the user initiates and would
   reasonably expect (Google lists "user-initiated action" as an exemption). Every transfer Peace
   makes is one the user switched on and triggered, so nothing is declared as *shared*.
@@ -25,12 +26,12 @@ Google's definitions decide the wording here, not ours:
 
 | Data type (Play's category) | Collected | Shared | Ephemeral | Required? | Purposes | Why |
 |---|---|---|---|---|---|---|
-| **Financial info › Purchase history** | Yes | No | No | Optional | App functionality | Records and ledger figures go to Gemini when Penny answers; the ledger goes to the user's own Drive in a backup |
+| **Financial info › Purchase history** | Yes | No | No | Optional | App functionality | Records and ledger figures go to the user's AI provider when Penny answers; the ledger goes to the user's own Drive in a backup |
 | **Financial info › Other financial info** | Yes | No | No | Optional | App functionality | Account and category names in AI requests and backups |
-| **Messages › SMS or MMS** | Yes | No | No | Optional | App functionality | Text of bank SMS from senders the user listed, sent to Gemini to be read. Read from the default SMS app's notifications, never the inbox — but the DATA is SMS, and the form asks about the data |
-| **Photos and videos › Photos** | Yes | No | No | Optional | App functionality | Receipt photos sent to Gemini to be read, and included in Drive backups |
-| **Audio › Voice or sound recordings** | Yes | No | No | Optional | App functionality | A record or a question spoken into the mic, sent to Gemini to be heard. Recorded only while the mic is open on screen, deleted from the phone once sent, never backed up |
-| **Files and docs** | Yes | No | No | Optional | App functionality | Files attached to a Penny question; PDF and text receipts sent to Gemini to be read; the backup file itself |
+| **Messages › SMS or MMS** | Yes | No | No | Optional | App functionality | Text of bank SMS from senders the user listed, sent to the user's AI provider to be read. Read from the default SMS app's notifications, never the inbox — but the DATA is SMS, and the form asks about the data |
+| **Photos and videos › Photos** | Yes | No | No | Optional | App functionality | Receipt photos sent to the user's AI provider to be read, and included in Drive backups |
+| **Audio › Voice or sound recordings** | Yes | No | No | Optional | App functionality | A record or a question spoken into the mic, sent to the user's AI provider to be heard. Recorded only while the mic is open on screen, deleted from the phone once sent, never backed up |
+| **Files and docs** | Yes | No | No | Optional | App functionality | Files attached to a Penny question; PDF and text receipts sent to the user's AI provider to be read; the backup file itself |
 | **App activity › Other user-generated content** | Yes | No | No | Optional | App functionality | Notes, questions to Penny |
 
 **Not collected** (answer *No* for each): Location, Personal info (name, email, user IDs —
@@ -38,8 +39,8 @@ Google Sign-In is used only to authorise the Drive folder and the account detail
 anywhere by Peace), Health and fitness, Contacts, Calendar, Music or other audio files, Web browsing, App info and
 performance (no crash or analytics SDK), Device or other IDs.
 
-*Ephemeral* is answered **No** throughout, conservatively: a user on Gemini's free tier is subject
-to Google's retention terms, which we do not control.
+*Ephemeral* is answered **No** throughout, conservatively: each AI provider keeps requests under
+its own retention terms for the user's key, which we do not control.
 
 ## Deletion
 
@@ -48,7 +49,7 @@ asks for a "delete data URL" when the answer is Yes: it is **https://peace.merop
 written to Play's three requirements (names the app and developer, gives the steps, says what is
 deleted or kept). In short: uninstalling or clearing storage deletes everything on
 the phone; Drive backups are removed from Google Drive › Settings › *Manage apps*; requests sent
-to Gemini are governed by the user's own API key and Google's terms.
+to an AI provider are governed by the user's own API key and that provider's terms.
 
 ## Judgement calls to re-check before submitting
 

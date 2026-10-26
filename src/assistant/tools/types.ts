@@ -4,7 +4,7 @@ import type * as schema from '../../db/schema';
 import type { GroupBy, Measure } from '../aggregate';
 import type { ChatAttachment } from '../attachments';
 import type { Figure, FigureBook } from '../figures';
-import type { FunctionDeclaration } from '../gemini-chat';
+import type { FunctionDeclaration } from '../../ai/content';
 
 export type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 

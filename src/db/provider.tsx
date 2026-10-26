@@ -13,6 +13,7 @@ import { forgetHandled } from './repo/bank-captures';
 import { db } from './client';
 import { readLaunchExtras } from '../../modules/launch-extras/src/LaunchExtrasModule';
 import { buildInfo } from '../lib/build-info';
+import { MODEL_SETTINGS } from '../ai/model-ref';
 import { firstRunSettings } from '../lib/first-run';
 import { accounts } from './schema';
 import { seedDefaults } from './seed';
@@ -56,6 +57,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         setSetting('setupCard', first.setupCard);
         setSetting('theme', first.theme);
         setSetting('whatsNewSeen', first.whatsNewSeen);
+        // Every AI job starts unchosen — written, so the migration that fills
+        // an upgrade's jobs from its old Gemini models leaves this one alone.
+        for (const key of MODEL_SETTINGS) setSetting(key, '');
       }
 
       trackSync('launch:seed', () => seedDefaults(db, getSetting('homeCurrency')));

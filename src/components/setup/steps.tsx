@@ -25,13 +25,15 @@ import { adoptCurrency, listAccountsWithBalance, updateAccount } from '@/db/repo
 import { accountBalance, setBalanceToday } from '@/db/repo/adjust';
 import { CURRENCIES, currencyName } from '@/lib/currencies';
 import { detectCurrency } from '@/lib/first-run';
-import { GeminiError } from '@/lib/gemini';
+import { AiError } from '@/ai/error';
+import { PROVIDER_IDS, PROVIDERS, type ProviderId } from '@/ai/providers';
+import { ModelRow } from '@/components/model-picker';
 import { connect } from '@/lib/google-auth';
 import { minorToMajor, parseAmountToMinor } from '@/lib/money';
 import { formatTimeLabel } from '@/lib/period';
 import { onDay } from '@/lib/reminder';
 import { SETUP_STEPS, STEP_LABELS, stepDone, type SetupFacts, type SetupStep } from '@/lib/setup';
-import { useGeminiKeyStore } from '@/state/gemini-key';
+import { anyKey, useAiKeysStore } from '@/state/ai-keys';
 import { useMoney } from '@/state/money';
 import { requestReminderPermission, syncReminders } from '@/state/reminders';
 import { bankAccess } from '@/state/setup';
@@ -563,30 +565,40 @@ export function ReminderStep({ eyebrow, onDone, onSkip }: StepProps) {
 
 // --------------------------------------------------------------------- ai --
 
-const KEY_PAGE = 'https://aistudio.google.com/apikey';
-
+/**
+ * A provider, its key, then a model for each feature.
+ *
+ * No feature is given a model nobody chose — one could be expensive, or bad
+ * at the job — so the step that adds the key also asks, right there, which
+ * model reads receipts, hears voice, reads bank messages and talks as Penny.
+ * Leaving one unchosen is fine; its page says so until somebody picks.
+ */
 export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
   const palette = useTheme();
-  const save = useGeminiKeyStore((s) => s.save);
-  const hasKey = useGeminiKeyStore((s) => s.hasKey);
+  const save = useAiKeysStore((s) => s.save);
+  const keys = useAiKeysStore((s) => s.keys);
+  const settings = useSettingsStore((s) => s.settings);
+  const update = useSettingsStore((s) => s.update);
+  const [provider, setProvider] = useState<ProviderId>('gemini');
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const info = PROVIDERS[provider];
+  const hasKey = anyKey(keys) === true;
+  const thisKey = keys?.[provider] === true;
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await save(draft.trim());
-      onDone();
+      await save(provider, draft.trim());
+      setDraft('');
     } catch (e) {
-      if (e instanceof GeminiError) {
+      if (e instanceof AiError) {
         setError(e.message);
       } else {
-        console.warn('[setup] saving the Gemini key failed', e);
-        setError(
-          'The key could not be saved on this phone. Try again, or add it later in Settings.'
-        );
+        console.warn(`[setup] saving the ${info.name} key failed`, e);
+        setError('The key could not be saved on this phone. Try again, or add it later in Settings.');
       }
     } finally {
       setBusy(false);
@@ -599,7 +611,7 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
       color={COLOR.ai}
       eyebrow={eyebrow}
       title="Let AI do the typing"
-      body="Photograph a receipt or pick an invoice, and the amount fills itself in. Bank alerts become records to approve. Ask Penny where the money went. All of it runs on your own Google Gemini key — free to create, and only Google sees what you send."
+      body="Photograph a receipt or pick an invoice, and the amount fills itself in. Bank alerts become records to approve. Ask Penny where the money went. All of it runs on your own key from an AI provider, and only that provider sees what you send."
       testID="setup-ai"
       actions={
         <>
@@ -619,9 +631,33 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
           <QuietButton onPress={onSkip} testID="setup-ai-skip" />
         </>
       }>
-      {hasKey ? (
+      <View className="mb-3 flex-row flex-wrap gap-2" testID="setup-ai-providers">
+        {PROVIDER_IDS.map((id) => {
+          const chosen = id === provider;
+          return (
+            <Pressable
+              key={id}
+              onPress={() => {
+                setProvider(id);
+                setError(null);
+              }}
+              testID={`setup-ai-provider-${id}`}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: chosen }}
+              className={`flex-row items-center gap-1.5 rounded-full border px-3 py-1.5 active:opacity-70 ${
+                chosen ? 'border-accent bg-accent' : 'border-line'
+              }`}>
+              <Text className={`text-sm ${chosen ? 'font-semibold text-accent-ink' : 'text-ink'}`}>
+                {PROVIDERS[id].name}
+              </Text>
+              {keys?.[id] ? <Icon name="check" size={10} color={chosen ? palette['accent-ink'] : palette.muted} /> : null}
+            </Pressable>
+          );
+        })}
+      </View>
+      {thisKey ? (
         <Note tone="good" testID="setup-ai-present">
-          A key is already saved. Paste a new one to replace it.
+          A {info.name} key is saved. Paste a new one to replace it.
         </Note>
       ) : null}
       <TextInput
@@ -630,7 +666,7 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
           setDraft(next);
           setError(null);
         }}
-        placeholder="Paste your API key"
+        placeholder={`Paste your ${info.name} API key`}
         placeholderTextColor={palette.muted}
         autoCapitalize="none"
         autoCorrect={false}
@@ -640,17 +676,51 @@ export function AiStep({ eyebrow, onDone, onSkip }: StepProps) {
       />
       <FieldError message={error} testID="setup-ai-error" />
       <Pressable
-        onPress={() => void Linking.openURL(KEY_PAGE)}
+        onPress={() => void Linking.openURL(info.keyPage)}
         testID="setup-ai-get-key"
         accessibilityRole="link"
         className="mt-3 flex-row items-center gap-1 self-start py-1 active:opacity-60">
-        <Text className="text-sm text-accent">Get a key from Google AI Studio</Text>
+        <Text className="text-sm text-accent">Get a {info.name} key</Text>
         <Icon name="chevron" size={12} color={palette.accent} />
       </Pressable>
       <Note>
-        Checked with Google before it is saved, then kept in this phone&apos;s secure storage —
+        Checked with {info.name} before it is saved, then kept in this phone&apos;s secure storage —
         never in a backup.
       </Note>
+      {hasKey ? (
+        <View className="mt-4 gap-4 rounded-2xl bg-surface p-4" testID="setup-ai-models">
+          <Text className="text-sm text-muted">Which model does each job? Change any of them later in Settings › AI.</Text>
+          <ModelRow
+            label="Receipts"
+            value={settings.receiptsModel}
+            onChange={(stored) => update('receiptsModel', stored)}
+            sheetTitle="Model for receipts"
+            testIDPrefix="setup-receipts-model"
+          />
+          <ModelRow
+            label="Voice"
+            value={settings.voiceModel}
+            onChange={(stored) => update('voiceModel', stored)}
+            sheetTitle="Model for voice"
+            testIDPrefix="setup-voice-model"
+            listen
+          />
+          <ModelRow
+            label="Bank messages"
+            value={settings.bankModel}
+            onChange={(stored) => update('bankModel', stored)}
+            sheetTitle="Model for bank messages"
+            testIDPrefix="setup-bank-model"
+          />
+          <ModelRow
+            label="Penny"
+            value={settings.pennyModel}
+            onChange={(stored) => update('pennyModel', stored)}
+            sheetTitle="Penny's model"
+            testIDPrefix="setup-penny-model"
+          />
+        </View>
+      ) : null}
     </StepFrame>
   );
 }
@@ -679,7 +749,7 @@ const DISCLOSURE = [
   },
   {
     title: 'Where it goes',
-    body: 'The text of a matching message is sent to Google Gemini, with your own API key, to read the amount and where it was spent. Nothing goes to Merope or anyone else.',
+    body: 'The text of a matching message is sent to the AI provider whose model you choose for bank messages — Gemini, OpenAI, DeepSeek, Mistral or OpenRouter — with your own API key, to read the amount and where it was spent. Nothing goes to Merope or anyone else.',
   },
   {
     title: 'How long',
@@ -691,7 +761,7 @@ export function BankStep({ eyebrow, onDone, onSkip }: StepProps) {
   const palette = useTheme();
   const senders = useSettingsStore((s) => s.settings.bankSenders);
   const update = useSettingsStore((s) => s.update);
-  const hasKey = useGeminiKeyStore((s) => s.hasKey);
+  const hasKey = useAiKeysStore((s) => anyKey(s.keys));
   const [access, setAccess] = useState(bankAccess);
   const [draft, setDraft] = useState('');
 

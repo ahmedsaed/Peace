@@ -2,7 +2,7 @@ import type { StoredRow } from '../db/repo/chat';
 import { attachmentsOf, type ChatAttachment } from './attachments';
 import type { ErrorMeta, ModelMeta, Proposal, ToolsMeta } from './engine';
 import type { Figure } from './figures';
-import { textOf, type Content } from './gemini-chat';
+import { textOf, type Content } from '../ai/content';
 import type { Display } from './tools/types';
 
 /**

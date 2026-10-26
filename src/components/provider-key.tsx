@@ -1,5 +1,5 @@
 /**
- * The Gemini API key, and the model it names.
+ * One provider's API key, as a row in Settings › AI › Providers & keys.
  *
  * WHY THIS IS A SETTING AND NOT A BUILD CONSTANT. A key baked into the APK is a
  * key anybody who installs it can extract and bill to the person who built it.
@@ -12,32 +12,57 @@
  * job (a secret, entered inline, masked once saved) should not have two
  * different shapes in one app.
  *
- * The MODEL is chosen from a list Google returns rather than typed. A typed
- * model name is a 404 waiting to happen, and there is no way to discover the
- * right spelling from inside the app.
+ * KEYS ONLY. Which model does which job is chosen on each feature's own page,
+ * from every provider that has a key here.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
+import { AiError } from '@/ai/error';
+import { MODEL_SETTINGS, parseModelRef, type ModelSetting } from '@/ai/model-ref';
+import { PROVIDERS, type ProviderId } from '@/ai/providers';
 import { Icon } from '@/components/icon';
-import { ModelRow } from '@/components/model-picker';
-import { useTheme } from '@/state/theme';
-import { GeminiError } from '@/lib/gemini';
-import { getGeminiKey, maskKey } from '@/lib/secrets';
-import { useGeminiKeyStore } from '@/state/gemini-key';
+import { getApiKey, maskKey } from '@/lib/secrets';
+import { useAiKeysStore } from '@/state/ai-keys';
 import { runBankCatchUp } from '@/state/bank';
 import { useSettingsStore } from '@/state/settings';
+import { useTheme } from '@/state/theme';
 
-/**
- * The key and the model, as rows inside Settings' AI section.
- */
-export function GeminiKeyRows() {
+/** What each job is called, for "Penny and Bank messages use DeepSeek". */
+const JOB_NAMES: Record<ModelSetting, string> = {
+  receiptsModel: 'Receipts',
+  bankModel: 'Bank messages',
+  voiceModel: 'Voice',
+  voiceReadModel: 'Voice',
+  pennyModel: 'Penny',
+  pennyFilesModel: 'Penny',
+};
+
+/** Where each provider's key comes from, in the words its console uses. */
+const KEY_SOURCE: Record<ProviderId, string> = {
+  gemini: 'Google AI Studio',
+  openai: 'the OpenAI platform',
+  deepseek: 'the DeepSeek platform',
+  mistral: 'Mistral’s console',
+  openrouter: 'OpenRouter',
+};
+
+export function ProviderKeyRow({
+  provider,
+  last,
+  testID,
+}: {
+  provider: ProviderId;
+  last?: boolean;
+  /** `gemini-key`: the row's parts are `-edit`, `-input`, `-save` and so on. */
+  testID: string;
+}) {
   const palette = useTheme();
+  const info = PROVIDERS[provider];
   const settings = useSettingsStore((state) => state.settings);
-  const update = useSettingsStore((state) => state.update);
 
-  const saveKey = useGeminiKeyStore((state) => state.save);
+  const saveKey = useAiKeysStore((state) => state.save);
   const [saved, setSaved] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -49,7 +74,7 @@ export function GeminiKeyRows() {
   // before the answer arrives, which would read as the key having been lost.
   useEffect(() => {
     let alive = true;
-    void getGeminiKey().then((key) => {
+    void getApiKey(provider).then((key) => {
       if (!alive) return;
       setSaved(key);
       setLoaded(true);
@@ -57,15 +82,15 @@ export function GeminiKeyRows() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [provider]);
 
-  const onSave = useCallback(async () => {
+  const save = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
-      // Through the store, so Penny's card below learns of it on this screen.
-      await saveKey(draft);
-      setSaved(await getGeminiKey());
+      // Through the store, so every feature page learns of it on this screen.
+      await saveKey(provider, draft);
+      setSaved(await getApiKey(provider));
       setEditing(false);
       setDraft('');
 
@@ -79,56 +104,75 @@ export function GeminiKeyRows() {
       void runBankCatchUp({
         senders: settings.bankSenders,
         homeCurrency: settings.homeCurrency,
-        geminiModel: settings.geminiModel,
+        bankModel: settings.bankModel,
         guidance: settings.bankGuidance,
         aiEnabled: settings.aiEnabled,
       });
     } catch (e) {
-      // A refused key arrives as a GeminiError already worded for this
-      // screen. Anything else is the keystore refusing, on a device with a
-      // broken keychain: friendly sentence here, real error in the log.
-      if (e instanceof GeminiError) {
+      // A refused key arrives as an AiError already worded for this screen.
+      // Anything else is the keystore refusing, on a device with a broken
+      // keychain: friendly sentence here, real error in the log.
+      if (e instanceof AiError) {
         setError(e.message);
       } else {
-        console.warn('[settings] could not save the Gemini key', e);
+        console.warn(`[settings] could not save the ${info.name} key`, e);
         setError('Could not save that key on this device.');
       }
     } finally {
       setBusy(false);
     }
-  }, [
-    draft,
-    saveKey,
-    settings.bankSenders,
-    settings.homeCurrency,
-    settings.geminiModel,
-    settings.bankGuidance,
-    settings.aiEnabled,
-  ]);
+  }, [draft, info.name, provider, saveKey, settings]);
+
+  /**
+   * Removing a key that features still use says which, before it happens —
+   * they stop working the moment it is gone, and "why did Penny stop?" a week
+   * later has no answer on Penny's page.
+   */
+  const onSave = useCallback(() => {
+    if (draft.trim() !== '' || saved === null) {
+      void save();
+      return;
+    }
+    const using = [
+      ...new Set(
+        MODEL_SETTINGS.filter((key) => parseModelRef(settings[key])?.provider === provider).map(
+          (key) => JOB_NAMES[key]
+        )
+      ),
+    ];
+    if (using.length === 0) {
+      void save();
+      return;
+    }
+    const list = using.length === 1 ? using[0] : `${using.slice(0, -1).join(', ')} and ${using.at(-1)}`;
+    Alert.alert(
+      `Remove the ${info.name} key?`,
+      `${list} ${using.length === 1 ? 'uses' : 'use'} ${info.name}, and will stop working until you choose another model or add a key again.`,
+      [
+        { text: 'Keep it', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => void save() },
+      ]
+    );
+  }, [draft, info.name, provider, save, saved, settings]);
 
   return (
     <>
       {/* The key, as a row. Tapping it opens the editor right here rather than
-          on a page of its own — it is two fields and a button, and the switch
-          it serves is directly above it. */}
+          on a page of its own — it is two fields and a button. */}
       <Pressable
         onPress={() => setEditing(true)}
         disabled={!loaded || editing}
-        testID="gemini-key-edit"
+        testID={`${testID}-edit`}
         accessibilityRole="button"
-        accessibilityLabel={saved ? 'Change the Gemini key' : 'Add a Gemini key'}
+        accessibilityLabel={saved ? `Change the ${info.name} key` : `Add a ${info.name} key`}
         className={`flex-row items-center gap-3 px-4 py-3.5 active:bg-raised ${
-          editing ? '' : 'border-b border-line'
+          editing || last ? '' : 'border-b border-line'
         }`}>
         <View className="flex-1">
-          <Text className="text-[15px] text-ink">Gemini key</Text>
-          <Text className="text-xs leading-4 text-muted">
-            Your own, from Google AI Studio. Kept on this phone, never in a backup.
-          </Text>
+          <Text className="text-[15px] text-ink">{info.name}</Text>
+          <Text className="text-xs leading-4 text-muted">From {KEY_SOURCE[provider]}.</Text>
         </View>
-        <Text
-          className={`text-sm ${saved ? 'text-ink' : 'text-accent'}`}
-          testID="gemini-key-state">
+        <Text className={`text-sm ${saved ? 'text-ink' : 'text-accent'}`} testID={`${testID}-state`}>
           {/* Nothing at all until the keystore has answered — "Not set" shown
               while loading reads as the key having been lost. */}
           {loaded ? maskKey(saved) : ' '}
@@ -137,7 +181,7 @@ export function GeminiKeyRows() {
       </Pressable>
 
       {editing ? (
-        <View className="border-b border-line px-4 pb-4">
+        <View className={`px-4 pb-4 ${last ? '' : 'border-b border-line'}`}>
           <TextInput
             value={draft}
             onChangeText={(next) => {
@@ -152,19 +196,19 @@ export function GeminiKeyRows() {
             className={`mb-2 rounded-lg border px-3 py-2.5 text-ink ${
               error ? 'border-expense' : 'border-line'
             }`}
-            testID="gemini-key-input"
+            testID={`${testID}-input`}
           />
           {/* Directly under the field it is about. At the foot of the card it
               sat below the fold with the keyboard up, and a Save that seemed
               to do nothing was all anyone saw. */}
           {error ? (
-            <Text className="mb-2 text-sm leading-5 text-expense" testID="gemini-key-error">
+            <Text className="mb-2 text-sm leading-5 text-expense" testID={`${testID}-error`}>
               {error}
             </Text>
           ) : (
             <Text className="mb-3 text-xs leading-5 text-muted">
-              Checked with Google before it is saved. Make one at aistudio.google.com — reading a
-              receipt is one request, and the free tier covers ordinary use.
+              Checked with {info.name} before it is saved. Make one at{' '}
+              {info.keyPage.replace(/^https:\/\//, '')}.
             </Text>
           )}
           <View className="flex-row gap-2">
@@ -173,7 +217,7 @@ export function GeminiKeyRows() {
               onPress={onSave}
               disabled={busy}
               primary
-              testID="gemini-key-save"
+              testID={`${testID}-save`}
             />
             <SmallButton
               label="Cancel"
@@ -183,31 +227,9 @@ export function GeminiKeyRows() {
                 setError(null);
               }}
               disabled={busy}
-              testID="gemini-key-cancel"
+              testID={`${testID}-cancel`}
             />
           </View>
-        </View>
-      ) : null}
-
-      {/**
-       * The model row appears ONLY once a key exists.
-       *
-       * Same rule as the rest of Settings: a control for something that cannot
-       * run is a control that silently does nothing. Choosing a model before
-       * there is a key to call it with is exactly that.
-       */}
-      {saved ? (
-        <View className="border-b border-line px-4 py-3.5">
-          {/* Selecting writes straight through to the settings store, which is
-              a write-through cache over SQLite — so the record screen picks up
-              the new model without this component telling it anything. */}
-          <ModelRow
-            label="Model"
-            value={settings.geminiModel}
-            onChange={(id) => update('geminiModel', id)}
-            sheetTitle="Gemini model"
-            testIDPrefix="gemini-model"
-          />
         </View>
       ) : null}
     </>

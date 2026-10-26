@@ -3,7 +3,7 @@
  *
  * Composition only — every decision lives elsewhere and is tested there:
  * the native module captures, `lib/bank-sms.ts` filters and validates,
- * `lib/gemini.ts` talks to the model, `repo/bank-captures.ts` stores. This file
+ * `ai/read.ts` talks to the model, `repo/bank-captures.ts` stores. This file
  * owns the ORDER, which is where the losing-a-message mistakes live.
  *
  * NOTHING HERE IS LOAD-BEARING. Every failure ends with the ledger untouched
@@ -25,8 +25,10 @@ import {
 import { matchCategory } from '../lib/receipt';
 import { listAccountsWithBalance } from './repo/accounts';
 import { listCategoriesFlat } from './repo/categories';
-import { GeminiError, readBankMessage } from '../lib/gemini';
-import { getGeminiKey } from '../lib/secrets';
+import { AiError } from '../ai/error';
+import type { Endpoint, ModelRef } from '../ai/providers';
+import { readBankMessage } from '../ai/read';
+import { endpointFor } from '../lib/secrets';
 import { db } from './client';
 import {
   markParsed,
@@ -112,7 +114,7 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 export async function readPending(
   fallbackCurrency: string,
-  model: string,
+  model: ModelRef,
   guidance = '',
   /**
    * Called after EACH message is settled, not once at the end.
@@ -127,8 +129,8 @@ export async function readPending(
   const waiting = pendingCaptures(db);
   if (waiting.length === 0) return { read: 0, failed: 0, deferred: 0 };
 
-  const key = await getGeminiKey();
-  if (key === null) {
+  const endpoint = await endpointFor(model);
+  if (endpoint === null) {
     // Not an error and not marked as one: the messages stay pending, and the
     // moment a key is added they are read. Marking them unreadable here would
     // bury a queue of perfectly good messages behind a setting.
@@ -159,8 +161,7 @@ export async function readPending(
 
   for (const capture of waiting) {
     const outcome = await readOne(
-      key,
-      model,
+      endpoint,
       capture.body,
       fallbackCurrency,
       accountNames,
@@ -229,8 +230,7 @@ type ReadOne =
  * a spinner who can tap again, and this one has nobody watching at all.
  */
 async function readOne(
-  key: string,
-  model: string,
+  endpoint: Endpoint,
   body: string,
   fallbackCurrency: string,
   accountNames: string[],
@@ -240,18 +240,17 @@ async function readOne(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const raw = await readBankMessage(
-        key,
-        model,
+        endpoint,
         buildBankPrompt(body, accountNames, guidance, categoryNames),
         BANK_RESPONSE_SCHEMA
       );
       return { kind: 'read', fields: parseBankReading(raw, fallbackCurrency) };
     } catch (error) {
-      const transient = error instanceof GeminiError && error.transient;
+      const transient = error instanceof AiError && error.transient;
       const message =
-        error instanceof GeminiError ? error.message : 'That message could not be read.';
+        error instanceof AiError ? error.message : 'That message could not be read.';
 
-      if (!(error instanceof GeminiError)) {
+      if (!(error instanceof AiError)) {
         console.warn('[bank] reading a message failed', error);
       }
 

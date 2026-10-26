@@ -5,7 +5,7 @@
  *
  * Every piece is tested where it is defined — the filtering and validation in
  * `lib/bank-sms.ts`, the storage in `repo/bank-captures.ts`, the transport in
- * `lib/gemini.ts`. What this guards is the sequence, and specifically the rule
+ * `ai/read.ts`. What this guards is the sequence, and specifically the rule
  * that a BUSY MODEL MUST NOT BURN THE MESSAGE.
  */
 
@@ -20,7 +20,9 @@ jest.mock('../../modules/notification-listener/src/NotificationListenerModule', 
     drain: jest.fn(() => '[]'),
   },
 }));
-jest.mock('../lib/secrets', () => ({ getGeminiKey: jest.fn(async () => 'a-key') }));
+jest.mock('../lib/secrets', () => ({
+  endpointFor: jest.fn(async (ref: { provider: string; model: string }) => ({ ...ref, apiKey: 'a-key' })),
+}));
 /**
  * The real client opens expo-sqlite, which does not exist in Node. A GETTER
  * rather than a value: the module under test imports `db` once at load, and each
@@ -33,15 +35,13 @@ jest.mock('./client', () => ({
   sqliteDb: {},
   DATABASE_NAME: 'peace.db',
 }));
-jest.mock('../lib/gemini', () => {
-  const actual = jest.requireActual('../lib/gemini');
-  return { ...actual, readBankMessage: jest.fn() };
-});
+jest.mock('../ai/read', () => ({ readBankMessage: jest.fn() }));
 
 /* eslint-disable import/first */
 import NotificationListener from '../../modules/notification-listener/src/NotificationListenerModule';
-import { GeminiError, readBankMessage } from '../lib/gemini';
-import { getGeminiKey } from '../lib/secrets';
+import { AiError } from '../ai/error';
+import { readBankMessage } from '../ai/read';
+import { endpointFor } from '../lib/secrets';
 import { createTestDb } from '../test/db';
 import { drainCaptures, readPending } from './bank-inbox';
 import { pendingCaptures, recordCaptures } from './repo/bank-captures';
@@ -52,7 +52,7 @@ const mocked = {
   drain: NotificationListener.drain as jest.Mock,
   isEnabled: NotificationListener.isEnabled as jest.Mock,
   readBankMessage: readBankMessage as jest.Mock,
-  getGeminiKey: getGeminiKey as jest.Mock,
+  endpointFor: endpointFor as jest.Mock,
 };
 
 /** The module holds one `db`; point it at a fresh in-memory one per test. */
@@ -61,7 +61,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   db = createTestDb().db;
   (globalThis as unknown as { __testDb: unknown }).__testDb = db;
-  mocked.getGeminiKey.mockResolvedValue('a-key');
+  mocked.endpointFor.mockImplementation(async (ref: object) => ({ ...ref, apiKey: 'a-key' }));
   mocked.isEnabled.mockReturnValue(true);
 });
 
@@ -142,7 +142,7 @@ describe('reading what is waiting', () => {
     queue('Purchase of EGP 450 at CARREFOUR');
     mocked.readBankMessage.mockResolvedValue(GOOD);
 
-    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' })).toEqual({
       read: 1,
       failed: 0,
       deferred: 0,
@@ -166,10 +166,10 @@ describe('reading what is waiting', () => {
   it('leaves a message pending when the model is merely busy', async () => {
     queue('Purchase of EGP 450');
     mocked.readBankMessage.mockRejectedValue(
-      new GeminiError('Gemini is unavailable right now.', true)
+      new AiError('Gemini is unavailable right now.', true)
     );
 
-    const outcome = await read('EGP', 'gemini-flash-latest');
+    const outcome = await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' });
 
     expect(outcome).toEqual({ read: 0, failed: 0, deferred: 1 });
     // Still pending, so the next launch, foreground or capture reads it.
@@ -180,10 +180,10 @@ describe('reading what is waiting', () => {
   it('retries once, and keeps the reading when the second attempt lands', async () => {
     queue('Purchase of EGP 450');
     mocked.readBankMessage
-      .mockRejectedValueOnce(new GeminiError('Gemini is unavailable right now.', true))
+      .mockRejectedValueOnce(new AiError('Gemini is unavailable right now.', true))
       .mockResolvedValueOnce(GOOD);
 
-    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' })).toEqual({
       read: 1,
       failed: 0,
       deferred: 0,
@@ -198,10 +198,10 @@ describe('reading what is waiting', () => {
   it('does not retry a failure a retry cannot fix', async () => {
     queue('Purchase of EGP 450');
     mocked.readBankMessage.mockRejectedValue(
-      new GeminiError('That Gemini API key was refused.', false)
+      new AiError('That Gemini API key was refused.', false)
     );
 
-    const outcome = await read('EGP', 'gemini-flash-latest');
+    const outcome = await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' });
 
     expect(outcome).toEqual({ read: 0, failed: 1, deferred: 0 });
     expect(mocked.readBankMessage).toHaveBeenCalledTimes(1);
@@ -217,10 +217,10 @@ describe('reading what is waiting', () => {
   it('carries on past a message it cannot read', async () => {
     queue('first', 'second');
     mocked.readBankMessage
-      .mockRejectedValueOnce(new GeminiError('That Gemini API key was refused.', false))
+      .mockRejectedValueOnce(new AiError('That Gemini API key was refused.', false))
       .mockResolvedValueOnce(GOOD);
 
-    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' })).toEqual({
       read: 1,
       failed: 1,
       deferred: 0,
@@ -234,9 +234,9 @@ describe('reading what is waiting', () => {
    */
   it('does nothing at all without a key, and marks nothing', async () => {
     queue('Purchase of EGP 450');
-    mocked.getGeminiKey.mockResolvedValue(null);
+    mocked.endpointFor.mockResolvedValue(null);
 
-    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' })).toEqual({
       read: 0,
       failed: 0,
       deferred: 0,
@@ -246,12 +246,12 @@ describe('reading what is waiting', () => {
   });
 
   it('asks for nothing when the queue is empty', async () => {
-    expect(await read('EGP', 'gemini-flash-latest')).toEqual({
+    expect(await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' })).toEqual({
       read: 0,
       failed: 0,
       deferred: 0,
     });
-    expect(mocked.getGeminiKey).not.toHaveBeenCalled();
+    expect(mocked.endpointFor).not.toHaveBeenCalled();
   });
 
   /**
@@ -268,7 +268,7 @@ describe('reading what is waiting', () => {
     mocked.readBankMessage.mockResolvedValue(GOOD);
 
     const seen: number[] = [];
-    await read('EGP', 'gemini-flash-latest', '', () => seen.push(1));
+    await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' }, '', () => seen.push(1));
 
     expect(seen).toHaveLength(3);
   });
@@ -277,11 +277,11 @@ describe('reading what is waiting', () => {
   it('reports a failure as progress as well', async () => {
     queue('first');
     mocked.readBankMessage.mockRejectedValue(
-      new GeminiError('That Gemini API key was refused.', false)
+      new AiError('That Gemini API key was refused.', false)
     );
 
     let calls = 0;
-    await read('EGP', 'gemini-flash-latest', '', () => {
+    await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' }, '', () => {
       calls += 1;
     });
 
@@ -295,10 +295,10 @@ describe('reading what is waiting', () => {
    */
   it('says nothing when a message is merely deferred', async () => {
     queue('first');
-    mocked.readBankMessage.mockRejectedValue(new GeminiError('Gemini is busy.', true));
+    mocked.readBankMessage.mockRejectedValue(new AiError('Gemini is busy.', true));
 
     let calls = 0;
-    await read('EGP', 'gemini-flash-latest', '', () => {
+    await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' }, '', () => {
       calls += 1;
     });
 
@@ -309,9 +309,9 @@ describe('reading what is waiting', () => {
     queue('oldest', 'newest');
     mocked.readBankMessage.mockResolvedValue(GOOD);
 
-    await read('EGP', 'gemini-flash-latest');
+    await read('EGP', { provider: 'gemini', model: 'gemini-flash-latest' });
 
-    const prompts = mocked.readBankMessage.mock.calls.map((call) => call[2] as string);
+    const prompts = mocked.readBankMessage.mock.calls.map((call) => call[1] as string);
     expect(prompts[0]).toContain('oldest');
     expect(prompts[1]).toContain('newest');
   });

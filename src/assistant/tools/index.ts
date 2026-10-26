@@ -3,7 +3,7 @@ import { RecurringError } from '../../db/repo/recurring';
 import { restoreRecords } from '../../db/repo/transactions';
 import { attachments, transactionTags } from '../../db/schema';
 import { ToolInputError } from '../dates';
-import type { FunctionCall, FunctionDeclaration } from '../gemini-chat';
+import type { FunctionCall, FunctionDeclaration } from '../../ai/content';
 import { READ_TOOLS } from './read';
 import type { Db, Display, Preview, Tool, ToolContext, Undo } from './types';
 import { WRITE_TOOLS } from './write';

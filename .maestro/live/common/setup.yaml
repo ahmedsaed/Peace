@@ -22,8 +22,10 @@ appId: dev.merope.peace.oss
     id: "drawer-settings"
 - scrollUntilVisible:
     element:
-      id: "gemini-key-edit"
+      id: "settings-ai-providers"
     direction: DOWN
+- tapOn:
+    id: "settings-ai-providers"
 - tapOn:
     id: "gemini-key-edit"
 - tapOn:
@@ -43,6 +45,41 @@ appId: dev.merope.peace.oss
     notVisible:
       id: "gemini-key-input"
     timeout: 20000
+- tapOn:
+    id: "nav-back"
+# A fresh install has chosen no model for anything: receipts and voice first.
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-receipts"
+    direction: DOWN
+- tapOn:
+    id: "settings-ai-receipts"
+- tapOn:
+    id: "receipts-model-edit"
+- extendedWaitUntil:
+    visible:
+      id: "picker-option-gemini:gemini-flash-latest"
+    timeout: 20000
+- tapOn:
+    id: "picker-option-gemini:gemini-flash-latest"
+- tapOn:
+    id: "nav-back"
+- scrollUntilVisible:
+    element:
+      id: "settings-ai-voice"
+    direction: DOWN
+- tapOn:
+    id: "settings-ai-voice"
+- tapOn:
+    id: "voice-model-edit"
+- extendedWaitUntil:
+    visible:
+      id: "picker-option-gemini:gemini-flash-latest"
+    timeout: 20000
+- tapOn:
+    id: "picker-option-gemini:gemini-flash-latest"
+- tapOn:
+    id: "nav-back"
 # Penny has a page of her own under AI.
 - scrollUntilVisible:
     element:
@@ -52,6 +89,15 @@ appId: dev.merope.peace.oss
     id: "settings-ai-penny"
 - tapOn:
     id: "assistant-enabled"
+# A fresh install has chosen no model for anything — pick Penny's.
+- tapOn:
+    id: "assistant-model-edit"
+- extendedWaitUntil:
+    visible:
+      id: "picker-option-gemini:gemini-flash-latest"
+    timeout: 20000
+- tapOn:
+    id: "picker-option-gemini:gemini-flash-latest"
 - scrollUntilVisible:
     element:
       id: "assistant-open"

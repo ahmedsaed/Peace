@@ -1,6 +1,6 @@
 import type { StoredRow } from '../db/repo/chat';
 import { base64ToText, isTextMime } from '../lib/attachment';
-import type { Part } from './gemini-chat';
+import type { Part } from '../ai/content';
 
 /**
  * Files the user hands the assistant — a receipt photo, a PDF invoice.
@@ -28,6 +28,12 @@ export type ChatAttachment = {
   sha256: string;
   width: number | null;
   height: number | null;
+  /**
+   * What Penny's files model wrote out of it, when that is a different model
+   * from the one she talks through. Read ONCE, when the message is sent, and
+   * sent as text from then on — so the file never needs to travel again.
+   */
+  reading?: string;
 };
 
 /** How many files a request carries inline. Older ones are described, not sent. */
@@ -73,7 +79,13 @@ export function userParts(
   const parts: Part[] = [];
   for (const a of attachments) {
     const data = loaded.get(a.fileName);
-    if (data) {
+    if (a.reading !== undefined) {
+      // Read for her by another model: always in view, because it is text.
+      parts.push({
+        text: `[Attached file id "${a.id}": ${label(a)} — you cannot see it; another model read it, and this is what it says:]`,
+      });
+      parts.push({ text: `<<<\n${a.reading}\n>>>` });
+    } else if (data) {
       parts.push({ text: `[Attached file id "${a.id}": ${label(a)}]` });
       // Text as text — the input every model reads — fenced so its contents
       // stay the user's document rather than instructions. See readReceipt.

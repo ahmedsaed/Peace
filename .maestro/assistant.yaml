@@ -39,8 +39,8 @@ appId: dev.merope.peace.oss
     id: "setting-ai-enabled"
     enabled: false
 - assertVisible:
-    id: "gemini-key-state"
-    text: "Not set"
+    id: "settings-ai-providers-summary"
+    text: "No keys yet"
 - assertVisible:
     id: "settings-ai-receipts-summary"
     text: "Needs a key"
@@ -114,8 +114,10 @@ appId: dev.merope.peace.oss
 # editor says so, nothing is stored, and everything stays muted.
 - scrollUntilVisible:
     element:
-      id: "gemini-key-edit"
+      id: "settings-ai-providers"
     direction: UP
+- tapOn:
+    id: "settings-ai-providers"
 - tapOn:
     id: "gemini-key-edit"
 - tapOn:
@@ -138,6 +140,8 @@ appId: dev.merope.peace.oss
 - takeScreenshot: 03-key-refused
 - tapOn:
     id: "gemini-key-cancel"
+- tapOn:
+    id: "nav-back"
 - assertVisible:
     id: "setting-ai-enabled"
     enabled: false

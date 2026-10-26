@@ -177,7 +177,7 @@ export default function Home() {
               <li>Read a receipt or invoice into the form — a photo, a PDF or a text file: the shop, total and basket.</li>
               <li>What you typed in the note stays; the reading goes underneath it.</li>
               <li>The file stays attached to the record, and travels in your backups.</li>
-              <li>Off until you add your own Gemini API key.</li>
+              <li>Off until you add your own AI API key.</li>
             </ul>
           </Feature>
 
@@ -193,7 +193,7 @@ export default function Home() {
               <li>The amount, account, category and date are filled in for you to check; what you said goes in the note.</li>
               <li>Ask Penny out loud too: your words land in her box, to fix before you send.</li>
               <li>The mic is open only while you see it, and the recording is never kept.</li>
-              <li>Off until you add your own Gemini API key.</li>
+              <li>Off until you add your own AI API key.</li>
             </ul>
           </Feature>
 
@@ -213,7 +213,7 @@ export default function Home() {
                 Only messages from the bank senders you name are kept — the list starts empty — and each is deleted
                 once you have dealt with it.
               </li>
-              <li>Off until you allow it and add your own Gemini API key.</li>
+              <li>Off until you allow it and add your own AI API key.</li>
             </ul>
           </Feature>
 
@@ -334,7 +334,7 @@ export default function Home() {
             </div>
             <div className="card">
               <h3>Your AI key, your requests</h3>
-              <p>Receipts, bank messages and Penny use your own Gemini key, straight to Google. We never see them.</p>
+              <p>Receipts, bank messages and Penny use your own key — Gemini, OpenAI, DeepSeek, Mistral or OpenRouter — straight to that provider. We never see them.</p>
             </div>
             <div className="card">
               <h3>Bank alerts, not your inbox</h3>

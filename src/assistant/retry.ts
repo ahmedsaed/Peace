@@ -1,11 +1,11 @@
-import { GeminiError } from '../lib/gemini';
+import { AiError } from '../ai/error';
 
 /**
  * Trying a model step again when the failure was the kind that passes.
  *
  * Rate limits (429, RESOURCE_EXHAUSTED), a busy model (503 "high demand",
  * which `flash-latest` answers often enough to be the common case), a dropped
- * connection, a fumbled tool call — `GeminiError.transient` already marks
+ * connection, a fumbled tool call — `AiError.transient` already marks
  * exactly these, and every one of them is likely to work a few seconds later.
  * A bad key, a disabled API or a refused prompt never will, and retrying those
  * only spends requests on the same answer.
@@ -28,14 +28,14 @@ export type RetryNotice = { attempt: number; waitMs: number; message: string };
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(new GeminiError('Stopped.', true));
+    if (signal?.aborted) return reject(new AiError('Stopped.', true));
     const timer = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort);
       resolve();
     }, ms);
     const onAbort = () => {
       clearTimeout(timer);
-      reject(new GeminiError('Stopped.', true));
+      reject(new AiError('Stopped.', true));
     };
     signal?.addEventListener('abort', onAbort, { once: true });
   });
@@ -53,24 +53,27 @@ export async function withRetries<T>(
     signal,
     onRetry,
     wait = sleep,
+    provider = 'The AI provider',
   }: {
     delays?: number[];
     signal?: AbortSignal;
     onRetry?: (notice: RetryNotice) => void;
     /** Injected so tests do not sleep. */
     wait?: (ms: number, signal?: AbortSignal) => Promise<void>;
+    /** Who is refusing, by name, for the sentence when the wait is too long. */
+    provider?: string;
   } = {}
 ): Promise<T> {
   for (let i = 0; ; i++) {
     try {
       return await attempt();
     } catch (error) {
-      const retryable = error instanceof GeminiError && error.transient && !signal?.aborted;
+      const retryable = error instanceof AiError && error.transient && !signal?.aborted;
       if (!retryable || i >= delays.length) throw error;
 
       const asked = error.retryAfterMs ?? 0;
       if (asked > MAX_WAIT_MS) {
-        throw new GeminiError(`Gemini's limit for this key is used up for now. Try again in ${minutes(asked)}.`);
+        throw new AiError(`${provider}'s limit for this key is used up for now. Try again in ${minutes(asked)}.`);
       }
       const waitMs = Math.max(delays[i], asked);
       onRetry?.({ attempt: i + 1, waitMs, message: error.message });

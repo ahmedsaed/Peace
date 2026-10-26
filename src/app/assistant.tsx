@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,8 +23,11 @@ import { db } from '@/db/client';
 import type { RecordRow } from '@/db/repo/records';
 import { searchRecords } from '@/db/repo/search';
 import { AttachmentError } from '@/lib/attachment';
-import { GeminiError, transcribe, type VoiceClip } from '@/lib/gemini';
-import { getGeminiKey } from '@/lib/secrets';
+import type { JobBlock } from '@/ai/availability';
+import { AiError } from '@/ai/error';
+import { listenerFor } from '@/ai/job';
+import { PROVIDERS } from '@/ai/providers';
+import { writeDown as writeDownClip, type VoiceClip } from '@/ai/read';
 import { clipClock, MAX_CLIP_MS } from '@/lib/voice';
 import { useVoiceRecorder } from '@/state/voice';
 import { EMPTY_QUERY } from '@/lib/search-query';
@@ -32,7 +35,7 @@ import { useKeyboardOverlap } from '@/lib/layout';
 import { useAssistantStore } from '@/state/assistant';
 import { useMoney } from '@/state/money';
 import { useAi } from '@/state/ai';
-import { useGeminiKeyStore } from '@/state/gemini-key';
+import { useAiKeysStore } from '@/state/ai-keys';
 import { useSetting } from '@/state/settings';
 import { useTheme } from '@/state/theme';
 
@@ -68,7 +71,6 @@ export default function AssistantScreen() {
    * keyboard's overlap — see `keyboardOverlap` for why not its height.
    */
   const keyboard = useKeyboardOverlap();
-  const enabled = useSetting('assistantEnabled');
   const ai = useAi();
   const homeCurrency = useSetting('homeCurrency');
   const money = useMoney();
@@ -82,7 +84,7 @@ export default function AssistantScreen() {
   const pendingUndo = useAssistantStore((s) => s.pendingUndo);
   const { load, loadOlder, send, retry, stop, decide, reset, undo, clearUndo } = useAssistantStore.getState();
 
-  const refreshKey = useGeminiKeyStore((state) => state.refresh);
+  const refreshKey = useAiKeysStore((state) => state.refresh);
   const [draft, setDraft] = useState('');
   const [drill, setDrill] = useState<Drill | null>(null);
   /** Files waiting to go with the next message. Already on disk; only rows wait. */
@@ -100,7 +102,9 @@ export default function AssistantScreen() {
    * one tap to fix there, and an unfixable proposal once Penny has acted on
    * it. The audio itself never enters the conversation (see `transcribe`).
    */
-  const geminiModel = useSetting('geminiModel');
+  const voiceModel = useSetting('voiceModel');
+  const voiceReadModel = useSetting('voiceReadModel');
+  const modelAbilities = useSetting('modelAbilities');
   const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const recorder = useVoiceRecorder({
@@ -113,12 +117,12 @@ export default function AssistantScreen() {
   async function writeDown(clip: VoiceClip) {
     setTranscribing(true);
     try {
-      const key = await getGeminiKey();
-      if (key === null) {
-        setVoiceError('Add a Gemini API key in Settings to ask by voice.');
+      const job = await listenerFor(voiceModel, voiceReadModel, modelAbilities, 'ask by voice');
+      if ('problem' in job) {
+        setVoiceError(job.problem);
         return;
       }
-      const text = await transcribe(key, geminiModel, clip);
+      const text = await writeDownClip(job.listener, clip);
       if (text === '') {
         setVoiceError('Nothing could be heard. Try again, or type it.');
         return;
@@ -126,8 +130,8 @@ export default function AssistantScreen() {
       // Added to whatever was typed meanwhile, never over it.
       setDraft((current) => (current.trim() ? `${current.trimEnd()} ${text}` : text));
     } catch (e) {
-      if (!(e instanceof GeminiError)) console.warn('[assistant] transcription failed', e);
-      setVoiceError(e instanceof GeminiError ? e.message : 'Could not write down what you said.');
+      if (!(e instanceof AiError)) console.warn('[assistant] transcription failed', e);
+      setVoiceError(e instanceof AiError ? e.message : 'Could not write down what you said.');
     } finally {
       setTranscribing(false);
     }
@@ -208,13 +212,13 @@ export default function AssistantScreen() {
     });
   };
 
-  // `ai.penny` needs all three: a key, Use AI, and her own switch. The gate
-  // names whichever is missing, in that order — a key comes before anything.
+  // `ai.penny` needs a key, Use AI, her own switch and a model. The gate names
+  // whichever is missing — no key at all comes before anything.
   if (ai.hasKey !== null && !ai.penny) {
     return (
       <View className="flex-1 bg-ground" testID="assistant-screen">
         <StackHeader title="Penny" />
-        <Gate reason={ai.blocked ?? (enabled ? 'no-key' : 'off')} />
+        <Gate reason={ai.hasKey === false ? { kind: 'no-key-any' } : (ai.why.penny ?? { kind: 'off' })} />
       </View>
     );
   }
@@ -450,30 +454,57 @@ export default function AssistantScreen() {
   );
 }
 
-const GATES = {
-  'ai-off': {
-    title: 'AI is switched off',
-    body: 'Turn on “Use AI” in Settings. While it is off, nothing is sent to Google.',
-    href: '/settings',
-  },
-  off: {
-    title: 'Penny is switched off',
-    body: 'Turn it on in Settings › Penny. To answer, it sends what it reads from your ledger to Google’s Gemini.',
-    href: '/settings/ai/penny',
-  },
-  'no-key': {
-    title: 'Add a Gemini key first',
-    body: 'Penny runs on your own Gemini API key, kept on this device. Add it in Settings, under AI.',
-    href: '/settings',
-  },
-} as const;
+type GateReason = JobBlock | { kind: 'no-key-any' };
+
+function gateFor(reason: GateReason): { title: string; body: string; href: Href } {
+  switch (reason.kind) {
+    case 'ai-off':
+      return {
+        title: 'AI is switched off',
+        body: 'Turn on “Use AI” in Settings. While it is off, nothing is sent anywhere.',
+        href: '/settings',
+      };
+    case 'off':
+      return {
+        title: 'Penny is switched off',
+        body: 'Turn it on in Settings › Penny. To answer, it sends what it reads from your ledger to the provider of the model you choose.',
+        href: '/settings/ai/penny',
+      };
+    case 'no-model':
+      return {
+        title: 'Choose Penny’s model',
+        body: 'Pick which model Penny talks through in Settings › Penny.',
+        href: '/settings/ai/penny',
+      };
+    case 'no-key':
+      return {
+        title: `Add a ${PROVIDERS[reason.provider].name} key`,
+        body: `Penny’s model is from ${PROVIDERS[reason.provider].name}, and this phone has no key for it. Add one, or choose another model.`,
+        href: '/settings/ai/providers',
+      };
+    case 'cannot':
+      return {
+        title: `${reason.model} cannot use tools`,
+        body: 'Penny answers by calling tools that read your ledger, and the checks found this model cannot. Choose another in Settings › Penny.',
+        href: '/settings/ai/penny',
+      };
+    case 'no-key-any':
+      return {
+        title: 'Add an API key first',
+        body: 'Penny runs on your own key from an AI provider, kept on this device. Add one in Settings › AI.',
+        href: '/settings/ai/providers',
+      };
+  }
+}
 
 /** Why Penny cannot answer, and the one place that fixes it. */
-function Gate({ reason }: { reason: keyof typeof GATES }) {
+function Gate({ reason }: { reason: GateReason }) {
   const palette = useTheme();
-  const gate = GATES[reason];
+  const gate = gateFor(reason);
+  // `no-key` keeps its old id whichever key is missing — flows look for it.
+  const id = reason.kind === 'no-key-any' ? 'no-key' : reason.kind;
   return (
-    <View className="flex-1 items-center justify-center gap-3 px-8" testID={`assistant-gate-${reason}`}>
+    <View className="flex-1 items-center justify-center gap-3 px-8" testID={`assistant-gate-${id}`}>
       <Icon name="sparkle" size={32} color={palette.accent} />
       <Text className="text-center text-base font-semibold text-ink">{gate.title}</Text>
       <Text className="text-center text-sm leading-5 text-muted">{gate.body}</Text>

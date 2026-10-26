@@ -6,7 +6,7 @@ import { pageMeta } from '@/lib/meta';
 export const metadata: Metadata = pageMeta({
   title: 'Deleting your data',
   description:
-    'How to delete everything Peace: Expense Tracker has stored — on your phone, in your Google Drive, and with Google Gemini.',
+    'How to delete everything Peace: Expense Tracker has stored — on your phone, in your Google Drive, and with the AI provider you chose.',
   path: '/delete/',
   card: 'data',
 });
@@ -56,19 +56,21 @@ export default function DeleteData() {
           </li>
         </ul>
 
-        <h2>3. With Google Gemini (only if you added your own API key)</h2>
+        <h2>3. With your AI provider (only if you added your own API key)</h2>
         <p>
-          Receipts and invoices you ask to have read, bank messages and questions to Penny are sent straight from your phone to Google, using
-          your own key. They never pass through us, so we cannot see or delete them.
+          Receipts and invoices you ask to have read, recordings, bank messages and questions to Penny are sent straight from your phone
+          to the provider of the model you chose — Google Gemini, OpenAI, DeepSeek, Mistral or OpenRouter — using your own key. They
+          never pass through us, so we cannot see or delete them.
         </p>
         <ul>
           <li>
-            How long Google keeps them is set by Google’s{' '}
-            <a href="https://ai.google.dev/gemini-api/terms">Gemini API terms</a> for your key, not by Peace.
+            How long they are kept is set by that provider’s terms for your key, not by Peace — for Google, the{' '}
+            <a href="https://ai.google.dev/gemini-api/terms">Gemini API terms</a>. OpenRouter forwards each request to the company
+            running the model, whose terms apply too.
           </li>
           <li>
-            To stop anything further being sent, clear the key in Peace (<em>Settings › Gemini key</em>, saved blank), and delete it in{' '}
-            <a href="https://aistudio.google.com/app/apikey">Google AI Studio</a>.
+            To stop anything further being sent, clear the key in Peace (<em>Settings › AI › Providers &amp; keys</em>, saved blank),
+            and delete it in the provider’s own console.
           </li>
         </ul>
 

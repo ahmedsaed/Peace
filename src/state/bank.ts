@@ -4,6 +4,7 @@ import { create } from 'zustand';
 
 import NotificationListener from '../../modules/notification-listener/src/NotificationListenerModule';
 import { drainCaptures, isCapturing, readPending } from '@/db/bank-inbox';
+import { parseModelRef } from '@/ai/model-ref';
 import { db } from '@/db/client';
 import { pendingCaptures, reviewableCaptures } from '@/db/repo/bank-captures';
 import type { BankCapture } from '@/db/schema';
@@ -79,7 +80,7 @@ let running = false;
 export async function runBankCatchUp(input: {
   senders: string[];
   homeCurrency: string;
-  geminiModel: string;
+  bankModel: string;
   guidance?: string;
   /** Settings › AI › Use AI. Off: messages are still captured, and wait unread. */
   aiEnabled: boolean;
@@ -102,6 +103,9 @@ export async function runBankCatchUp(input: {
     // AI switched off: captured and counted as waiting, but nothing is sent.
     // Turning it back on reads them (the Settings switch kicks a catch-up).
     if (!input.aiEnabled) return;
+    // No model chosen for bank messages: they wait, like with no key.
+    const model = parseModelRef(input.bankModel);
+    if (model === null) return;
 
     /**
      * Repainted after EACH message, not once at the end.
@@ -112,7 +116,7 @@ export async function runBankCatchUp(input: {
      * cheap to reload and the screens are already subscribed.
      */
     const outcome = await track('bank:read', () =>
-      readPending(input.homeCurrency, input.geminiModel, input.guidance ?? '', () =>
+      readPending(input.homeCurrency, model, input.guidance ?? '', () =>
         useBankInbox.getState().reload()
       )
     );
@@ -140,16 +144,16 @@ export async function runBankCatchUp(input: {
 export function useBankCatchUp(): void {
   const senders = useSetting('bankSenders');
   const homeCurrency = useSetting('homeCurrency');
-  const geminiModel = useSetting('geminiModel');
+  const bankModel = useSetting('bankModel');
   const guidance = useSetting('bankGuidance');
   const aiEnabled = useSetting('aiEnabled');
 
   // Read through a ref inside the listener so the subscription is created once
   // rather than rebuilt whenever a setting changes. Written in an effect, never
   // during render — a ref mutated mid-render is invisible to React.
-  const state = useRef({ senders, homeCurrency, geminiModel, guidance, aiEnabled });
+  const state = useRef({ senders, homeCurrency, bankModel, guidance, aiEnabled });
   useEffect(() => {
-    state.current = { senders, homeCurrency, geminiModel, guidance, aiEnabled };
+    state.current = { senders, homeCurrency, bankModel, guidance, aiEnabled };
   });
 
   useEffect(() => {

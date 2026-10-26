@@ -2,7 +2,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, useColorScheme, View } from 'react-native';
 
-import { GeminiKeyRows } from '@/components/gemini-key';
 import { StackHeader } from '@/components/screen';
 import { Section, SectionLink, Toggle } from '@/components/settings-ui';
 import { SECTIONS } from '@/constants/sections';
@@ -15,9 +14,12 @@ import { formatTimeLabel, ordinal } from '@/lib/period';
 import { onDay } from '@/lib/reminder';
 import { setupProgress } from '@/lib/setup';
 import { runBankCatchUp } from '@/state/bank';
+import { describeBlock } from '@/ai/availability';
+import { describeModel } from '@/components/model-picker';
+import { PROVIDER_IDS, PROVIDERS } from '@/ai/providers';
 import { useAi } from '@/state/ai';
+import { useAiKeysStore } from '@/state/ai-keys';
 import { readDeviceLock, useLockStore } from '@/state/app-lock';
-import { useGeminiKeyStore } from '@/state/gemini-key';
 import { useSettingsStore } from '@/state/settings';
 import { describeTheme } from '@/lib/theme';
 import { bankAccess, describeBank, useSetupFacts } from '@/state/setup';
@@ -31,16 +33,16 @@ import { bankAccess, describeBank, useSetupFacts } from '@/state/setup';
  * trusting it. Each row lands in the same change as the code that honours it.
  *
  * AI IS ON THIS PAGE, NOT BEHIND A ROW. It is the one part of Peace that sends
- * anything anywhere, so its master switch and its key sit in plain view under a
- * caption that says where things go; the three features that run on it are
- * rows beneath, each with a page of its own. Every other row says what its
+ * anything anywhere, so its master switch sits in plain view under a caption
+ * that says where things go. The keys have a page of their own, and each
+ * feature's page chooses its own model from whichever providers have one. Every other row says what its
  * section is set to NOW, read from the same state its page shows.
  */
 export default function SettingsIndex() {
   const router = useRouter();
   const s = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
-  const hasKey = useGeminiKeyStore((state) => state.hasKey);
+  const keys = useAiKeysStore((state) => state.keys);
   const lockDevice = useLockStore((state) => state.device);
   const facts = useSetupFacts();
   const phone = useColorScheme();
@@ -74,8 +76,14 @@ export default function SettingsIndex() {
   // whether it can run. Their own settings are kept whatever this says.
   const aiState = useAi();
   const ai = aiState.ready;
-  const keyless = hasKey === false;
-  const blockedLabel = keyless ? 'Needs a key' : 'AI is off';
+  const keyless = aiState.hasKey === false;
+  const keyed = keys ? PROVIDER_IDS.filter((id) => keys[id]).map((id) => PROVIDERS[id].name) : [];
+  // The model a feature uses when it can run; why not, when it cannot.
+  const summary = (feature: 'receipts' | 'voice' | 'bank' | 'penny', stored: string, running: string) => {
+    const block = aiState.why[feature];
+    if (keyless) return 'Needs a key';
+    return block ? describeBlock(block) : `${running} · ${describeModel(stored)}`;
+  };
   const bankState = describeBank(access, s.bankSenders);
 
   const toggleAi = (next: boolean) => {
@@ -86,7 +94,7 @@ export default function SettingsIndex() {
       void runBankCatchUp({
         senders: s.bankSenders,
         homeCurrency: s.homeCurrency,
-        geminiModel: s.geminiModel,
+        bankModel: s.bankModel,
         guidance: s.bankGuidance,
         aiEnabled: true,
       });
@@ -142,13 +150,13 @@ export default function SettingsIndex() {
 
         <Section
           title="AI"
-          caption="Sent to Google Gemini with your own key — only for what you turn on. Switched off, nothing is sent."
+          caption="Sent to the provider you choose for each feature, with your own key — only for what you turn on. Switched off, nothing is sent."
           testID="gemini-card">
           <Toggle
             label="Use AI"
             hint={
               keyless
-                ? 'Add your Gemini key below, then switch this on.'
+                ? 'Add a key in Providers & keys, then switch this on.'
                 : s.aiEnabled
                   ? 'Reading receipts, voice, reading bank messages and Penny can run.'
                   : 'Paused. Your key and choices are kept; bank messages wait unread.'
@@ -159,12 +167,19 @@ export default function SettingsIndex() {
             onChange={toggleAi}
             testID="setting-ai-enabled"
           />
-          <GeminiKeyRows />
+          <SectionLink
+            emblem="key"
+            color={SECTIONS.ai.color}
+            title="Providers & keys"
+            summary={keyed.length > 0 ? keyed.join(', ') : 'No keys yet'}
+            onPress={go('/settings/ai/providers')}
+            testID="settings-ai-providers"
+          />
           <SectionLink
             emblem="camera"
             color={SECTIONS.ai.color}
             title="Receipts & invoices"
-            summary={!ai ? blockedLabel : aiState.receipts ? 'Photos, PDFs and text files, read into a record' : 'Off'}
+            summary={summary('receipts', s.receiptsModel, 'On')}
             onPress={go('/settings/ai/receipts')}
             testID="settings-ai-receipts"
             dim={!ai}
@@ -173,7 +188,7 @@ export default function SettingsIndex() {
             emblem="mic"
             color={SECTIONS.ai.color}
             title="Voice"
-            summary={!ai ? blockedLabel : aiState.voice ? 'Speak a record or a question' : 'Off'}
+            summary={summary('voice', s.voiceModel, 'On')}
             onPress={go('/settings/ai/voice')}
             testID="settings-ai-voice"
             dim={!ai}
@@ -181,7 +196,7 @@ export default function SettingsIndex() {
           <SectionLink
             {...SECTIONS.bank}
             title="Bank messages"
-            summary={!ai ? blockedLabel : bankState}
+            summary={aiState.why.bank || keyless ? summary('bank', s.bankModel, '') : bankState}
             onPress={go('/settings/ai/bank')}
             testID="settings-ai-bank"
             dim={!ai}
@@ -190,7 +205,7 @@ export default function SettingsIndex() {
             emblem="sparkle"
             color={SECTIONS.ai.color}
             title="Penny, the assistant"
-            summary={!ai ? blockedLabel : aiState.penny ? 'On' : 'Off'}
+            summary={summary('penny', s.pennyModel, 'On')}
             onPress={go('/settings/ai/penny')}
             testID="settings-ai-penny"
             dim={!ai}

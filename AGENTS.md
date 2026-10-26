@@ -39,6 +39,7 @@ Non-login shells may not source `.bashrc`. If `adb`/`emulator`/`maestro` is not 
 | Check every flow's testIDs without a device | `npm test -- flows` |
 | E2E without an emulator to hand | Actions › **E2E** › Run workflow (manual) |
 | Assistant against the real Gemini API — **costs money, ask first** | `PEACE_GEMINI_KEY_FILE=<file> npx jest src/assistant/live` |
+| Assistant and readers against another provider — **costs money, ask first** | `PEACE_AI_PROVIDER=deepseek PEACE_AI_KEY_FILE=<file> PEACE_AI_MODEL=deepseek-flash npx jest src/assistant/live src/ai/live` |
 | App lock E2E (sets, then clears, a device PIN) | `npm run e2e:lock` (flows in `.maestro/lock/`) |
 | Assistant E2E with a real key — **costs money, ask first** | `PEACE_GEMINI_KEY_FILE=<file> npm run e2e:live` (flows in `.maestro/live/`) |
 | Dev server | `npm start` |
@@ -910,6 +911,25 @@ Next's `opengraph-image.tsx`, which exports an extensionless file that GitHub Pa
   must stay out of `npm test`, `npm run e2e` and CI. Iterate on flow STEPS with the key-less flows
   and on prompts with the scripted model in `engine.test.ts`; spend a live run once the change is
   ready, and say beforehand that it will cost something.
+- **Every AI request goes through `src/ai/`, and no screen knows which provider answers.** Two
+  wire formats cover five providers: Gemini's own, and OpenAI's Chat Completions (OpenAI, DeepSeek,
+  Mistral, OpenRouter — their dialects are rows in `ai/openai/flavors.ts`). Features call
+  `ai/read.ts` or the dispatcher in `ai/index.ts` with an `Endpoint`; each job's model is its own
+  setting (`receiptsModel`, `voiceModel`, `bankModel`, `pennyModel`, …) stored as `provider:model`.
+  **Empty means "Choose a model", never a default** — a model nobody picked can be expensive or bad
+  at the job — and an install from before providers is filled from `geminiModel`/`assistantModel`
+  on load (`legacyModelChoices`), so nobody's setup moves on upgrade. **Gemini's `Content` stays the
+  stored conversation format**; the OpenAI adapter translates on the way out (ids made up in order
+  for Gemini's id-less calls) and back, and a turn another provider wrote carries `native` — its
+  reasoning, replayed only to that provider — which `forGemini` strips, signing foreign calls with
+  Google's documented `skip_thought_signature_validator`. **What a model can do is ASKED, not
+  assumed**: choosing one runs four tiny checks (`ai/checks.ts`) and they VERIFY the answer —
+  DeepSeek's text model takes an image, swaps it for "[Unsupported Image]" and answers 200. A check
+  that could not be asked is "unknown" and never blocks a feature. Read error bodies per provider:
+  OpenAI's `429 insufficient_quota` and everyone's `402` are billing, and retrying them is useless.
+  DeepSeek refuses `json_schema` (JSON mode plus the schema in the prompt instead) and takes no PDFs;
+  OpenRouter's `/models` is public, so a key is proven on `/key`, and every request carries
+  `provider.require_parameters` or it can land on a host that ignores `tools`.
 - **The assistant's model never writes an amount — it CITES one.** Every amount a tool returns is
   registered in a `FigureBook` and handed over as `{"amount": 1240.5, "cite": "{{t41f3}}"}`; the
   reply writes the token and the screen renders it through `useMoney`. Typed prose figures would be

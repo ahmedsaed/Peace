@@ -318,11 +318,11 @@ export function AiNotice() {
       <Icon name={blocked === 'no-key' ? 'key' : 'sparkle'} size={18} color={palette.muted} />
       <Text className="flex-1 text-sm leading-5 text-muted">
         {blocked === 'no-key'
-          ? 'Runs on your Gemini key, which is not set yet.'
+          ? 'Runs on your own key from an AI provider, which is not set yet.'
           : 'Use AI is switched off, so nothing here can run.'}
       </Text>
       <Pressable
-        onPress={() => router.navigate('/settings')}
+        onPress={() => router.navigate(blocked === 'no-key' ? '/settings/ai/providers' : '/settings')}
         testID="key-notice-add"
         accessibilityRole="button"
         className="rounded-full bg-accent px-4 py-2 active:opacity-80">

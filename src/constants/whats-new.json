@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.38.0",
+    "notes": [
+      "AI now works with OpenAI, DeepSeek, Mistral and OpenRouter as well as Gemini. Add your keys under Settings › AI › Providers & keys.",
+      "Choose a model for each feature on its own page — one for receipts, another for voice, bank messages or Penny. Peace checks what each model can do when you pick it.",
+      "If you already use Gemini, everything stays as you left it."
+    ]
+  },
+  {
     "version": "1.37.3",
     "notes": [
       "A long note now scrolls wherever you drag it, including in the space around the photos, tags and buttons at its foot."

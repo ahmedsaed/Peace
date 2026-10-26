@@ -1,5 +1,6 @@
-import { GeminiError } from '../lib/gemini';
-import { buildChatRequest, callsOf, chatStep, extractTurn, textOf } from './gemini-chat';
+import { callsOf, textOf } from '../content';
+import { AiError } from '../error';
+import { buildChatRequest, chatStep, extractTurn } from './chat';
 
 const reply = (parts: unknown[], finishReason = 'STOP') => ({
   candidates: [{ content: { role: 'model', parts }, finishReason }],
@@ -23,8 +24,8 @@ describe('extractTurn', () => {
       extractTurn(reply([], 'MALFORMED_FUNCTION_CALL'));
       throw new Error('did not throw');
     } catch (error) {
-      expect(error).toBeInstanceOf(GeminiError);
-      expect((error as GeminiError).transient).toBe(true);
+      expect(error).toBeInstanceOf(AiError);
+      expect((error as AiError).transient).toBe(true);
     }
   });
 });

@@ -10,6 +10,7 @@
 
 import { Switch, Text, View } from 'react-native';
 
+import { ModelRow } from '@/components/model-picker';
 import { PromptEditor } from '@/components/prompt-editor';
 import { useSwitchColors } from '@/state/theme';
 import { useAi } from '@/state/ai';
@@ -19,10 +20,12 @@ export function ReceiptsCard() {
   const switchColors = useSwitchColors();
   const settings = useSettingsStore((state) => state.settings);
   const update = useSettingsStore((state) => state.update);
-  // What the switch SHOWS is whether reading can run — a key, Use AI and this
-  // switch. With no key it is off and muted, and the setting itself is kept.
+  // What the switch SHOWS is whether reading is wanted AND could be — Use AI,
+  // some key, and this switch. With no key it is off and muted, and the setting
+  // itself is kept. The model is chosen below it, so "on with no model yet" is
+  // a state the switch has to be able to show.
   const ai = useAi();
-  const enabled = ai.receipts;
+  const enabled = ai.ready && settings.receiptsEnabled;
 
   return (
     <View className="rounded-xl bg-surface p-4" testID="receipts-card">
@@ -44,8 +47,14 @@ export function ReceiptsCard() {
       </View>
 
       {enabled ? (
-        // No divider of its own: the rules editor draws the line above itself.
-        <View className="mt-4">
+        <View className="mt-4 gap-4 border-t border-line pt-4">
+          <ModelRow
+            label="Model"
+            value={settings.receiptsModel}
+            onChange={(stored) => update('receiptsModel', stored)}
+            sheetTitle="Model for receipts"
+            testIDPrefix="receipts-model"
+          />
           <PromptEditor
             label="Your rules"
             hint="Anything about your own receipts and invoices the model could not work out — a shop it keeps misreading, a charge that should not count. Most people need none."
