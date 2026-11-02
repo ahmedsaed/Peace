@@ -31,8 +31,8 @@ export default function MoveToPlay() {
         {ON_PLAY ? null : (
           <p>
             <em>
-              Peace is not on Google Play yet. This page is ready for the day it is — until then, the version from
-              GitHub is the one to use.
+              Peace is not public on Google Play yet. You can get the Play version now by{' '}
+              <Link href="/beta/">joining the beta</Link>, and these steps apply to it already.
             </em>
           </p>
         )}
