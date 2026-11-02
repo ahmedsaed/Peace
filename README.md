@@ -14,7 +14,7 @@ no ads, no analytics — and nothing reaches the network unless you ask it to.
 [![License](https://img.shields.io/badge/license-GPL--3.0-4a4a4a)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Android-4a4a4a)
 
-**[peace.merope.dev](https://peace.merope.dev)** · **[⬇ Download the APK](../../releases/latest)** · Coming soon to Google Play
+**[peace.merope.dev](https://peace.merope.dev)** · **[⬇ Download the APK](../../releases/latest)** · **[Join the beta on Google Play](https://peace.merope.dev/beta/)**
 
 </div>
 
@@ -174,8 +174,11 @@ A few things that follow from taking that seriously:
 
 ## Install
 
-**Google Play** is coming, starting with a closed test; the listing is drafted in [`store/`](store).
-The Play build installs as `dev.merope.peace` and Play keeps it updated.
+**Google Play is in closed testing — [join the beta](https://peace.merope.dev/beta/).** Join the
+[tester group](https://groups.google.com/g/peace-testers), then
+[become a tester](https://play.google.com/apps/testing/dev.merope.peace) with the same Google account
+and install from Play. The Play build installs as **Peace** (`dev.merope.peace`) and Play keeps it
+updated; the listing is drafted in [`store/`](store).
 
 **Or [download the latest APK from the Releases page.](../../releases/latest)** Every merge to `main`
 publishes a signed arm64 build there, and it upgrades an existing install in place — no uninstall,
@@ -215,10 +218,8 @@ A short list, because what an app refuses to do is as much a description of it a
 |---|---|
 | **Multi-device sync** | The ledger stays on the phone. Sync means a server, an account, and a copy of your spending somewhere you don't control. |
 | **Budget carry-over** | An unspent limit rolling into next month is a limit that gets easier every time you fail to use it. What carries between months is *money* — the header's **Now** does that instead, and reconciles exactly with the Accounts total. |
-| **Voice entry** | Dropped rather than deferred. Photographing a receipt answers the same question better, and a second capture path would be a second set of parsing rules to keep honest. |
 | **One cross-currency total** | Valuing a whole balance needs today's rate, and the only honest rates here belong to past records. Accounts shows one line per currency held instead of one authoritative-looking number. |
 | **Settings that do nothing** | A control for a preference nothing reads is a switch that silently lies. Each row ships in the same change as the code that honours it. |
-| **The Play Store — for now** | Sideloading is what lets Peace read bank notifications without a restricted-permission review. An internal testing track stays possible; a public listing would mean asking Google's permission to keep the feature. |
 
 There are 27 more decisions like these, each with the reasoning and usually the bug that caused it,
 in **[docs/decisions.md](docs/decisions.md)**.

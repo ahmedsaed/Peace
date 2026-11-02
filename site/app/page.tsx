@@ -86,9 +86,9 @@ export default function Home() {
               nothing reaches the network unless you ask it to.
             </p>
             <div className="ctas">
-              <span className="button soon" aria-disabled="true">
-                Coming soon to Google Play
-              </span>
+              <Link className="button primary" href="/beta/">
+                Join the beta on Google Play
+              </Link>
               <a className="button ghost" href={RELEASES}>
                 Download the APK
               </a>
