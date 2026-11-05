@@ -152,7 +152,7 @@ switch them on, one happens only when you tap a button, and one is a once-a-day 
 | Talks to | When | Default |
 |---|---|---|
 | `api.frankfurter.dev` | you tap to fetch an exchange rate | never load-bearing — the field stays manual if it fails |
-| `generativelanguage.googleapis.com` | reading a receipt or a bank message, and asking Penny — which sends your question and what it reads from the ledger to answer it | **off** — needs your own Gemini key, and Penny has its own switch |
+| `generativelanguage.googleapis.com` | reading a receipt, a bank message or a spoken record, and asking Penny — which sends your question and what it reads from the ledger to answer it | **off** — needs your own Gemini key, and Penny has its own switch |
 | `googleapis.com/drive` | backup to Drive's private app folder | **off** — needs you to connect it |
 | `api.github.com` | checking once a day whether a newer build exists | one quiet line in the drawer, nothing when it fails |
 
@@ -165,8 +165,10 @@ A few things that follow from taking that seriously:
 - **Bank alerts are read, not your inbox.** Android hands over the notification your messaging app
   already showed — the same text you read off a lock screen. No `READ_SMS`, no conversation
   history. The sender list **starts empty and reads nothing** until you name a bank.
-- **The microphone is blocked in the manifest.** `RECORD_AUDIO` is on the app's blocked list, so
-  the permission cannot be requested even by accident.
+- **The microphone is open only while you are speaking.** It starts on a tap, never when a screen
+  opens; it stops at a minute; and it is cancelled, not sent, the moment the app leaves the
+  foreground. The recording is read once, sent to Gemini and deleted. Only the text it heard
+  reaches the ledger, after you have seen it.
 - **Your Gemini key lives in the device keystore**, never in the settings table — that table
   travels inside every backup.
 - **Disconnecting Drive signs out, it never revokes.** Revoking would make Google delete the app
