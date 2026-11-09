@@ -4,9 +4,11 @@
 import { createTestDb, type TestDb } from '../../test/db';
 import { localNoon as on } from '../../test/dates';
 import { createAccount } from './accounts';
-import { cashFlow, cashFlowPeak, categoryBreakdown } from './analysis';
+import { cashFlow, cashFlowPeak, categoryBreakdown, dailyHistory } from './analysis';
 import { createCategory, updateCategory } from './categories';
+import { periodSummary } from './records';
 import { totalsByTopCategory } from './spend';
+import { ensureTag, setRecordTags } from './tags';
 import { createRecord, createTransfer } from './transactions';
 
 const archiveCategory = (db: TestDb, id: string) => updateCategory(db, id, { archived: true });
@@ -377,5 +379,53 @@ describe('cashFlowPeak', () => {
     // Math.max() with no arguments is -Infinity, and dividing by it silently
     // gives every bar a width of -0.
     expect(cashFlowPeak([])).toBe(0);
+  });
+});
+
+describe('dailyHistory', () => {
+  /**
+   * The Pace slide's "so far" is the Records header's figure for the month —
+   * uncategorised money, refunds and all — with transfers and corrections out.
+   * Two screens stating one month's spending must agree.
+   */
+  it('adds up to the Records header, day by day', () => {
+    const db = seed();
+    createAccount(db, { id: 'cash', name: 'Cash', currency: 'EGP' });
+    spend(db, 'a', 'coffee', 4_000, on(2026, 8, 1));
+    spend(db, 'b', null, 1_500, on(2026, 8, 1));
+    spend(db, 'c', 'transport', 2_000, on(2026, 8, 20));
+    refund(db, 'd', 'transport', 500, on(2026, 8, 20));
+    earn(db, 'e', 'salary', 900_000, on(2026, 8, 3));
+    createTransfer(db, {
+      fromAccountId: 'bank',
+      toAccountId: 'cash',
+      amountMinor: 70_000,
+      occurredAt: on(2026, 8, 5),
+    });
+
+    const { daily } = dailyHistory(db, '2026-08', 'expense');
+    expect(daily).toHaveLength(31);
+    expect(daily[0]).toBe(5_500);
+    expect(daily[4]).toBe(0);
+    expect(daily[19]).toBe(1_500);
+    expect(daily.reduce((a, b) => a + b, 0)).toBe(-periodSummary(db, '2026-08').expenseMinor);
+
+    const income = dailyHistory(db, '2026-08', 'income').daily;
+    expect(income.reduce((a, b) => a + b, 0)).toBe(periodSummary(db, '2026-08').incomeMinor);
+  });
+
+  it('brings the earlier months, newest first, under the same tag', () => {
+    const db = seed();
+    spend(db, 'jul', 'coffee', 1_000, on(2026, 7, 2));
+    spend(db, 'jun', 'coffee', 3_000, on(2026, 6, 2));
+    spend(db, 'jun-tagged', 'coffee', 700, on(2026, 6, 3));
+    setRecordTags(db, 'jun-tagged', [ensureTag(db, 'Trip').id]);
+
+    const { previous } = dailyHistory(db, '2026-08', 'expense');
+    expect(previous.map((d) => d.reduce((a, b) => a + b, 0))).toEqual([1_000, 3_700, 0]);
+
+    const trip = ensureTag(db, 'Trip').id;
+    const tagged = dailyHistory(db, '2026-08', 'expense', 'EGP', trip).previous;
+    expect(tagged.map((d) => d.reduce((a, b) => a + b, 0))).toEqual([0, 700, 0]);
   });
 });

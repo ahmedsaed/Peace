@@ -1,5 +1,11 @@
 [
   {
+    "version": "1.38.0",
+    "notes": [
+      "Swipe the chart on Analysis for two new views. Pace shows whether this month is running ahead of or behind your usual month, and where it is heading. Weekdays shows which days of the week cost you the most."
+    ]
+  },
+  {
     "version": "1.37.3",
     "notes": [
       "A long note now scrolls wherever you drag it, including in the space around the photos, tags and buttons at its foot."
