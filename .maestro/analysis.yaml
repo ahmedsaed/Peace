@@ -199,6 +199,42 @@ appId: dev.merope.peace.oss
     id: "analysis-total"
     text: "E£320.00"
 
+# --- the slides beside the ring: swiped, and named underneath ---
+# A SWIPE reaches Pace, which proves the pager pages rather than only that the
+# buttons work. A new ledger has no earlier month, so Pace states the month so
+# far — the SAME E£320.00 as the ring here, since nothing is uncategorised —
+# and says it has nothing to compare with rather than comparing with zero.
+- swipe:
+    from:
+      id: "analysis-pager"
+    direction: LEFT
+- assertVisible:
+    id: "pace-headline"
+    text: "E£320.00"
+- assertVisible:
+    id: "pace-comparison"
+    text: "No earlier month to compare with yet."
+- assertVisible:
+    id: "pace-chart"
+- takeScreenshot: 01c-analysis-pace
+# The names are buttons too: TalkBack cannot swipe a pager it cannot see.
+- tapOn:
+    id: "analysis-slide-weekdays"
+- assertVisible:
+    id: "weekday-headline"
+    text: ".* cost you most"
+# Every record is from today, so today's weekday holds all E£320.00, and with
+# under a fortnight counted the slide says the pattern is not settled yet.
+- assertVisible:
+    id: "weekday-detail"
+    text: ".*: E£.* on average, over .* Firmer after a few more weeks."
+- takeScreenshot: 01d-analysis-weekdays
+- tapOn:
+    id: "analysis-slide-categories"
+- assertVisible:
+    id: "analysis-total"
+    text: "E£320.00"
+
 # --- cash flow across months ---
 - scrollUntilVisible:
     element:

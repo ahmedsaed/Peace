@@ -4,12 +4,14 @@ import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-na
 
 import { Donut } from '@/components/donut';
 import { Icon } from '@/components/icon';
+import { ChartPager, PaceSlide, WeekdaySlide } from '@/components/insight-slides';
 import { EmptyState, MonthHeader, Screen } from '@/components/screen';
 import { db } from '@/db/client';
 import {
   cashFlow,
   cashFlowPeak,
   categoryBreakdown,
+  dailyHistory,
   type Breakdown,
   type CashFlowPoint,
 } from '@/db/repo/analysis';
@@ -19,10 +21,17 @@ import { tagBreakdown, type TagTotal } from '@/db/repo/tags';
 import type { CategoryKind } from '@/db/repo/spend';
 import { mixHex, rankSlices, rankSubs, type RankedSlice, type RankedSub } from '@/lib/analysis';
 import { testIdSlug as slug } from '@/lib/id';
+import {
+  pace as paceOf,
+  todayIndex,
+  weekdayAverages,
+  type Pace,
+  type WeekdayAverage,
+} from '@/lib/insights';
 import { ringSize } from '@/lib/layout';
 import { parsePeriod, type Period } from '@/lib/period';
 import { usePeriodState, usePeriodLabel } from '@/state/period';
-import { useSetting } from '@/state/settings';
+import { resolveWeekStart, useSetting } from '@/state/settings';
 import { useMoney, type Money } from '@/state/money';
 import { useTheme } from '@/state/theme';
 
@@ -46,12 +55,24 @@ export default function AnalysisScreen() {
   const money = useMoney();
   const homeCurrency = useSetting('homeCurrency');
   const carryOver = useSetting('carryOver');
+  // Read here so a change to either repaints the slides: the arithmetic reads
+  // module state the React Compiler cannot see (see `usePeriodLabel`).
+  const monthStartDay = useSetting('monthStartDay');
+  const weekStart = resolveWeekStart(useSetting('weekStart'));
   const [period, setPeriod] = usePeriodState();
   const [kind, setKind] = useState<CategoryKind>('expense');
   const [breakdown, setBreakdown] = useState<Breakdown>(EMPTY);
   const [flow, setFlow] = useState<CashFlowPoint[]>([]);
   const [flowOpening, setFlowOpening] = useState(0);
   const [tagTotals, setTagTotals] = useState<TagTotal[]>([]);
+  const [pace, setPace] = useState<Pace | null>(null);
+  const [weekdays, setWeekdays] = useState<{
+    averages: WeekdayAverage[];
+    days: number;
+  }>({
+    averages: [],
+    days: 0,
+  });
   /**
    * Narrow every figure on this screen to one tag.
    *
@@ -67,7 +88,18 @@ export default function AnalysisScreen() {
   const refresh = useCallback(() => {
     setBreakdown(categoryBreakdown(db, period, kind, homeCurrency, tagId));
     setTagTotals(tagBreakdown(db, period, kind, homeCurrency));
-    const points = cashFlow(db, period, { months: CASH_FLOW_MONTHS, homeCurrency });
+    // The slides beside the ring answer to the same month, side and tag.
+    const { daily, previous } = dailyHistory(db, period, kind, homeCurrency, tagId);
+    const today = todayIndex(period);
+    setPace(paceOf(daily, previous, today));
+    setWeekdays({
+      averages: weekdayAverages(daily, period, today, weekStart),
+      days: today + 1,
+    });
+    const points = cashFlow(db, period, {
+      months: CASH_FLOW_MONTHS,
+      homeCurrency,
+    });
     setFlow(points);
     // The strip starts at its OLDEST month, not at the month being viewed —
     // taking the carry for `period` would start the line at today's position and
@@ -77,7 +109,10 @@ export default function AnalysisScreen() {
         ? broughtForward(db, points[0].period, homeCurrency).amountMinor
         : 0
     );
-  }, [period, kind, homeCurrency, carryOver, tagId]);
+    // monthStartDay is read by every query here through module state the lint
+    // cannot see; moving it must refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, kind, homeCurrency, carryOver, tagId, weekStart, monthStartDay]);
 
   // On focus rather than on mount: every number here moves when a record is
   // logged, and returning from the record screen has to show that.
@@ -119,7 +154,11 @@ export default function AnalysisScreen() {
               hint="Log your salary and anything else that comes in, and this shows what each source adds up to."
               action={{
                 label: 'Log income',
-                onPress: () => router.push({ pathname: '/record', params: { startAs: 'income' } }),
+                onPress: () =>
+                  router.push({
+                    pathname: '/record',
+                    params: { startAs: 'income' },
+                  }),
                 testID: 'empty-analysis-income-action',
               }}
               testID="empty-analysis-income"
@@ -141,36 +180,78 @@ export default function AnalysisScreen() {
           />
         ) : (
           <>
-            <View className="items-center pt-2">
-              <Donut
-                // A touched wedge belongs to the figures it was touched on: a
-                // new month, side or tag starts with nothing selected.
-                key={`${period}:${kind}:${tagId ?? ''}`}
-                slices={ranked}
-                size={ring}
-                thickness={Math.round(ring * 0.14)}
-                ground={palette.ground}
-                testID="analysis-donut">
-                {/* THE NAME OF WHAT IS BEING SHOWN, when it is not the whole
-                    month. The tag row that set this is far below and usually
-                    scrolled off, so without this the ring silently means
-                    something narrower than the header above it says — copy tied
-                    to a computed value belongs beside the value. */}
-                <Text
-                  className="text-[10px] uppercase tracking-widest text-muted"
-                  numberOfLines={1}
-                  testID="analysis-scope">
-                  {filteredTo ?? (kind === 'expense' ? 'Spent' : 'Earned')}
-                </Text>
-                <Text
-                  className="text-center text-2xl font-semibold text-ink"
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  testID="analysis-total">
-                  {money(breakdown.totalMinor, homeCurrency)}
-                </Text>
-              </Donut>
-            </View>
+            <ChartPager
+              height={ring + 8}
+              slides={[
+                {
+                  key: 'categories',
+                  label: 'Categories',
+                  render: () => (
+                    <View className="items-center">
+                      <Donut
+                        // A touched wedge belongs to the figures it was touched on: a
+                        // new month, side or tag starts with nothing selected.
+                        key={`${period}:${kind}:${tagId ?? ''}`}
+                        slices={ranked}
+                        size={ring}
+                        thickness={Math.round(ring * 0.14)}
+                        ground={palette.ground}
+                        testID="analysis-donut">
+                        {/* THE NAME OF WHAT IS BEING SHOWN, when it is not the whole
+                        month. The tag row that set this is far below and usually
+                        scrolled off, so without this the ring silently means
+                        something narrower than the header above it says — copy tied
+                        to a computed value belongs beside the value. */}
+                        <Text
+                          className="text-[10px] uppercase tracking-widest text-muted"
+                          numberOfLines={1}
+                          testID="analysis-scope">
+                          {filteredTo ?? (kind === 'expense' ? 'Spent' : 'Earned')}
+                        </Text>
+                        <Text
+                          className="text-center text-2xl font-semibold text-ink"
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          testID="analysis-total">
+                          {money(breakdown.totalMinor, homeCurrency)}
+                        </Text>
+                      </Donut>
+                    </View>
+                  ),
+                },
+                {
+                  key: 'pace',
+                  label: 'Pace',
+                  render: (width) => (
+                    <PaceSlide
+                      pace={pace}
+                      scope={filteredTo}
+                      kind={kind}
+                      period={period}
+                      homeCurrency={homeCurrency}
+                      width={width}
+                      height={ring}
+                    />
+                  ),
+                },
+                {
+                  key: 'weekdays',
+                  label: 'Weekdays',
+                  render: () => (
+                    <WeekdaySlide
+                      // A bar picked on one month means nothing on the next.
+                      key={`${period}:${kind}:${tagId ?? ''}`}
+                      scope={filteredTo}
+                      averages={weekdays.averages}
+                      daysCounted={weekdays.days}
+                      kind={kind}
+                      homeCurrency={homeCurrency}
+                      height={ring}
+                    />
+                  ),
+                },
+              ]}
+            />
 
             <View className="mt-4">
               {ranked.map((slice) => (
@@ -366,7 +447,9 @@ function SubRow({
       <View className="flex-row items-center gap-3">
         <View
           className="h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: refund ? 'transparent' : mixHex(sub.color, ground, sub.tint) }}
+          style={{
+            backgroundColor: refund ? 'transparent' : mixHex(sub.color, ground, sub.tint),
+          }}
         />
         <Text className="flex-1 text-sm text-ink" numberOfLines={1}>
           {sub.label}

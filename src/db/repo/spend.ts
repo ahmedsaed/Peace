@@ -93,7 +93,11 @@ export function totalsByCategory(
   kind: CategoryKind,
   homeCurrency = 'EGP',
   tagId: string | null = null
-): { byCategory: Map<string, number>; uncategorised: number; unvalued: number } {
+): {
+  byCategory: Map<string, number>;
+  uncategorised: number;
+  unvalued: number;
+} {
   const rows = sideTotals(db, period, kind, homeCurrency, tagId, transactions.categoryId);
   // Stored amounts are negative for spending, so expense flips to read as "spent".
   const direction = kind === 'expense' ? -1 : 1;
@@ -127,19 +131,7 @@ function sideTotals(
   tagId: string | null,
   group: SQL<string | null> | typeof transactions.categoryId
 ) {
-  const { start, end } = periodBounds(period);
-  const home = sql`${homeCurrency.toUpperCase()}`;
-
-  // NULL when the row has no value in today's home currency, so it drops out of
-  // SUM rather than being added as though its number meant something it does
-  // not. Changing the home currency is what puts rows in this state.
-  const valued = sql<number>`case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home}
-      then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end`;
-
-  // By SIDE, not by sign: a refund is positive but belongs to expense, so it
-  // nets against the category it reverses instead of inflating income.
-  const direction = kind === 'expense' ? onExpenseSide() : onIncomeSide();
-
+  const valued = valuedIn(homeCurrency);
   return db
     .select({
       topId: group,
@@ -148,25 +140,75 @@ function sideTotals(
     })
     .from(transactions)
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
-    .where(
-      and(
-        gte(transactions.occurredAt, start),
-        lt(transactions.occurredAt, end),
-        // `direction` already excludes adjustments; this drops transfer legs.
-        movesPosition(),
-        direction,
-        // EXISTS rather than a join: a record can carry several tags, and
-        // joining would count it once per tag and inflate the very total this
-        // screen exists to state.
-        tagId
-          ? sql`exists (select 1 from ${transactionTags}
-                where ${transactionTags.transactionId} = ${transactions.id}
-                  and ${transactionTags.tagId} = ${tagId})`
-          : undefined
-      )
-    )
+    .where(sideOf(period, kind, tagId))
     .groupBy(group)
     .all();
+}
+
+/**
+ * Every valued row on one side of one month, with WHEN it happened — what the
+ * Pace and Weekdays slides are drawn from.
+ *
+ * The same `where` as the totals above, deliberately: these slides sit beside
+ * the ring, and a day-by-day line that summed to a different figure from the
+ * one in the ring's hole would be the screen disagreeing with itself.
+ * Amounts are SIGNED in the direction of `kind`, like `totalsByCategory`, so a
+ * refund pulls its day down instead of adding to it. Rows with no value in the
+ * home currency are left out, as they are from every total.
+ */
+export function sideAmounts(
+  db: Db,
+  period: Period,
+  kind: CategoryKind,
+  homeCurrency = 'EGP',
+  tagId: string | null = null
+): { at: Date; amountMinor: number }[] {
+  const valued = valuedIn(homeCurrency);
+  const direction = kind === 'expense' ? -1 : 1;
+  return db
+    .select({ at: transactions.occurredAt, amount: valued })
+    .from(transactions)
+    .where(and(sideOf(period, kind, tagId), sql`${valued} is not null`))
+    .all()
+    .map((row) => ({
+      at: row.at,
+      amountMinor: direction * Number(row.amount) + 0,
+    }));
+}
+
+/**
+ * A row's amount in the home currency, or NULL when it has no value in it, so
+ * it drops out of SUM rather than being added as though its number meant
+ * something it does not. Changing the home currency is what puts rows in that
+ * state.
+ */
+function valuedIn(homeCurrency: string): SQL<number> {
+  const home = sql`${homeCurrency.toUpperCase()}`;
+  return sql<number>`case when upper(coalesce(${transactions.homeCurrency}, ${transactions.currency})) = ${home}
+      then coalesce(${transactions.homeAmountMinor}, ${transactions.amountMinor}) else null end`;
+}
+
+/** One month, one side of the ledger, transfers excluded, optionally one tag. */
+function sideOf(period: Period, kind: CategoryKind, tagId: string | null): SQL | undefined {
+  const { start, end } = periodBounds(period);
+  // By SIDE, not by sign: a refund is positive but belongs to expense, so it
+  // nets against the category it reverses instead of inflating income.
+  const direction = kind === 'expense' ? onExpenseSide() : onIncomeSide();
+  return and(
+    gte(transactions.occurredAt, start),
+    lt(transactions.occurredAt, end),
+    // `direction` already excludes adjustments; this drops transfer legs.
+    movesPosition(),
+    direction,
+    // EXISTS rather than a join: a record can carry several tags, and
+    // joining would count it once per tag and inflate the very total this
+    // screen exists to state.
+    tagId
+      ? sql`exists (select 1 from ${transactionTags}
+            where ${transactionTags.transactionId} = ${transactions.id}
+              and ${transactionTags.tagId} = ${tagId})`
+      : undefined
+  );
 }
 
 /** Every category of one kind, archived ones included, in the order the app shows them. */

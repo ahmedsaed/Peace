@@ -1,10 +1,11 @@
 import { type BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import type { Slice, SubSlice } from '../../lib/analysis';
+import { bucketByDay } from '../../lib/insights';
 import { addMonths, type Period } from '../../lib/period';
 import * as schema from '../schema';
 import { periodSummary } from './records';
-import { categoriesOfKind, totalsByCategory, type CategoryKind } from './spend';
+import { categoriesOfKind, sideAmounts, totalsByCategory, type CategoryKind } from './spend';
 
 type Db = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
@@ -113,7 +114,14 @@ export function categoryBreakdown(
           ]
         : children;
 
-    slices.push({ id: parent.id, label: parent.name, color, icon: parent.icon, amountMinor, subs });
+    slices.push({
+      id: parent.id,
+      label: parent.name,
+      color,
+      icon: parent.icon,
+      amountMinor,
+      subs,
+    });
     totalMinor += amountMinor;
   }
 
@@ -173,4 +181,31 @@ export function cashFlow(
 /** The tallest bar in a cash-flow chart, used to scale the rest. */
 export function cashFlowPeak(points: CashFlowPoint[]): number {
   return points.reduce((peak, p) => Math.max(peak, p.incomeMinor, p.expenseMinor), 0);
+}
+
+/** How many earlier months make up "your usual month" on the Pace slide. */
+export const USUAL_MONTHS = 3;
+
+/**
+ * One month day by day, and the months before it the same way — everything the
+ * Pace and Weekdays slides need, under the same side, tag and currency rules as
+ * the ring above them.
+ *
+ * Its total is the RECORDS header's figure, not the ring's: money with no
+ * category is still money spent, and a line meant to answer "how is the month
+ * going" cannot leave it out. The ring says what it leaves out in its
+ * footnotes; this has nothing to leave out.
+ */
+export function dailyHistory(
+  db: Db,
+  period: Period,
+  kind: CategoryKind,
+  homeCurrency = 'EGP',
+  tagId: string | null = null,
+  months = USUAL_MONTHS
+): { daily: number[]; previous: number[][] } {
+  const daysOf = (p: Period) => bucketByDay(sideAmounts(db, p, kind, homeCurrency, tagId), p);
+  const previous: number[][] = [];
+  for (let i = 1; i <= months; i++) previous.push(daysOf(addMonths(period, -i)));
+  return { daily: daysOf(period), previous };
 }
