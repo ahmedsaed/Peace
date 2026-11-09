@@ -204,10 +204,13 @@ appId: dev.merope.peace.oss
 # buttons work. A new ledger has no earlier month, so Pace states the month so
 # far — the SAME E£320.00 as the ring here, since nothing is uncategorised —
 # and says it has nothing to compare with rather than comparing with zero.
+# Across the ring itself, by screen position: Maestro's element swipe starts
+# from the pager's centre and was too gentle to page it, while a real finger
+# (and `adb shell input swipe`) does. 45% down is inside the ring at any size.
 - swipe:
-    from:
-      id: "analysis-pager"
-    direction: LEFT
+    start: "90%, 45%"
+    end: "10%, 45%"
+    duration: 300
 - assertVisible:
     id: "pace-headline"
     text: "E£320.00"
