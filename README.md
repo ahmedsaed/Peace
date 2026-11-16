@@ -67,7 +67,7 @@ no ads, no analytics — and nothing reaches the network unless you ask it to.
 <td><img src="docs/screenshots/welcome.png" alt="The welcome screen: the Peace wordmark, the line Peace of mind, piece of cake, three promises about privacy, and a Get started button"></td>
 </tr>
 <tr>
-<td align="center"><b>Just say it</b><br><sub>Arabic, English or both in one sentence.</sub></td>
+<td align="center"><b>Just say it</b><br><sub>In your language, even two in one sentence.</sub></td>
 <td align="center"><b>Bank messages</b><br><sub>A card alert becomes a record to approve.</sub></td>
 <td align="center"><b>Private by default</b><br><sub>No account, no tracking, nothing on until you say so.</sub></td>
 </tr>

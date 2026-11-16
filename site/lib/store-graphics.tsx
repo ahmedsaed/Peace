@@ -108,7 +108,7 @@ export const STORE_SHOTS: StoreShot[] = [
     shot: 'voice',
     title: 'Or just',
     highlight: 'say it.',
-    subtitle: 'Speak a record in Arabic, English or both, and Peace fills it in.',
+    subtitle: 'Speak a record in your language, and Peace fills it in.',
   },
   {
     shot: 'home',

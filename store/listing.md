@@ -28,7 +28,7 @@ LOG A SPEND IN SECONDS
 • Pick a calculator or phone layout, and the side the operators sit on.
 • Works in split screen next to your bank's notification.
 • Photograph a receipt right in the note field: one tap and it is attached.
-• Or just say it — "250 lunch from Cash" — in Arabic, English or both, and the record fills itself in.
+• Or just say it — "250 lunch from Cash" — in your language, even mixing two in one sentence, and the record fills itself in.
 • From your home screen: widgets for your balance and your budget, and hold the Peace icon for a new expense, a receipt, your voice or Penny.
 
 SEE WHERE IT WENT
