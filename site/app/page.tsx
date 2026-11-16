@@ -189,7 +189,7 @@ export default function Home() {
             alt="The record screen listening: the note field has become a microphone with a check button, a running timer and the line Say it your way"
           >
             <ul>
-              <li>Tap the mic and say it your way — “250 lunch from Cash”, in Arabic, English or both in one sentence.</li>
+              <li>Tap the mic and say it your way — “250 lunch from Cash”, in your language, even two in one sentence.</li>
               <li>The amount, account, category and date are filled in for you to check; what you said goes in the note.</li>
               <li>Ask Penny out loud too: your words land in her box, to fix before you send.</li>
               <li>The mic is open only while you see it, and the recording is never kept.</li>

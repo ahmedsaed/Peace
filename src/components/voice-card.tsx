@@ -25,8 +25,8 @@ export function VoiceCard() {
       <View className="flex-row items-center gap-3">
         <View className="flex-1">
           <Text className="text-[15px] leading-6 text-ink">
-            Tap the mic on a new record, or in Penny, and say it in Arabic, English or both. The
-            recording is sent to Gemini, read once and deleted — it is never kept.
+            Tap the mic on a new record, or in Penny, and say it in your language, even mixing
+            two. The recording is sent to Gemini, read once and deleted — it is never kept.
           </Text>
         </View>
         <Switch
