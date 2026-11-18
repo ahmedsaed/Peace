@@ -2,7 +2,7 @@
   "expo": {
     "name": "Peace",
     "slug": "peace",
-    "version": "1.38.1",
+    "version": "1.38.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "peace",
@@ -105,7 +105,8 @@
       "@react-native-community/datetimepicker",
       "./plugins/with-native-theme",
       "./plugins/with-release-signing",
-      "./plugins/with-shortcuts"
+      "./plugins/with-shortcuts",
+      "./plugins/with-optional-portrait"
     ],
     "experiments": {
       "typedRoutes": true,
