@@ -126,9 +126,13 @@ layout on the screens that use them.
       — neither is requested; expo-notifications falls back to inexact alarms
 - [x] Target SDK meets Play's current minimum (36)
 - [x] Store listing: screenshots (`npm run shot`), feature graphic, short and long description — `store/`, graphics at `/store/`
-- [x] Sideload → Play migration documented on the website (backup → install → restore) — `/move/`; flip
-      `ON_PLAY` in `site/app/move/page.tsx` when the listing is public
-- [ ] Closed testing track: 12+ testers opted in for 14 consecutive days (mandatory — personal account). Testers join through a Google Group and an opt-in link, then install from the Play Store as normal.
+- [x] Sideload → Play migration documented on the website (backup → install → restore) — `/move/`;
+      `ON_PLAY` flipped when the listing went public
+- [x] Closed testing track: 12+ testers opted in for 14 consecutive days (mandatory — personal account). Testers join through a Google Group and an opt-in link, then install from the Play Store as normal.
+      Production access granted on the second application; the closed track stays open as early
+      access at `/beta/`
+- [x] **Production: public on Google Play 2026-11-19** with 1.38.2 (360), promoted from the build
+      the testers ran
 - [x] Internal testing track for our own devices from day one (does not count towards the 12)
       — 1.23.0 (269) released to it 2026-10-14
 

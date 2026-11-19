@@ -26,6 +26,7 @@ const structuredData = {
 };
 
 const RELEASES = 'https://github.com/ahmedsaed/Peace/releases/latest';
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=dev.merope.peace';
 
 function Shot({ name, src, alt }: { name: string; src?: string; alt: string }) {
   return (
@@ -86,9 +87,9 @@ export default function Home() {
               nothing reaches the network unless you ask it to.
             </p>
             <div className="ctas">
-              <Link className="button primary" href="/beta/">
-                Join the beta on Google Play
-              </Link>
+              <a className="button primary" href={PLAY_URL}>
+                Get it on Google Play
+              </a>
               <a className="button ghost" href={RELEASES}>
                 Download the APK
               </a>

@@ -20,22 +20,12 @@ export const metadata: Metadata = pageMeta({
  */
 const PLAY_URL = 'https://play.google.com/store/apps/details?id=dev.merope.peace';
 
-/** Flip when the listing is public; until then the page says it is early. */
-const ON_PLAY = false;
 
 export default function MoveToPlay() {
   return (
     <div className="wrap">
       <article className="prose">
         <h1>Moving to Google Play</h1>
-        {ON_PLAY ? null : (
-          <p>
-            <em>
-              Peace is not public on Google Play yet. You can get the Play version now by{' '}
-              <Link href="/beta/">joining the beta</Link>, and these steps apply to it already.
-            </em>
-          </p>
-        )}
         <p>
           If you installed Peace from GitHub, the Google Play version is a <strong>separate app</strong>, not an
           update. It installs beside the one you have, starts empty, and is called <strong>Peace</strong> where the
@@ -61,12 +51,7 @@ export default function MoveToPlay() {
 
         <h2>2. Install from Google Play</h2>
         <p>
-          {ON_PLAY ? (
-            <a href={PLAY_URL}>Install Peace from Google Play</a>
-          ) : (
-            'Install Peace from Google Play'
-          )}
-          . Leave Peace OSS where it is for now — both can be installed at once, and keeping the old one until you
+          <a href={PLAY_URL}>Install Peace from Google Play</a>. Leave Peace OSS where it is for now — both can be installed at once, and keeping the old one until you
           have checked the new one costs nothing.
         </p>
 
