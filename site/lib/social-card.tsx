@@ -27,6 +27,8 @@ type Card = {
   shots: [string, string];
   /** What the card shows, for og:image:alt. */
   alt: string;
+  /** Show Google's "Get it on Google Play" badge beside the address. */
+  playBadge?: boolean;
 };
 
 export const CARDS = {
@@ -36,7 +38,8 @@ export const CARDS = {
     stacked: true,
     subtitle: 'An expense tracker that keeps its mouth shut. Local-first, for Android: no account, no server, no ads.',
     shots: ['analysis', 'records'],
-    alt: 'Peace — peace of mind, piece of cake: an expense tracker for Android, with two screens of the app.',
+    alt: 'Peace — peace of mind, piece of cake: an expense tracker for Android, with two screens of the app. Get it on Google Play.',
+    playBadge: true,
   },
   data: {
     eyebrow: 'Your data',
@@ -87,7 +90,7 @@ export const CARDS = {
 
 export type CardName = keyof typeof CARDS;
 
-export function socialCard({ eyebrow, title, highlight, stacked, subtitle, shots }: Card) {
+export function socialCard({ eyebrow, title, highlight, stacked, subtitle, shots, playBadge }: Card) {
   return new ImageResponse(
     (
       <div
@@ -164,7 +167,16 @@ export function socialCard({ eyebrow, title, highlight, stacked, subtitle, shots
             </div>
           </div>
 
-          <div style={{ display: 'flex', fontSize: 24, fontWeight: 700, color: ink }}>peace.merope.dev</div>
+          {/* Google's badge exactly as published (public/google-play-badge.png,
+              646×250 with its own clear space built in): the brand rules forbid
+              recolouring or cropping it, so the negative margin lines its VISIBLE
+              edge up with the text above rather than trimming the file. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            {playBadge ? (
+              <img src={dataUri('public/google-play-badge.png')} width={233} height={90} style={{ margin: '-15px 0 -15px -15px' }} />
+            ) : null}
+            <div style={{ display: 'flex', fontSize: 24, fontWeight: 700, color: ink }}>peace.merope.dev</div>
+          </div>
         </div>
 
         <div style={{ display: 'flex', position: 'relative', flex: 1 }}>
