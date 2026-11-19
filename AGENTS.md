@@ -98,6 +98,14 @@ upload burns its versionCode for good. **There is no key**: Workload Identity Fe
 workflow, in this repo, on `main`, act as the `peace-play-upload` service account for an hour
 (`PLAY_WIF_PROVIDER` and `PLAY_SERVICE_ACCOUNT` are repository VARIABLES, not secrets). That account
 can release to testing tracks of this one app and nothing else; production is a human's click.
+**Production (public since 2026-11-19) is promoted, never uploaded**: Play Console › Test and
+release › Production › Create new release › *Add from library* (or *Promote release* on a
+rolled-out closed-testing release) puts the very bundle the testers ran in front of everyone, with
+no build and no new versionCode. That is why there is no production workflow. Write a production
+release's notes for people UPDATING — the first one introduced the app, every later one is the
+`whats-new.json` entry. **Play's pre-review check blocks a release that requires hardware not
+every device has**: a portrait lock implies a REQUIRED `android.hardware.screen.portrait`, and
+`plugins/with-optional-portrait.js` declares it optional so tablets and Chromebooks can install.
 The merope.dev Cloud organisation forbids service-account keys, so do not try to add one. The bundle is signed with our release key acting as the **upload key** —
 Play App Signing re-signs it, which is the whole reason the play build's OAuth client takes Play's
 SHA-1. Locally: `PEACE_FLAVOR=play npx expo prebuild --platform android --clean`, then

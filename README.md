@@ -14,7 +14,7 @@ no ads, no analytics — and nothing reaches the network unless you ask it to.
 [![License](https://img.shields.io/badge/license-GPL--3.0-4a4a4a)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Android-4a4a4a)
 
-**[peace.merope.dev](https://peace.merope.dev)** · **[⬇ Download the APK](../../releases/latest)** · **[Join the beta on Google Play](https://peace.merope.dev/beta/)**
+**[peace.merope.dev](https://peace.merope.dev)** · **[⬇ Download the APK](../../releases/latest)** · **[Get it on Google Play](https://play.google.com/store/apps/details?id=dev.merope.peace)**
 
 </div>
 
@@ -176,11 +176,12 @@ A few things that follow from taking that seriously:
 
 ## Install
 
-**Google Play is in closed testing — [join the beta](https://peace.merope.dev/beta/).** Join the
+**[Get Peace on Google Play.](https://play.google.com/store/apps/details?id=dev.merope.peace)** It
+installs as **Peace** (`dev.merope.peace`) and Play keeps it updated; the listing is drafted in
+[`store/`](store). To get new versions before everyone else,
+[test new versions](https://peace.merope.dev/beta/): join the
 [tester group](https://groups.google.com/g/peace-testers), then
-[become a tester](https://play.google.com/apps/testing/dev.merope.peace) with the same Google account
-and install from Play. The Play build installs as **Peace** (`dev.merope.peace`) and Play keeps it
-updated; the listing is drafted in [`store/`](store).
+[become a tester](https://play.google.com/apps/testing/dev.merope.peace) with the same Google account.
 
 **Or [download the latest APK from the Releases page.](../../releases/latest)** Every merge to `main`
 publishes a signed arm64 build there, and it upgrades an existing install in place — no uninstall,
@@ -202,8 +203,7 @@ over it, and checks GitHub for updates itself. Moving between the two is backup 
 
 The declaration **is** the capability — Google classes notification access alongside `READ_SMS`
 and accessibility services, so no amount of manifest tuning avoids the block while the feature
-exists. The real escape is distributing through Play itself, and an internal testing track would
-do it: notification access is governed by the ordinary "necessary for core functionality" policy,
+exists. The real escape is distributing through Play itself, which is what the Play build does: notification access is governed by the ordinary "necessary for core functionality" policy,
 not the near-total ban that applies to `READ_SMS`. Keeping that door open is exactly why Peace
 reads notifications rather than the inbox.
 

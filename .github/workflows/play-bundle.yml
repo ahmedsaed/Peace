@@ -20,7 +20,8 @@ name: Play bundle
 # service account for an hour (the two `PLAY_*` repository variables say which
 # provider and account). That account holds "Release to testing tracks" for
 # this app and nothing else, so production is unreachable from here by design —
-# promoting a build to production stays a human's click in Play Console.
+# a tested build reaches production by being PROMOTED in Play Console (Production
+# › Create new release › Add from library), never by a fresh upload.
 on:
   workflow_dispatch:
     inputs:

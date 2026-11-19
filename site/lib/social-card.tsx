@@ -66,13 +66,13 @@ export const CARDS = {
     alt: 'Moving Peace from the GitHub version to the Google Play version.',
   },
   beta: {
-    eyebrow: 'Join the beta',
-    title: 'Try Peace',
+    eyebrow: 'Test new versions',
+    title: 'Get new versions',
     highlight: 'before everyone else.',
     stacked: true,
-    subtitle: 'Join the tester group, then become a tester and install from Google Play. No emails.',
+    subtitle: 'Join the tester group, then become a tester on Google Play. No emails.',
     shots: ['record', 'analysis'],
-    alt: 'Join the Peace beta on Google Play.',
+    alt: 'Test new versions of Peace on Google Play.',
   },
   import: {
     eyebrow: 'Importing records',
